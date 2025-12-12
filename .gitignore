@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments / uv cache
+.venv/
+.uv-cache/
+
+# Scrapy generated files
+.scrapy/
+manga_sanctuary/crawls/
+manga_sanctuary/*.jsonl
+
+# Logs / dumps
+logs/
+*.log
+
+# OS X
+.DS_Store
