@@ -1,0 +1,1 @@
+"""API Manga package."""
