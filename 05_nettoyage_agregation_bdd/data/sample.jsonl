@@ -1,0 +1,4 @@
+{"id": 1, "name": "Alice", "tags": ["a", "b"], "active": true, "meta": {"country": "FR"}}
+{"id": 2, "name": "Bob", "tags": [], "active": false, "meta": {"country": "BE"}}
+{"id": 3, "name": "Chloé", "tags": ["x"], "active": true, "meta": {"country": "FR", "score": 15.25}}
+

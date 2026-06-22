@@ -1,0 +1,3908 @@
+{
+  "meta": {
+    "category": "top_publishing",
+    "source": "kitsu",
+    "endpoint": "manga?filter[status]=current&sort=popularityRank",
+    "fetched_at": "2025-12-13T20:31:33+00:00",
+    "limit": 100,
+    "offset": 0
+  },
+  "data": [
+    {
+      "id": "38",
+      "slug": "one-piece",
+      "titles": {
+        "canonical": "One Piece",
+        "en": "One Piece",
+        "ja": "ONE PIECE"
+      },
+      "status": "current",
+      "synopsis": "Gol D. Roger was known as the Pirate King, the strongest and most infamous being to have sailed the Grand Line. The capture and death of Roger by the World Government brought a change throughout the world. His last words before his death revealed the location of the greatest treasure in the world, One Piece. It was this revelation that brought about the Grand Age of Pirates, men who dreamed of finding One Piece (which promises an unlimited amount of riches and fame), and quite possibly the most coveted of titles for the person who found it, the title of the Pirate King.\n\nEnter Monkey D. Luffy, a 17-year-old boy that defies your standard definition of a pirate. Rather than the popular persona of a wicked, hardened, toothless pirate who ransacks villages for fun, Luffy’s reason for being a pirate is one of pure wonder; the thought of an exciting adventure and meeting new and intriguing people, along with finding One Piece, are his reasons of becoming a pirate. Following in the footsteps of his childhood hero, Luffy and his crew travel across the Grand Line, experiencing crazy adventures, unveiling dark mysteries and battling strong enemies, all in order to reach One Piece.\n\n(Source: MAL Rewrite)",
+      "authors": [
+        {
+          "name": "Eiichiro Oda",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 85.05,
+        "rank": 2
+      },
+      "popularity": {
+        "rank": 3
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Friendship",
+          "Adventure",
+          "Shounen",
+          "Pirate",
+          "Drama"
+        ],
+        "genres": [
+          "Comedy",
+          "Sports",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Friendship",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "24147",
+      "slug": "one-punch-man",
+      "titles": {
+        "canonical": "One Punch-Man",
+        "en": "One-Punch Man",
+        "ja": "ワンパンマン"
+      },
+      "status": "current",
+      "synopsis": "Everything about a young man named Saitama screams \"AVERAGE,” from his lifeless expression, to his bald head, to his unimpressive physique. However, this average-looking fellow doesn't have your average problem... He's actually a superhero that's looking for tough opponents! The problem is, every time he finds a promising candidate he beats the snot out of them in one punch. Can Saitama finally find an evil villain strong enough to challenge him? Follow Saitama through his hilarious romps as he searches for new bad guys to challenge!\n\n(Source: Viz)",
+      "authors": [
+        {
+          "name": "Yusuke Murata",
+          "role": "Dessin"
+        },
+        {
+          "name": "ONE",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 84.64,
+        "rank": 10
+      },
+      "popularity": {
+        "rank": 5
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Science Fiction",
+          "Super Power",
+          "Parody",
+          "Action",
+          "Violence",
+          "Superhero",
+          "Cyborg",
+          "Alien",
+          "Seinen",
+          "Supernatural"
+        ],
+        "genres": [
+          "Comedy",
+          "Sci-Fi",
+          "Supernatural",
+          "Super Power",
+          "Parody",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "68",
+      "slug": "hunter-x-hunter",
+      "titles": {
+        "canonical": "Hunter x Hunter",
+        "en": "Hunter x Hunter",
+        "ja": "HUNTER×HUNTER"
+      },
+      "status": "current",
+      "synopsis": "Hunters are a special breed, dedicated to tracking down treasures, magical beasts, and even other men. But such pursuits require a license, and less than one in a hundred thousand can pass the grueling qualification exam. Those who do pass gain access to restricted areas, amazing stores of information, and the right to call themselves Hunters.\n\n(Source: Shonen Jump)",
+      "authors": [
+        {
+          "name": "Yoshihiro Togashi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.33,
+        "rank": 19
+      },
+      "popularity": {
+        "rank": 11
+      },
+      "tags": {
+        "categories": [
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Psychological",
+          "Fantasy World",
+          "Shounen"
+        ],
+        "genres": [
+          "Psychological",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "8",
+      "slug": "berserk",
+      "titles": {
+        "canonical": "Berserk",
+        "en": "Berserk",
+        "ja": "ベルセルク"
+      },
+      "status": "current",
+      "synopsis": "His name is Guts, the Black Swordsman, a feared warrior spoken of only in whispers. Bearer of a gigantic sword, an iron hand, and the scars of countless battles and tortures, his flesh is also indelibly marked with The Brand, an unholy symbol that draws the forces of darkness to him and dooms him as their sacrifice. But Guts won't take his fate lying down; he'll cut a crimson swath of carnage through the ranks of the damned—and anyone else foolish enough to oppose him! Accompanied by Puck the Elf, more an annoyance than a companion, Guts relentlessly follows a dark, bloodstained path that leads only to death...or vengeance.\n\n(Source: Dark Horse)\n\nNotes:\n- Volumes 1-5 contain the 16 prequel chapters 0A - 0P.\n- Chapter 83 was omitted from Volume 13 due to the author’s request.\n- Volume 14 includes “Berserk: The Prototype”.\n- Due to the author's passing, starting from Chapter 365, the manga is illustrated by Studio Gaga (Miura's assistants) and supervised by Kouji Mori (a close friend of Miura's).",
+      "authors": [
+        {
+          "name": "Kentarou Miura",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.84,
+        "rank": 5
+      },
+      "popularity": {
+        "rank": 17
+      },
+      "tags": {
+        "categories": [
+          "Military",
+          "Demon",
+          "Horror",
+          "Drama",
+          "Action",
+          "Adventure",
+          "Fantasy",
+          "Psychological",
+          "Dark Fantasy",
+          "Contemporary Fantasy",
+          "Alternative Past",
+          "Fantasy World",
+          "Rotten World",
+          "Revenge",
+          "Violence",
+          "Feudal Warfare",
+          "Plot Continuity",
+          "Swordplay",
+          "Past",
+          "Dystopia"
+        ],
+        "genres": [
+          "Supernatural",
+          "Psychological",
+          "Military",
+          "Demons",
+          "Fantasy",
+          "Horror",
+          "Drama",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "8549",
+      "slug": "kuroshitsuji",
+      "titles": {
+        "canonical": "Kuroshitsuji",
+        "en": "Black Butler",
+        "ja": "黒執事"
+      },
+      "status": "current",
+      "synopsis": "In Victorian era Europe, a young boy loses everything he once held near and dear to a vicious plot. In his moment of death, he strikes a deal with a demon: his soul, in exchange for revenge. Ciel Phantomhive is now the head of the Phantomhive corporation, handling all business affairs as well as the underground work for the Queen of England. His new partner is a demon butler, Sebastian Michaelis, whose prowess as a butler is only surpassed by his strength as a demon.\n\nThe story follows the two along with their other servants, as they work to unravel the plot behind Ciel's parents' murder, and the horrendous tragedies that befell Ciel in the month directly after.",
+      "authors": [
+        {
+          "name": "Yana Toboso",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 83.2,
+        "rank": 59
+      },
+      "popularity": {
+        "rank": 21
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Demon",
+          "Fantasy",
+          "Shounen"
+        ],
+        "genres": [
+          "Comedy",
+          "Mystery",
+          "Supernatural",
+          "Historical",
+          "Demons",
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "54448",
+      "slug": "spy-x-family",
+      "titles": {
+        "canonical": "SPY×FAMILY",
+        "en": "SPY x FAMILY",
+        "ja": "SPY×FAMILY"
+      },
+      "status": "current",
+      "synopsis": "The master spy codenamed  has spent his days on undercover missions, all for the dream of a better world. But one day, he receives a particularly difficult new order from command. For his mission, he must form a temporary family and start a new life?! A Spy/Action/Comedy about a one-of-a-kind family!\n\nNote: Nominated for the 12th Manga Taishou Award in 2019, also nominated for the 24th Tezuka Osamu Cultural Prize and the Best Shounen Manga of the 44th Kodansha Manga Awards in 2020.\n\n\n(Source: Manga PLUS)",
+      "authors": [],
+      "ratings": {
+        "average": 84.78,
+        "rank": 7
+      },
+      "popularity": {
+        "rank": 30
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Action",
+          "Family",
+          "Assassin",
+          "Supernatural",
+          "Slice of Life"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "40121",
+      "slug": "jibaku-shounen-hanako-kun",
+      "titles": {
+        "canonical": "Jibaku Shounen Hanako-kun",
+        "en": "Toilet-bound Hanako-kun",
+        "ja": "地縛少年 花子くん"
+      },
+      "status": "current",
+      "synopsis": "\"Hanako-san, Hanako-san...are you there?\" At Kamome Academy, rumors abound about the school's Seven Mysteries, one of which is Hanako-san. Said to occupy the third stall of the third floor girls' bathroom in the old school building, Hanako-san grants any wish when summoned. Nene Yashiro, an occult-loving high school girl who dreams of romance, ventures into this haunted bathroom...but the Hanako-san she meets there is nothing like she imagined! Kamome Academy's Hanako-san...is a boy!(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Iro Aida",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.16,
+        "rank": 23
+      },
+      "popularity": {
+        "rank": 34
+      },
+      "tags": {
+        "categories": [
+          "Ghost",
+          "Japan",
+          "School Life"
+        ],
+        "genres": [
+          "Supernatural",
+          "School"
+        ]
+      }
+    },
+    {
+      "id": "5927",
+      "slug": "no-game-no-life-novel",
+      "titles": {
+        "canonical": "No Game No Life",
+        "en": "No Game No Life",
+        "ja": "ノーゲーム・ノーライフ"
+      },
+      "status": "current",
+      "synopsis": "Meet Sora and Shiro, a brother and sister who are loser shut-ins by normal standards. But these siblings don't play by the rules of the \"crappy game\" that is average society. In the world of gaming, this genius pair reigns supreme, their invincible avatar so famous that it's the stuff of urban legend.\n\nSo when a young boy calling himself God summons the siblings to a fantastic alternate world where war is forbidden and all conflicts - even those involving national borders - are decided by the outcome of games, Sora and Shiro have pretty much hit the jackpot. But they soon learn that in this world, humanity, cornered and outnumbered by other species, survives within the confines of one city. Will Sora and Shiro, two failures at life, turn out to be the saviors of mankind? Let the games begin...!\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Yuu Kamiya",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.5,
+        "rank": 142
+      },
+      "popularity": {
+        "rank": 36
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Fantasy",
+          "Ecchi",
+          "Adventure"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "Fantasy",
+          "Ecchi",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "24155",
+      "slug": "ao-no-exorcist",
+      "titles": {
+        "canonical": "Ao no Exorcist",
+        "en": "Blue Exorcist",
+        "ja": "青の祓魔師〈エクソシスト〉"
+      },
+      "status": "current",
+      "synopsis": "This world consists of two dimensions joined as one, like a mirror. The first is the world in which the humans live, Assiah. The other is the world of demons, Gehenna. Ordinarily, travel between the two, and indeed any kind of contact between the two, is impossible. However the demons can pass over into this world by possessing anything that exist within it. Satan the god of demons, but there's one thing that he doesn't have, and that's a substance in the human world that is powerful enough to contain him!! For that purpose he created Rin, his son from a human woman, but will his son agree to his plans? Or will he become something else...? An exorcist?\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Kazue Katou",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.07,
+        "rank": 433
+      },
+      "popularity": {
+        "rank": 40
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "School Life",
+          "Demon",
+          "Fantasy",
+          "Drama",
+          "Action",
+          "Adventure",
+          "Shounen"
+        ],
+        "genres": [
+          "Supernatural",
+          "School",
+          "Demons",
+          "Fantasy",
+          "Drama",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "35483",
+      "slug": "tensei-shitara-slime-datta-ken",
+      "titles": {
+        "canonical": "Tensei shitara Slime Datta Ken",
+        "en": "That Time I Got Reincarnated as a Slime",
+        "ja": "転生したらスライムだった件"
+      },
+      "status": "current",
+      "synopsis": "After being killed by a passing robber, a normal 37-year-old guy finds himself reincarnated in another world as a blind slime with unique abilities. He takes up a new name and calls himself \"Rimuru Tempest,\" which he thought of after meeting his new friend, \"catastrophe-level\" Storm Dragon Verudora. There, he begins his new slime-like life in another world with his increasing number of minions by his side.\n\n(Source: Guro Translation)",
+      "authors": [
+        {
+          "name": "Taiki Kawakami",
+          "role": "Dessin"
+        },
+        {
+          "name": "Fuse",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 82.65,
+        "rank": 108
+      },
+      "popularity": {
+        "rank": 54
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Shounen",
+          "Comedy",
+          "Action",
+          "Adventure",
+          "Gender Bender",
+          "Slice of Life",
+          "Isekai"
+        ],
+        "genres": [
+          "Fantasy"
+        ]
+      }
+    },
+    {
+      "id": "11152",
+      "slug": "akatsuki-no-yona",
+      "titles": {
+        "canonical": "Akatsuki no Yona",
+        "en": "Yona of the Dawn",
+        "ja": "暁のヨナ"
+      },
+      "status": "current",
+      "synopsis": "Princess Yona lives an ideal life as the only princess of her kingdom. Doted on by her father, the king, and protected by her faithful guard Hak, she cherishes the time spent with the man she loves, Su-won. But everything changes on her 16th birthday when tragedy strikes her family!\n\n(Source: VIZ Media)",
+      "authors": [
+        {
+          "name": "Mizuho Kusanagi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.54,
+        "rank": 133
+      },
+      "popularity": {
+        "rank": 62
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Romance",
+          "Action",
+          "Friendship",
+          "Adventure",
+          "Fantasy",
+          "Shoujo"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "Fantasy",
+          "Drama",
+          "Romance",
+          "Action",
+          "Friendship",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "272",
+      "slug": "yotsubato",
+      "titles": {
+        "canonical": "Yotsubato!",
+        "en": "Yotsuba&!",
+        "ja": "よつばと!"
+      },
+      "status": "current",
+      "synopsis": "Yotsuba's daily life is full of adventure. She is energetic, curious, and a bit odd—odd enough to be called strange by her father as well as ignorant of many things that even a five-year-old should know. Because of this, the most ordinary experience can become an adventure for her. As the days progress, she makes new friends and shows those around her that every day can be enjoyable.\n\n(Source: MAL Rewrite)",
+      "authors": [],
+      "ratings": {
+        "average": 82.78,
+        "rank": 88
+      },
+      "popularity": {
+        "rank": 64
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Slice of Life",
+          "Seinen",
+          "Family",
+          "Friendship",
+          "Japan"
+        ],
+        "genres": [
+          "Comedy",
+          "Thriller",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "25356",
+      "slug": "mahou-tsukai-no-yome",
+      "titles": {
+        "canonical": "Mahoutsukai no Yome",
+        "en": "The Ancient Magus' Bride",
+        "ja": "魔法使いの嫁"
+      },
+      "status": "current",
+      "synopsis": "Hatori Chise has lived a life full of neglect and abuse, devoid of anything resembling love. Far from the warmth of family, she has had her share of troubles and pitfalls. Just when all hope seems lost, a fateful encounter awaits her. When a man with the head of a beast, wielding strange powers, obtains her through a slave auction, Chise's life will never be the same again.\n\nThe man is a \"magus,\" a sorcerer of great power, who decides to free Chise from the bonds of captivity. The magus then makes a bold statement: Chise will become his apprentice–and his bride!\n\n(Source: Seven Seas Entertainment)",
+      "authors": [
+        {
+          "name": "Kore Yamazaki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.39,
+        "rank": 189
+      },
+      "popularity": {
+        "rank": 68
+      },
+      "tags": {
+        "categories": [
+          "Magic",
+          "Contemporary Fantasy",
+          "Slice of Life",
+          "Fantasy"
+        ],
+        "genres": [
+          "Magic",
+          "Supernatural",
+          "Fantasy",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "25436",
+      "slug": "tower-of-god",
+      "titles": {
+        "canonical": "Tower of God",
+        "en": "Tower of God",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "What do you desire? Fortune? Glory? Power? Revenge? Or something that surpasses all others? What ever you desire, that is here. Tower of God.\n\nJoin Baam as he climbs each level of the Tower to find his beloved friend, Rachel. Facing impossible missions to mind bending puzzles as he uses any means necessary to reach the top.",
+      "authors": [],
+      "ratings": {
+        "average": 82.14,
+        "rank": 398
+      },
+      "popularity": {
+        "rank": 67
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Mystery"
+        ],
+        "genres": [
+          "Mystery",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "27527",
+      "slug": "black-clover",
+      "titles": {
+        "canonical": "Black Clover",
+        "en": "Black Clover",
+        "ja": "ブラッククローバー"
+      },
+      "status": "current",
+      "synopsis": "Asta is a young boy who dreams of becoming the greatest mage in the kingdom. Only one problem—he can’t use any magic! Luckily for Asta, he receives the incredibly rare five-leaf clover grimoire that gives him the power of anti-magic. Can someone who can’t use magic really become the Wizard King? One thing’s for sure—Asta will never give up!\n\n(Source: Viz Media)",
+      "authors": [
+        {
+          "name": "Yuuki Tabata",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 77.64,
+        "rank": 1916
+      },
+      "popularity": {
+        "rank": 69
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Magic",
+          "Fantasy",
+          "Action",
+          "Shounen",
+          "Elf",
+          "Demon",
+          "Adventure"
+        ],
+        "genres": [
+          "Comedy",
+          "Magic",
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "9855",
+      "slug": "akagami-no-shirayuki-hime",
+      "titles": {
+        "canonical": "Akagami no Shirayuki-hime",
+        "en": "Snow White with the Red Hair",
+        "ja": "赤髪の白雪姫"
+      },
+      "status": "current",
+      "synopsis": "Shirayuki was a young girl born with unique apple-red hair. She meets a famous but foolish Prince Raji, who falls in love with her at first sight and orders her to become his concubine. With nowhere else to go, Shirayuki cuts her hair and escapes to a neighboring country. While traversing through the forests, she meets a young boy, Zen, who helps her after she boldly cures his wounds but then gets poisoned by an apple given to Shirayuki. Meanwhile, Prince Raji sends out henchmen to search for her. What will happen to Shirayuki? What is Zen’s true character? A refreshing fantasy story between an optimistic heroine and a prince who constantly stays on her watch.\n\n(Source: Aerandria Scans)\n\nIncluded one-shots:\nVolume 1: Hachigatsu no Shikisai (Four-season Color of August)\nVolume 2: Bokura wo Tsunaide. (Bind Us)",
+      "authors": [
+        {
+          "name": "Sorata Akizuki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.45,
+        "rank": 160
+      },
+      "popularity": {
+        "rank": 74
+      },
+      "tags": {
+        "categories": [
+          "Historical",
+          "Fantasy",
+          "Drama",
+          "Romance"
+        ],
+        "genres": [
+          "Historical",
+          "Fantasy",
+          "Drama",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "54597",
+      "slug": "the-beginning-after-the-end",
+      "titles": {
+        "canonical": "The Beginning After the End",
+        "en": "The Beginning After the End",
+        "ja": "最強の王様、二度目の人生は何をする？"
+      },
+      "status": "current",
+      "synopsis": "King Grey has unrivaled strength, wealth, and prestige in a world governed by martial ability. However, solitude lingers closely behind those with great power. Beneath the glamorous exterior of a powerful king lurks the shell of man, devoid of purpose and will.Reincarnated into a new world filled with magic and monsters, the king has a second chance to relive his life. Correcting the mistakes of his past will not be his only challenge, however. Underneath the peace and prosperity of the new world is an undercurrent threatening to destroy everything he has worked for, questioning his role and reason for being born again.(Source:Mangadex)",
+      "authors": [],
+      "ratings": {
+        "average": 83.16,
+        "rank": 60
+      },
+      "popularity": {
+        "rank": 71
+      },
+      "tags": {
+        "categories": [
+          "Demon",
+          "Magic",
+          "Isekai",
+          "Fantasy",
+          "Adventure"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "36446",
+      "slug": "19-tian",
+      "titles": {
+        "canonical": "19 Days",
+        "en": "19 Days",
+        "ja": "19日"
+      },
+      "status": "current",
+      "synopsis": "The cute and funny bromance of a boy and his best friend. (Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.52,
+        "rank": 140
+      },
+      "popularity": {
+        "rank": 91
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "School Life",
+          "Slice of Life",
+          "Drama"
+        ],
+        "genres": [
+          "Comedy",
+          "School",
+          "Slice of Life",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "38449",
+      "slug": "made-in-abyss",
+      "titles": {
+        "canonical": "Made in Abyss",
+        "en": "Made in Abyss",
+        "ja": "メイドインアビス"
+      },
+      "status": "current",
+      "synopsis": "The enormous cave system, known as the Abyss, is the only unexplored place in the world. Nobody knows how deep down goes this titanic pit, inhabited by strange and wondrous creatures and full of mysterious ancient relics which purpose in unknown to modern man. Generations of bold adventurers have been drawn by the cryptic depths of the Abyss. In course of time those bold enough to explore the dangerous pit came to be known as \"Cave Raiders.\"\n\nIn Oosu, the town at the edge of the Abyss, there lives a little orphan named Rico, who dreams of becoming as great a cave raider as her mother was and solving the great mystery of the pit. One day exploring the murky depths she stumbles upon a little boy, who turns out to be a robot...",
+      "authors": [
+        {
+          "name": "Akihito Tsukushi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.6,
+        "rank": 119
+      },
+      "popularity": {
+        "rank": 89
+      },
+      "tags": {
+        "categories": [
+          "Science Fiction",
+          "Fantasy",
+          "Adventure",
+          "Drama",
+          "Dark Fantasy",
+          "Human Enhancement",
+          "Psychological",
+          "Android",
+          "Seinen",
+          "Fantasy World"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "30463",
+      "slug": "grand-blue",
+      "titles": {
+        "canonical": "Grand Blue",
+        "en": "Grand Blue Dreaming",
+        "ja": "ぐらんぶる"
+      },
+      "status": "current",
+      "synopsis": "A new life begins for Kitahara Iori as he begins his college career near the ocean in Izu city, full of excitement for his new life. He will be moving into his Uncle's diving store \"Grand Blue.\" There he finds the beautiful ocean, beautiful women, and men that love diving and alcohol. Will Iori be able to live his dream college life?\n\n(Source: MangaHelpers)",
+      "authors": [
+        {
+          "name": "Kenji Inoue",
+          "role": "Scénario"
+        },
+        {
+          "name": "Kimitake Yoshioka",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.74,
+        "rank": 93
+      },
+      "popularity": {
+        "rank": 93
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Slice of Life",
+          "University",
+          "Ecchi",
+          "Romance"
+        ],
+        "genres": [
+          "Comedy",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "38",
+      "slug": "one-piece",
+      "titles": {
+        "canonical": "One Piece",
+        "en": "One Piece",
+        "ja": "ONE PIECE"
+      },
+      "status": "current",
+      "synopsis": "Gol D. Roger was known as the Pirate King, the strongest and most infamous being to have sailed the Grand Line. The capture and death of Roger by the World Government brought a change throughout the world. His last words before his death revealed the location of the greatest treasure in the world, One Piece. It was this revelation that brought about the Grand Age of Pirates, men who dreamed of finding One Piece (which promises an unlimited amount of riches and fame), and quite possibly the most coveted of titles for the person who found it, the title of the Pirate King.\n\nEnter Monkey D. Luffy, a 17-year-old boy that defies your standard definition of a pirate. Rather than the popular persona of a wicked, hardened, toothless pirate who ransacks villages for fun, Luffy’s reason for being a pirate is one of pure wonder; the thought of an exciting adventure and meeting new and intriguing people, along with finding One Piece, are his reasons of becoming a pirate. Following in the footsteps of his childhood hero, Luffy and his crew travel across the Grand Line, experiencing crazy adventures, unveiling dark mysteries and battling strong enemies, all in order to reach One Piece.\n\n(Source: MAL Rewrite)",
+      "authors": [
+        {
+          "name": "Eiichiro Oda",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 85.05,
+        "rank": 2
+      },
+      "popularity": {
+        "rank": 3
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Friendship",
+          "Adventure",
+          "Shounen",
+          "Pirate",
+          "Drama"
+        ],
+        "genres": [
+          "Comedy",
+          "Sports",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Friendship",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "24147",
+      "slug": "one-punch-man",
+      "titles": {
+        "canonical": "One Punch-Man",
+        "en": "One-Punch Man",
+        "ja": "ワンパンマン"
+      },
+      "status": "current",
+      "synopsis": "Everything about a young man named Saitama screams \"AVERAGE,” from his lifeless expression, to his bald head, to his unimpressive physique. However, this average-looking fellow doesn't have your average problem... He's actually a superhero that's looking for tough opponents! The problem is, every time he finds a promising candidate he beats the snot out of them in one punch. Can Saitama finally find an evil villain strong enough to challenge him? Follow Saitama through his hilarious romps as he searches for new bad guys to challenge!\n\n(Source: Viz)",
+      "authors": [
+        {
+          "name": "Yusuke Murata",
+          "role": "Dessin"
+        },
+        {
+          "name": "ONE",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 84.64,
+        "rank": 10
+      },
+      "popularity": {
+        "rank": 5
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Science Fiction",
+          "Super Power",
+          "Parody",
+          "Action",
+          "Violence",
+          "Superhero",
+          "Cyborg",
+          "Alien",
+          "Seinen",
+          "Supernatural"
+        ],
+        "genres": [
+          "Comedy",
+          "Sci-Fi",
+          "Supernatural",
+          "Super Power",
+          "Parody",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "68",
+      "slug": "hunter-x-hunter",
+      "titles": {
+        "canonical": "Hunter x Hunter",
+        "en": "Hunter x Hunter",
+        "ja": "HUNTER×HUNTER"
+      },
+      "status": "current",
+      "synopsis": "Hunters are a special breed, dedicated to tracking down treasures, magical beasts, and even other men. But such pursuits require a license, and less than one in a hundred thousand can pass the grueling qualification exam. Those who do pass gain access to restricted areas, amazing stores of information, and the right to call themselves Hunters.\n\n(Source: Shonen Jump)",
+      "authors": [
+        {
+          "name": "Yoshihiro Togashi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.33,
+        "rank": 19
+      },
+      "popularity": {
+        "rank": 11
+      },
+      "tags": {
+        "categories": [
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Psychological",
+          "Fantasy World",
+          "Shounen"
+        ],
+        "genres": [
+          "Psychological",
+          "Super Power",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "8",
+      "slug": "berserk",
+      "titles": {
+        "canonical": "Berserk",
+        "en": "Berserk",
+        "ja": "ベルセルク"
+      },
+      "status": "current",
+      "synopsis": "His name is Guts, the Black Swordsman, a feared warrior spoken of only in whispers. Bearer of a gigantic sword, an iron hand, and the scars of countless battles and tortures, his flesh is also indelibly marked with The Brand, an unholy symbol that draws the forces of darkness to him and dooms him as their sacrifice. But Guts won't take his fate lying down; he'll cut a crimson swath of carnage through the ranks of the damned—and anyone else foolish enough to oppose him! Accompanied by Puck the Elf, more an annoyance than a companion, Guts relentlessly follows a dark, bloodstained path that leads only to death...or vengeance.\n\n(Source: Dark Horse)\n\nNotes:\n- Volumes 1-5 contain the 16 prequel chapters 0A - 0P.\n- Chapter 83 was omitted from Volume 13 due to the author’s request.\n- Volume 14 includes “Berserk: The Prototype”.\n- Due to the author's passing, starting from Chapter 365, the manga is illustrated by Studio Gaga (Miura's assistants) and supervised by Kouji Mori (a close friend of Miura's).",
+      "authors": [
+        {
+          "name": "Kentarou Miura",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.84,
+        "rank": 5
+      },
+      "popularity": {
+        "rank": 17
+      },
+      "tags": {
+        "categories": [
+          "Military",
+          "Demon",
+          "Horror",
+          "Drama",
+          "Action",
+          "Adventure",
+          "Fantasy",
+          "Psychological",
+          "Dark Fantasy",
+          "Contemporary Fantasy",
+          "Alternative Past",
+          "Fantasy World",
+          "Rotten World",
+          "Revenge",
+          "Violence",
+          "Feudal Warfare",
+          "Plot Continuity",
+          "Swordplay",
+          "Past",
+          "Dystopia"
+        ],
+        "genres": [
+          "Supernatural",
+          "Psychological",
+          "Military",
+          "Demons",
+          "Fantasy",
+          "Horror",
+          "Drama",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "8549",
+      "slug": "kuroshitsuji",
+      "titles": {
+        "canonical": "Kuroshitsuji",
+        "en": "Black Butler",
+        "ja": "黒執事"
+      },
+      "status": "current",
+      "synopsis": "In Victorian era Europe, a young boy loses everything he once held near and dear to a vicious plot. In his moment of death, he strikes a deal with a demon: his soul, in exchange for revenge. Ciel Phantomhive is now the head of the Phantomhive corporation, handling all business affairs as well as the underground work for the Queen of England. His new partner is a demon butler, Sebastian Michaelis, whose prowess as a butler is only surpassed by his strength as a demon.\n\nThe story follows the two along with their other servants, as they work to unravel the plot behind Ciel's parents' murder, and the horrendous tragedies that befell Ciel in the month directly after.",
+      "authors": [
+        {
+          "name": "Yana Toboso",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 83.2,
+        "rank": 59
+      },
+      "popularity": {
+        "rank": 21
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Demon",
+          "Fantasy",
+          "Shounen"
+        ],
+        "genres": [
+          "Comedy",
+          "Mystery",
+          "Supernatural",
+          "Historical",
+          "Demons",
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "54448",
+      "slug": "spy-x-family",
+      "titles": {
+        "canonical": "SPY×FAMILY",
+        "en": "SPY x FAMILY",
+        "ja": "SPY×FAMILY"
+      },
+      "status": "current",
+      "synopsis": "The master spy codenamed  has spent his days on undercover missions, all for the dream of a better world. But one day, he receives a particularly difficult new order from command. For his mission, he must form a temporary family and start a new life?! A Spy/Action/Comedy about a one-of-a-kind family!\n\nNote: Nominated for the 12th Manga Taishou Award in 2019, also nominated for the 24th Tezuka Osamu Cultural Prize and the Best Shounen Manga of the 44th Kodansha Manga Awards in 2020.\n\n\n(Source: Manga PLUS)",
+      "authors": [],
+      "ratings": {
+        "average": 84.78,
+        "rank": 7
+      },
+      "popularity": {
+        "rank": 30
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Action",
+          "Family",
+          "Assassin",
+          "Supernatural",
+          "Slice of Life"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "40121",
+      "slug": "jibaku-shounen-hanako-kun",
+      "titles": {
+        "canonical": "Jibaku Shounen Hanako-kun",
+        "en": "Toilet-bound Hanako-kun",
+        "ja": "地縛少年 花子くん"
+      },
+      "status": "current",
+      "synopsis": "\"Hanako-san, Hanako-san...are you there?\" At Kamome Academy, rumors abound about the school's Seven Mysteries, one of which is Hanako-san. Said to occupy the third stall of the third floor girls' bathroom in the old school building, Hanako-san grants any wish when summoned. Nene Yashiro, an occult-loving high school girl who dreams of romance, ventures into this haunted bathroom...but the Hanako-san she meets there is nothing like she imagined! Kamome Academy's Hanako-san...is a boy!(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Iro Aida",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 84.16,
+        "rank": 23
+      },
+      "popularity": {
+        "rank": 34
+      },
+      "tags": {
+        "categories": [
+          "Ghost",
+          "Japan",
+          "School Life"
+        ],
+        "genres": [
+          "Supernatural",
+          "School"
+        ]
+      }
+    },
+    {
+      "id": "5927",
+      "slug": "no-game-no-life-novel",
+      "titles": {
+        "canonical": "No Game No Life",
+        "en": "No Game No Life",
+        "ja": "ノーゲーム・ノーライフ"
+      },
+      "status": "current",
+      "synopsis": "Meet Sora and Shiro, a brother and sister who are loser shut-ins by normal standards. But these siblings don't play by the rules of the \"crappy game\" that is average society. In the world of gaming, this genius pair reigns supreme, their invincible avatar so famous that it's the stuff of urban legend.\n\nSo when a young boy calling himself God summons the siblings to a fantastic alternate world where war is forbidden and all conflicts - even those involving national borders - are decided by the outcome of games, Sora and Shiro have pretty much hit the jackpot. But they soon learn that in this world, humanity, cornered and outnumbered by other species, survives within the confines of one city. Will Sora and Shiro, two failures at life, turn out to be the saviors of mankind? Let the games begin...!\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Yuu Kamiya",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.5,
+        "rank": 142
+      },
+      "popularity": {
+        "rank": 36
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Fantasy",
+          "Ecchi",
+          "Adventure"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "Fantasy",
+          "Ecchi",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "24155",
+      "slug": "ao-no-exorcist",
+      "titles": {
+        "canonical": "Ao no Exorcist",
+        "en": "Blue Exorcist",
+        "ja": "青の祓魔師〈エクソシスト〉"
+      },
+      "status": "current",
+      "synopsis": "This world consists of two dimensions joined as one, like a mirror. The first is the world in which the humans live, Assiah. The other is the world of demons, Gehenna. Ordinarily, travel between the two, and indeed any kind of contact between the two, is impossible. However the demons can pass over into this world by possessing anything that exist within it. Satan the god of demons, but there's one thing that he doesn't have, and that's a substance in the human world that is powerful enough to contain him!! For that purpose he created Rin, his son from a human woman, but will his son agree to his plans? Or will he become something else...? An exorcist?\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Kazue Katou",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.07,
+        "rank": 433
+      },
+      "popularity": {
+        "rank": 40
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "School Life",
+          "Demon",
+          "Fantasy",
+          "Drama",
+          "Action",
+          "Adventure",
+          "Shounen"
+        ],
+        "genres": [
+          "Supernatural",
+          "School",
+          "Demons",
+          "Fantasy",
+          "Drama",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "35483",
+      "slug": "tensei-shitara-slime-datta-ken",
+      "titles": {
+        "canonical": "Tensei shitara Slime Datta Ken",
+        "en": "That Time I Got Reincarnated as a Slime",
+        "ja": "転生したらスライムだった件"
+      },
+      "status": "current",
+      "synopsis": "After being killed by a passing robber, a normal 37-year-old guy finds himself reincarnated in another world as a blind slime with unique abilities. He takes up a new name and calls himself \"Rimuru Tempest,\" which he thought of after meeting his new friend, \"catastrophe-level\" Storm Dragon Verudora. There, he begins his new slime-like life in another world with his increasing number of minions by his side.\n\n(Source: Guro Translation)",
+      "authors": [
+        {
+          "name": "Taiki Kawakami",
+          "role": "Dessin"
+        },
+        {
+          "name": "Fuse",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 82.65,
+        "rank": 108
+      },
+      "popularity": {
+        "rank": 54
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Shounen",
+          "Comedy",
+          "Action",
+          "Adventure",
+          "Gender Bender",
+          "Slice of Life",
+          "Isekai"
+        ],
+        "genres": [
+          "Fantasy"
+        ]
+      }
+    },
+    {
+      "id": "11152",
+      "slug": "akatsuki-no-yona",
+      "titles": {
+        "canonical": "Akatsuki no Yona",
+        "en": "Yona of the Dawn",
+        "ja": "暁のヨナ"
+      },
+      "status": "current",
+      "synopsis": "Princess Yona lives an ideal life as the only princess of her kingdom. Doted on by her father, the king, and protected by her faithful guard Hak, she cherishes the time spent with the man she loves, Su-won. But everything changes on her 16th birthday when tragedy strikes her family!\n\n(Source: VIZ Media)",
+      "authors": [
+        {
+          "name": "Mizuho Kusanagi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.54,
+        "rank": 133
+      },
+      "popularity": {
+        "rank": 62
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Romance",
+          "Action",
+          "Friendship",
+          "Adventure",
+          "Fantasy",
+          "Shoujo"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "Fantasy",
+          "Drama",
+          "Romance",
+          "Action",
+          "Friendship",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "272",
+      "slug": "yotsubato",
+      "titles": {
+        "canonical": "Yotsubato!",
+        "en": "Yotsuba&!",
+        "ja": "よつばと!"
+      },
+      "status": "current",
+      "synopsis": "Yotsuba's daily life is full of adventure. She is energetic, curious, and a bit odd—odd enough to be called strange by her father as well as ignorant of many things that even a five-year-old should know. Because of this, the most ordinary experience can become an adventure for her. As the days progress, she makes new friends and shows those around her that every day can be enjoyable.\n\n(Source: MAL Rewrite)",
+      "authors": [],
+      "ratings": {
+        "average": 82.78,
+        "rank": 88
+      },
+      "popularity": {
+        "rank": 64
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Slice of Life",
+          "Seinen",
+          "Family",
+          "Friendship",
+          "Japan"
+        ],
+        "genres": [
+          "Comedy",
+          "Thriller",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "25356",
+      "slug": "mahou-tsukai-no-yome",
+      "titles": {
+        "canonical": "Mahoutsukai no Yome",
+        "en": "The Ancient Magus' Bride",
+        "ja": "魔法使いの嫁"
+      },
+      "status": "current",
+      "synopsis": "Hatori Chise has lived a life full of neglect and abuse, devoid of anything resembling love. Far from the warmth of family, she has had her share of troubles and pitfalls. Just when all hope seems lost, a fateful encounter awaits her. When a man with the head of a beast, wielding strange powers, obtains her through a slave auction, Chise's life will never be the same again.\n\nThe man is a \"magus,\" a sorcerer of great power, who decides to free Chise from the bonds of captivity. The magus then makes a bold statement: Chise will become his apprentice–and his bride!\n\n(Source: Seven Seas Entertainment)",
+      "authors": [
+        {
+          "name": "Kore Yamazaki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.39,
+        "rank": 189
+      },
+      "popularity": {
+        "rank": 68
+      },
+      "tags": {
+        "categories": [
+          "Magic",
+          "Contemporary Fantasy",
+          "Slice of Life",
+          "Fantasy"
+        ],
+        "genres": [
+          "Magic",
+          "Supernatural",
+          "Fantasy",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "25436",
+      "slug": "tower-of-god",
+      "titles": {
+        "canonical": "Tower of God",
+        "en": "Tower of God",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "What do you desire? Fortune? Glory? Power? Revenge? Or something that surpasses all others? What ever you desire, that is here. Tower of God.\n\nJoin Baam as he climbs each level of the Tower to find his beloved friend, Rachel. Facing impossible missions to mind bending puzzles as he uses any means necessary to reach the top.",
+      "authors": [],
+      "ratings": {
+        "average": 82.14,
+        "rank": 398
+      },
+      "popularity": {
+        "rank": 67
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Mystery"
+        ],
+        "genres": [
+          "Mystery",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "27527",
+      "slug": "black-clover",
+      "titles": {
+        "canonical": "Black Clover",
+        "en": "Black Clover",
+        "ja": "ブラッククローバー"
+      },
+      "status": "current",
+      "synopsis": "Asta is a young boy who dreams of becoming the greatest mage in the kingdom. Only one problem—he can’t use any magic! Luckily for Asta, he receives the incredibly rare five-leaf clover grimoire that gives him the power of anti-magic. Can someone who can’t use magic really become the Wizard King? One thing’s for sure—Asta will never give up!\n\n(Source: Viz Media)",
+      "authors": [
+        {
+          "name": "Yuuki Tabata",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 77.64,
+        "rank": 1916
+      },
+      "popularity": {
+        "rank": 69
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Magic",
+          "Fantasy",
+          "Action",
+          "Shounen",
+          "Elf",
+          "Demon",
+          "Adventure"
+        ],
+        "genres": [
+          "Comedy",
+          "Magic",
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "9855",
+      "slug": "akagami-no-shirayuki-hime",
+      "titles": {
+        "canonical": "Akagami no Shirayuki-hime",
+        "en": "Snow White with the Red Hair",
+        "ja": "赤髪の白雪姫"
+      },
+      "status": "current",
+      "synopsis": "Shirayuki was a young girl born with unique apple-red hair. She meets a famous but foolish Prince Raji, who falls in love with her at first sight and orders her to become his concubine. With nowhere else to go, Shirayuki cuts her hair and escapes to a neighboring country. While traversing through the forests, she meets a young boy, Zen, who helps her after she boldly cures his wounds but then gets poisoned by an apple given to Shirayuki. Meanwhile, Prince Raji sends out henchmen to search for her. What will happen to Shirayuki? What is Zen’s true character? A refreshing fantasy story between an optimistic heroine and a prince who constantly stays on her watch.\n\n(Source: Aerandria Scans)\n\nIncluded one-shots:\nVolume 1: Hachigatsu no Shikisai (Four-season Color of August)\nVolume 2: Bokura wo Tsunaide. (Bind Us)",
+      "authors": [
+        {
+          "name": "Sorata Akizuki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.45,
+        "rank": 160
+      },
+      "popularity": {
+        "rank": 74
+      },
+      "tags": {
+        "categories": [
+          "Historical",
+          "Fantasy",
+          "Drama",
+          "Romance"
+        ],
+        "genres": [
+          "Historical",
+          "Fantasy",
+          "Drama",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "54597",
+      "slug": "the-beginning-after-the-end",
+      "titles": {
+        "canonical": "The Beginning After the End",
+        "en": "The Beginning After the End",
+        "ja": "最強の王様、二度目の人生は何をする？"
+      },
+      "status": "current",
+      "synopsis": "King Grey has unrivaled strength, wealth, and prestige in a world governed by martial ability. However, solitude lingers closely behind those with great power. Beneath the glamorous exterior of a powerful king lurks the shell of man, devoid of purpose and will.Reincarnated into a new world filled with magic and monsters, the king has a second chance to relive his life. Correcting the mistakes of his past will not be his only challenge, however. Underneath the peace and prosperity of the new world is an undercurrent threatening to destroy everything he has worked for, questioning his role and reason for being born again.(Source:Mangadex)",
+      "authors": [],
+      "ratings": {
+        "average": 83.16,
+        "rank": 60
+      },
+      "popularity": {
+        "rank": 71
+      },
+      "tags": {
+        "categories": [
+          "Demon",
+          "Magic",
+          "Isekai",
+          "Fantasy",
+          "Adventure"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "36446",
+      "slug": "19-tian",
+      "titles": {
+        "canonical": "19 Days",
+        "en": "19 Days",
+        "ja": "19日"
+      },
+      "status": "current",
+      "synopsis": "The cute and funny bromance of a boy and his best friend. (Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.52,
+        "rank": 140
+      },
+      "popularity": {
+        "rank": 91
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "School Life",
+          "Slice of Life",
+          "Drama"
+        ],
+        "genres": [
+          "Comedy",
+          "School",
+          "Slice of Life",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "38449",
+      "slug": "made-in-abyss",
+      "titles": {
+        "canonical": "Made in Abyss",
+        "en": "Made in Abyss",
+        "ja": "メイドインアビス"
+      },
+      "status": "current",
+      "synopsis": "The enormous cave system, known as the Abyss, is the only unexplored place in the world. Nobody knows how deep down goes this titanic pit, inhabited by strange and wondrous creatures and full of mysterious ancient relics which purpose in unknown to modern man. Generations of bold adventurers have been drawn by the cryptic depths of the Abyss. In course of time those bold enough to explore the dangerous pit came to be known as \"Cave Raiders.\"\n\nIn Oosu, the town at the edge of the Abyss, there lives a little orphan named Rico, who dreams of becoming as great a cave raider as her mother was and solving the great mystery of the pit. One day exploring the murky depths she stumbles upon a little boy, who turns out to be a robot...",
+      "authors": [
+        {
+          "name": "Akihito Tsukushi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.6,
+        "rank": 119
+      },
+      "popularity": {
+        "rank": 89
+      },
+      "tags": {
+        "categories": [
+          "Science Fiction",
+          "Fantasy",
+          "Adventure",
+          "Drama",
+          "Dark Fantasy",
+          "Human Enhancement",
+          "Psychological",
+          "Android",
+          "Seinen",
+          "Fantasy World"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "30463",
+      "slug": "grand-blue",
+      "titles": {
+        "canonical": "Grand Blue",
+        "en": "Grand Blue Dreaming",
+        "ja": "ぐらんぶる"
+      },
+      "status": "current",
+      "synopsis": "A new life begins for Kitahara Iori as he begins his college career near the ocean in Izu city, full of excitement for his new life. He will be moving into his Uncle's diving store \"Grand Blue.\" There he finds the beautiful ocean, beautiful women, and men that love diving and alcohol. Will Iori be able to live his dream college life?\n\n(Source: MangaHelpers)",
+      "authors": [
+        {
+          "name": "Kenji Inoue",
+          "role": "Scénario"
+        },
+        {
+          "name": "Kimitake Yoshioka",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.74,
+        "rank": 93
+      },
+      "popularity": {
+        "rank": 93
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Slice of Life",
+          "University",
+          "Ecchi",
+          "Romance"
+        ],
+        "genres": [
+          "Comedy",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "56452",
+      "slug": "omniscient-readers-point-of-view",
+      "titles": {
+        "canonical": "Omniscient Reader's Point of View",
+        "en": "Omniscient Reader's Point of View",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "Back then, Dok-Ja had no idea. He had no idea his favorite web novel 'Three Ways to Survive the Apocalypse' was going to come to life, and that he would become the only person to know how the world was going to end. He also had no idea he would end up becoming the protagonist of this novel-turned-reality. Now, Dok-Ja will go on a journey to change the course of the story and save humankind once and for all.\n\n(Source: WEBTOONS, edited)",
+      "authors": [],
+      "ratings": {
+        "average": 83.62,
+        "rank": 40
+      },
+      "popularity": {
+        "rank": 88
+      },
+      "tags": {
+        "categories": [
+          "Adventure",
+          "Action",
+          "Fantasy",
+          "Post Apocalypse"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "25524",
+      "slug": "tate-no-yuusha-no-nariagari",
+      "titles": {
+        "canonical": "Tate no Yuusha no Nariagari",
+        "en": "The Rising of the Shield Hero: The Manga Companion",
+        "ja": "盾の勇者の成り上がり"
+      },
+      "status": "current",
+      "synopsis": "Naofumi Iwatani, an uncharismatic Otaku who spends his days on games and manga, suddenly finds himself summoned to a parallel universe! He discovers he is one of four heroes equipped with legendary weapons and tasked with saving the world from its prophesied destruction. As the Shield Hero, the weakest of the heroes, all is not as it seems. Naofumi is soon alone, penniless, and betrayed. With no one to turn to, and nowhere to run, he is left with only his shield. Now, Naofumi must rise to become the legendary Shield Hero and save the world!\n\n(Source: One Peace)",
+      "authors": [
+        {
+          "name": "Kyu Aiya",
+          "role": "Dessin"
+        },
+        {
+          "name": "Yusagi Aneko",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 78.65,
+        "rank": 1433
+      },
+      "popularity": {
+        "rank": 104
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Seinen",
+          "Drama",
+          "Isekai"
+        ],
+        "genres": [
+          "Fantasy",
+          "Drama",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "3480",
+      "slug": "kingdom",
+      "titles": {
+        "canonical": "Kingdom",
+        "en": "Kingdom",
+        "ja": "キングダム"
+      },
+      "status": "current",
+      "synopsis": "Millions of years have passed since the times of legends, when the worlds of man and gods were still the same. In these times it was the desires of man that moved the world. It is the period of the 500 year war: the Era of Warring States. Kingdom is the story of a young boy who grew into a great general and all the trials and bloodshed that led him there.\n\n(Source: Exertus Scans)",
+      "authors": [
+        {
+          "name": "Yasuhisa Hara",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.72,
+        "rank": 95
+      },
+      "popularity": {
+        "rank": 103
+      },
+      "tags": {
+        "categories": [
+          "Thriller",
+          "Historical",
+          "Military",
+          "Drama",
+          "Action",
+          "War",
+          "Seinen",
+          "Swordplay",
+          "Politics",
+          "Conspiracy"
+        ],
+        "genres": [
+          "Thriller",
+          "Historical",
+          "Military",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "16084",
+      "slug": "bungou-stray-dogs",
+      "titles": {
+        "canonical": "Bungou Stray Dogs",
+        "en": "Bungou Stray Dogs",
+        "ja": "文豪ストレイドッグス"
+      },
+      "status": "current",
+      "synopsis": "Having been kicked out of the orphanage, a despairing young man by the name of Atsushi Nakajima rescues a strange man from a suicide attempt--Osamu Dazai. Turns out that Dazai is part of an armed-detective agency staffed by individuals whose supernatural powers take on a literary bent!\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Kafka Asagiri",
+          "role": "Scénario"
+        },
+        {
+          "name": "Harukawa35",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.48,
+        "rank": 149
+      },
+      "popularity": {
+        "rank": 107
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Sports",
+          "Drama",
+          "Action",
+          "Mystery"
+        ],
+        "genres": [
+          "Mystery",
+          "Supernatural",
+          "Sports",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "64",
+      "slug": "d-gray-man",
+      "titles": {
+        "canonical": "D.Gray-man",
+        "en": "D.Gray-man",
+        "ja": "D.Gray-man"
+      },
+      "status": "current",
+      "synopsis": "Towards the end of the 19th century, Allen Walker officially joins the organization of Exorcists that destroy the beings known as Akuma; mechanic weapons made by the Millennium Earl with the suffering souls of the dead. Allen has both a cursed eye and an anti-Akuma weapon as an arm, bearing the power of \"Innocence\", a gift given to him as an apostle of God. Allen, along with his fellow Exorcists must put a stop to the Millennium Earl's ultimate plot that could lead to the destruction of the world and all who live on it.",
+      "authors": [
+        {
+          "name": "Katsura Hoshino",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.46,
+        "rank": 155
+      },
+      "popularity": {
+        "rank": 110
+      },
+      "tags": {
+        "categories": [
+          "Super Power",
+          "Demon",
+          "Action",
+          "Adventure",
+          "Comedy",
+          "Shounen",
+          "Supernatural"
+        ],
+        "genres": [
+          "Comedy",
+          "Sports",
+          "Super Power",
+          "Demons",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "40679",
+      "slug": "gokushufudou",
+      "titles": {
+        "canonical": "Gokushufudou",
+        "en": "Gokushufudou: The Way of the House Husband",
+        "ja": "極主夫道"
+      },
+      "status": "current",
+      "synopsis": "Immortal Tatsu is an ex-yakuza who’s given up violence for making an honest man of himself - but is it still possible for a devoted stay-at-home husband to get into a few scrapes? (Source: Sexy Akiba Detectives Translation)",
+      "authors": [],
+      "ratings": {
+        "average": 81.84,
+        "rank": 508
+      },
+      "popularity": {
+        "rank": 111
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Cooking",
+          "Slice of Life"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "22926",
+      "slug": "gekkan-shoujo-nozaki-kun",
+      "titles": {
+        "canonical": "Gekkan Shoujo Nozaki-kun",
+        "en": "Monthly Girls' Nozaki-kun",
+        "ja": "月刊少女野崎くん"
+      },
+      "status": "current",
+      "synopsis": "The boy of her dreams...is a girl's manga artist?!\n\nTo the eyes of high school student Chiyo Sakura, classmate Umetarou Nozaki--brawny of build and brusque of tongue--is a dreamboat! When Chiyo finally works up the courage to tell Nozaki how she feels about him, she knows rejection is on the table...but getting recruited as a manga-ka's assistant?! Never in a million years!\n\nBut for someone who makes a living drawing sweet girly romances, Nozaki-kun is a little slow on the uptake when it comes to matters of the heart in reality. And so Chiyo's daily life of manga making and heartache begins!\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Izumi Tsubaki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.4,
+        "rank": 182
+      },
+      "popularity": {
+        "rank": 117
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "School Life",
+          "Romance",
+          "Friendship",
+          "High School",
+          "Working Life",
+          "Slice of Life",
+          "Parody",
+          "Japan"
+        ],
+        "genres": [
+          "Comedy",
+          "School",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "53928",
+      "slug": "blue-lock",
+      "titles": {
+        "canonical": "Blue Lock",
+        "en": "Blue Lock",
+        "ja": "ブルーロック"
+      },
+      "status": "current",
+      "synopsis": "After failing to win the World Cup, there's unrest in the Japanese Soccer community. Many of the older patrons of the sport aren't too disturbed by the lack of trophies, but newcomer Anri Teiri is furious – and she's determined to fix what she sees as the problem with Japanese players. To that end she hires maverick trainer Jinpachi Ego, who devises a strange yet rigorous plan: he takes the three hundred best young soccer players in the country, sends them to a state-of-the-art training facility, and whittles them down until he has the absolute best striker in the nation. Yoichi Isagi is one of the boys chosen for the camp. He may be number 299 out of 300, but nothing – and no one – is going to stand in his way of coming out on top.\n\n(Source: Anime News Network)",
+      "authors": [],
+      "ratings": {
+        "average": 82.84,
+        "rank": 83
+      },
+      "popularity": {
+        "rank": 118
+      },
+      "tags": {
+        "categories": [
+          "Sports",
+          "Soccer",
+          "Shounen"
+        ],
+        "genres": [
+          "Sports"
+        ]
+      }
+    },
+    {
+      "id": "16462",
+      "slug": "dungeon-ni-deai-wo-motomeru-no-wa-machigatteiru-no-darou-ka",
+      "titles": {
+        "canonical": "Dungeon ni Deai wo Motomeru no wa Machigatteiru Darou ka",
+        "en": "Is It Wrong to Try to Pick Up Girls in a Dungeon?",
+        "ja": "ダンジョンに出会いを求めるのは間違っているだろうか"
+      },
+      "status": "current",
+      "synopsis": "The huge labyrinth city, Orario, is the gateway to the huge underground maze commonly known as the “Dungeon”. Its strange name causes excitement, a place to gain honour, and maybe even a romance with a pretty girl. A place where people hold their breath, hoping to gain all they wish for, a place where a solitary young man meets a little \"god\".\n\n\"Alright, Bell-kun, follow me! It's time for the \"Familiar\" initiation rite to happen!\"\n\"Yes! I'm going to get stronger!\"\n\nThe fated meeting of a boy who wants to become an adventurer, and the failed god who doesn't even have a single follower.\n\nThis boy's journey as written by the goddess, \"Family's Legend\" (Familiar's Myth).\n\n(Source: Baka-Tsuki)",
+      "authors": [
+        {
+          "name": "Suzuhito Yasuda",
+          "role": "Dessin"
+        },
+        {
+          "name": "Fujino Omori",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 82.09,
+        "rank": 423
+      },
+      "popularity": {
+        "rank": 133
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Romance",
+          "Action",
+          "Adventure",
+          "Fantasy World"
+        ],
+        "genres": [
+          "Comedy",
+          "Fantasy",
+          "Romance",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "26852",
+      "slug": "overlord-novel",
+      "titles": {
+        "canonical": "Overlord",
+        "en": "Overlord",
+        "ja": "オーバーロード"
+      },
+      "status": "current",
+      "synopsis": "The story begins with Yggdrasil, a popular online game which is quietly shut down one day. However, the protagonist Momonga decides to not log out. Momonga is then transformed into the image of a skeleton as \"the most powerful wizard.\" The world continues to change, with non-player characters (NPCs) begining to feel emotion. Having no parents, friends, or place in society, this ordinary young man Momonga then strives to take over the new world the game has become.\n\n(Source: ANN)",
+      "authors": [
+        {
+          "name": "Kugane Maruyama",
+          "role": "Scénario"
+        },
+        {
+          "name": "so-bin",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.43,
+        "rank": 168
+      },
+      "popularity": {
+        "rank": 141
+      },
+      "tags": {
+        "categories": [
+          "Magic",
+          "Harem",
+          "Virtual Reality",
+          "Action",
+          "Adventure",
+          "Fantasy World",
+          "Violence",
+          "Fantasy",
+          "Comedy",
+          "Romance"
+        ],
+        "genres": [
+          "Comedy",
+          "Magic",
+          "Supernatural",
+          "Harem",
+          "Game",
+          "Fantasy",
+          "Romance",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "39537",
+      "slug": "i-love-yoo",
+      "titles": {
+        "canonical": "I Love Yoo",
+        "en": "I Love Yoo",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "Dogged by pain and misfortune from the very beginning, Shin-Ae decides she wants nothing to do with people nor anything to do with romance. Although content with her unsocial, boring, loveless existence, her lifestyle is challenged after she ruins an unsuspecting strangers' clothes.\n\n(Source: webtoons.com)",
+      "authors": [],
+      "ratings": {
+        "average": 82.04,
+        "rank": 446
+      },
+      "popularity": {
+        "rank": 148
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Romance",
+          "Drama"
+        ],
+        "genres": [
+          "Comedy",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "23702",
+      "slug": "owari-no-seraph-m",
+      "titles": {
+        "canonical": "Owari no Seraph",
+        "en": "Seraph of the End: Vampire Reign",
+        "ja": "終わりのセラフ"
+      },
+      "status": "current",
+      "synopsis": "One day, a mysterious virus appeared on Earth which killed every infected human over the age of 13. At the same time, vampires emerged from the world's dark recesses and enslaved mankind. Enter Hyakuya Yuuichirou, a young boy, who along with the rest of the children from his orphanage, are treated as livestock by the vampires. Even in captivity, Yuuichirou dreams big. He dreams of killing vampires. He dreams of killing them all.\n\n(Source: Population Go)",
+      "authors": [
+        {
+          "name": "Yamato Yamamoto",
+          "role": "Dessin"
+        },
+        {
+          "name": "Takaya Kagami",
+          "role": "Scénario"
+        },
+        {
+          "name": "Daisuke Furuya",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 78.28,
+        "rank": 1591
+      },
+      "popularity": {
+        "rank": 143
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Vampire",
+          "Drama",
+          "Action",
+          "Shounen"
+        ],
+        "genres": [
+          "Supernatural",
+          "Vampire",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "38359",
+      "slug": "unordinary",
+      "titles": {
+        "canonical": "unOrdinary",
+        "en": "unOrdinary",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "Nobody paid much attention to John – just a normal teenager at a high school where the social elite happens to possess unthinkable powers and abilities. But John’s got a secret past that threatens to bring down the school’s whole social order – and much more. Fulfilling his destiny won’t be easy though, because there are battles, frenemies, and deadly conspiracies around every corner.(Source: LINE Webtoon)",
+      "authors": [],
+      "ratings": {
+        "average": 81.46,
+        "rank": 600
+      },
+      "popularity": {
+        "rank": 149
+      },
+      "tags": {
+        "categories": [
+          "Super Power"
+        ],
+        "genres": [
+          "Super Power"
+        ]
+      }
+    },
+    {
+      "id": "25541",
+      "slug": "mushoku-tensei-isekai-ittara-honki-dasu",
+      "titles": {
+        "canonical": "Mushoku Tensei: Isekai Ittara Honki Dasu",
+        "en": "Mushoku Tensei: Jobless Reincarnation",
+        "ja": "無職転生 ～異世界行ったら本気だす～"
+      },
+      "status": "current",
+      "synopsis": "Just when an unemployed thirty-four-year-old otaku reaches a dead end in life and decides that it's time to turn over a new leaf—he gets run over by a truck and dies! Shockingly, he finds himself reborn into an infant's body in a strange new world of swords and magic.His new identity is Rudeus Grayrat, but he still retains the memories of his previous life. Follow Rudeus from infancy to adulthood, as he struggles to redeem himself in a wondrous yet dangerous world.\n\n(Source: Seven Seas)",
+      "authors": [
+        {
+          "name": "Yuka Fujikawa",
+          "role": "Dessin"
+        },
+        {
+          "name": "Rifujin na Magonote",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 80.06,
+        "rank": 940
+      },
+      "popularity": {
+        "rank": 145
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Magic",
+          "Isekai",
+          "Action",
+          "Demon",
+          "Adventure",
+          "Fantasy World"
+        ],
+        "genres": [
+          "Magic",
+          "Fantasy",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "1388",
+      "slug": "skip-beat",
+      "titles": {
+        "canonical": "Skip Beat!",
+        "en": "Skip Beat!",
+        "ja": "スキップ・ビート！"
+      },
+      "status": "current",
+      "synopsis": "Kyoko Mogami followed her true love Sho to Tokyo to support him while he made it big as an idol. But he’s casting her out now that he’s famous enough! Kyoko won’t suffer in silence—she’s going to get her sweet revenge by beating Sho in show biz!\n\nKyoko’s broken heart and creepy rage keeps her from getting into her talent agency of choice. The eccentric president of the agency decides to give her a second chance, but it requires her to wear a bright pink uniform, put up with spoiled stars, and try to live up to the name of her new position—The Love Me Section! Can Kyoko stand the indignity long enough to find her vengeance?\n\n(Source: VIZ Media)",
+      "authors": [
+        {
+          "name": "Yoshiki Nakamura",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.32,
+        "rank": 246
+      },
+      "popularity": {
+        "rank": 161
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Drama",
+          "Romance",
+          "Shoujo"
+        ],
+        "genres": [
+          "Comedy",
+          "Drama",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "49863",
+      "slug": "blue-period",
+      "titles": {
+        "canonical": "Blue Period",
+        "en": "Blue Period",
+        "ja": "ブルーピリオド"
+      },
+      "status": "current",
+      "synopsis": "Yatora is the perfect high school student, with good grades and lots of friends. It’s an effortless performance, and, ultimately…a dull one. But he wanders into the art room one day, and a lone painting captures his eye, awakening him to a kind of beauty he never knew. Compelled and consumed, he dives in headfirst — and he’s about to learn how savage and unforgiving art can be! \n\n(Source: Kodansha Comics)",
+      "authors": [
+        {
+          "name": "Tsubasa Yamaguchi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.62,
+        "rank": 114
+      },
+      "popularity": {
+        "rank": 155
+      },
+      "tags": {
+        "categories": [
+          "Drama",
+          "School Life",
+          "Seinen",
+          "The Arts"
+        ],
+        "genres": [
+          "School",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "40005",
+      "slug": "kanojo-okarishimasu",
+      "titles": {
+        "canonical": "Kanojo, Okarishimasu",
+        "en": "Rent-A-Girlfriend",
+        "ja": "彼女、お借りします"
+      },
+      "status": "current",
+      "synopsis": "Kinoshita Kazuya is a regular college student who was just dumped by his girlfriend for another guy. Feeling down in the dumps, he decides to use an app called Diamond to hire Mizuhara Chizuru, a rental girlfriend, to make himself feel better. From their first meeting, she seems to be the perfect girl for him, but is there more to her than meets the eye? And how will their not quite typical relationship develop? (Source: MU)",
+      "authors": [
+        {
+          "name": "Reiji Miyajima",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 68.44,
+        "rank": 10219
+      },
+      "popularity": {
+        "rank": 160
+      },
+      "tags": {
+        "categories": [
+          "Romance",
+          "School Life",
+          "Ecchi",
+          "University",
+          "Harem",
+          "Comedy",
+          "Drama",
+          "Shounen"
+        ],
+        "genres": [
+          "Comedy",
+          "School",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "35886",
+      "slug": "their-story",
+      "titles": {
+        "canonical": "Tamen De Gushi  ",
+        "en": "Their Story",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "The funny romantic story of how Qiu Tong and Sun Jing met and fell in love.\n\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.44,
+        "rank": 165
+      },
+      "popularity": {
+        "rank": 169
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Shoujo Ai",
+          "Slice of Life",
+          "Romance"
+        ],
+        "genres": [
+          "Comedy",
+          "Shoujo Ai",
+          "Slice of Life",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "18471",
+      "slug": "ookami-to-koushinryou-novel",
+      "titles": {
+        "canonical": "Spice & Wolf",
+        "en": "Spice & Wolf",
+        "ja": "狼と香辛料"
+      },
+      "status": "current",
+      "synopsis": "The life of a traveling merchant is a lonely one, a fact with which Kraft Lawrence is well acquainted. Wandering from town to town with just his horse, cart, and whatever wares have come his way, the peddler has pretty well settled into his routine—that is, until the night Lawrence finds a wolf goddess asleep in his cart. Taking the form of a fetching girl with wolf ears and a tail, Holo has wearied of tending to harvests in the countryside and strikes up a bargain with the merchant to lend him the cunning of “Holo the Wisewolf” to increase his profits in exchange for taking her along on his travels. What kind of businessman could turn down such an offer? Lawrence soon learns, though, that having an ancient goddess as a traveling companion can be a bit of a mixed blessing. Will this wolf girl turn out to be too wild to tame?\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Isuna Hasekura",
+          "role": "Scénario"
+        },
+        {
+          "name": "Juu Ayakura",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.62,
+        "rank": 113
+      },
+      "popularity": {
+        "rank": 171
+      },
+      "tags": {
+        "categories": [
+          "Historical",
+          "Romance",
+          "Adventure",
+          "Contemporary Fantasy",
+          "Fantasy",
+          "Juujin"
+        ],
+        "genres": [
+          "Supernatural",
+          "Historical",
+          "Fantasy",
+          "Drama",
+          "Romance",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "26776",
+      "slug": "re-zero-kara-hajimeru-isekai-seikatsu",
+      "titles": {
+        "canonical": "Re:Zero kara Hajimeru Isekai Seikatsu",
+        "en": "Re:ZERO -Starting Life in Another World-",
+        "ja": "Re：ゼロから始める異世界生活"
+      },
+      "status": "current",
+      "synopsis": "Suddenly high school student Subaru Natsuki has been summoned to another world on the way back from the convenience store. With the biggest crisis of his life being summoned to another world and no sign of the one who summoned him, things become worse when he is attacked. But when he is saved by a mysterious silver-haired girl with a fairy cat, Subaru cooperates with the girl to return the favor. When they finally manage to get a clue, Subaru and the girl are attacked and killed by someone. Subaru then awakens in the place he was summoned and notices he gained the ability \"Returns by Death.\" A helpless boy that only has the ability to rewind time by dying. And beyond the despair can he save the girl from the fate of death?\n\n(Source: jCafe)",
+      "authors": [
+        {
+          "name": "Tappei Nagatsuki",
+          "role": "Scénario"
+        },
+        {
+          "name": "Shinichirou Ootsuka",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.71,
+        "rank": 100
+      },
+      "popularity": {
+        "rank": 175
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Drama",
+          "Romance",
+          "Adventure",
+          "Psychological",
+          "Thriller",
+          "Isekai",
+          "Magic",
+          "Elf",
+          "Maid",
+          "Assassin",
+          "Time Travel",
+          "Violence"
+        ],
+        "genres": [
+          "Comedy",
+          "Fantasy",
+          "Drama",
+          "Romance",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "14180",
+      "slug": "monster-musume-no-iru-nichijou",
+      "titles": {
+        "canonical": "Monster Musume no Iru Nichijou",
+        "en": "Monster Musume",
+        "ja": "モンスター娘のいる日常"
+      },
+      "status": "current",
+      "synopsis": "In a modern world where beast people exist and live with other humans, they have a regular household where a student lives with a lamia named Miia. The student, Kurusu Kimihito, came to live with Miia because of the culture exchange that has been going on with humans and sub-species alike. This is their story.",
+      "authors": [
+        {
+          "name": "Takemaru Inui",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 76.41,
+        "rank": 2684
+      },
+      "popularity": {
+        "rank": 177
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Harem",
+          "Fantasy",
+          "Romance",
+          "Ecchi",
+          "Seinen",
+          "Slice of Life",
+          "Juujin",
+          "Japan"
+        ],
+        "genres": [
+          "Comedy",
+          "Thriller",
+          "Harem",
+          "Fantasy",
+          "Slice of Life",
+          "Romance",
+          "Ecchi"
+        ]
+      }
+    },
+    {
+      "id": "39752",
+      "slug": "perfect-half",
+      "titles": {
+        "canonical": "Perfect Half",
+        "en": "Perfect Half",
+        "ja": "パーフェクトハーフ"
+      },
+      "status": "current",
+      "synopsis": "Once a world ruled by men, women stand up and fight to become men's equal. Now, in a land that is equally divided up between man and woman, the battle of the sexes is on! Who's going to win? But more importantly...what's the name of the game?\n\n(Source: Lezhin)",
+      "authors": [],
+      "ratings": {
+        "average": 81.79,
+        "rank": 515
+      },
+      "popularity": {
+        "rank": 184
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Harem"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "37781",
+      "slug": "goblin-slayer",
+      "titles": {
+        "canonical": "Goblin Slayer",
+        "en": "Goblin Slayer!",
+        "ja": "ゴブリンスレイヤー"
+      },
+      "status": "current",
+      "synopsis": "A young priestess has formed her first adventuring party, but almost immediately they find themselves in distress. It's the Goblin Slayer who comes to their rescue—a man who's dedicated his life to the extermination of all goblins, by any means necessary. And when rumors of his feats begin to circulate, there's no telling who might come calling next...\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Kousuke Kurose",
+          "role": "Dessin"
+        },
+        {
+          "name": "Kumo Kagyuu",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 78.33,
+        "rank": 1569
+      },
+      "popularity": {
+        "rank": 182
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Action",
+          "High Fantasy",
+          "Dark Fantasy",
+          "Violence",
+          "Fantasy World"
+        ],
+        "genres": [
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "40927",
+      "slug": "yancha-gal-no-anjou-san",
+      "titles": {
+        "canonical": "Yancha Gal no Anjou-san",
+        "en": "The mischievous gal Anjou-san",
+        "ja": "やんちゃギャルの安城さん"
+      },
+      "status": "current",
+      "synopsis": "Seto is a serious kid who leads a quiet High-school life, until he starts to get teased by resident Gal Anjo.\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Yuuichi Katou",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 80.93,
+        "rank": 718
+      },
+      "popularity": {
+        "rank": 183
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Ecchi",
+          "School Life",
+          "Seinen"
+        ],
+        "genres": [
+          "Comedy",
+          "School",
+          "Ecchi"
+        ]
+      }
+    },
+    {
+      "id": "51379",
+      "slug": "shuumatsu-no-walkure",
+      "titles": {
+        "canonical": "Shuumatsu no Walküre",
+        "en": "Record of Ragnarok",
+        "ja": "終末のワルキューレ"
+      },
+      "status": "current",
+      "synopsis": "The story begins when the gods call a convention to decide the whether to let humanity live or die, and settle on destroying humanity. But a lone valkyrie puts forward a suggestion to let the gods and humanity fight one last battle, as a last hope for humanity's continued survival. 13 gods will fight against 13 human champions in one-on-one battles to decide whether humanity lives or dies.",
+      "authors": [
+        {
+          "name": "Takumi Fukui",
+          "role": "Scénario"
+        },
+        {
+          "name": "Shinya Umemura",
+          "role": "Scénario"
+        },
+        {
+          "name": "Ajichika",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 80.81,
+        "rank": 743
+      },
+      "popularity": {
+        "rank": 180
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Comedy",
+          "Fantasy",
+          "Historical",
+          "Supernatural",
+          "Martial Arts"
+        ],
+        "genres": [
+          "Supernatural",
+          "Super Power",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "37605",
+      "slug": "yaoshenji",
+      "titles": {
+        "canonical": "Yaoshenji",
+        "en": "Tales of Demons and Gods",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "In his past life, although too weak to protect his home when it counted, out of grave determination Nie Li became the strongest Demon Spiritist and stood at the pinnacle of the martial world. However, he lost his life during the battle with the Sage Emperor and six deity-ranked beasts.\n\nHis soul was then brought back to when he was still 13 years old. Although he's the weakest in his class with the lowest talent, having only a red soul realm and a weak one at that, with the aid of the vast knowledge which he accumulated from his previous life, he decided to train faster than anyone could expect. He also decided to help those who died nobly in his previous life to train faster as well.\n\nHe aims to protect the city from the coming future of being devastated by demon beasts and the previous fate of ending up destroyed. He aims to protect his lover, friends, family and fellow citizens who died in the beast assault or its aftermath. And he aims to destroy the so-called Sacred family who arrogantly abandoned their duty and betrayed the city in his past life.\n\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 81.96,
+        "rank": 477
+      },
+      "popularity": {
+        "rank": 192
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Romance",
+          "Action",
+          "Adventure",
+          "Martial Arts"
+        ],
+        "genres": [
+          "Martial Arts",
+          "Fantasy",
+          "Romance",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "35883",
+      "slug": "one-punch-man-one",
+      "titles": {
+        "canonical": "One-Punch Man ONE",
+        "en": "One-Punch Man ONE",
+        "ja": "ワンパンマン"
+      },
+      "status": "current",
+      "synopsis": "Follows the life of a hero who manages to win all battles with only one punch. This ability seems to frustrate him as he no longer feels the thrill and adrenaline of fighting a tough battle, which leads to him questioning his past desire of being strong.\n\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.36,
+        "rank": 207
+      },
+      "popularity": {
+        "rank": 203
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Science Fiction",
+          "Action",
+          "Superhero",
+          "Parody",
+          "Supernatural"
+        ],
+        "genres": [
+          "Comedy",
+          "Sci-Fi",
+          "Fantasy",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "54690",
+      "slug": "ranker-who-lives-a-second-time",
+      "titles": {
+        "canonical": "Ranker Who Lives A Second Time",
+        "en": "Ranker Who Lives A Second Time",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "Yeon-woo had a twin brother who disappeared five years ago. One day, a pocket watch left by his brother returned to his possession. Inside, he found a hidden diary in which was recorded \"By the time you hear this, I guess I will be already dead….\"\n\n(source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 80.44,
+        "rank": 823
+      },
+      "popularity": {
+        "rank": 185
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Adventure",
+          "Fantasy"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "23",
+      "slug": "hajime-no-ippo",
+      "titles": {
+        "canonical": "Hajime no Ippo",
+        "en": "Hajime no Ippo",
+        "ja": "はじめの一歩"
+      },
+      "status": "current",
+      "synopsis": "Makunouchi Ippo has been bullied his entire life. Constantly running errands and being beaten up by his classmates, Ippo has always dreamed of changing himself, but never has the passion to act upon it. One day, in the midst of yet another bullying, Ippo is saved by Takamura Mamoru, who happens to be a boxer. Ippo faints from his injuries and is brought to Takamura boxing gym to recover. As he regains consciousness, he is awed and amazed at his new surroundings in the gym, though lacks confidence to attempt anything. Takamura places a photo of Ippo’s classmate on a punching bag and forces him to punch it. It is only then that Ippo feels something stir inside him and eventually asks Takamura to train him in boxing. Thinking that Ippo does not have what it takes, Takamura gives him a task deemed impossible and gives him a one week time limit. With a sudden desire to get stronger, for himself and his hard working mother, Ippo trains relentlessly to accomplish the task within the time limit. Thus Ippo’s journey to the top of the boxing world begins.\n[Written by MAL Rewrite]",
+      "authors": [
+        {
+          "name": "George Morikawa",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.65,
+        "rank": 106
+      },
+      "popularity": {
+        "rank": 199
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Sports",
+          "Sports",
+          "Drama",
+          "Action",
+          "Shounen"
+        ],
+        "genres": [
+          "Comedy",
+          "Sports",
+          "Sports",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "36487",
+      "slug": "tate-no-yuusha-no-nariagari-novel",
+      "titles": {
+        "canonical": "Tate no Yuusha no Nariagari",
+        "en": "The Rising of the Shield Hero",
+        "ja": "盾の勇者の成り上がり"
+      },
+      "status": "current",
+      "synopsis": "Naofumi Iwatani, an uncharismatic otaku who spends his days on games and manga, suddenly finds himself summoned to a parallel universe! He discovers he is one of four heroes equipped with legendary weapons and tasked with saving the world from its prophesied destruction.\n\nAs the Shield Hero, the weakest of the heroes, all is not as it seems. Naofumi is soon alone, penniless, and betrayed. With no one to turn to, and nowhere to run, he is left with only his shield. Now, Naofumi must rise to become the legendary Shield Hero and save the world!\n\n(Source: One Peace)",
+      "authors": [
+        {
+          "name": "Yusagi Aneko",
+          "role": "Scénario"
+        },
+        {
+          "name": "Seira Minami",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 81.49,
+        "rank": 596
+      },
+      "popularity": {
+        "rank": 208
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Isekai"
+        ],
+        "genres": [
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "35736",
+      "slug": "akatsuki-no-yona-novel",
+      "titles": {
+        "canonical": "Akatsuki no Yona",
+        "en": "Yona of the Dawn",
+        "ja": "暁のヨナ"
+      },
+      "status": "current",
+      "synopsis": "The novel is divided into three segments: Jae-Ha's Counseling Room – Part 1, Under the Same Moon – Parts 1-5, and Jae-Ha's Counseling Room – Part 2.\n\nWhen listening to a nostalgic voice in the crowd of people, Soo-Won looked back without thinking. However, it was not the girl of his memory...\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Mizuho Kusanagi",
+          "role": "Dessin"
+        },
+        {
+          "name": "Touko Fujitani",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 82.35,
+        "rank": 216
+      },
+      "popularity": {
+        "rank": 222
+      },
+      "tags": {
+        "categories": [
+          "Historical",
+          "Romance",
+          "Friendship",
+          "Adventure",
+          "Fantasy"
+        ],
+        "genres": [
+          "Historical",
+          "Fantasy",
+          "Romance",
+          "Friendship",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "37173",
+      "slug": "kumo-desu-ga-nani-ka",
+      "titles": {
+        "canonical": "Kumo desu ga, Nani ka?",
+        "en": "So I'm a Spider, So What?",
+        "ja": "蜘蛛ですが、なにか？"
+      },
+      "status": "current",
+      "synopsis": "When a mysterious explosion killed an entire class full of high school students, the souls of everyone in class was transported into a fantasy world and reincarnated. While some students were reincarnated as princes or prodigies, others were not as blessed.\n\nOur heroine, who was the lowest in the class, discovered that she was reincarnated as a spider!? Now at the bottom of the food chain, she needs to adapts to the current situation with willpower in order to live! Stuck in a dangerous labyrinth filled with monsters, it's eat or be eaten!\n\nThis is the story of a spider doing whatever she can in order to survive!\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Asahiro Kakashi",
+          "role": "Dessin"
+        },
+        {
+          "name": "Okina Baba",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 78.9,
+        "rank": 1331
+      },
+      "popularity": {
+        "rank": 209
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Adventure",
+          "Isekai",
+          "Fantasy World"
+        ],
+        "genres": [
+          "Comedy",
+          "Fantasy",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "21550",
+      "slug": "otoyomegatari",
+      "titles": {
+        "canonical": "Otoyomegatari",
+        "en": "A Bride's Story",
+        "ja": "乙嫁語り"
+      },
+      "status": "current",
+      "synopsis": "A Bride’s Story tells the tale of a beautiful young bride in nineteenth-century Asia. At the age of twenty, Amir is sent to a neighboring town to be wed. But her surprise at learning her new husband, Karluk, is eight years younger than her is quickly replaced by a deep affection for the boy and his family. Though she hails from just beyond the mountains, Amir’s clan had very different customs, foods, and clothes from what Karluk is used to. As the two of them learn more about each other through their day-to-day lives, the bond of respect and love grows stronger.\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Kaoru Mori",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.56,
+        "rank": 128
+      },
+      "popularity": {
+        "rank": 225
+      },
+      "tags": {
+        "categories": [
+          "Historical",
+          "Drama",
+          "Romance",
+          "Middle East"
+        ],
+        "genres": [
+          "Historical",
+          "Drama",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "56355",
+      "slug": "sousou-no-frieren",
+      "titles": {
+        "canonical": "Sousou no Frieren",
+        "en": "Frieren: Beyond Journey’s End",
+        "ja": "葬送のフリーレン"
+      },
+      "status": "current",
+      "synopsis": "The adventure is over but life goes on for an elf mage just beginning to learn what living is all about.\n\nElf mage Frieren and her courageous fellow adventurers have defeated the Demon King and brought peace to the land. With the great struggle over, they all go their separate ways to live a quiet life. But as an elf, Frieren, nearly immortal, will long outlive the rest of her former party. How will she come to terms with the mortality of her friends? How can she find fulfillment in her own life, and can she learn to understand what life means to the humans around her? Frieren begins a new journey to find the answer.\n\n(Source: Viz Media)\n\nNotes:\n- Winner of the Grand Prize at the 14th Manga Taisho Awards.\n- Nominated for the 25th Annual Tezuka Osamu Cultural Prize.\n- Placed 3rd at the 7th Annual Next Manga Award.",
+      "authors": [],
+      "ratings": {
+        "average": 83.83,
+        "rank": 35
+      },
+      "popularity": {
+        "rank": 196
+      },
+      "tags": {
+        "categories": [
+          "Elf",
+          "Shounen",
+          "Adventure",
+          "Fantasy",
+          "Magic",
+          "Drama",
+          "Slice of Life"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "2704",
+      "slug": "3-gatsu-no-lion",
+      "titles": {
+        "canonical": "3-gatsu no Lion",
+        "en": "March Comes in Like a Lion",
+        "ja": "3月のライオン"
+      },
+      "status": "current",
+      "synopsis": "A youth named Kiriyama Rei, who lost his family as a child, endures loneliness to become a professional shogi player. Then, through a chance meeting, he develops a relationship with the three Kawamoto sisters, who hail from a working-class district of the city, and little by little his frozen heart begins to thaw.\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Chika Umino",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.65,
+        "rank": 107
+      },
+      "popularity": {
+        "rank": 235
+      },
+      "tags": {
+        "categories": [
+          "Slice of Life",
+          "Drama",
+          "Seinen",
+          "Coming Of Age",
+          "Family",
+          "School Clubs",
+          "Sports"
+        ],
+        "genres": [
+          "Thriller",
+          "Game",
+          "Slice of Life",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "26233",
+      "slug": "kakegurui",
+      "titles": {
+        "canonical": "Kakegurui",
+        "en": "Kakegurui: Compulsive Gambler",
+        "ja": "賭ケグルイ"
+      },
+      "status": "current",
+      "synopsis": "Hyakkaou Private Academy. An institution for the privileged with a very peculiar curriculum. You see, when you're the sons and daughters of the wealthiest of the wealthy, it's not athletic prowess or book smarts that keep you ahead. It's reading your opponent, the art of the deal. What better way to hone those skills than with a rigorous curriculum of gambling? At Hyakkaou Private Academy, the winners live like kings, and the losers are put through the wringer. But when Yumeko Jabami enrolls, she's gonna teach these kids what a high roller really looks like!\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Tooru Naomura",
+          "role": "Dessin"
+        },
+        {
+          "name": "Homura Kawamoto",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 78.46,
+        "rank": 1514
+      },
+      "popularity": {
+        "rank": 229
+      },
+      "tags": {
+        "categories": [
+          "School Life",
+          "Drama",
+          "Psychological",
+          "Mystery"
+        ],
+        "genres": [
+          "Mystery",
+          "Psychological",
+          "School",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "59289",
+      "slug": "dandadan",
+      "titles": {
+        "canonical": "Dandadan",
+        "en": "Dandadan",
+        "ja": "ダンダダン"
+      },
+      "status": "current",
+      "synopsis": "Ghosts, monsters, aliens, teen romance, battles...and the kitchen sink! This series has it all! Takakura, an occult maniac who doesn't believe in ghosts, and Ayase, a girl who doesn't believe in aliens, try to overcome their differences when they encounter the paranormal! This manga is out of this world!\n\n(Source: MangaPlus)",
+      "authors": [],
+      "ratings": {
+        "average": 82.64,
+        "rank": 110
+      },
+      "popularity": {
+        "rank": 186
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Science Fiction",
+          "Shounen",
+          "Comedy",
+          "Drama",
+          "Mystery",
+          "Supernatural",
+          "Romance",
+          "Alien",
+          "Ghost"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "40657",
+      "slug": "tonikaku-cawaii",
+      "titles": {
+        "canonical": "Tonikaku Kawaii",
+        "en": "Tonikaku Kawaii",
+        "ja": "トニカクカワイイ"
+      },
+      "status": "current",
+      "synopsis": "Described as a story full of \"love\" and \"dreams\", Tonikaku Cawaii follows a protagonist whose name is written with the characters for \"Hoshizora\" (\"Starry Sky\" in Japanese), but whose name is pronounced as \"Nasa\". On the day of his high school entrance exams, Nasa encounters a beautiful girl. For Nasa, it feels like destiny is finally calling out to him that he will have a girlfriend, but...\n\n(Source: Crunchyroll)",
+      "authors": [],
+      "ratings": {
+        "average": 81.51,
+        "rank": 588
+      },
+      "popularity": {
+        "rank": 236
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Romance",
+          "Shounen",
+          "Slice of Life"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "58313",
+      "slug": "chainsaw-man-2",
+      "titles": {
+        "canonical": "Chainsaw Man: Dai-2 Bu",
+        "en": "Chainsaw Man Part 2",
+        "ja": "チェンソーマン 第二部"
+      },
+      "status": "current",
+      "synopsis": "Sometime after leaving Public Safety, Denji has now started to go to high school, while he also continues to exterminate devils. He still wishes to get a girlfriend and often tries to \"accidentally\" expose his identity as Chainsaw Man. Meanwhile, the War Devil returns to the world seeking revenge against the Chainsaw Devil. It possesses a loner high school girl, Asa Mitaka, who goes to the same school as Denji and makes her search for the Chainsaw Man's true identity.\n\n(Source: Chainsaw Man Wikia)",
+      "authors": [],
+      "ratings": {
+        "average": 83.37,
+        "rank": 48
+      },
+      "popularity": {
+        "rank": 250
+      },
+      "tags": {
+        "categories": [
+          "Shounen",
+          "Action",
+          "Comedy",
+          "Demon",
+          "Magic",
+          "Violence"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "54238",
+      "slug": "kage-no-jitsuryokusha-ni-naritakute",
+      "titles": {
+        "canonical": "Kage no Jitsuryokusha ni Naritakute",
+        "en": "To Be a Power in the Shadows!",
+        "ja": "陰の実力者になりたくて！"
+      },
+      "status": "current",
+      "synopsis": "Just like how everyone adored heroes in their childhood, a certain young man adored those powers hidden in shadows. After hiding his strength and living the mediocre life of a mob character by day while undergoing frenzied training by night, he finally reincarnates into a different world and gains ultimate power. The young man who is only playing at being a power in the shadows, his misunderstanding subordinates, and a giant organization in the shadows that gets trampled….. This is the story of a young boy who had adored powers in shadows possibly eventually reigning over the world of shadows in another world.\n\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 81.43,
+        "rank": 609
+      },
+      "popularity": {
+        "rank": 234
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Comedy",
+          "Fantasy",
+          "Seinen",
+          "Isekai",
+          "Harem"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "54156",
+      "slug": "mieruko-chan",
+      "titles": {
+        "canonical": "Mieruko-chan",
+        "en": "The Girl That Sees \"Them\"",
+        "ja": "見える子ちゃん"
+      },
+      "status": "current",
+      "synopsis": "One day a girl suddenly starts seeing heteromorphic \"gabbling\" looking creatures who can't be seen by any ordinary people. She doesn't try escaping them, nor does she attempt confronting them.. instead she tries her hardest to keep a normal appearance and live on as usual.\n\n(Source. MU)",
+      "authors": [],
+      "ratings": {
+        "average": 79.07,
+        "rank": 1273
+      },
+      "popularity": {
+        "rank": 251
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Horror",
+          "School Life",
+          "Seinen",
+          "Supernatural",
+          "Ghost"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "1484",
+      "slug": "real",
+      "titles": {
+        "canonical": "Real",
+        "en": "Real",
+        "ja": "リアル"
+      },
+      "status": "current",
+      "synopsis": "A motorcycle accident, bone cancer, a speeding truck crashing into a boy on a stolen bicycle—tragic life-changing events turn the worlds of three young men upside down. These three very different personalities have only one thing in common—their passion for basketball. \n\n(Source: Viz) \n\nNote: Won an Excellence Prize for manga at the 2001 Japan Media Arts Festival.",
+      "authors": [
+        {
+          "name": "Takehiko Inoue",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.8,
+        "rank": 86
+      },
+      "popularity": {
+        "rank": 260
+      },
+      "tags": {
+        "categories": [
+          "Sports",
+          "Drama",
+          "Psychological",
+          "Basketball",
+          "Slice of Life"
+        ],
+        "genres": [
+          "Sports",
+          "Psychological",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "17631",
+      "slug": "gangsta",
+      "titles": {
+        "canonical": "Gangsta.",
+        "en": "Gangsta.",
+        "ja": "GANGSTA."
+      },
+      "status": "current",
+      "synopsis": "In the city of Ergastulum, a shady ville filled with made men and petty thieves, whores on the make and cops on the take, there are some deeds too dirty for even its jaded inhabitants to touch. Enter the \"Handymen,\" Nic and Worick, who take care of the jobs no one else will handle. Until the day when a cop they know on the force requests their help in taking down a new gang muscling in on the territory of a top Mafia family. It seems like business (and mayhem) as usual, but the Handymen are about to find that this job is a lot more than they bargained for.\n\n(Source: VIZ Media)",
+      "authors": [
+        {
+          "name": "Kohske",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 81.17,
+        "rank": 663
+      },
+      "popularity": {
+        "rank": 274
+      },
+      "tags": {
+        "categories": [
+          "Super Power",
+          "Drama",
+          "Action",
+          "Violence",
+          "Mafia",
+          "Crime"
+        ],
+        "genres": [
+          "Super Power",
+          "Drama",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "38865",
+      "slug": "tongari-boushi-no-atelier",
+      "titles": {
+        "canonical": "Tongari Boushi no Atelier",
+        "en": "Witch Hat Atelier",
+        "ja": "とんがり帽子のアトリエ"
+      },
+      "status": "current",
+      "synopsis": "In a world where everyone takes wonders like magic spells and dragons for granted, Coco is a girl with a simple dream: she wants to be a witch. But everybody knows magicians are born, not made, and Coco was not born with a gift for magic. Resigned to her un-magical life, Coco is about to give up on her dream to become a witch … until the day she meets Qifrey, a mysterious, traveling magician. After secretly seeing Qifrey perform magic in a way she’s never seen before, Coco soon learns what everybody “knows” might not be the truth, and discovers that her magical dream may not be as far away as it may seem …(Source: Kodansha Comics)",
+      "authors": [
+        {
+          "name": "Kamome Shirahama",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.51,
+        "rank": 141
+      },
+      "popularity": {
+        "rank": 244
+      },
+      "tags": {
+        "categories": [
+          "Magic",
+          "Fantasy",
+          "Adventure",
+          "Seinen",
+          "Comedy",
+          "Drama"
+        ],
+        "genres": [
+          "Magic",
+          "Fantasy"
+        ]
+      }
+    },
+    {
+      "id": "37711",
+      "slug": "arifureta-shokugyou-de-sekai-saikyou-manga",
+      "titles": {
+        "canonical": "Arifureta Shokugyou de Sekai Saikyou",
+        "en": "Arifureta: From Commonplace to World's Strongest",
+        "ja": "ありふれた職業で世界最強"
+      },
+      "status": "current",
+      "synopsis": "When a classroom of students is transported to another world to act as its saviors, Hajime Nagumo finds himself the weakest link. As his friends and classmates are granted strong classes and impressive abilities due to their existing skills, he is given the weak title of Synergist. When a dungeon quest leaves him separated from his group, Hajime must discover his own talents or be left to rot in this world forever.\n\n(Source: Seven Seas Entertainment)",
+      "authors": [
+        {
+          "name": "Ryou Shirakome",
+          "role": "Scénario"
+        },
+        {
+          "name": "RoGa",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 72.76,
+        "rank": 6031
+      },
+      "popularity": {
+        "rank": 265
+      },
+      "tags": {
+        "categories": [
+          "Harem",
+          "Fantasy",
+          "Action",
+          "Adventure",
+          "Isekai"
+        ],
+        "genres": [
+          "Harem",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "26623",
+      "slug": "dead-tube",
+      "titles": {
+        "canonical": "Dead Tube",
+        "en": "Dead Tube",
+        "ja": "DEAD Tube ～デッドチューブ～"
+      },
+      "status": "current",
+      "synopsis": "Distributing thrilling videos in secret! A school game that puts life and death on the line!\n\n(Source: Kawa Scanlations)",
+      "authors": [
+        {
+          "name": "Touta Kitakawa",
+          "role": "Dessin"
+        },
+        {
+          "name": "Mikoto Yamaguchi",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 66.23,
+        "rank": 11238
+      },
+      "popularity": {
+        "rank": 272
+      },
+      "tags": {
+        "categories": [
+          "School Life",
+          "Horror",
+          "Ecchi"
+        ],
+        "genres": [
+          "School",
+          "Horror",
+          "Ecchi"
+        ]
+      }
+    },
+    {
+      "id": "35985",
+      "slug": "dragon-ball-super",
+      "titles": {
+        "canonical": "Dragon Ball Super",
+        "en": "Dragon Ball Super",
+        "ja": "ドラゴンボール超〈スーパー〉"
+      },
+      "status": "current",
+      "synopsis": "Having defeated Boo, Goku is starting to get bored with his life on Earth. His wife, Chi-chi, wants him to get a job, but all he wants to do is train and fight stronger enemies. Elsewhere in the universe, the God of Destruction, Beerus, and his attendant Whis are traveling from planet to planet in search of food and entertainment. After blowing up some hapless victims, Beerus is reminded of a man from his dreams with the moniker “Super Saiyan God,” or something like that... The God of Destruction sets his sights on Earth to track down this mysterious man! Maybe this will give Goku something to do?\n\n(Source: MangaPlus)",
+      "authors": [
+        {
+          "name": "Akira Toriyama",
+          "role": "Scénario"
+        },
+        {
+          "name": "Toyotarou",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 74.58,
+        "rank": 4166
+      },
+      "popularity": {
+        "rank": 271
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Super Power",
+          "Action",
+          "Martial Arts",
+          "Shounen"
+        ],
+        "genres": [
+          "Comedy",
+          "Martial Arts",
+          "Super Power",
+          "Action"
+        ]
+      }
+    },
+    {
+      "id": "32875",
+      "slug": "kobayashi-san-chi-no-maid-dragon",
+      "titles": {
+        "canonical": "Kobayashi-san Chi no Maid Dragon",
+        "en": "Miss Kobayashi's Dragon Maid",
+        "ja": "小林さんちのメイドラゴン"
+      },
+      "status": "current",
+      "synopsis": "Miss Kobayashi is your average office worker who lives a boring life, alone in her small apartment–until she saves the life of a female dragon in distress. The dragon, named Tohru, has the ability to magically transform into an adorable human girl (albeit with horns and a long tail!), who will do anything to pay off her debt of gratitude, whether Miss Kobayashi likes it or not. With a very persistent and amorous dragon as a roommate, nothing comes easy, and Miss Kobayashi’s normal life is about to go off the deep end!\n\n(Source: Seven Seas)",
+      "authors": [
+        {
+          "name": "Cool-kyou Shinja",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 81.53,
+        "rank": 581
+      },
+      "popularity": {
+        "rank": 281
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "Slice of Life",
+          "Dragon"
+        ],
+        "genres": [
+          "Comedy",
+          "Fantasy",
+          "Slice of Life"
+        ]
+      }
+    },
+    {
+      "id": "40299",
+      "slug": "kaifuku-jutsushi-no-yarinaoshi",
+      "titles": {
+        "canonical": "Kaifuku Jutsushi Yarinaoshi",
+        "en": "Redo of Healer",
+        "ja": "回復術士のやり直し"
+      },
+      "status": "current",
+      "synopsis": "Healing magicians cannot fight alone.’ Keare, who was bound by this common knowledge, was exploited again and again by others.But one day, he noticed what lay beyond healing magic, and was convinced that a healing magician was the strongest class. However, by the time he realized that potential, he was deprived of everything. Thus, he used healing magic on the world itself to go back four years, deciding to redo everything.This is a heroic tale of one healing magician who became the strongest by using knowledge from his past life and healing magic.(Source: MU)",
+      "authors": [
+        {
+          "name": "Rui Tsukiyo",
+          "role": "Scénario"
+        },
+        {
+          "name": "Souken Haga",
+          "role": "Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 64.57,
+        "rank": 11688
+      },
+      "popularity": {
+        "rank": 277
+      },
+      "tags": {
+        "categories": [
+          "Ecchi",
+          "Revenge",
+          "Fantasy",
+          "Fantasy World",
+          "Adventure",
+          "Harem",
+          "Action",
+          "Drama",
+          "Slavery"
+        ],
+        "genres": [
+          "Fantasy",
+          "Ecchi"
+        ]
+      }
+    },
+    {
+      "id": "58485",
+      "slug": "sss-class-suicide-hunter",
+      "titles": {
+        "canonical": "SSS-Class Revival Hunter",
+        "en": "SSS-Class Revival Hunter",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "I want an S-Rank skill too! I want it so badly, I could die for it!\n\n[You have awakened an S-Rank skill.] [But it only works when you die.]\n\nHUH!? WHAT’S THE POINT OF GETTING ONE IF I DIE!?\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.18,
+        "rank": 369
+      },
+      "popularity": {
+        "rank": 233
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Adventure",
+          "Fantasy",
+          "Supernatural"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "2299",
+      "slug": "detective-conan",
+      "titles": {
+        "canonical": "Case Closed",
+        "en": "Detective Conan",
+        "ja": "名探偵コナン"
+      },
+      "status": "current",
+      "synopsis": "Kudo Shinichi is a seventeen year-old high school detective whom people call the \"Modern Sherlock Holmes.\" However, one night after a date with his childhood sweetheart, Ran, Shinichi witnessed an illegal trade and, caught off his guard, was knocked unconscious and fed a drug that was supposed to kill him... but he woke up and found himself shrunken to a seven year-old. In order to track down the men who did this to him, Shinichi hid his identity and lived with Ran, whose father happened to be a hopeless detective, and with that came a series of murders and mysteries that he must solve.\n(Source: ANN)",
+      "authors": [
+        {
+          "name": "Gosho Aoyama",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.36,
+        "rank": 203
+      },
+      "popularity": {
+        "rank": 293
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Cops",
+          "Romance",
+          "Adventure",
+          "Psychological",
+          "Mystery",
+          "Detective",
+          "Shounen",
+          "Thievery",
+          "Action",
+          "Violence",
+          "Crime",
+          "Elementary School",
+          "Friendship"
+        ],
+        "genres": [
+          "Comedy",
+          "Mystery",
+          "Police",
+          "Psychological",
+          "Romance",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "56296",
+      "slug": "death-is-the-only-ending-for-the-villainess",
+      "titles": {
+        "canonical": "Villains Are Destined to Die",
+        "en": "Villains Are Destined to Die",
+        "ja": "悪役のエンディングは死のみ"
+      },
+      "status": "current",
+      "synopsis": "Penelope Eckart reincarnated as the adopted daughter of Duke Eckart and the villainess of a reverse harem dating sim. The problem is, she entered the game at its hardest difficulty, and no matter what she does, death awaits her at every ending! Before the \"real daughter\" of Duke Eckart appears, she must choose one of the male leads and reach a happy ending in order to survive. But the two brothers always pick a fight with her over every little thing, as well as a crazy crown prince, whose routes all lead to death. There's even a magician who's enamoured with the female lead, and a loyal slave knight! But somehow, the favourability meters of the male leads increase the more she crosses the line with them!\n\nThis is Penelope’s survival story, who’s been dropped in an insane reverse harem dating sim!\n\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 82.76,
+        "rank": 91
+      },
+      "popularity": {
+        "rank": 285
+      },
+      "tags": {
+        "categories": [
+          "Isekai",
+          "Fantasy",
+          "Magic",
+          "Romance",
+          "Shoujo"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "39293",
+      "slug": "lookism",
+      "titles": {
+        "canonical": "Oemojisangjuui",
+        "en": "Lookism",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "Park Hyung Suk, overweight and unattractive, is bullied and abused on a daily basis. But a miracle is about to happen.\n(Source: MU)",
+      "authors": [],
+      "ratings": {
+        "average": 80.25,
+        "rank": 885
+      },
+      "popularity": {
+        "rank": 286
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "School Life",
+          "Drama",
+          "Action",
+          "Supernatural",
+          "Shounen",
+          "Delinquent",
+          "Coming Of Age",
+          "Martial Arts",
+          "Boxing"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "School",
+          "Drama"
+        ]
+      }
+    },
+    {
+      "id": "20310",
+      "slug": "sekaiichi-hatsukoi-onodera-ritsu-no-baai",
+      "titles": {
+        "canonical": "Sekaiichi Hatsukoi: Onodera Ritsu no Baai",
+        "en": "The World's Greatest First Love: The Case of Ritsu Onodera",
+        "ja": "世界一初恋 ～小野寺律の場合～"
+      },
+      "status": "current",
+      "synopsis": "Onodera Ritsu has just transferred from his father's publishing company to Marukawa Shoten. Assigned to the shoujo manga division, he crosses path with the person he'd least expected to meet. Takano Masamune is the editor-in-chief of the division Ritsu's been assigned to, and the two seem get off on the wrong foot right from the very start when Takano unexpectedly kisses him. However, there is more to than what meets the eye: Takano is actually Saga, Ritsu's senpai and high school love, whom Ritsu had thought to have played him for a fool by taking his affections for granted when he confessed and summarily dumped him.",
+      "authors": [
+        {
+          "name": "Shungiku Nakamura",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.28,
+        "rank": 285
+      },
+      "popularity": {
+        "rank": 315
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Drama",
+          "Yaoi"
+        ],
+        "genres": [
+          "Comedy",
+          "Yaoi",
+          "Drama",
+          "Romance"
+        ]
+      }
+    },
+    {
+      "id": "25426",
+      "slug": "re-monster-m",
+      "titles": {
+        "canonical": "Re:Monster",
+        "en": "Re:Monster",
+        "ja": "Re:Monster"
+      },
+      "status": "current",
+      "synopsis": "Tomokui Kanata has been re-incarnated in the weakest goblin, named Goburou, after having undergone an unfortunate death. However Goburou has retained his previous life's memories, an unusual evolution, as well as becoming strong enough to gain status boosts from eating.\n\nIn this alternate world of survival of the fittest, events unfold with competent subordinates and comrades, delightful case of the tail-wagging dog...",
+      "authors": [
+        {
+          "name": "Haruyoshi Kobayakawa",
+          "role": "Dessin"
+        },
+        {
+          "name": "Kogitsune Kanekiru",
+          "role": "Scénario"
+        }
+      ],
+      "ratings": {
+        "average": 73.02,
+        "rank": 5732
+      },
+      "popularity": {
+        "rank": 307
+      },
+      "tags": {
+        "categories": [
+          "Magic",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ],
+        "genres": [
+          "Magic",
+          "Fantasy",
+          "Action",
+          "Adventure"
+        ]
+      }
+    },
+    {
+      "id": "58159",
+      "slug": "sakamoto-days",
+      "titles": {
+        "canonical": "Sakamoto Days",
+        "en": "SAKAMOTO DAYS",
+        "ja": "サカモトデイズ"
+      },
+      "status": "current",
+      "synopsis": "Tarou Sakamoto was the ultimate assassin, feared by villains and admired by hitmen. But one day...he fell in love! Retirement, marriage, fatherhood and then... Sakamoto gained weight! The chubby guy who runs the neighborhood store is actually a former legendary hitman! Can he protect his family from danger? Get ready to experience a new kind of action comedy series!\n\n(Source: MANGA Plus)",
+      "authors": [],
+      "ratings": {
+        "average": 79.4,
+        "rank": 1154
+      },
+      "popularity": {
+        "rank": 267
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Comedy",
+          "Shounen",
+          "Supernatural"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "58010",
+      "slug": "mercenary-enrollment",
+      "titles": {
+        "canonical": "Iphagyongbyeong",
+        "en": "Mercenary Enrollment",
+        "ja": null
+      },
+      "status": "current",
+      "synopsis": "At the age of eight, I-Jin Yu lost his parents in a plane crash and became stranded in a foreign land, forced to become a child mercenary in order to stay alive. He returns home ten years later to be reunited with his family in Korea, where food and shelter are plenty and everything seems peaceful. But I-Jin will soon learn that life as a teenager is a whole other feat of survival. With only one year of high school left, I-Jin must master new tactics to maneuver his way around the schoolhouse battleground. Can he survive a year of high school? Or rather, will the school be able to survive him?\n\n(Source: WEBTOONS)",
+      "authors": [],
+      "ratings": {
+        "average": 81.13,
+        "rank": 672
+      },
+      "popularity": {
+        "rank": 287
+      },
+      "tags": {
+        "categories": [
+          "Action",
+          "Drama",
+          "Military",
+          "Gunfights",
+          "War",
+          "Martial Arts"
+        ],
+        "genres": []
+      }
+    },
+    {
+      "id": "22206",
+      "slug": "watashi-ga-motenai-no-wa-dou-kangaete-mo-omaera-ga-warui",
+      "titles": {
+        "canonical": "Watashi ga Motenai no wa Dou Kangaetemo Omaera ga Warui!",
+        "en": "No Matter How I Look at It, It's You Guys' Fault I'm Not Popular!",
+        "ja": "私がモテないのはどう考えてもお前らが悪い!"
+      },
+      "status": "current",
+      "synopsis": "Kuroki Tomoko is a super popular, high school girl, who has had 50 years of dating experience, and 100 boys... in the Otome game world. In the real world, she is a 15 year old shut in, who has all of the qualities of a \"mojo\" (喪女, a gloomy or unpopular woman).\n\nHowever, when school isn't going as she expected, and she isn't as popular as she had thought she was, she takes a look at herself in the mirror for the first time in a few years, and has some shocking revelations...\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Nico Tanigawa",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 76.1,
+        "rank": 2926
+      },
+      "popularity": {
+        "rank": 324
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "School Life"
+        ],
+        "genres": [
+          "Comedy",
+          "School"
+        ]
+      }
+    },
+    {
+      "id": "36770",
+      "slug": "vanitas-no-carte",
+      "titles": {
+        "canonical": "Vanitas no Carte",
+        "en": "The Case Study of Vanitas",
+        "ja": "ヴァニタスの手記〈カルテ〉"
+      },
+      "status": "current",
+      "synopsis": "Rumors revolving around The Book of Vanitas, a clockwork grimoire of dubious reputation, draw Noé, a young vampire in search of a friend's salvation, to Paris. What awaits him in the City of Flowers, however, is not long hours treading the pavement or rifling through dusty bookshops in search of the tome. Instead, his quarry comes to him...in the arms of a man claiming to be a vampire doctor! Thrust into a conflict that threatens the peace between humans and vampires, will Noé cast in his lot with the curious and slightly unbalanced Vanitas and his quest to save vampirekind?\n\n(Source: Yen Press)",
+      "authors": [
+        {
+          "name": "Jun Mochizuki",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 81.99,
+        "rank": 469
+      },
+      "popularity": {
+        "rank": 320
+      },
+      "tags": {
+        "categories": [
+          "Fantasy",
+          "Vampire",
+          "Historical",
+          "Fantasy",
+          "Steampunk",
+          "Supernatural",
+          "Bishounen",
+          "Adventure",
+          "Drama",
+          "France",
+          "Mystery",
+          "Shounen"
+        ],
+        "genres": [
+          "Supernatural",
+          "Vampire",
+          "Historical",
+          "Fantasy"
+        ]
+      }
+    },
+    {
+      "id": "39700",
+      "slug": "mairimashita-iruma-kun",
+      "titles": {
+        "canonical": "Mairimashita! Iruma-kun",
+        "en": "Welcome to Demon School! Iruma-kun",
+        "ja": "魔入りました！入間くん"
+      },
+      "status": "current",
+      "synopsis": "Mairimashita! Iruma-kun is the story of Suzuki Iruma, who has been sold to the demon by his irresponsible parents in exchange for money. Surprisingly, next thing he knows, he is living with the demon and has been transferred into a school from Demon World. We invite you to follow Iruma-kun's extraordinary school life.\n\n(Source: MU)",
+      "authors": [
+        {
+          "name": "Osamu Nishi",
+          "role": "Scénario & Dessin"
+        }
+      ],
+      "ratings": {
+        "average": 82.32,
+        "rank": 247
+      },
+      "popularity": {
+        "rank": 312
+      },
+      "tags": {
+        "categories": [
+          "Comedy",
+          "Fantasy",
+          "School Life",
+          "Demon"
+        ],
+        "genres": [
+          "Comedy",
+          "Supernatural",
+          "Demons",
+          "Fantasy"
+        ]
+      }
+    }
+  ]
+}
