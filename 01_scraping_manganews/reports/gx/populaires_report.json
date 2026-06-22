@@ -1,0 +1,28 @@
+{
+  "critical": {
+    "failed_expectations": [],
+    "statistics": {
+      "evaluated_expectations": 23,
+      "success_percent": 100.0,
+      "successful_expectations": 23,
+      "unsuccessful_expectations": 0
+    },
+    "success": true
+  },
+  "dataset": "populaires",
+  "file": "data/enriched/populaires.backfilled.jsonl",
+  "git_commit": "990b26f0cd5ebf5f72add8f8decfac9f3754b31d",
+  "gx_version": "1.10.0",
+  "rows": 50,
+  "run_at_utc": "2026-01-06T01:24:16.797477+00:00",
+  "warning": {
+    "failed_expectations": [],
+    "statistics": {
+      "evaluated_expectations": 5,
+      "success_percent": 100.0,
+      "successful_expectations": 5,
+      "unsuccessful_expectations": 0
+    },
+    "success": true
+  }
+}

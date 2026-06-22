@@ -1,0 +1,40 @@
+name: quality_scraping
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+  #schedule:
+  # - cron: "30 2 * * *"
+
+jobs:
+  quality_scraping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pipeline (backfill + validate)
+        run: |
+          python scripts/run_pipeline_backfill_then_validate.py
+
+      - name: Upload GX reports (artifacts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gx-reports
+          path: |
+            reports/gx/*.json
+            great_expectations/uncommitted/data_docs/local_site/**
