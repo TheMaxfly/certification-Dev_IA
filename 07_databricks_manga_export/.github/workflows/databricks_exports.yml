@@ -1,0 +1,39 @@
+name: Databricks export (Bloc 1)
+
+on:
+  workflow_dispatch:
+ # schedule:
+ #   - cron: "0 6 * * 1"  # lundi 06:00 UTC
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install databricks-sdk python-dotenv
+
+      - name: Run Databricks export runner
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_JOB_ID: ${{ secrets.DATABRICKS_JOB_ID }}
+          DATABRICKS_ENABLE_EXPERIMENTAL_FILES_API_CLIENT: "true"
+        run: |
+          python3 run_databrick_job_export.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: databricks-export
+          path: |
+            exports/databricks/*.csv
+            exports/databricks/*.json
