@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=60", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apimanga"
+version = "0.1.0"
+description = "Client/service/CLI for fetching manga data from the Kitsu API."
+authors = [
+    { name="Maxime", email="maxime@example.com" },
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.31",
+]
+
+[project.urls]
+homepage = "https://github.com/example/ApiManga"
+repository = "https://github.com/example/ApiManga"
