@@ -1,9 +1,10 @@
 # manga_sanctuary/pipelines.py
 
 import re
+
 from itemadapter import ItemAdapter
 
-from .items import VolumeItem, ReviewItem
+from .items import ReviewItem, VolumeItem
 
 
 class CleanAndTypePipeline:
@@ -103,4 +104,3 @@ class CleanAndTypePipeline:
         # 4) Fallback : autre type d'item éventuel
         # ---------------------------------------------------
         return item
-

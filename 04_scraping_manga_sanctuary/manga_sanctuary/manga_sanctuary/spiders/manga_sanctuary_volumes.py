@@ -1,6 +1,8 @@
 import re
+
 import scrapy
-from ..items import VolumeItem, ReviewItem
+
+from ..items import ReviewItem, VolumeItem
 
 
 class MangaSanctuaryVolumesSpider(scrapy.Spider):
@@ -56,7 +58,7 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         # 2) Fallback : tout <p> avec text-align ET justify si rien trouvé
         if not texts:
             texts = response.xpath(
-                "//p[contains(@style, 'text-align') and contains(@style, 'justify')][1]//text()"
+                "//p[contains(@style, 'text-align') and contains(@style, 'justify')][1]//text()"  # noqa: E501
             ).getall()
 
         if not texts:
@@ -134,11 +136,11 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         def extract_after(label, a_tag=True):
             if a_tag:
                 return response.xpath(
-                    f"normalize-space(//text()[contains(., '{label}')]/following::a[1]/text())"
+                    f"normalize-space(//text()[contains(., '{label}')]/following::a[1]/text())"  # noqa: E501
                 ).get()
             else:
                 return response.xpath(
-                    f"normalize-space(//text()[contains(., '{label}')]/following::text()[1])"
+                    f"normalize-space(//text()[contains(., '{label}')]/following::text()[1])"  # noqa: E501
                 ).get()
 
         series_type = extract_after("Type")
@@ -178,15 +180,15 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
 
         # nb de tomes global (ex. "42 tomes")
         tomes_text = response.xpath(
-            "normalize-space(//span[contains(@class, 'badge-primary')]/following::text()[contains(., 'tome')][1])"
+            "normalize-space(//span[contains(@class, 'badge-primary')]/following::text()[contains(., 'tome')][1])"  # noqa: E501
         ).get()
         if series_statuses and tomes_text:
             series_statuses[0]["tomes"] = tomes_text.strip()
 
         # ---------- Popularité ----------
-        popularity_raw = response.css(
-            "a[href='/popularite.php'] span::text"
-        ).re_first(r"(\d+)")
+        popularity_raw = response.css("a[href='/popularite.php'] span::text").re_first(
+            r"(\d+)"
+        )
         series_popularity_rank = int(popularity_raw) if popularity_raw else None
 
         # ---------- Notes série (membres / experts) ----------
@@ -330,15 +332,15 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
 
         # Date de parution
         item["volume_publication_date"] = response.xpath(
-            "normalize-space(//text()[contains(., 'Date parution')]/following::text()[1])"
+            "normalize-space(//text()[contains(., 'Date parution')]/following::text()[1])"  # noqa: E501
         ).get()
 
         # Dessinateur / Scénariste spécifiques à l'édition (souvent identiques)
         item["volume_dessinateur"] = response.xpath(
-            "normalize-space(//text()[contains(., 'Dessinateur')]/following::a[1]/text())"
+            "normalize-space(//text()[contains(., 'Dessinateur')]/following::a[1]/text())"  # noqa: E501
         ).get()
         item["volume_scenariste"] = response.xpath(
-            "normalize-space(//text()[contains(., 'Scénariste')]/following::a[1]/text())"
+            "normalize-space(//text()[contains(., 'Scénariste')]/following::a[1]/text())"  # noqa: E501
         ).get()
 
         # Éditeur
@@ -371,7 +373,7 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
 
         # "2 tomes (sur 2)" pour cette édition
         tomes_edition = response.xpath(
-            "normalize-space(//span[contains(@class,'badge-primary')]/following::text()[contains(., 'tome')][1])"
+            "normalize-space(//span[contains(@class,'badge-primary')]/following::text()[contains(., 'tome')][1])"  # noqa: E501
         ).get()
         if tomes_edition:
             m1 = re.search(r"(\d+)\s+tome", tomes_edition)
@@ -423,7 +425,7 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         if not volume_synopsis:
             # … puis fallback : paragraphe juste avant "Les tomes de cette édition"
             volume_synopsis = response.xpath(
-                "normalize-space(//h5[contains(., 'Les tomes de cette édition')]/preceding::p[1]/text())"
+                "normalize-space(//h5[contains(., 'Les tomes de cette édition')]/preceding::p[1]/text())"  # noqa: E501
             ).get()
         item["volume_synopsis"] = volume_synopsis
 
@@ -523,4 +525,3 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         review["review_body"] = " ".join(p.strip() for p in body_parts if p.strip())
 
         yield review
-

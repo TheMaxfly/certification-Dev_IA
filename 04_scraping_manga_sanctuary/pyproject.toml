@@ -7,3 +7,13 @@ requires-python = ">=3.12"
 dependencies = [
     "scrapy>=2.13.4",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+# Scaffolding Scrapy non modifié et désactivé (middlewares commentés dans settings) :
+# exclu du lint car non maintenu par le projet.
+extend-exclude = ["manga_sanctuary/manga_sanctuary/middlewares.py"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
