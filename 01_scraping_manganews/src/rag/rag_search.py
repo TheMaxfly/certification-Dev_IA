@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-import os
 import json
-import requests
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from pgvector.psycopg2 import register_vector
+import os
 
-DSN = os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews")
+import psycopg2
+import requests
+from pgvector.psycopg2 import register_vector
+from psycopg2.extras import RealDictCursor
+
+DSN = os.getenv(
+    "POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews"
+)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "qllama/multilingual-e5-base:latest")
 
 # RAG defaults (tu peux adapter)
 DOC_TYPE = os.getenv("DOC_TYPE", "rag")
-TOP_K_CHUNKS = int(os.getenv("TOP_K_CHUNKS", "12"))      # chunks retournés (preuves)
-TOP_SERIES = int(os.getenv("TOP_SERIES", "5"))           # séries candidates (optionnel)
+TOP_K_CHUNKS = int(os.getenv("TOP_K_CHUNKS", "12"))  # chunks retournés (preuves)
+TOP_SERIES = int(os.getenv("TOP_SERIES", "5"))  # séries candidates (optionnel)
 MAX_CHUNKS_PER_SERIES = int(os.getenv("MAX_CHUNKS_PER_SERIES", "3"))  # diversité
 
 
@@ -76,11 +79,13 @@ def rank_series_from_chunks(chunks, top_series: int, max_chunks_per_series: int)
     ranked = []
     for s, rows in by_series.items():
         score = sum(r["cosine_sim"] for r in rows)
-        ranked.append({
-            "series_url": s,
-            "score": score,
-            "evidences": rows,
-        })
+        ranked.append(
+            {
+                "series_url": s,
+                "score": score,
+                "evidences": rows,
+            }
+        )
 
     ranked.sort(key=lambda x: x["score"], reverse=True)
     return ranked[:top_series]
@@ -88,8 +93,11 @@ def rank_series_from_chunks(chunks, top_series: int, max_chunks_per_series: int)
 
 def main():
     import argparse
+
     p = argparse.ArgumentParser()
-    p.add_argument("query", help="Texte utilisateur (ex: 'manga sombre avec des titans...')")
+    p.add_argument(
+        "query", help="Texte utilisateur (ex: 'manga sombre avec des titans...')"
+    )
     p.add_argument("--doc-type", default=DOC_TYPE)
     p.add_argument("--top-k-chunks", type=int, default=TOP_K_CHUNKS)
     p.add_argument("--top-series", type=int, default=TOP_SERIES)
@@ -105,7 +113,9 @@ def main():
     finally:
         conn.close()
 
-    ranked = rank_series_from_chunks(chunks, args.top_series, args.max_chunks_per_series)
+    ranked = rank_series_from_chunks(
+        chunks, args.top_series, args.max_chunks_per_series
+    )
 
     # Output JSON (pratique pour brancher sur ton service API plus tard)
     out = {

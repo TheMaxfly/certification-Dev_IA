@@ -1,5 +1,6 @@
 import scrapy
 
+
 class MangaNewsSeriesItem(scrapy.Item):
     url = scrapy.Field()
     title_page = scrapy.Field()
@@ -38,4 +39,3 @@ class MangaNewsSeriesItem(scrapy.Item):
 
     related_news = scrapy.Field()
     rag_text = scrapy.Field()
-

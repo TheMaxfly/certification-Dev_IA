@@ -1,6 +1,9 @@
-import json, re, hashlib, unicodedata
-from urllib.parse import urlparse
+import hashlib
+import json
+import re
+import unicodedata
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 SCHEMA_VERSION = "manganews.series.v1"
 ENRICH_VERSION = "enrich_jsonl.v1"
@@ -17,10 +20,13 @@ def norm_str(s: str) -> str | None:
     if not s:
         return None
     # retire accents
-    s = "".join(ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch))
+    s = "".join(
+        ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch)
+    )
     # espaces et ponctuation un peu tolérante
     s = re.sub(r"\s+", " ", s).strip()
     return s.upper()
+
 
 def clean_text(s: str) -> str | None:
     """Nettoyage simple texte (trim + espaces)."""
@@ -30,8 +36,10 @@ def clean_text(s: str) -> str | None:
     s = re.sub(r"\s+", " ", s).strip()
     return s or None
 
+
 def sha1_hex(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
+
 
 def extract_series_slug(url: str) -> str | None:
     """
@@ -46,6 +54,7 @@ def extract_series_slug(url: str) -> str | None:
         return m.group(1) if m else None
     except Exception:
         return None
+
 
 def parse_origine(origine: str):
     """
@@ -90,13 +99,15 @@ def align_parallel_lists(a, b):
     if not isinstance(b, list):
         b = [b]
 
-    pairs = [(x, y) for x, y in zip(a, b) if x and y]
+    pairs = [(x, y) for x, y in zip(a, b, strict=False) if x and y]
     a2 = [x for x, _ in pairs]
     b2 = [y for _, y in pairs]
     return a2, b2
 
+
 def build_rag_text(row: dict) -> str:
     parts = []
+
     def add(label, value):
         if value is None:
             return
@@ -122,12 +133,12 @@ def build_rag_text(row: dict) -> str:
 
     return "\n".join(parts)
 
+
 def enrich_row(row: dict) -> tuple[dict, list[str]]:
     """
     Retourne (row_enrichi, erreurs)
     """
     errors = []
-
 
     # --- provenance / versions ---
     row["schema_version"] = row.get("schema_version") or SCHEMA_VERSION
@@ -136,7 +147,6 @@ def enrich_row(row: dict) -> tuple[dict, list[str]]:
     # timestamp ISO en UTC (stable, comparable)
     if not row.get("scraped_at"):
         row["scraped_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-
 
     url = row.get("url")
     if not url:
@@ -148,8 +158,14 @@ def enrich_row(row: dict) -> tuple[dict, list[str]]:
         row["source_id"] = row.get("source_id") or sha1_hex(url)
 
     # 2) Listes parallèles
-    genres, genres_urls = align_parallel_lists(row.get("genres"), row.get("genres_urls"))
-    if (row.get("genres") or []) and (row.get("genres_urls") or []) and len((row.get("genres") or [])) != len((row.get("genres_urls") or [])):
+    genres, genres_urls = align_parallel_lists(
+        row.get("genres"), row.get("genres_urls")
+    )
+    if (
+        (row.get("genres") or [])
+        and (row.get("genres_urls") or [])
+        and len(row.get("genres") or []) != len(row.get("genres_urls") or [])
+    ):
         errors.append("mismatch:genres_vs_genres_urls")
     row["genres"] = genres
     row["genres_urls"] = genres_urls
@@ -190,6 +206,7 @@ def enrich_item(row: dict) -> dict:
     enriched, _errors = enrich_row(row)
     return enriched
 
+
 # -------------------------
 # Run sur un JSONL
 # -------------------------
@@ -199,7 +216,10 @@ def _run_jsonl(in_path: str, out_path: str) -> None:
     missing_resume = 0
     not_indexable = 0
 
-    with open(in_path, "r", encoding="utf-8") as f_in, open(out_path, "w", encoding="utf-8") as f_out:
+    with (
+        open(in_path, encoding="utf-8") as f_in,
+        open(out_path, "w", encoding="utf-8") as f_out,
+    ):
         for line in f_in:
             total += 1
             row = json.loads(line)

@@ -1,15 +1,14 @@
+import datetime as dt
+import json
 import os
 import re
-import json
-import datetime as dt
+
 import psycopg2
-from psycopg2.extras import execute_values
+
 # manga_news_scraper/pipelines.py
 from itemadapter import ItemAdapter
-from manga_news_scraper.utils.enrich_jsonl import enrich_item
+from psycopg2.extras import execute_values
 
-import datetime as dt
-from itemadapter import ItemAdapter
 from manga_news_scraper.utils.enrich_jsonl import enrich_item
 
 
@@ -50,14 +49,20 @@ class EnrichPipeline:
 
         # --- 2) Détection “populaires” ---
         collection = (data.get("collection") or "").strip().lower()
-        is_populaires = (collection == "populaires") or spider.name.endswith("populaires")
+        is_populaires = (collection == "populaires") or spider.name.endswith(
+            "populaires"
+        )
 
         # --- 3) schema/enrich/scraped_at (toujours renseignés) ---
         data["schema_version"] = (
-            self.POPULAIRES_SCHEMA_VERSION if is_populaires else self.SERIES_SCHEMA_VERSION
+            self.POPULAIRES_SCHEMA_VERSION
+            if is_populaires
+            else self.SERIES_SCHEMA_VERSION
         )
         data["enrich_version"] = self.ENRICH_VERSION
-        data["scraped_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+        data["scraped_at"] = (
+            dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+        )
 
         # --- 4) RAG indexability ---
         if is_populaires:
@@ -66,14 +71,20 @@ class EnrichPipeline:
         else:
             data.setdefault(
                 "indexable_rag",
-                bool(data.get("rag_text") or data.get("resume") or data.get("points_forts"))
+                bool(
+                    data.get("rag_text")
+                    or data.get("resume")
+                    or data.get("points_forts")
+                ),
             )
 
         # --- 5) Flags de cohérence (pour GX : CRITICAL vs WARNING) ---
         rag_text = data.get("rag_text")
         rag_char_len = data.get("rag_char_len") or 0
         indexable_rag = bool(data.get("indexable_rag"))
-        data["rag_is_consistent"] = (not indexable_rag) or (_truthy_text(rag_text) and rag_char_len > 0)
+        data["rag_is_consistent"] = (not indexable_rag) or (
+            _truthy_text(rag_text) and rag_char_len > 0
+        )
 
         has_resume = bool(data.get("has_resume"))
         resume = data.get("resume")
@@ -96,16 +107,16 @@ class EnrichPipeline:
         return data
 
 
-
-
 class ValidationError(Exception):
     pass
+
 
 def normalize_spaces(s: str | None) -> str | None:
     if not s:
         return None
     s = re.sub(r"\s+", " ", s).strip()
     return s or None
+
 
 def parse_origin(origin: str | None):
     """
@@ -118,6 +129,7 @@ def parse_origin(origin: str | None):
     if not m:
         return (normalize_spaces(origin), None)
     return (normalize_spaces(m.group("country")), int(m.group("year")))
+
 
 class MangaNewsPostgresPipeline:
     """
@@ -136,9 +148,15 @@ class MangaNewsPostgresPipeline:
 
     @classmethod
     def from_crawler(cls, crawler):
-        dsn = crawler.settings.get("POSTGRES_DSN") or os.getenv("APIMANGA_DSN") or os.getenv("POSTGRES_DSN")
+        dsn = (
+            crawler.settings.get("POSTGRES_DSN")
+            or os.getenv("APIMANGA_DSN")
+            or os.getenv("POSTGRES_DSN")
+        )
         if not dsn:
-            raise RuntimeError("POSTGRES_DSN manquant (settings.py ou variable d'environnement).")
+            raise RuntimeError(
+                "POSTGRES_DSN manquant (settings.py ou variable d'environnement)."
+            )
         batch_size = crawler.settings.getint("PG_BATCH_SIZE", 200)
         return cls(dsn=dsn, batch_size=batch_size)
 
@@ -177,7 +195,9 @@ class MangaNewsPostgresPipeline:
             raise ValidationError("url manquante")
 
         if not (titre_traduit or titre_vo or title_page):
-            raise ValidationError("aucun titre disponible (titre_traduit/titre_vo/title_page)")
+            raise ValidationError(
+                "aucun titre disponible (titre_traduit/titre_vo/title_page)"
+            )
 
         # Pour le RAG, on veut au moins une source de texte
         if not (resume or points_forts):
@@ -252,4 +272,3 @@ class MangaNewsPostgresPipeline:
         execute_values(self.cur, sql, self.buffer, page_size=self.batch_size)
         self.conn.commit()
         self.buffer.clear()
-

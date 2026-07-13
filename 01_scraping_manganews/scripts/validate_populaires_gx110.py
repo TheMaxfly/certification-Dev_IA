@@ -4,13 +4,12 @@ import re
 import sys
 from pathlib import Path
 
-import pandas as pd
 import great_expectations as gx
-
+import pandas as pd
 from gx_report_utils import (
-    utc_now_iso,
-    try_git_commit,
     extract_failed_expectations,
+    try_git_commit,
+    utc_now_iso,
     write_json_report,
 )
 
@@ -72,7 +71,9 @@ def add_critical_expectations(v):
 
     # NOTE: si tu as backfillé schema_version => adapte ici au standard choisi
     # v.expect_column_values_to_be_in_set("schema_version", ["manganews.populaires.v1"])
-    v.expect_column_values_to_be_in_set("schema_version", ["manganews.populaires.v1", "manganews:populaires:v1"])
+    v.expect_column_values_to_be_in_set(
+        "schema_version", ["manganews.populaires.v1", "manganews:populaires:v1"]
+    )
 
     v.expect_column_values_to_be_in_set("enrich_version", ["enrich_item:v2"])
 
@@ -107,7 +108,9 @@ def add_critical_expectations(v):
 
 
 def add_warning_expectations(v):
-    v.expect_column_values_to_be_in_set("volumes_text_count_consistent", [True], mostly=0.99)
+    v.expect_column_values_to_be_in_set(
+        "volumes_text_count_consistent", [True], mostly=0.99
+    )
     v.expect_column_values_to_be_in_set("genres_is_list", [True], mostly=0.99)
     v.expect_column_values_to_be_in_set("genres_urls_is_list", [True], mostly=0.99)
     v.expect_column_values_to_be_in_set("genres_norm_is_list", [True], mostly=0.99)
@@ -143,8 +146,12 @@ def main() -> int:
     df["volumes_text_count_consistent"] = (vt == vc).fillna(False)
 
     df["genres_is_list"] = df.get("genres").apply(lambda x: isinstance(x, list))
-    df["genres_urls_is_list"] = df.get("genres_urls").apply(lambda x: isinstance(x, list))
-    df["genres_norm_is_list"] = df.get("genres_norm").apply(lambda x: isinstance(x, list))
+    df["genres_urls_is_list"] = df.get("genres_urls").apply(
+        lambda x: isinstance(x, list)
+    )
+    df["genres_norm_is_list"] = df.get("genres_norm").apply(
+        lambda x: isinstance(x, list)
+    )
 
     idx = df.get("indexable_rag") == True  # noqa: E712
     rag_len = pd.to_numeric(df.get("rag_char_len"), errors="coerce").fillna(0)

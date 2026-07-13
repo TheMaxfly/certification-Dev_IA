@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 import os
-import time
 import re
+import time
 import unicodedata
-import requests
+
 import psycopg2
-from psycopg2.extras import execute_values
+import requests
 from pgvector.psycopg2 import register_vector
+from psycopg2.extras import execute_values
 
 # -----------------------
 # Config
 # -----------------------
-DSN = os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews")
+DSN = os.getenv(
+    "POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews"
+)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 MODEL = os.getenv("EMBED_MODEL", "qllama/multilingual-e5-base:q4_k_m")
 
 # Safe+fast defaults for your laptop (you can override via env)
-PAGE_SIZE = int(os.getenv("PAGE_SIZE", "100"))       # how many series per loop
-EMBED_BATCH = int(os.getenv("EMBED_BATCH", "16"))    # chunks per embed call (raise to 32 if stable)
+PAGE_SIZE = int(os.getenv("PAGE_SIZE", "100"))  # how many series per loop
+EMBED_BATCH = int(
+    os.getenv("EMBED_BATCH", "16")
+)  # chunks per embed call (raise to 32 if stable)
 COMMIT_EVERY = int(os.getenv("COMMIT_EVERY", "400"))
 SLEEP_BETWEEN = float(os.getenv("SLEEP_BETWEEN", "0"))
 
@@ -54,7 +59,7 @@ def chunk_text(text: str, size: int, overlap: int):
     n = len(text)
     step = max(1, size - overlap)
     while i < n:
-        out.append(text[i:i + size])
+        out.append(text[i : i + size])
         i += step
     return out
 
@@ -145,7 +150,7 @@ def main():
 
         # Build chunks for this page
         chunk_rows = []
-        for (url, rag_text) in rows:
+        for url, rag_text in rows:
             cleaned = sanitize_text(rag_text or "")
             if not cleaned:
                 continue
@@ -156,14 +161,14 @@ def main():
         # Embed + insert chunks in batches
         i = 0
         while i < len(chunk_rows):
-            batch = chunk_rows[i:i + EMBED_BATCH]
+            batch = chunk_rows[i : i + EMBED_BATCH]
             passages = [f"{E5_PREFIX}{t[3]}" for t in batch]
 
             total_batches += 1
             vecs = post_embed_batch(passages)
 
             insert_tuples = []
-            for (row, vec) in zip(batch, vecs):
+            for row, vec in zip(batch, vecs, strict=False):
                 (url, doc_type, idx, ch) = row
                 insert_tuples.append((url, doc_type, idx, ch, vec, MODEL))
 
@@ -204,9 +209,10 @@ def main():
 
     conn.close()
     print("done")
-    print(f"final: series_processed={total_series_processed} inserted_chunks={total_inserted} batches={total_batches}")
+    print(
+        f"final: series_processed={total_series_processed} inserted_chunks={total_inserted} batches={total_batches}"
+    )
 
 
 if __name__ == "__main__":
     main()
-

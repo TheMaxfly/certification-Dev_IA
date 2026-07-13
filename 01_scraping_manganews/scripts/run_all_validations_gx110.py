@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gx_report_utils import utc_now_iso, try_git_commit, write_json_report
+from gx_report_utils import try_git_commit, utc_now_iso, write_json_report
 
 
 def run(cmd: list[str]) -> tuple[int, str]:
@@ -19,15 +19,33 @@ def main() -> int:
     )
 
     # Reports
-    ap.add_argument("--report-dir", default="reports/gx", help="Directory where reports are written")
-    ap.add_argument("--summary-name", default="summary_report.json", help="Filename for the global summary report")
+    ap.add_argument(
+        "--report-dir", default="reports/gx", help="Directory where reports are written"
+    )
+    ap.add_argument(
+        "--summary-name",
+        default="summary_report.json",
+        help="Filename for the global summary report",
+    )
 
     # Inputs (raw)
-    ap.add_argument("--series-file", default="data/enriched/manganews_series.jsonl", help="Path to series JSONL input")
-    ap.add_argument("--pop-file", default="data/enriched/populaires.jsonl", help="Path to populaires JSONL input")
+    ap.add_argument(
+        "--series-file",
+        default="data/enriched/manganews_series.jsonl",
+        help="Path to series JSONL input",
+    )
+    ap.add_argument(
+        "--pop-file",
+        default="data/enriched/populaires.jsonl",
+        help="Path to populaires JSONL input",
+    )
 
     # Backfill
-    ap.add_argument("--do-backfill", action="store_true", help="Run backfill_jsonl.py before validations")
+    ap.add_argument(
+        "--do-backfill",
+        action="store_true",
+        help="Run backfill_jsonl.py before validations",
+    )
     ap.add_argument(
         "--series-backfilled",
         default="data/enriched/manganews_series.backfilled.jsonl",
@@ -50,8 +68,20 @@ def main() -> int:
     # ---- optional backfill step ----
     backfill_info = {
         "enabled": bool(args.do_backfill),
-        "series": {"cmd": None, "exit_code": None, "log_tail": None, "in": args.series_file, "out": args.series_backfilled},
-        "populaires": {"cmd": None, "exit_code": None, "log_tail": None, "in": args.pop_file, "out": args.pop_backfilled},
+        "series": {
+            "cmd": None,
+            "exit_code": None,
+            "log_tail": None,
+            "in": args.series_file,
+            "out": args.series_backfilled,
+        },
+        "populaires": {
+            "cmd": None,
+            "exit_code": None,
+            "log_tail": None,
+            "in": args.pop_file,
+            "out": args.pop_backfilled,
+        },
     }
 
     if args.do_backfill:
@@ -96,7 +126,9 @@ def main() -> int:
                 "backfill": backfill_info,
                 "overall_success": False,
             }
-            summary_path = write_json_report(args.report_dir, args.summary_name, summary)
+            summary_path = write_json_report(
+                args.report_dir, args.summary_name, summary
+            )
             print("Summary report written:", summary_path)
             return 1
 
@@ -130,7 +162,7 @@ def main() -> int:
     rc_series, out_series = run(cmd_series)
     rc_pop, out_pop = run(cmd_pop)
 
-    overall_success = (rc_series == 0 and rc_pop == 0)
+    overall_success = rc_series == 0 and rc_pop == 0
 
     summary = {
         "run_at_utc": utc_now_iso(),

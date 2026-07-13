@@ -1,16 +1,14 @@
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 
-import pandas as pd
 import great_expectations as gx
-
+import pandas as pd
 from gx_report_utils import (
-    utc_now_iso,
-    try_git_commit,
     extract_failed_expectations,
+    try_git_commit,
+    utc_now_iso,
     write_json_report,
 )
 
@@ -69,7 +67,9 @@ def add_critical_expectations(v):
 
     v.expect_column_to_exist("enrich_version")
     # adapte la liste si tu as plusieurs enrich_version en prod
-    v.expect_column_values_to_be_in_set("enrich_version", ["enrich_jsonl.v1", "enrich_item:v2"])
+    v.expect_column_values_to_be_in_set(
+        "enrich_version", ["enrich_jsonl.v1", "enrich_item:v2"]
+    )
 
     v.expect_column_to_exist("scraped_at_is_parseable")
     v.expect_column_values_to_be_in_set("scraped_at_is_parseable", [True])
@@ -140,7 +140,9 @@ def main() -> int:
     year_ok = year.between(args.min_year, args.max_year, inclusive="both")
     df["origin_year_is_plausible"] = (~has_year) | year_ok
 
-    df["genres_norm_is_list"] = df.get("genres_norm").apply(lambda x: isinstance(x, list))
+    df["genres_norm_is_list"] = df.get("genres_norm").apply(
+        lambda x: isinstance(x, list)
+    )
 
     # ===== GX runtime =====
     context = build_runtime_context()

@@ -17,9 +17,9 @@ AUTOTHROTTLE_START_DELAY = 0.5
 AUTOTHROTTLE_MAX_DELAY = 15.0
 AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0  # important: lisse le débit
 
-CONCURRENT_REQUESTS = 16               # ok si target_concurrency = 1.0
-CONCURRENT_REQUESTS_PER_DOMAIN = 4     # limite les rafales sur manga-news
-DOWNLOAD_DELAY = 0.2                   # léger gain
+CONCURRENT_REQUESTS = 16  # ok si target_concurrency = 1.0
+CONCURRENT_REQUESTS_PER_DOMAIN = 4  # limite les rafales sur manga-news
+DOWNLOAD_DELAY = 0.2  # léger gain
 RANDOMIZE_DOWNLOAD_DELAY = True
 RETRY_TIMES = 6
 DOWNLOAD_TIMEOUT = 30
@@ -37,6 +37,7 @@ JOBDIR = "job_state/manganews_series"
 # Exports
 FEED_EXPORT_ENCODING = "utf-8"
 
+
 def feed_uri_params(params, spider):
     # Map spider -> fixed output filename.
     name_map = {
@@ -45,6 +46,7 @@ def feed_uri_params(params, spider):
     }
     params["feed_name"] = name_map.get(spider.name, spider.name)
     return params
+
 
 FEED_URI_PARAMS = feed_uri_params
 FEEDS = {
@@ -56,8 +58,10 @@ FEEDS = {
 
 ITEM_PIPELINES = {
     "manga_news_scraper.pipelines.EnrichPipeline": 100,
-#    "manga_news_scraper.pipelines.MangaNewsPostgresPipeline": 300,
+    #    "manga_news_scraper.pipelines.MangaNewsPostgresPipeline": 300,
 }
 
-POSTGRES_DSN = "dbname=apimanga user=postgres password=postgres host=127.0.0.1 port=5432"
+POSTGRES_DSN = (
+    "dbname=apimanga user=postgres password=postgres host=127.0.0.1 port=5432"
+)
 PG_BATCH_SIZE = 200

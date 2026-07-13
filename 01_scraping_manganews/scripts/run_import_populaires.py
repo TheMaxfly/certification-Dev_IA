@@ -5,12 +5,11 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import psycopg2
-from psycopg2.extras import execute_values, register_uuid
 from dotenv import load_dotenv
-
+from psycopg2.extras import execute_values, register_uuid
 
 POP_STAGING_TABLE = "manga.mn_populaires_staging"
 POP_FINAL_TABLE = "manga.mn_populaires"
@@ -37,9 +36,9 @@ def utc_now() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
-def read_jsonl(path: str) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as f:
+def read_jsonl(path: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as f:
         for i, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
@@ -51,11 +50,17 @@ def read_jsonl(path: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def insert_into_staging(conn, items: List[Dict[str, Any]], run_id: uuid.UUID, source_file: str, batch_size: int) -> int:
+def insert_into_staging(
+    conn,
+    items: list[dict[str, Any]],
+    run_id: uuid.UUID,
+    source_file: str,
+    batch_size: int,
+) -> int:
     loaded_at = utc_now()
     staging_cols = FINAL_COLS + ["run_id", "loaded_at", "source_file"]
 
-    values: List[Tuple[Any, ...]] = []
+    values: list[tuple[Any, ...]] = []
     for it in items:
         row_vals = [it.get(c) for c in FINAL_COLS]
         row_vals.extend([run_id, loaded_at, source_file])
@@ -72,7 +77,9 @@ def insert_into_staging(conn, items: List[Dict[str, Any]], run_id: uuid.UUID, so
 
 def upsert_into_final(conn, run_id: uuid.UUID) -> int:
     cols_sql = ", ".join(FINAL_COLS)
-    update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in FINAL_COLS if c != "serie_url"])
+    update_sql = ", ".join(
+        [f"{c}=EXCLUDED.{c}" for c in FINAL_COLS if c != "serie_url"]
+    )
 
     sql = f"""
     INSERT INTO {POP_FINAL_TABLE} ({cols_sql})
@@ -84,7 +91,9 @@ def upsert_into_final(conn, run_id: uuid.UUID) -> int:
     """
     with conn.cursor() as cur:
         cur.execute(sql, (run_id,))
-        cur.execute(f"SELECT COUNT(*) FROM {POP_STAGING_TABLE} WHERE run_id=%s", (run_id,))
+        cur.execute(
+            f"SELECT COUNT(*) FROM {POP_STAGING_TABLE} WHERE run_id=%s", (run_id,)
+        )
         n = cur.fetchone()[0]
     return int(n)
 
@@ -103,10 +112,18 @@ def main() -> None:
         default="/home/maxime/certification/scrapping_manga-news/data/enriched/populaires.backfilled.jsonl",
         help="Chemin du JSONL (populaires.backfilled.jsonl)",
     )
-    ap.add_argument("--dsn", default=os.getenv("POSTGRES_DSN"), help="DSN Postgres (sinon env POSTGRES_DSN)")
+    ap.add_argument(
+        "--dsn",
+        default=os.getenv("POSTGRES_DSN"),
+        help="DSN Postgres (sinon env POSTGRES_DSN)",
+    )
     ap.add_argument("--run-id", default=None, help="UUID à imposer (sinon généré)")
     ap.add_argument("--batch-size", type=int, default=500)
-    ap.add_argument("--no-merge", action="store_true", help="Charge staging uniquement (pas d'upsert final)")
+    ap.add_argument(
+        "--no-merge",
+        action="store_true",
+        help="Charge staging uniquement (pas d'upsert final)",
+    )
     ap.add_argument(
         "--keep-staging",
         dest="keep_staging",
@@ -136,7 +153,9 @@ def main() -> None:
     register_uuid(conn)
     conn.autocommit = False
     try:
-        inserted = insert_into_staging(conn, items, run_id, source_file, args.batch_size)
+        inserted = insert_into_staging(
+            conn, items, run_id, source_file, args.batch_size
+        )
 
         merged = 0
         if not args.no_merge:

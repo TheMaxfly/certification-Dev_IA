@@ -8,12 +8,11 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import psycopg2
-from psycopg2.extras import register_uuid
 from dotenv import load_dotenv
-
+from psycopg2.extras import register_uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT_SUMMARY = ROOT / "reports" / "gx" / "summary_report.json"
@@ -39,7 +38,7 @@ def utc_now() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
-def run_cmd(cmd: list[str]) -> Tuple[int, str]:
+def run_cmd(cmd: list[str]) -> tuple[int, str]:
     """Run command, return (exit_code, combined_output)."""
     p = subprocess.run(
         cmd,
@@ -52,14 +51,16 @@ def run_cmd(cmd: list[str]) -> Tuple[int, str]:
     return p.returncode, p.stdout
 
 
-def read_summary_report(path: Path) -> Dict[str, Any]:
+def read_summary_report(path: Path) -> dict[str, Any]:
     if not path.exists():
-        raise SystemExit(f"Rapport GX introuvable: {path}. Ton pipeline GX a-t-il bien tourné ?")
+        raise SystemExit(
+            f"Rapport GX introuvable: {path}. Ton pipeline GX a-t-il bien tourné ?"
+        )
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def extract_gx_success(summary: Dict[str, Any], dataset: str) -> Optional[bool]:
+def extract_gx_success(summary: dict[str, Any], dataset: str) -> bool | None:
     """
     Essaie d'être tolérant car la structure du summary_report peut varier.
     On cherche un booléen de succès pour 'series' / 'populaires'.
@@ -144,7 +145,9 @@ def upsert_run_log(
       created_at = EXCLUDED.created_at;
     """
     with conn.cursor() as cur:
-        cur.execute(sql, (run_id, dataset, gx_success, rows_staging, rows_merged, source_file))
+        cur.execute(
+            sql, (run_id, dataset, gx_success, rows_staging, rows_merged, source_file)
+        )
 
 
 def purge_staging(conn, staging_table: str, keep_days: int) -> int:
@@ -157,7 +160,7 @@ def purge_staging(conn, staging_table: str, keep_days: int) -> int:
         return cur.rowcount
 
 
-def parse_import_output(out: str) -> Tuple[int, int]:
+def parse_import_output(out: str) -> tuple[int, int]:
     """
     Parse stdout de run_import_*.py:
       staging_inserted: N
@@ -179,11 +182,23 @@ def main() -> None:
     load_dotenv(dotenv_path=dotenv_path)
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", choices=["series", "populaires"], required=True)
-    ap.add_argument("--file", default=None, help="Chemin du backfilled.jsonl (sinon valeur par défaut)")
-    ap.add_argument("--dsn", default=os.getenv("POSTGRES_DSN"), help="DSN Postgres (sinon env POSTGRES_DSN)")
+    ap.add_argument(
+        "--file",
+        default=None,
+        help="Chemin du backfilled.jsonl (sinon valeur par défaut)",
+    )
+    ap.add_argument(
+        "--dsn",
+        default=os.getenv("POSTGRES_DSN"),
+        help="DSN Postgres (sinon env POSTGRES_DSN)",
+    )
     ap.add_argument("--run-id", default=None, help="UUID imposé (sinon généré)")
-    ap.add_argument("--keep-days", type=int, default=30, help="Rétention staging en jours")
-    ap.add_argument("--skip-gx", action="store_true", help="(debug) saute GX et importe quand même")
+    ap.add_argument(
+        "--keep-days", type=int, default=30, help="Rétention staging en jours"
+    )
+    ap.add_argument(
+        "--skip-gx", action="store_true", help="(debug) saute GX et importe quand même"
+    )
     args = ap.parse_args()
 
     if not args.dsn:
@@ -203,7 +218,9 @@ def main() -> None:
         code, gx_out = run_cmd([sys.executable, PIPELINE_VALIDATE_SCRIPT])
         if code != 0:
             print(gx_out)
-            raise SystemExit(f"Le pipeline GX a échoué (exit code {code}). Import DB annulé.")
+            raise SystemExit(
+                f"Le pipeline GX a échoué (exit code {code}). Import DB annulé."
+            )
 
         summary = read_summary_report(REPORT_SUMMARY)
         s = extract_gx_success(summary, args.dataset)
@@ -217,7 +234,9 @@ def main() -> None:
         gx_success = bool(s)
 
         if not gx_success:
-            raise SystemExit(f"GX = KO pour dataset='{args.dataset}'. Import DB annulé.")
+            raise SystemExit(
+                f"GX = KO pour dataset='{args.dataset}'. Import DB annulé."
+            )
 
     # 2) Import staging + merge final (avec run_id)
     # On force --keep-staging pour audit + purge 30 jours.

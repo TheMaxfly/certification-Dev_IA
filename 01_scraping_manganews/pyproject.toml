@@ -14,3 +14,26 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+# force-exclude : respecter l'exclusion même en pre-commit (fichiers passés explicitement).
+force-exclude = true
+# Exclus du lint : scaffolding Scrapy non activé + scripts auto-nommés obsolètes
+# (versions abandonnées, non maintenues).
+extend-exclude = [
+    "src/manga_news_scraper/middlewares.py",
+    "scripts/obsolateimport_series_backfilled_to_postgres.py",
+    "scripts/obsolateload_populaires_to_postgres.py",
+    "scripts/obsolatevalidate_populaires_gx110v1.py",
+    "scripts/obsoletevalidate_manganews_series_gx110v1.py",
+    "scripts/obsoletevalidate_runtime_jsonl_gx110.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+# Résiduels E501 = fragments SQL (dans des triple-quotes), messages de log f-strings
+# et commentaires : chaînes intentionnelles non cassables. La largeur du CODE est
+# déjà garantie par `ruff format` ; on n'active donc pas E501 dans le linter.
+ignore = ["E501"]

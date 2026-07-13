@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import datetime as dt
+import json
 from pathlib import Path
 
 
@@ -48,12 +48,15 @@ def backfill_record(rec: dict, *, file_kind: str) -> dict:
 
     # 3) scraped_at : ne pas écraser si déjà présent (important traçabilité)
     if not truthy_text(rec.get("scraped_at")):
-        rec["scraped_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+        rec["scraped_at"] = (
+            dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+        )
 
-   # 4) enrich_version : par type de fichier
+    # 4) enrich_version : par type de fichier
     if not truthy_text(rec.get("enrich_version")):
-        rec["enrich_version"] = "enrich_jsonl.v1" if file_kind == "series" else "enrich_item:v2"
-
+        rec["enrich_version"] = (
+            "enrich_jsonl.v1" if file_kind == "series" else "enrich_item:v2"
+        )
 
     # 5) flags CRITICAL (GX-friendly)
     indexable_rag = bool(rec.get("indexable_rag"))
@@ -64,7 +67,9 @@ def backfill_record(rec: dict, *, file_kind: str) -> dict:
     except Exception:
         rag_char_len = 0
 
-    rec["rag_is_consistent"] = (not indexable_rag) or (truthy_text(rag_text) and rag_char_len > 0)
+    rec["rag_is_consistent"] = (not indexable_rag) or (
+        truthy_text(rag_text) and rag_char_len > 0
+    )
 
     has_resume = bool(rec.get("has_resume"))
     resume = rec.get("resume")
@@ -80,7 +85,9 @@ def backfill_record(rec: dict, *, file_kind: str) -> dict:
 
     rec["genres_norm_is_list"] = isinstance(rec.get("genres_norm"), list)
 
-    rec["type_is_present"] = truthy_text(rec.get("type_norm")) or truthy_text(rec.get("type"))
+    rec["type_is_present"] = truthy_text(rec.get("type_norm")) or truthy_text(
+        rec.get("type")
+    )
 
     return rec
 
@@ -90,7 +97,10 @@ def backfill_jsonl(in_path: Path, out_path: Path, *, file_kind: str) -> None:
     tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
 
     n = 0
-    with in_path.open("r", encoding="utf-8") as fin, tmp_path.open("w", encoding="utf-8") as fout:
+    with (
+        in_path.open("r", encoding="utf-8") as fin,
+        tmp_path.open("w", encoding="utf-8") as fout,
+    ):
         for line in fin:
             line = line.strip()
             if not line:
@@ -107,12 +117,14 @@ def backfill_jsonl(in_path: Path, out_path: Path, *, file_kind: str) -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="in_path", required=True, help="Chemin du JSONL input")
-    ap.add_argument("--out", dest="out_path", required=True, help="Chemin du JSONL output")
+    ap.add_argument(
+        "--out", dest="out_path", required=True, help="Chemin du JSONL output"
+    )
     ap.add_argument(
         "--kind",
         choices=["series", "populaires"],
         required=True,
-        help="Type de fichier (series ou populaires) pour fixer schema_version"
+        help="Type de fichier (series ou populaires) pour fixer schema_version",
     )
     args = ap.parse_args()
 

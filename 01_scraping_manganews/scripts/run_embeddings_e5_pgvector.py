@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
 import os
-import time
 import re
+import time
 import unicodedata
-import requests
+
 import psycopg2
-from psycopg2.extras import execute_values
+import requests
 
 # ✅ pgvector adapter
 from pgvector.psycopg2 import register_vector
+from psycopg2.extras import execute_values
 
 # -----------------------
 # Config
 # -----------------------
-DSN = os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews")
+DSN = os.getenv(
+    "POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:5432/manganews"
+)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 MODEL_PRIMARY = os.getenv("EMBED_MODEL", "qllama/multilingual-e5-base:latest")
 
 FALLBACK_MODELS = [
-    m.strip() for m in os.getenv(
+    m.strip()
+    for m in os.getenv(
         "FALLBACK_MODELS",
-        "qllama/multilingual-e5-base:q8_0,qllama/multilingual-e5-base:q4_k_m"
+        "qllama/multilingual-e5-base:q8_0,qllama/multilingual-e5-base:q4_k_m",
     ).split(",")
     if m.strip()
 ]
@@ -38,7 +42,9 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))
 RETRY_SLEEP = float(os.getenv("RETRY_SLEEP", "0.1"))
 
-TRUNCATE_STEPS = [int(x) for x in os.getenv("TRUNCATE_STEPS", "1200,900,700,500,350,250").split(",")]
+TRUNCATE_STEPS = [
+    int(x) for x in os.getenv("TRUNCATE_STEPS", "1200,900,700,500,350,250").split(",")
+]
 MIN_TRUNC = int(os.getenv("MIN_TRUNC", "200"))
 
 E5_PREFIX = os.getenv("E5_PREFIX", "passage: ")
@@ -69,7 +75,7 @@ def chunk_text(text: str, size: int, overlap: int):
     n = len(text)
     step = max(1, size - overlap)
     while i < n:
-        out.append(text[i:i + size])
+        out.append(text[i : i + size])
         i += step
     return out
 
@@ -169,7 +175,9 @@ def embed_batch_best_effort(passages):
                 break
 
         if vec is None:
-            print(f"[WARN] skip passage after retries. len={len(p_clean)} last_err={last_err}")
+            print(
+                f"[WARN] skip passage after retries. len={len(p_clean)} last_err={last_err}"
+            )
         results.append((vec, model_used))
 
     return results
@@ -219,7 +227,7 @@ def main():
             break
 
         chunk_rows = []
-        for (url, resume, points_forts) in rows:
+        for url, resume, points_forts in rows:
             for doc_type, txt in (("resume", resume), ("points_forts", points_forts)):
                 cleaned = sanitize_text(txt or "")
                 if not cleaned:
@@ -232,7 +240,7 @@ def main():
 
         i = 0
         while i < len(chunk_rows):
-            batch = chunk_rows[i:i + EMBED_BATCH]
+            batch = chunk_rows[i : i + EMBED_BATCH]
             passages = [f"{E5_PREFIX}{t[3]}" for t in batch]
 
             total_batches += 1
@@ -243,7 +251,7 @@ def main():
                 total_batches_fallback += 1
 
             insert_tuples = []
-            for (row, (vec, model_used)) in zip(batch, results):
+            for row, (vec, model_used) in zip(batch, results, strict=False):
                 if vec is None:
                     total_skipped += 1
                     continue
