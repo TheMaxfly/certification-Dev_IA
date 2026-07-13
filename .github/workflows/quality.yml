@@ -1,0 +1,51 @@
+name: quality
+
+# Gate qualité racine, volontairement INDICATIF (non bloquant) pour l'instant :
+# chaque étape est en continue-on-error afin de rendre le rapport visible sans
+# bloquer les merges tant que le code existant n'a pas été aligné.
+# Durcissement prévu une fois la base nettoyée (retirer les continue-on-error).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: python -m pip install --upgrade pip ruff bandit pip-audit
+
+      - name: Ruff lint (indicatif)
+        continue-on-error: true
+        run: ruff check --output-format=github .
+
+      - name: Ruff format check (indicatif)
+        continue-on-error: true
+        run: ruff format --check .
+
+      - name: Bandit (indicatif)
+        continue-on-error: true
+        run: bandit -r . -x ./.venv,./venv,./build,./dist
+
+      - name: pip-audit (indicatif, dépendances transitives non contrôlables)
+        continue-on-error: true
+        run: |
+          for req in $(git ls-files '*requirements*.txt'); do
+            echo "::group::pip-audit $req"
+            pip-audit -r "$req" || true
+            echo "::endgroup::"
+          done
+
+  # À activer plus tard, par module, une fois un environnement de test unifié en place :
+  #   - Pyright (type checking, mode basic)
+  #   - pytest + pytest-cov (aucun test dans le dépôt pour l'instant)
