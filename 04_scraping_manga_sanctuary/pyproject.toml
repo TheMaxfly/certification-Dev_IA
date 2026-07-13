@@ -12,7 +12,9 @@ dependencies = [
 line-length = 88
 target-version = "py312"
 # Scaffolding Scrapy non modifié et désactivé (middlewares commentés dans settings) :
-# exclu du lint car non maintenu par le projet.
+# exclu du lint car non maintenu par le projet. force-exclude pour que l'exclusion
+# tienne aussi quand le fichier est passé explicitement (hook pre-commit).
+force-exclude = true
 extend-exclude = ["manga_sanctuary/manga_sanctuary/middlewares.py"]
 
 [tool.ruff.lint]
