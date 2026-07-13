@@ -56,9 +56,15 @@ def _load_json(path: Path) -> Any:
 
 @app.command("json")
 def explore_json(
-    file: str = typer.Argument(..., help="Chemin vers un fichier .json ou .jsonl (support .gz)."),
-    limit: int = typer.Option(20, "--limit", "-n", help="Nombre max d'objets à afficher."),
-    show: bool = typer.Option(True, "--show/--no-show", help="Afficher un aperçu des données."),
+    file: str = typer.Argument(
+        ..., help="Chemin vers un fichier .json ou .jsonl (support .gz)."
+    ),
+    limit: int = typer.Option(
+        20, "--limit", "-n", help="Nombre max d'objets à afficher."
+    ),
+    show: bool = typer.Option(
+        True, "--show/--no-show", help="Afficher un aperçu des données."
+    ),
 ) -> None:
     path = resolve_path(file)
     if not path.exists():
@@ -82,7 +88,8 @@ def explore_json(
         console.print(f"[bold]JSONL[/bold] {path} — enregistrements: {record_count}")
         console.print("Champs les plus fréquents:", Pretty(key_counter.most_common(10)))
         console.print(
-            "Types (champ:type) les plus fréquents:", Pretty(type_counter.most_common(10))
+            "Types (champ:type) les plus fréquents:",
+            Pretty(type_counter.most_common(10)),
         )
         if show:
             console.print("Aperçu:", Pretty(records))
@@ -97,14 +104,18 @@ def explore_json(
         console.print("Champs les plus fréquents:", Pretty(key_counter.most_common(10)))
     console.print("Type racine:", _type_name(value))
     if show:
-        console.print("Aperçu:", Pretty(value if not isinstance(value, list) else value[:limit]))
+        console.print(
+            "Aperçu:", Pretty(value if not isinstance(value, list) else value[:limit])
+        )
 
 
 @app.command("csv")
 def explore_csv(
     file: str = typer.Argument(..., help="Chemin vers un fichier .csv (support .gz)."),
     head: int = typer.Option(10, "--head", "-n", help="Nombre de lignes à afficher."),
-    sep: str | None = typer.Option(None, "--sep", help="Séparateur; autodétecté si omis."),
+    sep: str | None = typer.Option(
+        None, "--sep", help="Séparateur; autodétecté si omis."
+    ),
     encoding: str = typer.Option("utf-8", "--encoding"),
 ) -> None:
     path = resolve_path(file)
