@@ -1,18 +1,16 @@
+import hashlib
+import json
 import os
 import uuid
-import json
-import hashlib
 from dataclasses import dataclass
-from typing import List, Tuple, Dict
 
+import faiss
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import faiss
 import psycopg
-from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
-
+from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 
 # ----------------------------
 # Config
@@ -39,7 +37,9 @@ def sha1_text(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
 
-def chunk_text_chars(text: str, chunk_size: int, overlap: int) -> List[Tuple[int, int, str]]:
+def chunk_text_chars(
+    text: str, chunk_size: int, overlap: int
+) -> list[tuple[int, int, str]]:
     """Return list of (start, end, chunk_text)."""
     if not text:
         return []
@@ -89,7 +89,7 @@ def ensure_out_dirs():
     os.makedirs(os.path.join(OUT_DIR, "faiss"), exist_ok=True)
 
 
-def get_ids(conn) -> Tuple[int, int, int, int]:
+def get_ids(conn) -> tuple[int, int, int, int]:
     # chunking_id
     row = fetch_one(
         conn,
@@ -109,16 +109,22 @@ def get_ids(conn) -> Tuple[int, int, int, int]:
     model_map = {name: (mid, dim) for (mid, name, dim) in model_rows}
     for m in EMBED_MODELS:
         if m not in model_map:
-            raise RuntimeError(f"embedding model not found in bench.embedding_models: {m}")
+            raise RuntimeError(
+                f"embedding model not found in bench.embedding_models: {m}"
+            )
 
     return chunking_id, chunk_size, chunk_overlap, model_map
 
 
-def build_chunks_if_needed(conn, chunk_size: int, overlap: int, limit_docs: int | None = None):
+def build_chunks_if_needed(
+    conn, chunk_size: int, overlap: int, limit_docs: int | None = None
+):
     # Check if chunks exist
     n_chunks = fetch_one(conn, "SELECT COUNT(*) FROM bench.corpus_chunks")[0]
     if n_chunks > 0:
-        print(f"[OK] bench.corpus_chunks already has {n_chunks} rows. Skipping chunk build.")
+        print(
+            f"[OK] bench.corpus_chunks already has {n_chunks} rows. Skipping chunk build."
+        )
         return
 
     print("[RUN] Building chunks into bench.corpus_chunks ...")
@@ -138,9 +144,7 @@ def build_chunks_if_needed(conn, chunk_size: int, overlap: int, limit_docs: int 
     for doc_key, doc_text in tqdm(docs, desc="Chunking"):
         chunks = chunk_text_chars(doc_text, chunk_size=chunk_size, overlap=overlap)
         for idx, (cs, ce, ctext) in enumerate(chunks):
-            rows_to_insert.append(
-                (doc_key, idx, ctext, cs, ce, None, sha1_text(ctext))
-            )
+            rows_to_insert.append((doc_key, idx, ctext, cs, ce, None, sha1_text(ctext)))
 
         # batch insert to avoid huge memory
         if len(rows_to_insert) >= 5000:
@@ -202,7 +206,14 @@ def load_chunks(conn) -> pd.DataFrame:
     return df
 
 
-def save_faiss_meta(conn, run_id: str, index_path: str, meta_path: str, index_type="FlatIP", metric="cosine"):
+def save_faiss_meta(
+    conn,
+    run_id: str,
+    index_path: str,
+    meta_path: str,
+    index_type="FlatIP",
+    metric="cosine",
+):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -216,24 +227,38 @@ def save_faiss_meta(conn, run_id: str, index_path: str, meta_path: str, index_ty
                   metric     = EXCLUDED.metric,
                   built_at   = now()
             """,
-            (run_id, index_path, meta_path, index_type, metric, "FAISS built by bench_embeddings.py"),
+            (
+                run_id,
+                index_path,
+                meta_path,
+                index_type,
+                metric,
+                "FAISS built by bench_embeddings.py",
+            ),
         )
     conn.commit()
 
 
-def load_queries_qrels(conn) -> Tuple[pd.DataFrame, Dict[int, set]]:
-    q = fetch_all(conn, "SELECT query_id, query_text FROM bench.queries WHERE split='test' ORDER BY query_id")
+def load_queries_qrels(conn) -> tuple[pd.DataFrame, dict[int, set]]:
+    q = fetch_all(
+        conn,
+        "SELECT query_id, query_text FROM bench.queries WHERE split='test' ORDER BY query_id",
+    )
     queries = pd.DataFrame(q, columns=["query_id", "query_text"])
 
     # qrels: query_id -> set(doc_key)
-    rel_rows = fetch_all(conn, "SELECT query_id, doc_key FROM bench.qrels WHERE relevance >= 1")
-    qrels: Dict[int, set] = {}
+    rel_rows = fetch_all(
+        conn, "SELECT query_id, doc_key FROM bench.qrels WHERE relevance >= 1"
+    )
+    qrels: dict[int, set] = {}
     for qid, doc_key in rel_rows:
         qrels.setdefault(qid, set()).add(doc_key)
     return queries, qrels
 
 
-def store_retrieval_results(conn, run_id: str, query_id: int, ranks: List[Tuple[int, str, int, float]]):
+def store_retrieval_results(
+    conn, run_id: str, query_id: int, ranks: list[tuple[int, str, int, float]]
+):
     # ranks: list of (rank, doc_key, chunk_id, score)
     with conn.cursor() as cur:
         cur.executemany(
@@ -275,7 +300,9 @@ def store_metrics(conn, run_id: str, recall_at_k: float, mrr: float):
 # ----------------------------
 # Benchmark core
 # ----------------------------
-def encode_texts(model: SentenceTransformer, texts: List[str], batch_size: int = 64) -> np.ndarray:
+def encode_texts(
+    model: SentenceTransformer, texts: list[str], batch_size: int = 64
+) -> np.ndarray:
     emb = model.encode(
         texts,
         batch_size=batch_size,
@@ -309,7 +336,9 @@ def evaluate_run(
     # Encode all chunks
     texts = chunks_df["chunk_text"].tolist()
     embeddings = encode_texts(st_model, texts, batch_size=64)
-    assert embeddings.shape[1] == dim, f"dim mismatch: got {embeddings.shape[1]}, expected {dim}"
+    assert embeddings.shape[1] == dim, (
+        f"dim mismatch: got {embeddings.shape[1]}, expected {dim}"
+    )
 
     # Build FAISS
     index = build_faiss_index(embeddings)
@@ -333,7 +362,9 @@ def evaluate_run(
         print("[WARN] No queries in bench.queries. Skipping evaluation.")
         return
     if len(qrels) == 0:
-        print("[WARN] No qrels in bench.qrels. Add qrels to compute metrics. Skipping evaluation.")
+        print(
+            "[WARN] No qrels in bench.qrels. Add qrels to compute metrics. Skipping evaluation."
+        )
         return
 
     # Prepare quick lookup
@@ -356,7 +387,7 @@ def evaluate_run(
         found_rank = None
         rel_set = qrels.get(qid, set())
 
-        for rank, (ix, sc) in enumerate(zip(idxs, scores), start=1):
+        for rank, (ix, sc) in enumerate(zip(idxs, scores, strict=False), start=1):
             if ix < 0:
                 continue
             chunk_id = int(chunk_id_arr[ix])
@@ -389,15 +420,23 @@ def main():
         chunking_id, chunk_size, chunk_overlap, model_map = get_ids(conn)
 
         # Build chunks if missing (you can set limit_docs for fast smoke test)
-        build_chunks_if_needed(conn, chunk_size=chunk_size, overlap=chunk_overlap, limit_docs=None)
+        build_chunks_if_needed(
+            conn, chunk_size=chunk_size, overlap=chunk_overlap, limit_docs=None
+        )
 
         chunks_df = load_chunks(conn)
         print(f"[INFO] chunks loaded: {len(chunks_df)}")
 
         for model_name in EMBED_MODELS:
             model_id, dim = model_map[model_name]
-            evaluate_run(conn, model_name=model_name, model_id=model_id, dim=dim,
-                         chunking_id=chunking_id, chunks_df=chunks_df)
+            evaluate_run(
+                conn,
+                model_name=model_name,
+                model_id=model_id,
+                dim=dim,
+                chunking_id=chunking_id,
+                chunks_df=chunks_df,
+            )
 
 
 if __name__ == "__main__":

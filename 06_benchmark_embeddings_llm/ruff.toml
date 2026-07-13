@@ -1,0 +1,27 @@
+# Config Ruff du module 06 (benchmark embeddings / LLM). Cible py310 (module >=3.10).
+# Seuls les scripts maintenus sont lintés : Bench_embedding.py, Bench_only.py
+# et Bench_llm_only_v7.py (version courante). Les itérations LLM antérieures sont
+# des expérimentations non maintenues, exclues du lint.
+
+line-length = 88
+target-version = "py310"
+# force-exclude : respecter extend-exclude même quand les fichiers sont passés
+# explicitement (cas du hook pre-commit), pas seulement lors d'un scan de dossier.
+force-exclude = true
+
+extend-exclude = [
+    "Bench_llm_only.py",
+    "Bench_llm_onlyv1.py",
+    "Bench_llm_only_v3.py",
+    "Bench_llm_only_v5.py",
+    "Bench_llm_only_v5a.py",
+    "Bench_llm_only_v6.py",
+    "Bench_llm_only_v6b.py",
+]
+
+[lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+# Scripts denses en SQL, prompts LLM, logs et données d'éval : les longues chaînes
+# littérales sont intentionnelles et non cassables. La longueur des lignes de CODE
+# reste gérée par `ruff format` ; on n'active donc pas E501 dans le linter.
+ignore = ["E501"]
