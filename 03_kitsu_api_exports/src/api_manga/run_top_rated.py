@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from .client import KitsuClient
-from .exporter import _read_latest_marker, _run_id_now, _write_latest_marker, export_top_rated
+from .exporter import (
+    _read_latest_marker,
+    _run_id_now,
+    _write_latest_marker,
+    export_top_rated,
+)
 from .service import MangaService
 from .validate_fixtures import validate_file
 
@@ -20,17 +25,34 @@ def _validate_or_raise(path: Path, *, strict: bool, max_items: int) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Runner: export top rated (optionally all) to JSON.")
-    parser.add_argument("--out-dir", default="exports", help="Output directory (default: exports).")
+    parser = argparse.ArgumentParser(
+        description="Runner: export top rated (optionally all) to JSON."
+    )
+    parser.add_argument(
+        "--out-dir", default="exports", help="Output directory (default: exports)."
+    )
     parser.add_argument(
         "--run-id",
         help="Identifiant de run (défaut: reuse LATEST si --resume, sinon horodaté). "
         "Les exports sont écrits dans out-dir/top_rated/<run-id>/",
     )
-    parser.add_argument("--rated-limit", type=int, default=0, help='Limit (default: 0 = "all available").')
-    parser.add_argument("--rated-offset", type=int, default=0, help="Offset (default: 0).")
-    parser.add_argument("--with-authors", action="store_true", help="Fetch authors (slow for large exports).")
-    parser.add_argument("--force", action="store_true", help="Overwrite existing top_rated.json.")
+    parser.add_argument(
+        "--rated-limit",
+        type=int,
+        default=0,
+        help='Limit (default: 0 = "all available").',
+    )
+    parser.add_argument(
+        "--rated-offset", type=int, default=0, help="Offset (default: 0)."
+    )
+    parser.add_argument(
+        "--with-authors",
+        action="store_true",
+        help="Fetch authors (slow for large exports).",
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="Overwrite existing top_rated.json."
+    )
     parser.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,
@@ -43,14 +65,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=0,
         help="For rated-limit=0 only: fetch at most N pages this run (0 = no limit).",
     )
-    parser.add_argument("--no-validate", action="store_true", help="Skip fixture validation.")
+    parser.add_argument(
+        "--no-validate", action="store_true", help="Skip fixture validation."
+    )
     parser.add_argument(
         "--strict",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Strict validation (default: enabled).",
     )
-    parser.add_argument("--max-items", type=int, default=0, help="Max items validated per file (0=all).")
+    parser.add_argument(
+        "--max-items", type=int, default=0, help="Max items validated per file (0=all)."
+    )
     args = parser.parse_args(argv)
 
     out_base = Path(args.out_dir)

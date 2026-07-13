@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any
 
 from .service import MangaService
 
 
 def _iso_utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
 
 def _run_id_now() -> str:
     # Format safe for filenames
@@ -21,7 +23,7 @@ def _write_latest_marker(dir_path: Path, run_id: str) -> None:
     (dir_path / "LATEST").write_text(run_id + "\n", encoding="utf-8")
 
 
-def _read_latest_marker(dir_path: Path) -> Optional[str]:
+def _read_latest_marker(dir_path: Path) -> str | None:
     p = dir_path / "LATEST"
     if not p.exists():
         return None
@@ -32,16 +34,18 @@ def _read_latest_marker(dir_path: Path) -> Optional[str]:
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     tmp.replace(path)
 
 
 def _write_json_streamed(
     path: Path,
-    meta: Dict[str, Any],
+    meta: dict[str, Any],
     items: Iterable[object],
     *,
-    progress_label: Optional[str] = None,
+    progress_label: str | None = None,
     progress_every: int = 500,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +68,7 @@ def _write_json_streamed(
         f.write("\n]\n}\n")
     tmp.replace(path)
 
+
 def _is_valid_json(path: Path) -> bool:
     try:
         json.loads(path.read_text(encoding="utf-8"))
@@ -82,7 +87,9 @@ def _append_ndjson(path: Path, items: Iterable[object]) -> int:
     return count
 
 
-def _ndjson_to_json_array(ndjson_path: Path, json_path: Path, meta: Dict[str, Any]) -> None:
+def _ndjson_to_json_array(
+    ndjson_path: Path, json_path: Path, meta: dict[str, Any]
+) -> None:
     tmp = json_path.with_suffix(json_path.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as out:
         out.write("{\n")
@@ -106,7 +113,7 @@ def _ndjson_to_json_array(ndjson_path: Path, json_path: Path, meta: Dict[str, An
 def export_trending_weekly(service: MangaService, out_dir: Path, limit: int) -> Path:
     payload = service.get_weekly_trending(limit=limit)
     out_path = out_dir / "trending_weekly.json"
-    export: Dict[str, Any] = {
+    export: dict[str, Any] = {
         "meta": {
             "category": "trending_weekly",
             "source": "kitsu",
@@ -121,10 +128,18 @@ def export_trending_weekly(service: MangaService, out_dir: Path, limit: int) -> 
     return out_path
 
 
-def export_top_publishing(service: MangaService, out_dir: Path, limit: int, offset: int, include_authors: bool = True) -> Path:
-    payload = service.get_top_publishing(limit=limit, offset=offset, include_authors=include_authors)
+def export_top_publishing(
+    service: MangaService,
+    out_dir: Path,
+    limit: int,
+    offset: int,
+    include_authors: bool = True,
+) -> Path:
+    payload = service.get_top_publishing(
+        limit=limit, offset=offset, include_authors=include_authors
+    )
     out_path = out_dir / "top_publishing.json"
-    export: Dict[str, Any] = {
+    export: dict[str, Any] = {
         "meta": {
             "category": "top_publishing",
             "source": "kitsu",
@@ -169,7 +184,9 @@ def export_top_rated(
         tmp_json_path = out_path.with_suffix(out_path.suffix + ".tmp")
 
         if force and out_path.exists():
-            backup = out_path.with_suffix(out_path.suffix + f".bak.{_iso_utc_now().replace(':', '-')}")
+            backup = out_path.with_suffix(
+                out_path.suffix + f".bak.{_iso_utc_now().replace(':', '-')}"
+            )
             out_path.replace(backup)
         if force and tmp_json_path.exists():
             tmp_json_path.unlink(missing_ok=True)
@@ -178,7 +195,7 @@ def export_top_rated(
             state_path.unlink(missing_ok=True)
             ndjson_path.unlink(missing_ok=True)
 
-        state: Dict[str, Any] = {}
+        state: dict[str, Any] = {}
         if resume and state_path.exists():
             try:
                 state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -212,7 +229,12 @@ def export_top_rated(
 
             state_path.write_text(
                 json.dumps(
-                    {"done": False, "next_offset": next_offset, "written": written, "meta": meta},
+                    {
+                        "done": False,
+                        "next_offset": next_offset,
+                        "written": written,
+                        "meta": meta,
+                    },
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -231,11 +253,21 @@ def export_top_rated(
                 print(f"[export] top_rated: {written} items...", flush=True)
 
         if done:
-            meta_final = {**meta, "fetched_at": _iso_utc_now(), "limit": 0, "offset": offset}
+            meta_final = {
+                **meta,
+                "fetched_at": _iso_utc_now(),
+                "limit": 0,
+                "offset": offset,
+            }
             _ndjson_to_json_array(ndjson_path, out_path, meta=meta_final)
             state_path.write_text(
                 json.dumps(
-                    {"done": True, "next_offset": next_offset, "written": written, "meta": meta_final},
+                    {
+                        "done": True,
+                        "next_offset": next_offset,
+                        "written": written,
+                        "meta": meta_final,
+                    },
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -245,15 +277,25 @@ def export_top_rated(
             ndjson_path.unlink(missing_ok=True)
         return out_path
 
-    payload = service.get_top_rated(limit=limit, offset=offset, include_authors=include_authors)
+    payload = service.get_top_rated(
+        limit=limit, offset=offset, include_authors=include_authors
+    )
     _write_json(out_path, {"meta": meta, **payload})
     return out_path
 
 
-def export_most_popular(service: MangaService, out_dir: Path, limit: int, offset: int, include_authors: bool = True) -> Path:
-    payload = service.get_most_popular(limit=limit, offset=offset, include_authors=include_authors)
+def export_most_popular(
+    service: MangaService,
+    out_dir: Path,
+    limit: int,
+    offset: int,
+    include_authors: bool = True,
+) -> Path:
+    payload = service.get_most_popular(
+        limit=limit, offset=offset, include_authors=include_authors
+    )
     out_path = out_dir / "most_popular.json"
-    export: Dict[str, Any] = {
+    export: dict[str, Any] = {
         "meta": {
             "category": "most_popular",
             "source": "kitsu",
@@ -283,10 +325,12 @@ def export_all(
     publishing_include_authors: bool = True,
     popular_include_authors: bool = True,
     force_top_rated: bool = False,
-) -> Dict[str, Path]:
+) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     return {
-        "trending_weekly": export_trending_weekly(service, out_dir, limit=trending_limit),
+        "trending_weekly": export_trending_weekly(
+            service, out_dir, limit=trending_limit
+        ),
         "top_publishing": export_top_publishing(
             service,
             out_dir,

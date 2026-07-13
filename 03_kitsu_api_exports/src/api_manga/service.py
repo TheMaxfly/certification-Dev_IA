@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from collections.abc import Iterator
+from typing import Any, Callable
 
 from .client import KitsuClient
 
@@ -19,16 +20,18 @@ class MangaService:
 
     # ----------- Résumé par slug/titre -----------
 
-    def get_manga_summary(self, slug: str) -> Optional[Dict[str, Any]]:
+    def get_manga_summary(self, slug: str) -> dict[str, Any] | None:
         manga = self.client.fetch_manga_by_slug(slug)
         if not manga:
             return None
 
         manga_id = manga.get("id")
-        detail_payload: Dict[str, Any] = {}
+        detail_payload: dict[str, Any] = {}
         if isinstance(manga_id, str):
             try:
-                detail_payload = self.client.fetch_manga_detail(manga_id, include=self.COLLECTION_INCLUDE)
+                detail_payload = self.client.fetch_manga_detail(
+                    manga_id, include=self.COLLECTION_INCLUDE
+                )
             except Exception:
                 detail_payload = {}
 
@@ -39,11 +42,16 @@ class MangaService:
         attrs = detail_item.get("attributes") or {}
 
         authors = self._get_manga_authors(manga_id) if isinstance(manga_id, str) else []
-        authors_str = ", ".join(
-            f"{author['name']} ({author.get('role')})" if author.get("role") else author["name"]
-            for author in authors
-            if isinstance(author, dict) and isinstance(author.get("name"), str)
-        ) or "Non renseignés"
+        authors_str = (
+            ", ".join(
+                f"{author['name']} ({author.get('role')})"
+                if author.get("role")
+                else author["name"]
+                for author in authors
+                if isinstance(author, dict) and isinstance(author.get("name"), str)
+            )
+            or "Non renseignés"
+        )
 
         summary = {
             "Titre": attrs.get("canonicalTitle") or attrs.get("slug"),
@@ -65,34 +73,40 @@ class MangaService:
 
     # ----------- Liste par tag/catégorie -----------
 
-    def list_manga_by_tag(self, tag: str, limit: int = 10) -> Dict[str, Any]:
+    def list_manga_by_tag(self, tag: str, limit: int = 10) -> dict[str, Any]:
         limit = max(1, limit)
         return self.client.list_manga_by_tag(tag, limit=limit)
 
     # ----------- Trending hebdomadaire -----------
 
-    def get_weekly_trending(self, limit: int = 20) -> Dict[str, Any]:
+    def get_weekly_trending(self, limit: int = 20) -> dict[str, Any]:
         payload = self.client.fetch_trending_manga(limit=limit)
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
 
         for item in (payload.get("data") or [])[: max(0, limit)]:
             manga_id = item.get("id")
             detail_item = item
-            included_idx: Dict[Tuple[str, str], Dict[str, Any]] = {}
+            included_idx: dict[tuple[str, str], dict[str, Any]] = {}
 
             if isinstance(manga_id, str):
                 try:
-                    detail_payload = self.client.fetch_manga_detail(manga_id, include=self.COLLECTION_INCLUDE)
+                    detail_payload = self.client.fetch_manga_detail(
+                        manga_id, include=self.COLLECTION_INCLUDE
+                    )
                     detail_item = detail_payload.get("data") or detail_item
-                    included_idx = self._index_included(detail_payload.get("included") or [])
+                    included_idx = self._index_included(
+                        detail_payload.get("included") or []
+                    )
                 except Exception:
                     included_idx = {}
 
             out.append(
                 self._format_manga_item(
-                item=detail_item,
-                included_idx=included_idx,
-                authors=self._get_manga_authors(manga_id) if isinstance(manga_id, str) else [],
+                    item=detail_item,
+                    included_idx=included_idx,
+                    authors=self._get_manga_authors(manga_id)
+                    if isinstance(manga_id, str)
+                    else [],
                 )
             )
 
@@ -100,7 +114,9 @@ class MangaService:
 
     # ----------- Top “rated” (mieux notés) -----------
 
-    def get_top_rated(self, limit: int = 10, offset: int = 0, include_authors: bool = True) -> Dict[str, Any]:
+    def get_top_rated(
+        self, limit: int = 10, offset: int = 0, include_authors: bool = True
+    ) -> dict[str, Any]:
         return self._collect_ranked_manga(
             fetch_fn=self.client.fetch_top_rated_manga,
             limit=limit,
@@ -111,7 +127,9 @@ class MangaService:
 
     # ----------- Top “popular” (plus populaires) -----------
 
-    def get_most_popular(self, limit: int = 10, offset: int = 0, include_authors: bool = True) -> Dict[str, Any]:
+    def get_most_popular(
+        self, limit: int = 10, offset: int = 0, include_authors: bool = True
+    ) -> dict[str, Any]:
         return self._collect_ranked_manga(
             fetch_fn=self.client.fetch_most_popular_manga,
             limit=limit,
@@ -122,7 +140,9 @@ class MangaService:
 
     # ----------- NOUVEAU : Top “publishing” (top publications) -----------
 
-    def get_top_publishing(self, limit: int = 10, offset: int = 0, include_authors: bool = True) -> Dict[str, Any]:
+    def get_top_publishing(
+        self, limit: int = 10, offset: int = 0, include_authors: bool = True
+    ) -> dict[str, Any]:
         return self._collect_ranked_manga(
             fetch_fn=self.client.fetch_top_publishing_manga,
             limit=limit,
@@ -131,7 +151,9 @@ class MangaService:
             include_authors=include_authors,
         )
 
-    def iter_top_rated(self, offset: int = 0, include_authors: bool = False) -> Iterator[Dict[str, Any]]:
+    def iter_top_rated(
+        self, offset: int = 0, include_authors: bool = False
+    ) -> Iterator[dict[str, Any]]:
         return self._iter_ranked_manga(
             fetch_fn=self.client.fetch_top_rated_manga,
             offset=offset,
@@ -141,37 +163,39 @@ class MangaService:
 
     def _collect_ranked_manga(
         self,
-        fetch_fn: Callable[..., Dict[str, Any]],
+        fetch_fn: Callable[..., dict[str, Any]],
         limit: int,
         offset: int,
         sort: str,
         include_authors: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Récupère une liste paginée de mangas triés (ratingRank/popularityRank).
         - `limit` <= 0 signifie "tout" (pagination jusqu'à épuisement).
         """
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         page_offset = max(offset, 0)
 
-        remaining: Optional[int]
+        remaining: int | None
         if limit <= 0:
             remaining = None
         else:
             remaining = max(0, limit)
 
         while True:
-            page_limit = self.PAGE_SIZE if remaining is None else min(self.PAGE_SIZE, remaining)
+            page_limit = (
+                self.PAGE_SIZE if remaining is None else min(self.PAGE_SIZE, remaining)
+            )
             if page_limit <= 0:
                 break
 
             page_items = list(
                 self._iter_ranked_manga_page(
-                fetch_fn=fetch_fn,
-                page_offset=page_offset,
-                page_limit=page_limit,
-                sort=sort,
-                include_authors=include_authors,
+                    fetch_fn=fetch_fn,
+                    page_offset=page_offset,
+                    page_limit=page_limit,
+                    sort=sort,
+                    include_authors=include_authors,
                 )
             )
             if not page_items:
@@ -196,11 +220,11 @@ class MangaService:
 
     def _iter_ranked_manga(
         self,
-        fetch_fn: Callable[..., Dict[str, Any]],
+        fetch_fn: Callable[..., dict[str, Any]],
         offset: int,
         sort: str,
         include_authors: bool,
-    ) -> Iterator[Dict[str, Any]]:
+    ) -> Iterator[dict[str, Any]]:
         page_offset = max(offset, 0)
         while True:
             page_limit = self.PAGE_SIZE
@@ -215,20 +239,19 @@ class MangaService:
             )
             if not items:
                 break
-            for item in items:
-                yield item
+            yield from items
             if len(items) < page_limit:
                 break
             page_offset += page_limit
 
     def _iter_ranked_manga_page(
         self,
-        fetch_fn: Callable[..., Dict[str, Any]],
+        fetch_fn: Callable[..., dict[str, Any]],
         page_offset: int,
         page_limit: int,
         sort: str,
         include_authors: bool,
-    ) -> Iterator[Dict[str, Any]]:
+    ) -> Iterator[dict[str, Any]]:
         payload = fetch_fn(
             limit=page_limit,
             offset=page_offset,
@@ -246,16 +269,18 @@ class MangaService:
             if not isinstance(manga_id, str):
                 continue
             authors = self._get_manga_authors(manga_id) if include_authors else []
-            yield self._format_manga_item(item=item, included_idx=included_idx, authors=authors)
+            yield self._format_manga_item(
+                item=item, included_idx=included_idx, authors=authors
+            )
 
     # ----------- Formatage -----------
 
     def _format_manga_item(
         self,
-        item: Dict[str, Any],
-        included_idx: Dict[Tuple[str, str], Dict[str, Any]],
-        authors: List[Dict[str, str]],
-    ) -> Dict[str, Any]:
+        item: dict[str, Any],
+        included_idx: dict[tuple[str, str], dict[str, Any]],
+        authors: list[dict[str, str]],
+    ) -> dict[str, Any]:
         attrs = item.get("attributes") or {}
         titles = attrs.get("titles") or {}
 
@@ -300,14 +325,16 @@ class MangaService:
 
     # ----------- Auteurs -----------
 
-    def _get_manga_authors(self, manga_id: str) -> List[Dict[str, str]]:
+    def _get_manga_authors(self, manga_id: str) -> list[dict[str, str]]:
         """
         Auteurs via /manga/{id}/staff?include=person
         Filtre sur rôles “story/writer/author” et “art/artist/illustr...”
         """
         # 1) Happy path : /staff
         try:
-            staff_payload = self.client.fetch_staff(manga_id, include=self.STAFF_INCLUDE, limit=self.STAFF_LIMIT)
+            staff_payload = self.client.fetch_staff(
+                manga_id, include=self.STAFF_INCLUDE, limit=self.STAFF_LIMIT
+            )
             authors = self._extract_authors_from_staff_payload(staff_payload)
             if authors:
                 return authors
@@ -316,26 +343,38 @@ class MangaService:
 
         # 2) Fallback : /manga-staff (si jamais utile)
         try:
-            staff_payload = self.client.fetch_manga_staff(manga_id, include=self.STAFF_INCLUDE, limit=self.STAFF_LIMIT)
+            staff_payload = self.client.fetch_manga_staff(
+                manga_id, include=self.STAFF_INCLUDE, limit=self.STAFF_LIMIT
+            )
             return self._extract_authors_from_staff_payload(staff_payload)
         except Exception:
             return []
 
-    def _extract_authors_from_staff_payload(self, staff_payload: Dict[str, Any]) -> List[Dict[str, str]]:
+    def _extract_authors_from_staff_payload(
+        self, staff_payload: dict[str, Any]
+    ) -> list[dict[str, str]]:
         included_idx = self._index_included(staff_payload.get("included") or [])
-        out: List[Dict[str, str]] = []
+        out: list[dict[str, str]] = []
         seen = set()
 
         for staff in staff_payload.get("data") or []:
             attrs = staff.get("attributes") or {}
             role_norm = str(attrs.get("role") or "").strip().lower()
 
-            is_story = any(k in role_norm for k in ("story", "writer", "author", "scenario", "script"))
-            is_art = any(k in role_norm for k in ("art", "artist", "illustr", "drawing", "pencils", "ink"))
+            is_story = any(
+                k in role_norm
+                for k in ("story", "writer", "author", "scenario", "script")
+            )
+            is_art = any(
+                k in role_norm
+                for k in ("art", "artist", "illustr", "drawing", "pencils", "ink")
+            )
             if not (is_story or is_art):
                 continue
 
-            person_ref = (((staff.get("relationships") or {}).get("person") or {}).get("data")) or {}
+            person_ref = (
+                ((staff.get("relationships") or {}).get("person") or {}).get("data")
+            ) or {}
             ref_type = person_ref.get("type")
             ref_id = person_ref.get("id")
             if not (isinstance(ref_type, str) and isinstance(ref_id, str)):
@@ -368,8 +407,10 @@ class MangaService:
     # ----------- Helpers JSON:API -----------
 
     @staticmethod
-    def _index_included(included: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
-        idx: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    def _index_included(
+        included: list[dict[str, Any]],
+    ) -> dict[tuple[str, str], dict[str, Any]]:
+        idx: dict[tuple[str, str], dict[str, Any]] = {}
         for obj in included:
             t = obj.get("type")
             i = obj.get("id")
@@ -379,13 +420,13 @@ class MangaService:
 
     @staticmethod
     def _resolve_rel_titles(
-        item: Dict[str, Any],
+        item: dict[str, Any],
         rel_name: str,
-        included_idx: Dict[Tuple[str, str], Dict[str, Any]],
-    ) -> List[str]:
+        included_idx: dict[tuple[str, str], dict[str, Any]],
+    ) -> list[str]:
         rel = (item.get("relationships") or {}).get(rel_name) or {}
         refs = rel.get("data") or []
-        titles: List[str] = []
+        titles: list[str] = []
 
         for ref in refs:
             ref_type = ref.get("type")
@@ -405,18 +446,18 @@ class MangaService:
         return titles
 
     @staticmethod
-    def _as_str(value: Any) -> Optional[str]:
+    def _as_str(value: Any) -> str | None:
         return value if isinstance(value, str) and value.strip() else None
 
     @staticmethod
-    def _pick_first_str(*values: Any) -> Optional[str]:
+    def _pick_first_str(*values: Any) -> str | None:
         for v in values:
             if isinstance(v, str) and v.strip():
                 return v.strip()
         return None
 
     @staticmethod
-    def _to_int(value: Any) -> Optional[int]:
+    def _to_int(value: Any) -> int | None:
         if isinstance(value, bool):
             return None
         if isinstance(value, int):
@@ -432,7 +473,7 @@ class MangaService:
         return None
 
     @staticmethod
-    def _to_float(value: Any) -> Optional[float]:
+    def _to_float(value: Any) -> float | None:
         if isinstance(value, bool):
             return None
         if isinstance(value, (int, float)):

@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from .client import KitsuClient
-from .exporter import export_most_popular, export_top_publishing, export_top_rated, export_trending_weekly
+from .exporter import (
+    export_most_popular,
+    export_top_publishing,
+    export_top_rated,
+    export_trending_weekly,
+)
 from .service import MangaService
 
 
@@ -20,7 +27,10 @@ def main(args: Sequence[str] | None = None) -> None:
         "--limit",
         type=int,
         default=20,
-        help="Nombre maximum d'éléments listés (--tag, --trending, --publishing, --top-rated, --popular).",
+        help=(
+            "Nombre maximum d'éléments listés "
+            "(--tag, --trending, --publishing, --top-rated, --popular)."
+        ),
     )
 
     parser.add_argument(
@@ -32,7 +42,10 @@ def main(args: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--publishing",
         action="store_true",
-        help="Affiche le top des publications manga (publishing/current) selon popularité.",
+        help=(
+            "Affiche le top des publications manga "
+            "(publishing/current) selon popularité."
+        ),
     )
 
     parser.add_argument(
@@ -51,7 +64,10 @@ def main(args: Sequence[str] | None = None) -> None:
         "--offset",
         type=int,
         default=0,
-        help="Offset de pagination (utile pour parcourir le classement sur --publishing, --top-rated, --popular).",
+        help=(
+            "Offset de pagination (utile pour parcourir le classement "
+            "sur --publishing, --top-rated, --popular)."
+        ),
     )
 
     parser.add_argument(
@@ -94,19 +110,25 @@ def main(args: Sequence[str] | None = None) -> None:
 
     # --- 4) Top publishing (publications) ---
     if parsed.publishing:
-        out_path = export_top_publishing(service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset)
+        out_path = export_top_publishing(
+            service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset
+        )
         print(f"Export JSON écrit: {out_path}")
         return
 
     # --- 5) Top rated (mieux notés) ---
     if parsed.top_rated:
-        out_path = export_top_rated(service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset)
+        out_path = export_top_rated(
+            service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset
+        )
         print(f"Export JSON écrit: {out_path}")
         return
 
     # --- 6) Plus populaires ---
     if parsed.popular:
-        out_path = export_most_popular(service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset)
+        out_path = export_most_popular(
+            service, out_dir=out_dir, limit=parsed.limit, offset=parsed.offset
+        )
         print(f"Export JSON écrit: {out_path}")
         return
 
