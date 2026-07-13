@@ -23,10 +23,8 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
@@ -114,7 +112,7 @@ def resolve_notebook_path(w: WorkspaceClient, nb_path: str) -> str:
     elif nb_path.startswith("/Users/"):
         candidates.append("/Workspace" + nb_path)
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for c in candidates:
         try:
             w.workspace.get_status(c)
@@ -130,7 +128,9 @@ def resolve_notebook_path(w: WorkspaceClient, nb_path: str) -> str:
     )
 
 
-def download_file(w: WorkspaceClient, remote_path: str, local_path: Path, chunk_bytes: int) -> None:
+def download_file(
+    w: WorkspaceClient, remote_path: str, local_path: Path, chunk_bytes: int
+) -> None:
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -155,7 +155,9 @@ def write_manifest(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def wait_for_run_terminated(w: WorkspaceClient, run_id: int, timeout_seconds: int = 2 * 60 * 60) -> None:
+def wait_for_run_terminated(
+    w: WorkspaceClient, run_id: int, timeout_seconds: int = 2 * 60 * 60
+) -> None:
     wait_fn = getattr(w.jobs, "wait_get_run_job_terminated_or_skipped", None)
     if callable(wait_fn):
         wait_fn(run_id=run_id, timeout=timedelta(seconds=timeout_seconds))

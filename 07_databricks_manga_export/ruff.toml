@@ -1,0 +1,14 @@
+# Config Ruff du module 07 (export Databricks). Cible py310 (environment.yml >=3.10).
+# Le notebook Databricks est exécuté dans le runtime Databricks (globals injectés :
+# spark, dbutils, display...) : hors périmètre du lint. Seuls les scripts runner
+# locaux sont lintés.
+line-length = 88
+target-version = "py310"
+force-exclude = true
+extend-exclude = ["*.ipynb"]
+
+[lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+# Résiduels E501 = docstrings et messages d'aide/erreur (chaînes utilisateur) ; la
+# largeur du CODE est déjà garantie par `ruff format`. E501 non activé dans le linter.
+ignore = ["E501"]

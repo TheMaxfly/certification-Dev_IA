@@ -7,10 +7,9 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-from dotenv import load_dotenv
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
-
+from dotenv import load_dotenv
 
 DEFAULT_TASK_KEY = "Export_databricks_manga"
 
@@ -22,18 +21,45 @@ def parse_args() -> argparse.Namespace:
             "dbutils.notebook.exit(...), puis télécharge le fichier en local."
         )
     )
-    p.add_argument("--dotenv", default="", help="Chemin vers un fichier .env (défaut: .env à côté du script).")
-    p.add_argument("--job-id", default="", help="ID du Job Databricks (sinon via DATABRICKS_JOB_ID).")
+    p.add_argument(
+        "--dotenv",
+        default="",
+        help="Chemin vers un fichier .env (défaut: .env à côté du script).",
+    )
+    p.add_argument(
+        "--job-id",
+        default="",
+        help="ID du Job Databricks (sinon via DATABRICKS_JOB_ID).",
+    )
     p.add_argument(
         "--task-key",
         default=DEFAULT_TASK_KEY,
         help=f"task_key de la task notebook (défaut: {DEFAULT_TASK_KEY}).",
     )
-    p.add_argument("--run-id", default="", help='Valeur du widget "run_id" (si vide, ne pas passer le widget).')
-    p.add_argument("--export-base", default="/Volumes/workspace/default/exports", help='Valeur du widget "export_base".')
-    p.add_argument("--local-csv", default="exports/databricks/albums_manga_clean.csv", help="Chemin local du CSV.")
-    p.add_argument("--timeout-seconds", type=int, default=2 * 60 * 60, help="Timeout attente run (défaut 2h).")
-    p.add_argument("--poll-seconds", type=int, default=5, help="Intervalle polling (défaut 5s).")
+    p.add_argument(
+        "--run-id",
+        default="",
+        help='Valeur du widget "run_id" (si vide, ne pas passer le widget).',
+    )
+    p.add_argument(
+        "--export-base",
+        default="/Volumes/workspace/default/exports",
+        help='Valeur du widget "export_base".',
+    )
+    p.add_argument(
+        "--local-csv",
+        default="exports/databricks/albums_manga_clean.csv",
+        help="Chemin local du CSV.",
+    )
+    p.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=2 * 60 * 60,
+        help="Timeout attente run (défaut 2h).",
+    )
+    p.add_argument(
+        "--poll-seconds", type=int, default=5, help="Intervalle polling (défaut 5s)."
+    )
     return p.parse_args()
 
 
@@ -48,7 +74,9 @@ def is_success(result_state) -> bool:
     return s == "SUCCESS" or s.endswith(".SUCCESS") or s.endswith("SUCCESS")
 
 
-def wait_for_run_terminated(w: WorkspaceClient, run_id: int, timeout_seconds: int, poll_seconds: int) -> None:
+def wait_for_run_terminated(
+    w: WorkspaceClient, run_id: int, timeout_seconds: int, poll_seconds: int
+) -> None:
     wait_fn = getattr(w.jobs, "wait_get_run_job_terminated_or_skipped", None)
     if callable(wait_fn):
         wait_fn(run_id=run_id, timeout=timedelta(seconds=timeout_seconds))
@@ -57,7 +85,9 @@ def wait_for_run_terminated(w: WorkspaceClient, run_id: int, timeout_seconds: in
         result_state = getattr(state, "result_state", None)
         msg = getattr(state, "state_message", "")
         if result_state is not None and not is_success(result_state):
-            raise SystemExit(f"❌ Run Databricks échoué: result_state={result_state} msg={msg}")
+            raise SystemExit(
+                f"❌ Run Databricks échoué: result_state={result_state} msg={msg}"
+            )
         return
 
     deadline = time.monotonic() + timeout_seconds
@@ -76,7 +106,9 @@ def wait_for_run_terminated(w: WorkspaceClient, run_id: int, timeout_seconds: in
             return
 
         if time.monotonic() > deadline:
-            raise SystemExit(f"❌ Timeout en attendant la fin du run {run_id}. life_cycle={life_cycle}")
+            raise SystemExit(
+                f"❌ Timeout en attendant la fin du run {run_id}. life_cycle={life_cycle}"
+            )
 
         time.sleep(poll_seconds)
 
@@ -96,7 +128,9 @@ def resolve_output_run_id(w: WorkspaceClient, parent_run_id: int, task_key: str)
                     break
                 return int(task_run_id)
         available = [getattr(t, "task_key", None) for t in tasks]
-        raise SystemExit(f"❌ task_key '{task_key}' introuvable. Tasks disponibles: {available}")
+        raise SystemExit(
+            f"❌ task_key '{task_key}' introuvable. Tasks disponibles: {available}"
+        )
 
     if len(tasks) == 1:
         task_run_id = getattr(tasks[0], "run_id", None)
@@ -131,7 +165,11 @@ def download_file(w: WorkspaceClient, remote_path: str, local_path: Path) -> Non
 def main() -> None:
     args = parse_args()
 
-    dotenv_path = Path(args.dotenv).expanduser() if args.dotenv else (Path(__file__).resolve().parent / ".env")
+    dotenv_path = (
+        Path(args.dotenv).expanduser()
+        if args.dotenv
+        else (Path(__file__).resolve().parent / ".env")
+    )
     if dotenv_path.exists():
         load_dotenv(dotenv_path=dotenv_path)
     else:
@@ -164,7 +202,12 @@ def main() -> None:
     print(f"✅ Job déclenché. run_id={parent_run_id}")
 
     # 2) Attend la fin
-    wait_for_run_terminated(w, parent_run_id, timeout_seconds=args.timeout_seconds, poll_seconds=args.poll_seconds)
+    wait_for_run_terminated(
+        w,
+        parent_run_id,
+        timeout_seconds=args.timeout_seconds,
+        poll_seconds=args.poll_seconds,
+    )
 
     # 3) Récupère l'output sur le run enfant de la task
     output_run_id = resolve_output_run_id(w, parent_run_id, task_key=args.task_key)
@@ -187,4 +230,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
