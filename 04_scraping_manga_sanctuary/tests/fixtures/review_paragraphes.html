@@ -1,0 +1,25 @@
+<!doctype html>
+<!--
+  Critique « récente » écrite à la main : texte en <p>, plus un chapô situé
+  HORS <p> (enfant direct du conteneur). Sert de test de non-régression : le
+  sélecteur corrigé doit rendre un sur-ensemble strict de l'ancien, le surplus
+  étant précisément ce chapô.
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Critique — Akira</title>
+  </head>
+  <body>
+    <h1>Akira</h1>
+    <span itemprop="ratingValue">9</span>
+    <p>par <a href="/membre.php?id=34">Erkael</a> le 21/11/2019</p>
+    <span class="badge-outline-primary">Staff</span>
+
+    <div class="post post-single text-justify">
+      Chapô hors paragraphe.
+      <p>Neo-Tokyo est sur le point d'exploser.</p>
+      <p>Katsuhiro Otomo signe une œuvre fondatrice.</p>
+    </div>
+  </body>
+</html>

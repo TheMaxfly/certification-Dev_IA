@@ -1,0 +1,93 @@
+<!doctype html>
+<!--
+  Fiche série écrite à la main : reproduit la structure du bloc d'infos de
+  Manga Sanctuary (<ul> de <li><span>LABEL</span><span>VALEUR</span></li>) telle
+  que constatée par le canari de 2026-07.
+
+  Trois pièges y sont volontairement reproduits :
+  1. les alias au-delà du premier occupent des <li> frères dont le span de
+     LABEL est vide (d'où la troncature historique à 1 alias par série) ;
+  2. « Type » est une ligne étiquetée qui suit immédiatement le bloc alias, et
+     porte elle aussi une ligne de continuation à label vide : la collecte des
+     alias ne doit pas déborder dessus ;
+  3. les <a> des genres ont pour parent un <span>, ceux des tags un <div> —
+     jamais un <p>, ce que l'ancien sélecteur exigeait.
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Parmi Eux - Hanakimi</title>
+  </head>
+  <body>
+    <h1>Parmi Eux - Hanakimi</h1>
+
+    <ul class="infos">
+      <li>
+        <span>Autres titres</span>
+        <span><img alt="drapeau Japon" src="/jp.png" />花ざかりの君たちへ</span>
+      </li>
+      <li>
+        <span></span>
+        <span><img alt="drapeau Japon" src="/jp.png" />Hanazakari no Kimitachi e</span>
+      </li>
+      <li>
+        <span></span>
+        <span><img alt="drapeau États-unis" src="/us.png" />Hana-Kimi</span>
+      </li>
+      <li>
+        <span></span>
+        <span><img alt="drapeau Allemagne" src="/de.png" />Hana-Kimi - For you in full blossom</span>
+      </li>
+
+      <li>
+        <span>Type</span>
+        <span><a href="/bdd/type/1-manga.html">Manga</a></span>
+      </li>
+      <li>
+        <span></span>
+        <span>Continuation de Type — ne doit jamais être collectée comme alias</span>
+      </li>
+
+      <li>
+        <span>Catégorie</span>
+        <span><a href="/bdd/categorie/2-shojo.html">Shojo</a></span>
+      </li>
+      <li>
+        <span>Année</span>
+        <span>1996</span>
+      </li>
+      <li>
+        <span>Dessinateur</span>
+        <span><a href="/bdd/auteur/1-hisaya-nakajo.html">Hisaya NAKAJO</a></span>
+      </li>
+      <li>
+        <span>Scénariste</span>
+        <span><a href="/bdd/auteur/1-hisaya-nakajo.html">Hisaya NAKAJO</a></span>
+      </li>
+
+      <li>
+        <span>Genres</span>
+        <span>
+          <a href="/bdd/genre/221/action.html">action</a>
+          <a href="/bdd/genre/222/aventure.html">aventure</a>
+          <a href="/bdd/genre/223/comedie.html">comédie</a>
+        </span>
+      </li>
+      <li>
+        <span>Tags</span>
+        <span>
+          <div class="tag"><a tag-id="78" href="#">#super pouvoirs</a></div>
+          <div class="tag"><a tag-id="79" href="#">#travestissement</a></div>
+        </span>
+      </li>
+    </ul>
+
+    <p style="text-align:justify">
+      Mizuki Ashiya quitte les États-Unis pour le Japon afin d'intégrer le lycée
+      d'Izumi Sano, sauteur en hauteur qu'elle admire. Un détail : l'établissement
+      est réservé aux garçons.
+    </p>
+
+    <a href="/bdd/manga/12345-parmi-eux-hanakimi-vol-1.html">Tome 1</a>
+  </body>
+</html>

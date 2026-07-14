@@ -3,9 +3,10 @@ import re
 import scrapy
 
 from ..items import ReviewItem, VolumeItem
+from ._access import MangaSanctuaryAccessGuard
 
 
-class MangaSanctuaryVolumesSpider(scrapy.Spider):
+class MangaSanctuaryVolumesSpider(MangaSanctuaryAccessGuard, scrapy.Spider):
     name = "manga_sanctuary_volumes"
     allowed_domains = ["manga-sanctuary.com", "www.manga-sanctuary.com"]
 
@@ -77,6 +78,7 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         On prend les liens vers toutes les fiches /bdd/... de type
         manga / manhwa / manhua / bd / comics.
         """
+        self.ensure_access(response)
         self.logger.info(f"[INDEX] Lettre {letter} -> {response.url}")
 
         for href in response.css("a[href^='/bdd/']::attr(href)").getall():
@@ -117,6 +119,8 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         - Oeuvres liées
         Puis on suit toutes les URLs des tomes (liens contenant '-vol-').
         """
+
+        self.ensure_access(response)
 
         series_url = response.url
         series_title = response.css("h1::text").get(default="").strip()
@@ -327,6 +331,8 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         - synopsis tome (si présent)
         plus toutes les infos "série" transmises via series_meta.
         """
+        self.ensure_access(response)
+
         item = VolumeItem()
 
         # ---- Reporter toutes les infos série dans l'item volume ----
@@ -490,6 +496,8 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         - texte intégral (tous les <p> et sous-noeuds dans le bloc de critique)
         Liée à une série + un tome (volume_number / volume_url).
         """
+        self.ensure_access(response)
+
         review = ReviewItem()
 
         # Contexte série

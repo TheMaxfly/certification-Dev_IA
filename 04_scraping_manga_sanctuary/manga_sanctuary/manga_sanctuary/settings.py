@@ -57,9 +57,9 @@ COOKIES_ENABLED = False
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
-# EXTENSIONS = {
-#    "scrapy.extensions.telnet.TelnetConsole": None,
-# }
+EXTENSIONS = {
+    "manga_sanctuary.extensions.RunStatusExtension": 10,
+}
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
@@ -95,23 +95,17 @@ RETRY_TIMES = 2
 RETRY_HTTP_CODES = [500, 502, 503, 504, 522, 524, 408]
 
 
+# JOBDIR n'est volontairement pas global : un dossier partagé entre deux crawls
+# ferait ignorer les URLs déjà vues et produirait un faux rafraîchissement
+# incomplet. scripts/run_scrape.py en donne un par run — neuf pour un crawl
+# neuf, et réutilisé par ses reprises, la file étant la seule mémoire de ce qui
+# a déjà été demandé. Reprendre avec un JOBDIR vide re-crawlerait l'acquis.
+
+# Exports
 FEED_EXPORT_ENCODING = "utf-8"
 
-FEED_EXPORT_ENCODING = "utf-8"
-
-FEEDS = {
-    "manga_sanctuary_volumes.jsonl": {
-        "format": "jsonlines",
-        "encoding": "utf8",
-        "store_empty": False,
-        "item_export_kwargs": {"ensure_ascii": False},
-        "item_classes": ["manga_sanctuary.items.VolumeItem"],
-    },
-    "manga_sanctuary_reviews.jsonl": {
-        "format": "jsonlines",
-        "encoding": "utf8",
-        "store_empty": False,
-        "item_export_kwargs": {"ensure_ascii": False},
-        "item_classes": ["manga_sanctuary.items.ReviewItem"],
-    },
-}
+# Aucun export implicite : un crawl bloqué ne doit jamais écraser le dernier jeu
+# valide avec un fichier partiel. Les deux flux d'items (VolumeItem, ReviewItem)
+# sont routés par scripts/run_scrape.py, qui exporte d'abord dans un dossier de
+# run puis promeut atomiquement vers data/raw/<AAAA-MM>/ après validation.
+# Pour un export de diagnostic, fournir explicitement -O.
