@@ -43,6 +43,10 @@ class VolumeItem(scrapy.Item):
     volume_editeur = scrapy.Field()
     volume_format = scrapy.Field()
     volume_pages = scrapy.Field()
+    # EAN-13 conservé en CHAÎNE : clé de jointure avec Manga Insight. Ne jamais
+    # le typer en int (cadrage 13 chiffres et clé de contrôle à préserver) —
+    # donc à tenir hors de `int_fields` dans CleanAndTypePipeline.
+    volume_ean = scrapy.Field()
 
     volume_country = scrapy.Field()  # pays de l’édition (drapeau)
     volume_status = scrapy.Field()  # Complète / En cours

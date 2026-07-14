@@ -15,6 +15,18 @@ wheels/
 manga_sanctuary/crawls/
 manga_sanctuary/*.jsonl
 
+# Données collectées — volumineuses (>100 Mo : au-delà de la limite par fichier de
+# GitHub) et régénérables par crawl. Jamais versionnées.
+data/
+*.jsonl
+
+# Canari (test de non-régression des sélecteurs avant re-crawl) : les scripts et
+# le rapport sont versionnés, jamais les données collectées. `canari/html/` est
+# du contenu du site figé ; les `*.json` de sortie embarquent synopsis, alias et
+# corps de critiques. Dépôt public : ces artefacts restent locaux.
+canari/html/
+canari/*.json
+
 # Logs / dumps
 logs/
 *.log

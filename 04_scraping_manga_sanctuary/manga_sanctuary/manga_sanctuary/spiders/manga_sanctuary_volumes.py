@@ -127,8 +127,22 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         series_id = m.group(1) if m else None
 
         # ---------- Autres titres ----------
+        # Le bloc d'infos est un <ul> de <li><span>LABEL</span><span>VALEUR</span></li>.
+        # Les alias au-delà du premier occupent des <li> frères dont le span de
+        # label est VIDE : le test porte donc sur span[1], car une ligne de
+        # continuation a bien un span non vide — celui de la valeur.
+        # L'intersection Kayessian (count(A | B) = 1 <=> A et B sont le même
+        # noeud) exige que la ligne étiquetée la plus proche en amont soit
+        # « Autres titres » : c'est elle qui borne la collecte au bloc alias et
+        # empêche de déborder sur « Type ».
+        ancre_alias = "//li[normalize-space(span[1])='Autres titres']"
         other_titles = response.xpath(
-            "//text()[contains(., 'Autres titres')]/following::span[1]//text()"
+            f"{ancre_alias}/span[2]//text()"
+            f" | {ancre_alias}/following-sibling::li["
+            "not(normalize-space(span[1]))"
+            f" and count(preceding-sibling::li[normalize-space(span[1])][1]"
+            f" | {ancre_alias}) = 1"
+            "]/span[2]//text()"
         ).getall()
         other_titles = [t.strip() for t in other_titles if t.strip()]
 
@@ -149,17 +163,18 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
         series_dessinateur = extract_after("Dessinateur")
         series_scenariste = extract_after("Scénariste")
 
-        # Genres
+        # Genres — le parent des <a> est un <span>, jamais un <p>.
         series_genres = response.xpath(
-            "//text()[contains(., 'Genres')]/following::a[1]/parent::p//a/text()"
+            "//li[normalize-space(span[1])='Genres']/span[2]//a/text()"
         ).getall()
         series_genres = [g.strip() for g in series_genres if g.strip()]
 
-        # Tags (si présents)
+        # Tags (si présents) — chaque <a> est encapsulé dans un <div>.
         series_tags = response.xpath(
-            "//text()[contains(., 'Tags')]/following::a[1]/parent::p//a/text()"
+            "//li[normalize-space(span[1])='Tags']/span[2]//a/text()"
         ).getall()
-        series_tags = [t.strip() for t in series_tags if t.strip()]
+        # Le « # » est décoratif dans le libellé du lien.
+        series_tags = [t.strip().lstrip("#") for t in series_tags if t.strip()]
 
         # Mag. prépub (optionnel)
         series_mag_prepub = extract_after("Mag. prépub.")
@@ -348,6 +363,14 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
             "normalize-space(//text()[contains(., 'Editeur')]/following::a[1]/text())"
         ).get()
 
+        # EAN-13 : seule source de la page (ni ISBN, ni <meta>, ni JSON-LD) et
+        # absent d'environ 40 à 50 % des fiches — le repli de jointure avec
+        # Manga Insight reste donc nécessaire.
+        ean = response.xpath(
+            "//li[normalize-space(span[1])='EAN-13']/span[2]/text()"
+        ).get()
+        item["volume_ean"] = ean.strip() if ean else None
+
         # Format
         item["volume_format"] = response.xpath(
             "normalize-space(//text()[contains(., 'Format')]/following::text()[1])"
@@ -518,9 +541,12 @@ class MangaSanctuaryVolumesSpider(scrapy.Spider):
 
         # Texte intégral de la critique :
         # on prend tous les textes dans le bloc de critique, sans les images.
+        # Deux structures coexistent : les critiques récentes sont en <p>, les
+        # anciennes en texte brut séparé par des <br> (aucun <p>). Exiger //p
+        # perdait donc l'intégralité de ces dernières.
         body_parts = response.xpath(
             "//div[contains(@class,'post-single') "
-            "and contains(@class,'text-justify')]//p//text()"
+            "and contains(@class,'text-justify')]//text()"
         ).getall()
         review["review_body"] = " ".join(p.strip() for p in body_parts if p.strip())
 

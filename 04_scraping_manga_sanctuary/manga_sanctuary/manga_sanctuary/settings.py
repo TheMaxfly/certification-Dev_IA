@@ -7,6 +7,8 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+import os
+
 BOT_NAME = "manga_sanctuary"
 
 SPIDER_MODULES = ["manga_sanctuary.spiders"]
@@ -15,8 +17,11 @@ NEWSPIDER_MODULE = "manga_sanctuary.spiders"
 ADDONS = {}
 
 
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
-# USER_AGENT = "manga_sanctuary (+http://www.yourdomain.com)"
+# User-Agent identifiable du projet : ne jamais crawler sous l'UA Scrapy par
+# défaut. Même convention que le module 01 (surchargeable par variable
+# d'environnement). Le robots.txt du site autorise /bdd/ pour le groupe « * »,
+# dont relève cet UA.
+USER_AGENT = os.getenv("MANGA_SANCTUARY_USER_AGENT", "manga-sanctuary-scraper/0.1")
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
