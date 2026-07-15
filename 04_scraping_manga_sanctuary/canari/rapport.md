@@ -251,7 +251,7 @@ Un repli (titre + éditeur + date) restera nécessaire pour la fraction sans EAN
 +            "//li[normalize-space(span[1])='Genres']/span[2]//a/text()"
          ).getall()
          series_genres = [g.strip() for g in series_genres if g.strip()]
- 
+
          # Tags (si présents)
          series_tags = response.xpath(
 -            "//text()[contains(., 'Tags')]/following::a[1]/parent::p//a/text()"
@@ -324,7 +324,7 @@ for li in response.xpath(
          item["volume_editeur"] = response.xpath(
              "normalize-space(//text()[contains(., 'Editeur')]/following::a[1]/text())"
          ).get()
- 
+
 +        # EAN-13 : absent d'environ 40-50 % des fiches (mesure canari) ; seule
 +        # source de la page — ni ISBN, ni <meta>, ni JSON-LD.
 +        ean = response.xpath(
