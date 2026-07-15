@@ -1,6 +1,3 @@
-# Documents de travail locaux non destinés au dépôt
-/MATIERE_CERTIFICATION_BLOC1.md
-
 # Environnements et artefacts Python
 .venv/
 __pycache__/
