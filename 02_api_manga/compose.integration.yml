@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: apimanga
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: integration-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d apimanga"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./sql/001_api_schema.sql:/docker-entrypoint-initdb.d/001_api_schema.sql:ro
+      - ./tests/fixtures/002_sample_data.sql:/docker-entrypoint-initdb.d/002_sample_data.sql:ro
+
+  api:
+    build: .
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: apimanga
+      DB_USER: postgres
+      DB_PASSWORD: integration-test
+      DB_POOL_MIN_SIZE: 1
+      DB_POOL_MAX_SIZE: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2)
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  smoke:
+    image: python:3.12-slim
+    command: ["python", "/tests/http_smoke.py"]
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      api:
+        condition: service_healthy
