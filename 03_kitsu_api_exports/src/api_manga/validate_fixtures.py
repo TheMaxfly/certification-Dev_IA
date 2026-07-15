@@ -506,6 +506,24 @@ def validate_file(
     if data is None:
         return issues, 0
 
+    first_position_by_id: dict[str, int] = {}
+    for position, item in enumerate(data):
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            continue
+        first_position = first_position_by_id.get(item_id)
+        if first_position is not None:
+            add_issue(
+                issues,
+                "ERROR",
+                f"{file_path}.data[{position}].id",
+                f"Duplicate id '{item_id}' (first seen at index {first_position}).",
+            )
+        else:
+            first_position_by_id[item_id] = position
+
     n = len(data)
     limit = n if max_items <= 0 else min(n, max_items)
     for i in range(limit):

@@ -17,6 +17,7 @@ class MangaService:
         self.client = client
 
     PAGE_SIZE = 20
+    MAX_CONSECUTIVE_STALE_PAGES = 3
 
     # ----------- Résumé par slug/titre -----------
 
@@ -174,7 +175,9 @@ class MangaService:
         - `limit` <= 0 signifie "tout" (pagination jusqu'à épuisement).
         """
         out: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
         page_offset = max(offset, 0)
+        consecutive_stale_pages = 0
 
         remaining: int | None
         if limit <= 0:
@@ -201,8 +204,14 @@ class MangaService:
             if not page_items:
                 break
 
+            added = 0
             for formatted in page_items:
+                manga_id = formatted.get("id")
+                if not isinstance(manga_id, str) or manga_id in seen_ids:
+                    continue
+                seen_ids.add(manga_id)
                 out.append(formatted)
+                added += 1
                 if remaining is not None:
                     remaining -= 1
                     if remaining <= 0:
@@ -214,7 +223,20 @@ class MangaService:
             if len(page_items) < page_limit:
                 break
 
-            page_offset += len(page_items)
+            if added == 0:
+                consecutive_stale_pages += 1
+                if consecutive_stale_pages >= self.MAX_CONSECUTIVE_STALE_PAGES:
+                    raise RuntimeError(
+                        "Pagination Kitsu bloquée: aucune nouvelle série après "
+                        f"{consecutive_stale_pages} pages (offset={page_offset})"
+                    )
+            else:
+                consecutive_stale_pages = 0
+
+            # L'API Kitsu peut renvoyer une page précédente tout en annonçant
+            # l'offset suivant. On avance selon la taille demandée et on poursuit
+            # jusqu'au nombre d'identifiants uniques attendu.
+            page_offset += page_limit
 
         return {"data": out}
 

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import time
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import requests
+
+
+class KitsuRequestError(RuntimeError):
+    """Erreur HTTP Kitsu avec code exploitable par les collecteurs."""
+
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class KitsuClient:
@@ -12,11 +21,44 @@ class KitsuClient:
     BASE_URL = "https://kitsu.io/api/edge"
 
     def __init__(
-        self, session: requests.Session | None = None, timeout: float = 15.0
+        self,
+        session: requests.Session | None = None,
+        timeout: float = 15.0,
+        *,
+        max_retries: int = 3,
+        min_interval: float = 0.0,
     ) -> None:
         self.session = session or requests.Session()
         self.timeout = timeout
-        self.headers = {"Accept": "application/vnd.api+json"}
+        self.max_retries = max(1, max_retries)
+        self.min_interval = max(0.0, min_interval)
+        self.request_count = 0
+        self._last_request_started = 0.0
+        self.headers = {
+            "Accept": "application/vnd.api+json",
+            "User-Agent": "ApiMangaCertification/0.2 (exhaustive data collector)",
+        }
+
+    def _wait_for_rate_limit(self) -> None:
+        elapsed = time.monotonic() - self._last_request_started
+        remaining = self.min_interval - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+
+    @staticmethod
+    def _retry_delay(response: requests.Response | None, attempt: int) -> float:
+        if response is not None:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    return max(0.0, float(retry_after))
+                except ValueError:
+                    try:
+                        retry_at = parsedate_to_datetime(retry_after)
+                        return max(0.0, retry_at.timestamp() - time.time())
+                    except (TypeError, ValueError):
+                        pass
+        return min(60.0, 0.5 * (2**attempt))
 
     def _request(
         self, path: str, params: dict[str, Any] | None = None
@@ -25,18 +67,73 @@ class KitsuClient:
         url = f"{self.BASE_URL}/{path}"
 
         last_exc: Exception | None = None
-        for attempt in range(3):
+        for attempt in range(self.max_retries):
+            response: requests.Response | None = None
             try:
-                resp = self.session.get(
+                self._wait_for_rate_limit()
+                self._last_request_started = time.monotonic()
+                response = self.session.get(
                     url, params=params, headers=self.headers, timeout=self.timeout
                 )
-                resp.raise_for_status()
-                return resp.json()
+                self.request_count += 1
+
+                if response.status_code == 429 or response.status_code >= 500:
+                    response.raise_for_status()
+                if response.status_code >= 400:
+                    raise KitsuRequestError(
+                        f"Kitsu HTTP {response.status_code}: {url}",
+                        status_code=response.status_code,
+                    )
+                return response.json()
+            except KitsuRequestError:
+                raise
             except (requests.RequestException, ValueError) as exc:
                 last_exc = exc
-                time.sleep(0.5 * (attempt + 1))
+                if attempt + 1 < self.max_retries:
+                    time.sleep(self._retry_delay(response, attempt))
 
-        raise RuntimeError(f"Requête Kitsu échouée après retries: {url} ({last_exc})")
+        status_code = response.status_code if response is not None else None
+        raise KitsuRequestError(
+            f"Requête Kitsu échouée après retries: {url} ({last_exc})",
+            status_code=status_code,
+        )
+
+    def fetch_catalog_page(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        include: str = "categories,genres",
+    ) -> dict[str, Any]:
+        """Récupère une page du catalogue manga sans filtre de classement."""
+        params: dict[str, Any] = {
+            "page[limit]": min(max(limit, 1), 20),
+            "page[offset]": max(offset, 0),
+        }
+        if include:
+            params["include"] = include
+        return self._request("manga", params=params)
+
+    def fetch_relationship_page(
+        self,
+        manga_id: str,
+        relationship: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        include: str | None = None,
+    ) -> dict[str, Any]:
+        """Récupère une page d'une relation exposée sous `/manga/{id}/...`."""
+        params: dict[str, Any] = {
+            "page[limit]": min(max(limit, 1), 20),
+            "page[offset]": max(offset, 0),
+        }
+        if include:
+            params["include"] = include
+        return self._request(
+            f"manga/{manga_id}/{relationship}",
+            params=params,
+        )
 
     def fetch_manga_by_slug(self, slug: str) -> dict[str, Any] | None:
         params = {"filter[text]": slug, "page[limit]": 1}
