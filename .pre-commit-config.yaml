@@ -9,7 +9,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^database/migrations/(001_socle_identite|002_staging_referentiels)\.sql$
       - id: end-of-file-fixer
+        exclude: ^database/migrations/(001_socle_identite|002_staging_referentiels)\.sql$
       - id: check-yaml
       - id: check-added-large-files
       - id: detect-private-key
