@@ -4,10 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "manga-news-scraper"
-version = "0.1.0"
+version = "0.2.0"
 description = "Scrapy project for manga-news.com"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "itemadapter>=0.9",
+    "scrapy>=2.17,<3",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9,<3",
+]
+quality = [
+    "great-expectations>=1.10,<2",
+    "pandas>=1.5",
+    "python-dotenv>=1.0",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

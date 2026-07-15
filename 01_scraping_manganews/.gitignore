@@ -14,3 +14,4 @@ build/
 *.log
 *.sqlite3
 *.jsonl
+data/runs/

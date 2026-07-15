@@ -1,5 +1,1 @@
-scrapy>=2.11
-psycopg2-binary
-great_expectations
-pandas>=1.5
-python-dotenv>=1.0
+-e .[postgres,quality]

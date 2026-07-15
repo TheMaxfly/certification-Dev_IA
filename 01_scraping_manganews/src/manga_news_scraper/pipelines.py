@@ -3,11 +3,8 @@ import json
 import os
 import re
 
-import psycopg2
-
 # manga_news_scraper/pipelines.py
 from itemadapter import ItemAdapter
-from psycopg2.extras import execute_values
 
 from manga_news_scraper.utils.enrich_jsonl import enrich_item
 
@@ -38,7 +35,14 @@ class EnrichPipeline:
     # version de la logique d’enrichissement (traçabilité pipeline)
     ENRICH_VERSION = "enrich_item:v2"
 
-    def process_item(self, item, spider):
+    @classmethod
+    def from_crawler(cls, crawler):
+        pipeline = cls()
+        pipeline.crawler = crawler
+        return pipeline
+
+    def process_item(self, item):
+        spider = self.crawler.spider
         data = ItemAdapter(item).asdict()
         data = enrich_item(data)
 
@@ -139,12 +143,14 @@ class MangaNewsPostgresPipeline:
     - batch insert (performance)
     """
 
-    def __init__(self, dsn: str, batch_size: int = 200):
+    def __init__(self, crawler, dsn: str, batch_size: int = 200):
+        self.crawler = crawler
         self.dsn = dsn
         self.batch_size = batch_size
         self.buffer = []
         self.conn = None
         self.cur = None
+        self.execute_values = None
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -158,14 +164,24 @@ class MangaNewsPostgresPipeline:
                 "POSTGRES_DSN manquant (settings.py ou variable d'environnement)."
             )
         batch_size = crawler.settings.getint("PG_BATCH_SIZE", 200)
-        return cls(dsn=dsn, batch_size=batch_size)
+        return cls(crawler=crawler, dsn=dsn, batch_size=batch_size)
 
-    def open_spider(self, spider):
+    def open_spider(self):
+        try:
+            import psycopg2
+            from psycopg2.extras import execute_values
+        except ImportError as exc:
+            raise RuntimeError(
+                "Support PostgreSQL absent. Installez le projet avec "
+                "`pip install -e '.[postgres]'`."
+            ) from exc
+
+        self.execute_values = execute_values
         self.conn = psycopg2.connect(self.dsn)
         self.conn.autocommit = False
         self.cur = self.conn.cursor()
 
-    def close_spider(self, spider):
+    def close_spider(self):
         self.flush()
         if self.cur:
             self.cur.close()
@@ -173,7 +189,7 @@ class MangaNewsPostgresPipeline:
             self.conn.commit()
             self.conn.close()
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
         # --- Normalisation ---
         url = normalize_spaces(item.get("url"))
         title_page = normalize_spaces(item.get("title_page"))
@@ -224,7 +240,7 @@ class MangaNewsPostgresPipeline:
             resume,
             points_forts,
             rag_text,
-            dt.datetime.utcnow(),
+            dt.datetime.now(dt.timezone.utc),
             "manganews",
         )
 
@@ -269,6 +285,6 @@ class MangaNewsPostgresPipeline:
         ;
         """
 
-        execute_values(self.cur, sql, self.buffer, page_size=self.batch_size)
+        self.execute_values(self.cur, sql, self.buffer, page_size=self.batch_size)
         self.conn.commit()
         self.buffer.clear()
