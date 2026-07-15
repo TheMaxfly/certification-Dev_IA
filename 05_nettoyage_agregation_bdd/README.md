@@ -9,22 +9,7 @@ Objectif : préparer un environnement Python simple pour explorer des fichiers `
 ## Installation
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -U pip
-```
-
-### Option A (packaging)
-
-```bash
-python3 -m pip install -e ".[dev]"
-```
-
-### Option B (requirements)
-
-```bash
-python3 -m pip install -r requirements.txt
-python3 -m pip install -r requirements-dev.txt
+uv sync --all-extras
 ```
 
 Optionnel : crée un fichier `.env` (voir `.env.example`) pour définir `DATA_DIR`.
@@ -32,8 +17,8 @@ Optionnel : crée un fichier `.env` (voir `.env.example`) pour définir `DATA_DI
 ## Exemples
 
 ```bash
-python3 -m preparation_bdd csv data/sample.csv --head 10
-python3 -m preparation_bdd json data/sample.jsonl --limit 5
+uv run python -m preparation_bdd csv data/sample.csv --head 10
+uv run python -m preparation_bdd json data/sample.jsonl --limit 5
 ```
 
 ## Notes Git (données / exports)
@@ -58,14 +43,16 @@ Conseils :
 
 - sélectionne le kernel Python de `.venv`
 - si tu vois `PermissionError: ... ~/.jupyter` (sandbox/droits), définis `JUPYTER_CONFIG_DIR`, `JUPYTER_DATA_DIR` et `JUPYTER_RUNTIME_DIR` vers des dossiers du projet (voir `.env.example`), puis redémarre VS Code / le notebook
-- certains notebooks exportent en CSV + Parquet (installe `pyarrow` via `requirements-dev.txt` ou `pip install -e ".[dev]"`)
+- certains notebooks exportent en CSV + Parquet ; les dépendances correspondantes
+  sont installées par `uv sync --all-extras`
 
 ## Commandes
 
 ```bash
-python3 -m preparation_bdd --help
-python3 -m preparation_bdd csv --help
-python3 -m preparation_bdd json --help
+uv run python -m preparation_bdd --help
+uv run python -m preparation_bdd csv --help
+uv run python -m preparation_bdd json --help
+uv run python src/identity/wikidata_dump.py --help
 ```
 
 ## Makefile
