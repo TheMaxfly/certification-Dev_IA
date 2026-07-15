@@ -9,7 +9,9 @@ Principes :
 - un checksum SHA-256 est enregistré à l'application. Si un fichier déjà joué
   change, le runner refuse d'avancer : l'historique d'une base ne doit jamais
   diverger silencieusement du dépôt ;
-- **pas de `down`**. On avance par migrations correctives (cf. README).
+- **pas de `down`**. On avance par migrations correctives (cf. README) ;
+- `mark-applied` enregistre une migration sans la jouer. Exception réservée à
+  la baseline d'héritage (000), déjà présente sur la base historique.
 
 La connexion vient de `DATABASE_URL` : aucun identifiant n'est écrit ici.
 """
@@ -178,6 +180,46 @@ def commande_status(_args) -> int:
     return 0
 
 
+def commande_mark_applied(args) -> int:
+    """Enregistre une migration comme appliquée SANS exécuter son SQL.
+
+    Usage prévu : la baseline d'héritage (000), dont les objets existent déjà
+    sur la base historique. L'y rejouer échouerait (`CREATE TABLE` sur une
+    table présente) ; ne pas l'enregistrer laisserait cette base éternellement
+    « en attente » d'une migration qu'elle a, de fait, déjà.
+
+    La commande ment donc délibérément au runner, et c'est son seul emploi
+    légitime : dire qu'un état est atteint alors qu'on ne l'a pas produit. À
+    n'utiliser que si l'on a vérifié que la base porte bien cet état.
+    """
+    migrations = decouvrir()
+    par_version = {m.version: m for m in migrations}
+    migration = par_version.get(args.version)
+    if migration is None:
+        raise ErreurMigration(
+            f"Version inconnue : {args.version!r}. "
+            f"Versions disponibles : {sorted(par_version)}"
+        )
+
+    with connecter(dsn()) as connexion:
+        appliquees = deja_appliquees(connexion)
+        if migration.version in appliquees:
+            raise ErreurMigration(
+                f"La migration {migration.version} est déjà enregistrée dans "
+                "schema_migrations : il n'y a rien à marquer."
+            )
+        with connexion.cursor() as curseur:
+            curseur.execute(
+                "INSERT INTO public.schema_migrations (version, checksum) "
+                "VALUES (%s, %s)",
+                (migration.version, migration.checksum),
+            )
+
+    print(f"→ {migration.version} ({migration.nom}) marquée appliquée.")
+    print("  Le SQL n'a PAS été exécuté : ses objets sont supposés déjà en base.")
+    return 0
+
+
 def commande_up(args) -> int:
     migrations = decouvrir()
     with connecter(dsn()) as connexion:
@@ -225,12 +267,26 @@ def construire_parser() -> argparse.ArgumentParser:
         metavar="NNN",
         help="S'arrêter à cette version incluse (ex. 001).",
     )
+    marque = sous.add_parser(
+        "mark-applied",
+        help="Enregistre une migration comme appliquée SANS l'exécuter "
+        "(baseline d'héritage).",
+    )
+    marque.add_argument(
+        "version",
+        metavar="NNN",
+        help="Version à marquer (ex. 000).",
+    )
     return parser
 
 
 def main() -> int:
     args = construire_parser().parse_args()
-    commandes = {"status": commande_status, "up": commande_up}
+    commandes = {
+        "status": commande_status,
+        "up": commande_up,
+        "mark-applied": commande_mark_applied,
+    }
     try:
         return commandes[args.commande](args)
     except ErreurMigration as erreur:

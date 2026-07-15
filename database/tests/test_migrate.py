@@ -37,9 +37,11 @@ def migrations_jetables(tmp_path, monkeypatch):
 
 
 def test_up_sur_base_vide_applique_tout(base, capsys):
+    """Le rejeu part de 000 : une base neuve reconstruit l'héritage, puis le
+    versionné par-dessus."""
     assert migrate.commande_up(UP) == 0
 
-    assert versions_appliquees(base) == ["001", "002"]
+    assert versions_appliquees(base) == ["000", "001", "002", "003"]
     assert "001 appliquée" in capsys.readouterr().out
 
 
@@ -50,29 +52,29 @@ def test_up_rejoue_est_un_noop(base, capsys):
     assert migrate.commande_up(UP) == 0
 
     assert "Rien à appliquer" in capsys.readouterr().out
-    assert versions_appliquees(base) == ["001", "002"]
+    assert versions_appliquees(base) == ["000", "001", "002", "003"]
 
 
 def test_status_avant_et_apres(base, capsys):
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 2 en attente" in avant
+    assert "0 appliquée(s), 4 en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "2 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert "4 appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
     assert migrate.commande_up(Namespace(commande="up", target="001")) == 0
 
-    assert versions_appliquees(base) == ["001"]
+    assert versions_appliquees(base) == ["000", "001"]
 
     assert migrate.commande_up(UP) == 0
-    assert versions_appliquees(base) == ["001", "002"]
+    assert versions_appliquees(base) == ["000", "001", "002", "003"]
 
 
 def test_target_inconnue_refusee(base):
@@ -167,6 +169,118 @@ def test_dsn_absent_message_clair(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+#  mark-applied — enregistrer sans exécuter
+# --------------------------------------------------------------------------- #
+
+
+def marquer(version: str) -> Namespace:
+    return Namespace(commande="mark-applied", version=version)
+
+
+def test_mark_applied_enregistre_sans_executer(base, migrations_jetables, capsys):
+    """Le cœur de la commande : la ligne est écrite, le SQL ne tourne pas."""
+    ecrire_migration(
+        migrations_jetables, "000_heritage.sql", "CREATE TABLE public.heritage (i INT);"
+    )
+
+    assert migrate.commande_mark_applied(marquer("000")) == 0
+
+    assert versions_appliquees(base) == ["000"]
+    with psycopg.connect(base) as connexion:
+        table = connexion.execute("SELECT to_regclass('public.heritage')").fetchone()
+    assert table[0] is None, "mark-applied ne doit RIEN exécuter du fichier"
+    assert "n'a PAS été exécuté" in capsys.readouterr().out
+
+
+def test_mark_applied_enregistre_le_checksum_du_fichier(base, migrations_jetables):
+    """Même discipline que `up` : le checksum enregistré est celui du fichier,
+    sinon `status` signalerait une dérive dès le lendemain du marquage."""
+    ecrire_migration(migrations_jetables, "000_heritage.sql", "CREATE TABLE h (i INT);")
+    attendu = migrate.decouvrir(migrations_jetables)[0].checksum
+
+    migrate.commande_mark_applied(marquer("000"))
+
+    with psycopg.connect(base) as connexion:
+        enregistre = connexion.execute(
+            "SELECT checksum FROM public.schema_migrations WHERE version = '000'"
+        ).fetchone()
+    assert enregistre[0] == attendu
+
+
+def test_mark_applied_refuse_une_version_inconnue(base, migrations_jetables):
+    ecrire_migration(migrations_jetables, "001_socle.sql", "CREATE TABLE a (i INT);")
+    # Matérialise schema_migrations : sans cela le refus, qui tombe avant toute
+    # connexion, laisserait la table inexistante et l'assertion finale ne
+    # prouverait rien.
+    migrate.commande_status(STATUS)
+
+    with pytest.raises(migrate.ErreurMigration, match="Version inconnue"):
+        migrate.commande_mark_applied(marquer("000"))
+
+    assert versions_appliquees(base) == [], "un refus ne doit rien enregistrer"
+
+
+def test_mark_applied_refuse_une_migration_deja_enregistree(base, migrations_jetables):
+    ecrire_migration(migrations_jetables, "000_heritage.sql", "CREATE TABLE h (i INT);")
+    migrate.commande_mark_applied(marquer("000"))
+
+    with pytest.raises(migrate.ErreurMigration, match="déjà enregistrée"):
+        migrate.commande_mark_applied(marquer("000"))
+
+    assert versions_appliquees(base) == ["000"], "pas de doublon en base"
+
+
+def test_mark_applied_refuse_une_migration_deja_appliquee_par_up(
+    base, migrations_jetables
+):
+    """Marquer ce que `up` a réellement joué n'aurait aucun sens."""
+    ecrire_migration(migrations_jetables, "000_heritage.sql", "CREATE TABLE h (i INT);")
+    migrate.commande_up(UP)
+
+    with pytest.raises(migrate.ErreurMigration, match="déjà enregistrée"):
+        migrate.commande_mark_applied(marquer("000"))
+
+
+def test_status_voit_la_migration_marquee_comme_appliquee(
+    base, migrations_jetables, capsys
+):
+    ecrire_migration(migrations_jetables, "000_heritage.sql", "CREATE TABLE h (i INT);")
+    migrate.commande_mark_applied(marquer("000"))
+    capsys.readouterr()
+
+    assert migrate.commande_status(STATUS) == 0
+
+    sortie = capsys.readouterr().out
+    assert "appliquée" in sortie
+    assert "1 appliquée(s), 0 en attente" in sortie
+
+
+def test_up_ne_rejoue_pas_une_migration_marquee(base, migrations_jetables, capsys):
+    """Le point qui rend le marquage utile sur la base historique : `up` doit
+    passer 000 et n'appliquer que la suite."""
+    ecrire_migration(
+        migrations_jetables, "000_heritage.sql", "CREATE TABLE public.heritage (i INT);"
+    )
+    ecrire_migration(
+        migrations_jetables, "001_socle.sql", "CREATE TABLE public.a (i INT);"
+    )
+    migrate.commande_mark_applied(marquer("000"))
+    capsys.readouterr()
+
+    assert migrate.commande_up(UP) == 0
+
+    sortie = capsys.readouterr().out
+    assert "000_heritage" not in sortie, "000 ne doit pas être rejouée"
+    assert "001 appliquée" in sortie
+    assert versions_appliquees(base) == ["000", "001"]
+    with psycopg.connect(base) as connexion:
+        heritage = connexion.execute("SELECT to_regclass('public.heritage')").fetchone()
+        socle = connexion.execute("SELECT to_regclass('public.a')").fetchone()
+    assert heritage[0] is None, "000 marquée : son SQL ne doit jamais tourner"
+    assert socle[0] is not None, "001 non marquée : son SQL doit tourner"
+
+
+# --------------------------------------------------------------------------- #
 #  Le SQL livré par 001
 # --------------------------------------------------------------------------- #
 
@@ -175,6 +289,53 @@ def test_dsn_absent_message_clair(monkeypatch):
 def base_migree(base):
     migrate.commande_up(UP)
     return base
+
+
+# --------------------------------------------------------------------------- #
+#  L'héritage livré par 000
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        "manga.ms_series_enriched",
+        "manga.ms_volumes_enriched",
+        "manga.ms_reviews_all",
+        "manga.ms_kitsu_map",
+        "manga.rag_reviews_docs",
+        "manga.kitsu_series_core",
+        "bench.corpus_chunks",
+        "bench.embedding_runs",
+    ],
+)
+def test_000_reconstruit_les_tables_de_l_heritage(base_migree, table):
+    """Sans 000, ces tables n'existaient QUE sur apimanga : le dépôt ne savait
+    pas les reconstruire."""
+    with psycopg.connect(base_migree) as connexion:
+        existe = connexion.execute("SELECT to_regclass(%s)", (table,)).fetchone()
+    assert existe[0] is not None, f"{table} manque après le rejeu de 000"
+
+
+def test_000_reconstruit_les_vues_rag(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        vues = connexion.execute(
+            "SELECT viewname FROM pg_views WHERE schemaname = 'manga' ORDER BY viewname"
+        ).fetchall()
+    noms = [v for (v,) in vues]
+    assert "rag_docs_all" in noms
+    assert "rag_export_docs" in noms
+    assert "v_match_current" in noms, "la vue de 001 doit coexister avec celles de 000"
+
+
+def test_000_ne_recree_pas_les_objets_de_001(base_migree):
+    """La frontière héritage/versionné : 000 laisse à 001 ce qui lui revient."""
+    contenu = (migrate.MIGRATIONS_DIR / "000_baseline.sql").read_text(encoding="utf-8")
+    corps = "\n".join(
+        ligne for ligne in contenu.splitlines() if not ligne.lstrip().startswith("--")
+    )
+    for objet in ("work_identity", "volume_identity", "match_decision", "staging."):
+        assert objet not in corps, f"{objet} appartient à 001/002, pas à la baseline"
 
 
 def test_work_identity_accepte_une_disponibilite_connue(base_migree):
@@ -387,3 +548,233 @@ def test_mi_conserve_le_subtype_kitsu(base_migree):
             "AND column_name = 'subtype'"
         ).fetchone()
     assert ligne[0] == 1
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 003
+# --------------------------------------------------------------------------- #
+
+
+def creer_serie(connexion, series_id: int) -> None:
+    """ms_series_enriched a 72 colonnes, dont une seule est NOT NULL."""
+    connexion.execute(
+        "INSERT INTO manga.ms_series_enriched (series_id) VALUES (%s)", (series_id,)
+    )
+
+
+@pytest.mark.parametrize(
+    ("table", "colonne", "type_attendu"),
+    [
+        ("ms_volumes_enriched", "volume_ean", "text"),
+        ("ms_series_enriched", "work_uid", "bigint"),
+        ("ms_reviews_all", "review_grain", "text"),
+    ],
+)
+def test_003_ajoute_les_colonnes_attendues(base_migree, table, colonne, type_attendu):
+    with psycopg.connect(base_migree) as connexion:
+        trouve = connexion.execute(
+            "SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a "
+            "WHERE a.attrelid = %s::regclass AND a.attname = %s "
+            "AND a.attnum > 0 AND NOT a.attisdropped",
+            (f"manga.{table}", colonne),
+        ).fetchone()
+    assert trouve is not None, f"{table}.{colonne} manque après 003"
+    assert trouve[0] == type_attendu
+
+
+def test_003_ne_recree_pas_ce_qui_existait_deja(base_migree):
+    """Le schéma réel portait déjà volume_number, review_type, series_genres et
+    series_tags : 003 ne doit pas les avoir touchés."""
+    contenu = (migrate.MIGRATIONS_DIR / "003_evolution_ms.sql").read_text(
+        encoding="utf-8"
+    )
+    corps = "\n".join(
+        ligne for ligne in contenu.splitlines() if not ligne.lstrip().startswith("--")
+    )
+    for deja_la in ("volume_number", "review_type", "series_genres", "series_tags"):
+        assert f"ADD COLUMN {deja_la}" not in corps
+
+
+def test_review_grain_vaut_volume_par_defaut(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.ms_reviews_all (review_body) VALUES ('critique')"
+        )
+        connexion.commit()
+        grain = connexion.execute(
+            "SELECT review_grain FROM manga.ms_reviews_all"
+        ).fetchone()
+    assert grain[0] == "volume"
+
+
+@pytest.mark.parametrize("grain", ["volume", "serie"])
+def test_review_grain_accepte_les_deux_grains(base_migree, grain):
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.ms_reviews_all (review_body, review_grain) "
+            "VALUES ('critique', %s)",
+            (grain,),
+        )
+        connexion.commit()
+
+
+def test_review_grain_refuse_un_grain_hors_liste(base_migree):
+    """MUTATION : sans le CHECK, cet INSERT passe."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_reviews_all (review_body, review_grain) "
+                "VALUES ('critique', 'chapitre')"
+            )
+
+
+def test_work_uid_refuse_un_moyeu_orphelin(base_migree):
+    """MUTATION : sans la FK, une série peut pointer vers une œuvre inexistante."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_series_enriched (series_id, work_uid) "
+                "VALUES (1, 999999)"
+            )
+
+
+def test_work_uid_accepte_null_et_un_moyeu_reel(base_migree):
+    """NULL est l'état normal tant que la cascade n'a pas tranché."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        work_uid = connexion.execute(
+            "INSERT INTO manga.work_identity (series_id) VALUES (2) RETURNING work_uid"
+        ).fetchone()[0]
+        connexion.execute(
+            "INSERT INTO manga.ms_series_enriched (series_id, work_uid) VALUES (2, %s)",
+            (work_uid,),
+        )
+        connexion.commit()
+        sans_moyeu = connexion.execute(
+            "SELECT count(*) FROM manga.ms_series_enriched WHERE work_uid IS NULL"
+        ).fetchone()
+    assert sans_moyeu[0] == 1
+
+
+def test_ms_formes_refuse_un_doublon_de_forme(base_migree):
+    """MUTATION : sans l'UNIQUE, la même forme se charge deux fois."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        connexion.execute(
+            "INSERT INTO manga.ms_formes (series_id, forme, forme_norm, forme_type) "
+            "VALUES (1, 'Bakegyamon', 'bakegyamon', 'title')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_formes "
+                "(series_id, forme, forme_norm, forme_type) "
+                "VALUES (1, 'BakéGyamon', 'bakegyamon', 'alias')"
+            )
+
+
+def test_ms_formes_accepte_la_meme_forme_pour_deux_series(base_migree):
+    """L'unicité porte sur le TRIPLET : deux séries homonymes sont un fait de la
+    source — et le problème même que la cascade doit trancher."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        creer_serie(connexion, 2)
+        for series_id in (1, 2):
+            connexion.execute(
+                "INSERT INTO manga.ms_formes "
+                "(series_id, forme, forme_norm, forme_type) "
+                "VALUES (%s, 'Monster', 'monster', 'title')",
+                (series_id,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.ms_formes WHERE forme_norm = 'monster'"
+        ).fetchone()
+    assert total[0] == 2
+
+
+def test_ms_formes_meme_forme_de_deux_sources_coexiste(base_migree):
+    """La source fait partie de la clé : Wikidata pourra proposer la même forme
+    que Manga Sanctuary sans écraser la sienne."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        for source in ("ms", "wikidata"):
+            connexion.execute(
+                "INSERT INTO manga.ms_formes "
+                "(series_id, forme, forme_norm, forme_type, source) "
+                "VALUES (1, 'Monster', 'monster', 'title', %s)",
+                (source,),
+            )
+        connexion.commit()
+        total = connexion.execute("SELECT count(*) FROM manga.ms_formes").fetchone()
+    assert total[0] == 2
+
+
+def test_ms_formes_refuse_un_type_de_forme_inconnu(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        connexion.commit()
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_formes "
+                "(series_id, forme, forme_norm, forme_type) "
+                "VALUES (1, 'Monster', 'monster', 'sous-titre')"
+            )
+
+
+def test_ms_formes_refuse_une_serie_inexistante(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_formes "
+                "(series_id, forme, forme_norm, forme_type) "
+                "VALUES (404, 'Monster', 'monster', 'title')"
+            )
+
+
+def test_ms_formes_langue_reste_nullable(base_migree):
+    """Les alias Manga Sanctuary n'ont pas de langue : la colonne doit
+    l'accepter plutôt que de forcer une inférence."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        connexion.execute(
+            "INSERT INTO manga.ms_formes (series_id, forme, forme_norm, forme_type) "
+            "VALUES (1, '妖逆門', 'yougyakumon', 'alias')"
+        )
+        connexion.commit()
+        ligne = connexion.execute(
+            "SELECT langue, source FROM manga.ms_formes"
+        ).fetchone()
+    assert ligne[0] is None
+    assert ligne[1] == "ms", "source vaut 'ms' par défaut"
+
+
+def test_003_installe_pg_trgm_et_ses_index(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        extension = connexion.execute(
+            "SELECT extversion FROM pg_extension WHERE extname = 'pg_trgm'"
+        ).fetchone()
+        index = connexion.execute(
+            "SELECT indexname, indexdef FROM pg_indexes "
+            "WHERE schemaname = 'manga' AND tablename = 'ms_formes'"
+        ).fetchall()
+    assert extension is not None, "pg_trgm doit être installée par 003"
+    definitions = dict(index)
+    assert "gin_trgm_ops" in definitions["ms_formes_forme_norm_trgm_idx"]
+    assert "btree" in definitions["ms_formes_forme_norm_idx"]
+
+
+def test_ms_formes_index_trigram_est_utilisable(base_migree):
+    """L'index n'a de sens que si l'opérateur % le trouve : on l'exerce."""
+    with psycopg.connect(base_migree) as connexion:
+        creer_serie(connexion, 1)
+        connexion.execute(
+            "INSERT INTO manga.ms_formes (series_id, forme, forme_norm, forme_type) "
+            "VALUES (1, 'Bakegyamon', 'bakegyamon', 'title')"
+        )
+        connexion.commit()
+        proche = connexion.execute(
+            "SELECT forme_norm FROM manga.ms_formes WHERE forme_norm %% %s",
+            ("bakegyamonn",),
+        ).fetchall()
+    assert len(proche) == 1, "la recherche floue doit retrouver la forme voisine"
