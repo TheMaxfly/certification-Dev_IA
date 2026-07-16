@@ -41,7 +41,14 @@ def test_up_sur_base_vide_applique_tout(base, capsys):
     versionné par-dessus."""
     assert migrate.commande_up(UP) == 0
 
-    assert versions_appliquees(base) == ["000", "001", "002", "003"]
+    assert versions_appliquees(base) == [
+        "000",
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+    ]
     assert "001 appliquée" in capsys.readouterr().out
 
 
@@ -52,20 +59,27 @@ def test_up_rejoue_est_un_noop(base, capsys):
     assert migrate.commande_up(UP) == 0
 
     assert "Rien à appliquer" in capsys.readouterr().out
-    assert versions_appliquees(base) == ["000", "001", "002", "003"]
+    assert versions_appliquees(base) == [
+        "000",
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+    ]
 
 
 def test_status_avant_et_apres(base, capsys):
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 4 en attente" in avant
+    assert "0 appliquée(s), 6 en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "4 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert "6 appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
@@ -74,7 +88,14 @@ def test_target_s_arrete_a_la_version_demandee(base):
     assert versions_appliquees(base) == ["000", "001"]
 
     assert migrate.commande_up(UP) == 0
-    assert versions_appliquees(base) == ["000", "001", "002", "003"]
+    assert versions_appliquees(base) == [
+        "000",
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+    ]
 
 
 def test_target_inconnue_refusee(base):
@@ -490,6 +511,9 @@ def test_staging_tables_creees(base_migree):
         "kitsu_formes",
         "mi_sorties",
         "mi_series",
+        # 004 — atterrissage du snapshot Manga Sanctuary.
+        "ms_volumes",
+        "ms_reviews",
     }
     with psycopg.connect(base_migree) as connexion:
         lignes = connexion.execute(
@@ -524,8 +548,8 @@ def test_staging_porte_les_colonnes_techniques(base_migree):
             "WHERE table_schema = 'staging' AND column_name = 'loaded_at' "
             "AND column_default LIKE 'now()%'"
         ).fetchone()
-    assert len(lignes) == 7
-    assert loaded[0] == 7
+    assert len(lignes) == 9, "7 tables de 002 + les 2 de 004"
+    assert loaded[0] == 9
 
 
 def test_mi_sorties_porte_l_ean_et_mi_series_non(base_migree):
@@ -778,3 +802,64 @@ def test_ms_formes_index_trigram_est_utilisable(base_migree):
             ("bakegyamonn",),
         ).fetchall()
     assert len(proche) == 1, "la recherche floue doit retrouver la forme voisine"
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 004 et 005
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("table", "attendu"),
+    [("ms_volumes", 42), ("ms_reviews", 15)],
+)
+def test_004_staging_porte_toutes_les_cles_du_fichier(base_migree, table, attendu):
+    """39 clés + 1 dérivée + 2 techniques pour les volumes ; 12 + 1 + 2 pour les
+    critiques. Aucune clé de la source n'est écartée au chargement."""
+    with psycopg.connect(base_migree) as connexion:
+        total = connexion.execute(
+            "SELECT count(*) FROM information_schema.columns "
+            "WHERE table_schema = 'staging' AND table_name = %s",
+            (table,),
+        ).fetchone()
+    assert total[0] == attendu
+
+
+def test_004_staging_ms_porte_les_colonnes_iso_derivees(base_migree):
+    """Les dates FR sont parsées en Python : le staging reçoit de l'ISO, que la
+    promotion caste sans jamais dépendre du lc_time du serveur."""
+    with psycopg.connect(base_migree) as connexion:
+        lignes = connexion.execute(
+            "SELECT table_name, data_type FROM information_schema.columns "
+            "WHERE table_schema = 'staging' AND column_name IN "
+            "('volume_publication_date_iso', 'review_date_iso') "
+            "ORDER BY table_name"
+        ).fetchall()
+    assert lignes == [("ms_reviews", "text"), ("ms_volumes", "text")]
+
+
+def test_005_review_url_devient_unique(base_migree):
+    """MUTATION : sans cet index, la promotion des critiques ne peut pas être un
+    upsert et dupliquerait 11 052 lignes par cycle."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.ms_reviews_all (review_url) VALUES ('https://x/r1')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.ms_reviews_all (review_url) VALUES ('https://x/r1')"
+            )
+
+
+def test_005_index_partiel_laisse_passer_les_null(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        for _ in range(2):
+            connexion.execute(
+                "INSERT INTO manga.ms_reviews_all (review_body) VALUES ('sans url')"
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.ms_reviews_all WHERE review_url IS NULL"
+        ).fetchone()
+    assert total[0] == 2

@@ -23,6 +23,8 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `001_socle_identite.sql` | schémas `manga` et `staging` ; `work_identity`, `volume_identity`, `match_decision` + vue `v_match_current` |
 | `002_staging_referentiels.sql` | staging des référentiels : `wd_*` (pivot Wikidata), `kitsu_formes`, `mi_sorties` / `mi_series` (Manga Insight) |
 | `003_evolution_ms.sql` | évolution `ms_*` pour le snapshot 2026-07 : `volume_ean`, `work_uid` (moyeu), `review_grain` ; table `ms_formes` + index trigramme |
+| `004_staging_ms.sql` | staging du snapshot Manga Sanctuary : `staging.ms_volumes` (39 clés), `staging.ms_reviews` (12 clés) |
+| `005_unicite_review_url.sql` | index UNIQUE partiel sur `ms_reviews_all.review_url` — la clé d'upsert du cycle mensuel |
 
 ## `000` — la frontière héritage / versionné
 
@@ -52,23 +54,24 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 ## État de la base réelle
 
-`001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15** ; `000` y
-a été **marquée appliquée le même jour**, sans exécution. Le contrôle final
-affiche **4 migrations appliquées et 0 en attente**.
+`001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004` et
+`005` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
+exécution. Le contrôle final affiche **6 migrations appliquées et 0 en
+attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
 
-Aucune donnée n'a été chargée ni modifiée par ces migrations. Les fichiers
-`000/001/002` sont désormais immuables ; toute évolution doit être ajoutée dans
-une migration `003` ou suivante.
+Aucune de ces migrations ne charge de données — elles ne créent que des
+structures. Le chargement du snapshot est le travail du chargeur (cf. plus bas).
+Les fichiers `000` à `005` sont désormais immuables.
 
 ### Preuve de fidélité
 
-La baseline ne vaut que si elle ne ment pas. Contrôle exécuté le 2026-07-15 :
+La baseline ne vaut que si elle ne ment pas. Contrôle rejoué le 2026-07-16 :
 `pg_dump --schema-only` (schémas `manga`, `bench`, `staging`) d'une base jetable
-reconstruite par `up` **000→003**, comparé au même dump d'`apimanga`. Diff
-normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 939
+reconstruite par `up` **000→005**, comparé au même dump d'`apimanga`. Diff
+normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 1 007
 lignes de part et d'autre, y compris après tri. La base reconstruite depuis le
 dépôt est identique à la base réelle.
 
@@ -136,7 +139,7 @@ Objets créés : `manga.match_decision`, `manga.volume_identity`,
 
 `000` a été ajoutée après coup, et **enregistrée sans être exécutée** : ses objets
 étaient déjà là depuis le module 05. Aucun DDL n'a tourné, aucune donnée n'a
-bougé (13 208 séries / 89 129 volumes / 6 749 critiques inchangées).
+bougé (l'état d'alors : 13 208 séries / 89 129 volumes / 6 749 critiques).
 
 ```console
 $ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run python migrate.py mark-applied 000
@@ -155,7 +158,7 @@ $ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run python mig
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 64 tests. Le harnais lance un PostgreSQL
+`uv run --extra dev pytest tests/` — 69 tests. Le harnais lance un PostgreSQL
 **jetable** en conteneur et crée une base neuve par test. Si Docker est absent,
 les tests **skippent avec un message** : ils ne se rabattent jamais sur une base
 réelle, et `apimanga` n'est jamais atteignable depuis la suite.
@@ -213,12 +216,52 @@ snapshot sont toutes ancrées sur un tome). Elle est créée quand même, avec
 `'serie'` autorisé par le CHECK : le jour où un avis au grain série arrivera, la
 structure l'accueillera sans migration.
 
+## Notes sur `004` / `005`
+
+`004` calque `staging.ms_*` sur les clés **réelles** des fichiers. Deux points :
+
+- **Une colonne dérivée par table** (`volume_publication_date_iso`,
+  `review_date_iso`), calculée par le chargeur et non lue du fichier. Le staging
+  reste tout-TEXT — une date ISO est du texte — mais la promotion peut la caster
+  par un simple `::date`. Le parsing des mois français appartient à Python
+  (`identity.dates`), pour la même raison que la normalisation des titres :
+  `to_date('27 nov. 2012', 'DD mon YYYY')` dépend du `lc_time` du serveur et
+  rendrait le résultat dépendant de la machine.
+- **`volume_members_rating` est chargée mais non promue** : `ms_volumes_enriched`
+  n'a pas de colonne pour elle, alors que `volume_experts_rating` existe. Écart du
+  schéma historique, pas du snapshot. La valeur reste dans le staging et dans le
+  raw ; lui ouvrir une colonne est une décision d'évolution à part.
+
+`005` ajoute l'unicité de `review_url`. Sans elle, la promotion des critiques ne
+peut pas être un upsert : `ms_reviews_all` a pour PK `review_id`, une séquence —
+un identifiant technique qui ne dit rien de l'identité d'une critique.
+
+## Chargement du snapshot Manga Sanctuary
+
+Le chargeur vit dans le module 05, auprès de `normaliser()` :
+
+```bash
+cd 05_nettoyage_agregation_bdd
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m identity.charger_ms                       # snapshot 2026-07
+uv run python -m identity.charger_ms --snapshot chemin/    # un autre
+```
+
+**Upsert, jamais de DELETE.** Une fiche absente du snapshot du mois reste en base :
+disparaître de Manga Sanctuary n'est pas une preuve d'inexistence. Le chargement
+2026-07 a laissé 296 volumes, 22 critiques et 18 séries de 2025-12 intacts.
+
+Chargement réel du 2026-07 sur `apimanga` (2026-07-16, 21 s) : 14 652 séries /
+103 811 volumes / 11 052 critiques promues ; 14 652 `title` + 17 252 alias dans
+`ms_formes` ; 104 107 lignes dans `volume_identity`, dont 63 627 `isbn13` valides.
+Rejouer le chargement ne change aucun compte.
+
 ## À suivre
 
-Le chargement du snapshot `2026-07` (promotion **B2**) : peupler `volume_ean`,
-`ms_formes` (`forme_norm` calculée par la fonction Python du module 05, **jamais**
-en SQL), puis la cascade de rapprochement (**étape C**) qui remplira `work_uid` et
-journalisera ses décisions dans `match_decision`.
+**Étape C — la cascade** : remplir `work_uid` et journaliser les décisions dans
+`match_decision`, en s'appuyant sur les trois tables de formes (`ms_formes`,
+`wd_formes`, `kitsu_formes` — même normalisation, même outillage d'index) et le
+pont Wikidata → Kitsu.
 
-Toute évolution doit être ajoutée comme nouveau fichier : **ne jamais modifier
-`000`, `001`, `002` ou `003`**.
+Toute évolution doit être ajoutée comme nouveau fichier : **ne jamais modifier une
+migration déjà appliquée**.
