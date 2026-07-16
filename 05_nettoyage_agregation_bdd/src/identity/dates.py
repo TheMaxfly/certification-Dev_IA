@@ -110,3 +110,33 @@ def iso_ou_none(valeur: str | None) -> str | None:
     """Forme ISO 8601 attendue par le staging, ou None."""
     parsee = parser_date_fr(valeur)
     return parsee.isoformat() if parsee else None
+
+
+def parser_date_souple(valeur: str | None) -> date | None:
+    """Date ISO **ou** française -> `date`, ou None.
+
+    Manga Insight mélange les deux dans une seule colonne : 52 225 valeurs en
+    ISO (« 1978-01-04 00:00:00 », héritées d'un export tableur) et 4 209 en
+    français (« 01 Octobre 2025 », saisies à la main, mois capitalisé). Le
+    fichier est un empilement de sources : la colonne porte donc les deux.
+
+    L'ISO est tentée d'abord — c'est la forme majoritaire et la moins ambiguë —
+    puis le français par `parser_date_fr`, qui reste l'unique implémentation du
+    calendrier français.
+
+    >>> parser_date_souple("1978-01-04 00:00:00")
+    datetime.date(1978, 1, 4)
+    >>> parser_date_souple("01 Octobre 2025")
+    datetime.date(2025, 10, 1)
+    """
+    if valeur is None:
+        return None
+    texte = str(valeur).strip()
+    if not texte:
+        return None
+    try:
+        # Tolère « aaaa-mm-jj » comme « aaaa-mm-jj hh:mm:ss » : seule la date
+        # nous intéresse, l'heure d'un export tableur est toujours minuit.
+        return date.fromisoformat(texte[:10])
+    except ValueError:
+        return parser_date_fr(texte)

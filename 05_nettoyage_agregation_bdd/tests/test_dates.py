@@ -7,7 +7,7 @@ bien formées : ce sont les valeurs que la source produit et qui n'en sont pas.
 
 from datetime import date
 
-from identity.dates import iso_ou_none, parser_date_fr
+from identity.dates import iso_ou_none, parser_date_fr, parser_date_souple
 
 
 class TestFormesReelles:
@@ -77,3 +77,30 @@ class TestIso:
     def test_iso_none_si_non_parsable(self):
         assert iso_ou_none("jeu.") is None
         assert iso_ou_none("Date inconnue") is None
+
+
+class TestDateSouple:
+    """Manga Insight mélange ISO et français dans une seule colonne."""
+
+    def test_iso_avec_heure(self):
+        assert parser_date_souple("1978-01-04 00:00:00") == date(1978, 1, 4)
+
+    def test_iso_sans_heure(self):
+        assert parser_date_souple("2025-10-01") == date(2025, 10, 1)
+
+    def test_francais_a_mois_capitalise(self):
+        """Les saisies manuelles de MI capitalisent le mois."""
+        assert parser_date_souple("01 Octobre 2025") == date(2025, 10, 1)
+        assert parser_date_souple("03 Décembre 2025") == date(2025, 12, 3)
+        assert parser_date_souple("04 Juin 2025") == date(2025, 6, 4)
+
+    def test_vide_et_none(self):
+        assert parser_date_souple(None) is None
+        assert parser_date_souple("") is None
+
+    def test_ne_devine_pas(self):
+        assert parser_date_souple("Date inconnue") is None
+        assert parser_date_souple("2025") is None
+
+    def test_iso_impossible_refusee(self):
+        assert parser_date_souple("2025-02-30") is None

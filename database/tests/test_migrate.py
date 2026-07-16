@@ -49,6 +49,7 @@ def test_up_sur_base_vide_applique_tout(base, capsys):
         "004",
         "005",
         "006",
+        "007",
     ]
     assert "001 appliquée" in capsys.readouterr().out
 
@@ -68,20 +69,21 @@ def test_up_rejoue_est_un_noop(base, capsys):
         "004",
         "005",
         "006",
+        "007",
     ]
 
 
 def test_status_avant_et_apres(base, capsys):
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 7 en attente" in avant
+    assert "0 appliquée(s), 8 en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "7 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert "8 appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
@@ -98,6 +100,7 @@ def test_target_s_arrete_a_la_version_demandee(base):
         "004",
         "005",
         "006",
+        "007",
     ]
 
 
@@ -1045,3 +1048,63 @@ def test_le_pont_wikidata_kitsu_est_joignable(base_migree):
             "  AND m.external_id = p.mal_id"
         ).fetchall()
     assert pont == [("Q1", 42)]
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 007
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("table", ["manga.mi_sorties", "manga.mi_series"])
+def test_007_cree_les_tables_mi(base_migree, table):
+    with psycopg.connect(base_migree) as connexion:
+        existe = connexion.execute("SELECT to_regclass(%s)", (table,)).fetchone()
+    assert existe[0] is not None
+
+
+def test_007_ean_n_est_pas_une_cle(base_migree):
+    """La révision de décision, rendue exécutable : 534 EAN portent plusieurs
+    sorties dans le fichier réel — un UNIQUE en perdrait 687."""
+    with psycopg.connect(base_migree) as connexion:
+        for titre in ("Berserk of Gluttony Vol.12", "Martial Universe Vol.10"):
+            connexion.execute(
+                "INSERT INTO manga.mi_sorties (ean, titre) "
+                "VALUES ('9782487369641', %s)",
+                (titre,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.mi_sorties WHERE ean = '9782487369641'"
+        ).fetchone()
+    assert total[0] == 2, "deux œuvres au même EAN doivent coexister"
+
+
+def test_007_une_sortie_sans_ean_est_acceptee(base_migree):
+    """1 721 lignes (3,52 %) n'ont aucun EAN : un NOT NULL les perdrait."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute("INSERT INTO manga.mi_sorties (titre) VALUES ('Sans EAN')")
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.mi_sorties WHERE ean IS NULL"
+        ).fetchone()
+    assert total[0] == 1
+
+
+def test_v_mi_ean_multiples_signale_les_titres_divergents(base_migree):
+    """La vue distingue l'erreur source (deux œuvres) de la simple réédition."""
+    with psycopg.connect(base_migree) as connexion:
+        for titre in ("Berserk of Gluttony Vol.12", "Martial Universe Vol.10"):
+            connexion.execute(
+                "INSERT INTO manga.mi_sorties (ean, titre) "
+                "VALUES ('9782487369641', %s)",
+                (titre,),
+            )
+        connexion.execute(
+            "INSERT INTO manga.mi_sorties (ean, titre) "
+            "VALUES ('9782360810284', 'Seul')"
+        )
+        connexion.commit()
+        lignes = connexion.execute(
+            "SELECT ean, nb_sorties, titres_divergents FROM manga.v_mi_ean_multiples"
+        ).fetchall()
+    assert lignes == [("9782487369641", 2, True)], "un EAN seul n'est pas multiple"

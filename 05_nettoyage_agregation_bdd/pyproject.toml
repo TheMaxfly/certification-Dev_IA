@@ -17,6 +17,7 @@ dependencies = [
   "pandas>=2.2",
   "requests>=2.34.2",
   "psycopg[binary]>=3.2",
+  "pyarrow>=25.0.0",
 ]
 
 [project.optional-dependencies]

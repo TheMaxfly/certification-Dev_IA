@@ -26,6 +26,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `004_staging_ms.sql` | staging du snapshot Manga Sanctuary : `staging.ms_volumes` (39 clés), `staging.ms_reviews` (12 clés) |
 | `005_unicite_review_url.sql` | index UNIQUE partiel sur `ms_reviews_all.review_url` — la clé d'upsert du cycle mensuel |
 | `006_referentiels.sql` | référentiels typés de la cascade : `staging.kitsu_mappings` ; `manga.wd_pivot` / `wd_formes` / `wd_auteurs` ; `manga.kitsu_mappings` / `kitsu_formes` |
+| `007_referentiel_mi.sql` | Manga Insight typé : `manga.mi_sorties` / `mi_series` + vue `v_mi_ean_multiples` |
 
 ## `000` — la frontière héritage / versionné
 
@@ -56,8 +57,8 @@ son seul emploi légitime, et il est réservé à ce cas.
 ## État de la base réelle
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
-à `006` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
-exécution. Le contrôle final affiche **7 migrations appliquées et 0 en
+à `007` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
+exécution. Le contrôle final affiche **8 migrations appliquées et 0 en
 attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
@@ -65,14 +66,14 @@ version est plus ancienne : la baseline date le constat, pas la construction.
 
 Aucune de ces migrations ne charge de données — elles ne créent que des
 structures. Le chargement du snapshot est le travail du chargeur (cf. plus bas).
-Les fichiers `000` à `006` sont désormais immuables.
+Les fichiers `000` à `007` sont désormais immuables.
 
 ### Preuve de fidélité
 
 La baseline ne vaut que si elle ne ment pas. Contrôle rejoué le 2026-07-16 :
 `pg_dump --schema-only` (schémas `manga`, `bench`, `staging`) d'une base jetable
-reconstruite par `up` **000→006**, comparé au même dump d'`apimanga`. Diff
-normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 1 115
+reconstruite par `up` **000→007**, comparé au même dump d'`apimanga`. Diff
+normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 1 237
 lignes de part et d'autre, y compris après tri. La base reconstruite depuis le
 dépôt est identique à la base réelle.
 
@@ -159,7 +160,7 @@ $ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run python mig
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 86 tests. Le harnais lance un PostgreSQL
+`uv run --extra dev pytest tests/` — 91 tests. Le harnais lance un PostgreSQL
 **jetable** en conteneur et crée une base neuve par test. Si Docker est absent,
 les tests **skippent avec un message** : ils ne se rabattent jamais sur une base
 réelle, et `apimanga` n'est jamais atteignable depuis la suite.
@@ -300,6 +301,52 @@ change aucun compte.
 
 Résultat qui compte : **5 963 qid Wikidata rejoignent désormais 5 973 kitsu_id**
 par les mappings. C'est le pont que la cascade attendait.
+
+## Notes sur `007` — Manga Insight, et une décision révisée
+
+`007` complète `006` : il restait Manga Insight, dont le parquet était
+introuvable au moment de l'écriture de `006`.
+
+**« Upsert clé EAN » a été abandonné, mesures à l'appui.** La décision reposait
+sur l'idée que l'EAN identifie une sortie. Le fichier réel dit le contraire :
+3,52 % des lignes n'ont aucun EAN, et 534 EAN portent plusieurs sorties. Un
+upsert de clé EAN aurait gardé 46 492 des 48 900 lignes — **2 408 perdues
+(4,92 %), en silence**. Certains doublons sont de vraies rééditions (trois
+éditions de « NonNonBa » partagent un EAN, comme les coffrets dans
+`volume_identity`), d'autres sont des **erreurs de la source** : l'EAN
+`9782368773512` porte « Comment lui avouer !? » et « Egregor - Collector Vol.1 ».
+Aucune clé naturelle n'existe : seule la ligne entière est unique.
+
+D'où **PK technique + rechargement complet**. La table EST le snapshot du mois ;
+l'historique vit dans le raw daté et immuable. Ce n'est pas le `DELETE` interdit
+par le cycle mensuel : `mi_*` n'a aucune FK entrante, n'est pas un référentiel,
+et rien n'y est irrécupérable. Le rechargement est protégé par un **plancher de
+volumétrie** : un snapshot sous 90 % du compte en base annule tout.
+
+La vue `v_mi_ean_multiples` rend visibles les 534 EAN partagés, dont 47 portent
+des titres divergents. Ce drapeau dit « probable », et pas plus : parmi ces 47,
+il y a de vraies erreurs (deux œuvres distinctes) et de simples variantes de
+libellé (« Coffret 4 - Water Seven » / « Coffret vide Water Seven Vol.4 »).
+
+## Acquisition et chargement de Manga Insight
+
+```bash
+cd 05_nettoyage_agregation_bdd
+uv run python -m identity.acquerir_mi            # HF -> data/raw/mi/<mois>/ + MANIFEST
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m identity.charger_mi             # raw daté -> manga.mi_*
+```
+
+L'acquisition **refuse d'écraser** un raw daté existant : pour rafraîchir, on
+change de date. Le chargeur **refuse un raw sans MANIFEST** — des données sans
+provenance n'entrent pas en base.
+
+Chargement réel du 2026-07-16 : **48 900** sorties + **10 162** séries en 2,5 s ;
+47 028 EAN valides, 151 faux, 1 721 absents. Rejouer ne change aucun compte.
+
+**Recouvrement EAN Manga Insight ↔ `volume_identity.isbn13`** (métrique
+récurrente, première mesure) : **38 561 EAN communs**, soit 83,20 % des 46 348
+EAN valides de MI et 60,72 % des 63 511 ISBN-13 de Manga Sanctuary.
 
 ## À suivre
 
