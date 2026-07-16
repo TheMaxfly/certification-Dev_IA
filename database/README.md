@@ -25,6 +25,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `003_evolution_ms.sql` | évolution `ms_*` pour le snapshot 2026-07 : `volume_ean`, `work_uid` (moyeu), `review_grain` ; table `ms_formes` + index trigramme |
 | `004_staging_ms.sql` | staging du snapshot Manga Sanctuary : `staging.ms_volumes` (39 clés), `staging.ms_reviews` (12 clés) |
 | `005_unicite_review_url.sql` | index UNIQUE partiel sur `ms_reviews_all.review_url` — la clé d'upsert du cycle mensuel |
+| `006_referentiels.sql` | référentiels typés de la cascade : `staging.kitsu_mappings` ; `manga.wd_pivot` / `wd_formes` / `wd_auteurs` ; `manga.kitsu_mappings` / `kitsu_formes` |
 
 ## `000` — la frontière héritage / versionné
 
@@ -54,9 +55,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 ## État de la base réelle
 
-`001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004` et
-`005` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
-exécution. Le contrôle final affiche **6 migrations appliquées et 0 en
+`001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
+à `006` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
+exécution. Le contrôle final affiche **7 migrations appliquées et 0 en
 attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
@@ -64,14 +65,14 @@ version est plus ancienne : la baseline date le constat, pas la construction.
 
 Aucune de ces migrations ne charge de données — elles ne créent que des
 structures. Le chargement du snapshot est le travail du chargeur (cf. plus bas).
-Les fichiers `000` à `005` sont désormais immuables.
+Les fichiers `000` à `006` sont désormais immuables.
 
 ### Preuve de fidélité
 
 La baseline ne vaut que si elle ne ment pas. Contrôle rejoué le 2026-07-16 :
 `pg_dump --schema-only` (schémas `manga`, `bench`, `staging`) d'une base jetable
-reconstruite par `up` **000→005**, comparé au même dump d'`apimanga`. Diff
-normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 1 007
+reconstruite par `up` **000→006**, comparé au même dump d'`apimanga`. Diff
+normalisé (hors commentaires, préambule `SET`, OWNER/GRANT) : **vide**, 1 115
 lignes de part et d'autre, y compris après tri. La base reconstruite depuis le
 dépôt est identique à la base réelle.
 
@@ -158,7 +159,7 @@ $ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run python mig
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 69 tests. Le harnais lance un PostgreSQL
+`uv run --extra dev pytest tests/` — 86 tests. Le harnais lance un PostgreSQL
 **jetable** en conteneur et crée une base neuve par test. Si Docker est absent,
 les tests **skippent avec un message** : ils ne se rabattent jamais sur une base
 réelle, et `apimanga` n'est jamais atteignable depuis la suite.
@@ -255,6 +256,50 @@ Chargement réel du 2026-07 sur `apimanga` (2026-07-16, 21 s) : 14 652 séries /
 103 811 volumes / 11 052 critiques promues ; 14 652 `title` + 17 252 alias dans
 `ms_formes` ; 104 107 lignes dans `volume_identity`, dont 63 627 `isbn13` valides.
 Rejouer le chargement ne change aucun compte.
+
+## Notes sur `006` — les référentiels de la cascade
+
+002 a posé un staging tout-TEXT pour Wikidata et Kitsu, et c'était le bon geste.
+Mais le staging est **TRONQUÉ à chaque chargement** : la cascade, qui joint ces
+référentiels à chaque décision, ne peut pas s'appuyer dessus. D'où le miroir
+typé et durable dans `manga` — staging = ce que le fichier dit, `manga` = ce sur
+quoi on décide.
+
+Il manquait par ailleurs **toute table pour les mappings Kitsu**. Vérifié avant
+d'écrire : ni le dépôt ni l'héritage n'en avaient. C'est l'étage `kitsu_bridge`
+de la cascade (cf. le CHECK de `match_decision` en 001) qui n'existait pas — sans
+lui, le pivot Wikidata, qui ne connaît que `mal_id` et `anilist_id`, ne peut pas
+rejoindre Kitsu.
+
+**Une seule normalisation, des deux côtés.** `forme_norm` vient de
+`identity.normaliser()` pour `ms_formes` (B2) comme pour `wd_formes` et
+`kitsu_formes`. Une jointure d'égalité entre deux colonnes normalisées par deux
+implémentations différentes renverrait « pas de match » là où les titres sont les
+mêmes — en silence. Les trois tables portent le même outillage : index btree +
+GIN trigramme sur `forme_norm`.
+
+`006` ne double pas `manga.kitsu_series_core` (héritage) : celle-ci reste la
+fiche Kitsu, `kitsu_formes` ne porte que des cibles de matching. Attention, ses
+`title_norm_*` viennent de l'ancien code du module 05 et ne sont pas garantis
+identiques à `forme_norm` — la cascade doit lire `kitsu_formes`.
+
+## Chargement des référentiels
+
+```bash
+cd 05_nettoyage_agregation_bdd
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m identity.charger_wikidata   # CSV -> manga.wd_*
+uv run python -m identity.charger_kitsu      # ndjson -> manga.kitsu_*
+```
+
+Chargement réel du 2026-07-16 : **8 214** `wd_pivot`, **26 103** `wd_formes`
+(28 668 lues, 2 565 collisions normalisées), **5 453** `wd_auteurs` en 2,1 s ;
+**155 003** `kitsu_formes` couvrant les **41 249** entrées de la cible et
+**74 866** `kitsu_mappings` retenus sur 104 726 bruts en 15,1 s. Rejouer ne
+change aucun compte.
+
+Résultat qui compte : **5 963 qid Wikidata rejoignent désormais 5 973 kitsu_id**
+par les mappings. C'est le pont que la cascade attendait.
 
 ## À suivre
 

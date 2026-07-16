@@ -48,6 +48,7 @@ def test_up_sur_base_vide_applique_tout(base, capsys):
         "003",
         "004",
         "005",
+        "006",
     ]
     assert "001 appliquée" in capsys.readouterr().out
 
@@ -66,20 +67,21 @@ def test_up_rejoue_est_un_noop(base, capsys):
         "003",
         "004",
         "005",
+        "006",
     ]
 
 
 def test_status_avant_et_apres(base, capsys):
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 6 en attente" in avant
+    assert "0 appliquée(s), 7 en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "6 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert "7 appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
@@ -95,6 +97,7 @@ def test_target_s_arrete_a_la_version_demandee(base):
         "003",
         "004",
         "005",
+        "006",
     ]
 
 
@@ -514,6 +517,8 @@ def test_staging_tables_creees(base_migree):
         # 004 — atterrissage du snapshot Manga Sanctuary.
         "ms_volumes",
         "ms_reviews",
+        # 006 — l'atterrissage des mappings Kitsu, qui manquait.
+        "kitsu_mappings",
     }
     with psycopg.connect(base_migree) as connexion:
         lignes = connexion.execute(
@@ -548,8 +553,8 @@ def test_staging_porte_les_colonnes_techniques(base_migree):
             "WHERE table_schema = 'staging' AND column_name = 'loaded_at' "
             "AND column_default LIKE 'now()%'"
         ).fetchone()
-    assert len(lignes) == 9, "7 tables de 002 + les 2 de 004"
-    assert loaded[0] == 9
+    assert len(lignes) == 10, "7 tables de 002 + 2 de 004 + 1 de 006"
+    assert loaded[0] == 10
 
 
 def test_mi_sorties_porte_l_ean_et_mi_series_non(base_migree):
@@ -863,3 +868,180 @@ def test_005_index_partiel_laisse_passer_les_null(base_migree):
             "SELECT count(*) FROM manga.ms_reviews_all WHERE review_url IS NULL"
         ).fetchone()
     assert total[0] == 2
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 006
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        "staging.kitsu_mappings",
+        "manga.wd_pivot",
+        "manga.wd_formes",
+        "manga.wd_auteurs",
+        "manga.kitsu_mappings",
+        "manga.kitsu_formes",
+    ],
+)
+def test_006_cree_les_referentiels(base_migree, table):
+    with psycopg.connect(base_migree) as connexion:
+        existe = connexion.execute("SELECT to_regclass(%s)", (table,)).fetchone()
+    assert existe[0] is not None, f"{table} manque après 006"
+
+
+def test_006_ne_double_pas_kitsu_series_core(base_migree):
+    """L'héritage porte déjà les titres et le synopsis Kitsu : kitsu_formes ne
+    contient QUE des formes de matching."""
+    with psycopg.connect(base_migree) as connexion:
+        colonnes = {
+            c
+            for (c,) in connexion.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'manga' AND table_name = 'kitsu_formes'"
+            ).fetchall()
+        }
+    for absente in ("synopsis_clean", "rating_average_10", "categories_json"):
+        assert absente not in colonnes, "kitsu_series_core reste la fiche Kitsu"
+
+
+def test_kitsu_formes_refuse_un_subtype_hors_cible(base_migree):
+    """MUTATION : sans ce CHECK, un light novel entrerait dans les cibles de
+    matching — 15 224 d'entre eux attendent dans le catalogue."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_formes "
+                "(kitsu_id, forme, forme_norm, forme_type, subtype) "
+                "VALUES (1, 'Un roman', 'un roman', 'canonical', 'novel')"
+            )
+
+
+def test_kitsu_formes_refuse_un_type_de_forme_inconnu(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_formes "
+                "(kitsu_id, forme, forme_norm, forme_type, subtype) "
+                "VALUES (1, 'X', 'x', 'sous-titre', 'manga')"
+            )
+
+
+def test_kitsu_formes_dedoublonne_par_entree(base_migree):
+    """MUTATION : sans l'UNIQUE, le titre canonique et son en_jp identique
+    feraient deux formes pour une seule œuvre."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.kitsu_formes "
+            "(kitsu_id, forme, forme_norm, forme_type, subtype) "
+            "VALUES (1, 'Monster', 'monster', 'canonical', 'manga')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_formes "
+                "(kitsu_id, forme, forme_norm, forme_type, subtype) "
+                "VALUES (1, 'MONSTER', 'monster', 'title', 'manga')"
+            )
+
+
+def test_kitsu_formes_meme_forme_pour_deux_entrees(base_migree):
+    """Deux œuvres homonymes : le problème que la cascade doit trancher."""
+    with psycopg.connect(base_migree) as connexion:
+        for kitsu_id in (1, 2):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_formes "
+                "(kitsu_id, forme, forme_norm, forme_type, subtype) "
+                "VALUES (%s, 'Monster', 'monster', 'canonical', 'manga')",
+                (kitsu_id,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.kitsu_formes WHERE forme_norm = 'monster'"
+        ).fetchone()
+    assert total[0] == 2
+
+
+def test_kitsu_mappings_dedoublonne_le_triplet(base_migree):
+    """MUTATION : sans l'UNIQUE, un rechargement dupliquerait les 74 866 ponts."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.kitsu_mappings (kitsu_id, external_site, external_id) "
+            "VALUES (1, 'myanimelist/manga', '101')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_mappings "
+                "(kitsu_id, external_site, external_id) "
+                "VALUES (1, 'myanimelist/manga', '101')"
+            )
+
+
+def test_kitsu_mappings_accepte_plusieurs_sites_par_entree(base_migree):
+    """La clé est le triplet : une œuvre a légitimement un id MAL et un AniList."""
+    with psycopg.connect(base_migree) as connexion:
+        for site in ("myanimelist/manga", "anilist/manga", "mangaupdates"):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_mappings "
+                "(kitsu_id, external_site, external_id) VALUES (1, %s, '101')",
+                (site,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.kitsu_mappings WHERE kitsu_id = 1"
+        ).fetchone()
+    assert total[0] == 3
+
+
+def test_wd_formes_refuse_un_type_inconnu(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute("INSERT INTO manga.wd_pivot (qid) VALUES ('Q1')")
+        connexion.commit()
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.wd_formes (qid, forme, forme_norm, forme_type) "
+                "VALUES ('Q1', 'X', 'x', 'surnom')"
+            )
+
+
+def test_wd_formes_refuse_un_qid_inexistant(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.execute(
+                "INSERT INTO manga.wd_formes (qid, forme, forme_norm, forme_type) "
+                "VALUES ('Q404', 'X', 'x', 'label')"
+            )
+
+
+def test_006_pose_les_index_trigram_des_deux_cotes(base_migree):
+    """La cascade compare ms_formes à wd_formes et kitsu_formes : les trois
+    colonnes forme_norm doivent porter le même outillage."""
+    with psycopg.connect(base_migree) as connexion:
+        lignes = connexion.execute(
+            "SELECT tablename FROM pg_indexes WHERE schemaname = 'manga' "
+            "AND indexdef LIKE '%gin_trgm_ops%' ORDER BY tablename"
+        ).fetchall()
+    assert [t for (t,) in lignes] == ["kitsu_formes", "ms_formes", "wd_formes"]
+
+
+def test_le_pont_wikidata_kitsu_est_joignable(base_migree):
+    """La raison d'être de 006 : sans identifiant commun entre plateformes, le
+    pivot Wikidata (mal_id) ne rejoint Kitsu (kitsu_id) que par cette table."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.wd_pivot (qid, mal_id) VALUES ('Q1', '101')"
+        )
+        connexion.execute(
+            "INSERT INTO manga.kitsu_mappings (kitsu_id, external_site, external_id) "
+            "VALUES (42, 'myanimelist/manga', '101')"
+        )
+        connexion.commit()
+        pont = connexion.execute(
+            "SELECT p.qid, m.kitsu_id FROM manga.wd_pivot p "
+            "JOIN manga.kitsu_mappings m ON m.external_site = 'myanimelist/manga' "
+            "  AND m.external_id = p.mal_id"
+        ).fetchall()
+    assert pont == [("Q1", 42)]
