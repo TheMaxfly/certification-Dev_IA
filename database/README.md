@@ -348,12 +348,34 @@ Chargement réel du 2026-07-16 : **48 900** sorties + **10 162** séries en 2,5 
 récurrente, première mesure) : **38 561 EAN communs**, soit 83,20 % des 46 348
 EAN valides de MI et 60,72 % des 63 511 ISBN-13 de Manga Sanctuary.
 
-## À suivre
+## Étape C — la cascade d'identité
 
-**Étape C — la cascade** : remplir `work_uid` et journaliser les décisions dans
-`match_decision`, en s'appuyant sur les trois tables de formes (`ms_formes`,
-`wd_formes`, `kitsu_formes` — même normalisation, même outillage d'index) et le
-pont Wikidata → Kitsu.
+**Étage 0 (pont Kitsu) — fait.** `05_.../src/identity/pont_kitsu.py` sème
+`manga.work_identity` (14 670 séries : l'identité précède le rattachement),
+remplit `ms_series_enriched.work_uid`, puis joint `ms_kitsu_map` ×
+`kitsu_mappings` × `wd_pivot` en une seule transaction. C'est un étage de PURES
+jointures d'identifiants — aucune lecture de titre. Résultat 2026-07 :
+
+- entonnoir : **5 608** séries avec `kitsu_id` → **4 922** candidates (moins 264
+  ambiguës et 519 needs_review, ∩ 97) → **4 465** avec mapping externe →
+  **1 689** avec QID. Le déficit confirme, chiffré, que Wikidata couvre la tête
+  du catalogue, pas la longue traîne ;
+- **1 689 décisions `kitsu_bridge` auto** (score 1.0), 0 divergence, 0 collision ;
+- `match_decision` append-only ; idempotence par `v_match_current` (re-run : 0
+  écriture) ; les collisions d'unicité et les QID divergents partent en
+  `needs_review`, jamais résolus par ordre d'arrivée.
+
+**Étages 1-3 (matching par titre) — à venir**, sur les 3 233 hors-pont, les 686
+exclues et les séries sans `kitsu_id`, via `ms_formes` / `wd_formes` /
+`kitsu_formes` (même normalisation, même outillage d'index). Deux préalables à
+**figer en conception avant toute exécution** :
+
+- les règles de désambiguïsation **auteur / année** (l'étage 1 départage les
+  homonymes de titre par l'année ±2 puis l'auteur) ;
+- **`wd_auteurs` ne porte pas encore les noms** : ses 5 453 lignes ont un
+  `auteur_qid` mais `auteur`/`auteur_norm` sont vides. Une **hydratation
+  préalable** (résolution des labels d'auteurs depuis Wikidata) est à trancher
+  avant de pouvoir désambiguïser par auteur.
 
 Toute évolution doit être ajoutée comme nouveau fichier : **ne jamais modifier une
 migration déjà appliquée**.
