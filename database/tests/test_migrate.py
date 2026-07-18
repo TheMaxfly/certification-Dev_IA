@@ -50,6 +50,7 @@ def test_up_sur_base_vide_applique_tout(base, capsys):
         "005",
         "006",
         "007",
+        "008",
     ]
     assert "001 appliquée" in capsys.readouterr().out
 
@@ -70,20 +71,21 @@ def test_up_rejoue_est_un_noop(base, capsys):
         "005",
         "006",
         "007",
+        "008",
     ]
 
 
 def test_status_avant_et_apres(base, capsys):
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 8 en attente" in avant
+    assert "0 appliquée(s), 9 en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "8 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert "9 appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
@@ -101,6 +103,7 @@ def test_target_s_arrete_a_la_version_demandee(base):
         "005",
         "006",
         "007",
+        "008",
     ]
 
 
@@ -1027,7 +1030,12 @@ def test_006_pose_les_index_trigram_des_deux_cotes(base_migree):
             "SELECT tablename FROM pg_indexes WHERE schemaname = 'manga' "
             "AND indexdef LIKE '%gin_trgm_ops%' ORDER BY tablename"
         ).fetchall()
-    assert [t for (t,) in lignes] == ["kitsu_formes", "ms_formes", "wd_formes"]
+    assert [t for (t,) in lignes] == [
+        "kitsu_formes",
+        "ms_formes",
+        "wd_auteurs_formes",
+        "wd_formes",
+    ]
 
 
 def test_le_pont_wikidata_kitsu_est_joignable(base_migree):
@@ -1100,8 +1108,7 @@ def test_v_mi_ean_multiples_signale_les_titres_divergents(base_migree):
                 (titre,),
             )
         connexion.execute(
-            "INSERT INTO manga.mi_sorties (ean, titre) "
-            "VALUES ('9782360810284', 'Seul')"
+            "INSERT INTO manga.mi_sorties (ean, titre) VALUES ('9782360810284', 'Seul')"
         )
         connexion.commit()
         lignes = connexion.execute(
