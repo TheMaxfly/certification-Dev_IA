@@ -9,6 +9,50 @@ from conftest import migrate
 UP = Namespace(commande="up", target=None)
 STATUS = Namespace(commande="status")
 
+# --------------------------------------------------------------------------- #
+#  Inventaire dérivé + sentinelles (dette 22.2)
+# --------------------------------------------------------------------------- #
+# Ces tests codaient en dur la liste des migrations et le nombre « en attente ».
+# Chaque migration ajoutée forçait cinq retouches manuelles (subi en 003, 006,
+# 007, 008) — friction croissante, et risque qu'une mise à jour mécanique masque
+# un jour une vraie régression. L'inventaire se dérive donc du répertoire.
+#
+# MAIS un inventaire 100 % dérivé ne peut plus rien attraper : si le glob ne
+# renvoie rien, toutes les assertions dérivées s'ajustent en silence. D'où deux
+# SENTINELLES écrites en dur — un témoin indépendant du code qu'on teste.
+SENTINELLE_PREMIERE = "000"
+SENTINELLE_001_CREE = "work_identity"
+SENTINELLE_PLANCHER = 9  # 000→008 acquises ; ce plancher ne peut que monter.
+
+
+def versions_du_depot() -> list[str]:
+    """L'inventaire réel, dérivé du répertoire de migrations courant.
+
+    Lit `migrate.MIGRATIONS_DIR` à l'appel : la fixture `migrations_jetables`
+    le monkeypatche, donc le helper suit le dossier actif sans le savoir.
+    """
+    return [m.version for m in migrate.decouvrir(migrate.MIGRATIONS_DIR)]
+
+
+def test_inventaire_derive_reste_sous_temoin():
+    """Le garde-fou de la dérivation : sans lui, un glob vide rendrait tous les
+    tests d'inventaire vrais et silencieux."""
+    versions = versions_du_depot()
+
+    assert versions, "le glob des migrations ne doit jamais être vide"
+    assert versions[0] == SENTINELLE_PREMIERE, "000 doit rester la première"
+    assert versions == sorted(versions), "l'ordre lexicographique est l'ordre réel"
+    assert len(versions) >= SENTINELLE_PLANCHER, (
+        f"{len(versions)} migrations : le plancher {SENTINELLE_PLANCHER} est "
+        "acquis, une disparition est une régression"
+    )
+    assert len(set(versions)) == len(versions), "deux migrations au même numéro"
+
+    socle = next(f for f in migrate.MIGRATIONS_DIR.glob("001_*.sql")).read_text(
+        encoding="utf-8"
+    )
+    assert SENTINELLE_001_CREE in socle, "001 doit toujours créer work_identity"
+
 
 def versions_appliquees(dsn: str) -> list[str]:
     with psycopg.connect(dsn) as connexion:
@@ -41,17 +85,7 @@ def test_up_sur_base_vide_applique_tout(base, capsys):
     versionné par-dessus."""
     assert migrate.commande_up(UP) == 0
 
-    assert versions_appliquees(base) == [
-        "000",
-        "001",
-        "002",
-        "003",
-        "004",
-        "005",
-        "006",
-        "007",
-        "008",
-    ]
+    assert versions_appliquees(base) == versions_du_depot()
     assert "001 appliquée" in capsys.readouterr().out
 
 
@@ -62,30 +96,22 @@ def test_up_rejoue_est_un_noop(base, capsys):
     assert migrate.commande_up(UP) == 0
 
     assert "Rien à appliquer" in capsys.readouterr().out
-    assert versions_appliquees(base) == [
-        "000",
-        "001",
-        "002",
-        "003",
-        "004",
-        "005",
-        "006",
-        "007",
-        "008",
-    ]
+    assert versions_appliquees(base) == versions_du_depot()
 
 
 def test_status_avant_et_apres(base, capsys):
+    total = len(versions_du_depot())
+
     assert migrate.commande_status(STATUS) == 0
     avant = capsys.readouterr().out
-    assert "0 appliquée(s), 9 en attente" in avant
+    assert f"0 appliquée(s), {total} en attente" in avant
     assert "en attente" in avant
 
     migrate.commande_up(UP)
     capsys.readouterr()
 
     assert migrate.commande_status(STATUS) == 0
-    assert "9 appliquée(s), 0 en attente" in capsys.readouterr().out
+    assert f"{total} appliquée(s), 0 en attente" in capsys.readouterr().out
 
 
 def test_target_s_arrete_a_la_version_demandee(base):
@@ -94,17 +120,7 @@ def test_target_s_arrete_a_la_version_demandee(base):
     assert versions_appliquees(base) == ["000", "001"]
 
     assert migrate.commande_up(UP) == 0
-    assert versions_appliquees(base) == [
-        "000",
-        "001",
-        "002",
-        "003",
-        "004",
-        "005",
-        "006",
-        "007",
-        "008",
-    ]
+    assert versions_appliquees(base) == versions_du_depot()
 
 
 def test_target_inconnue_refusee(base):
@@ -525,6 +541,8 @@ def test_staging_tables_creees(base_migree):
         "ms_reviews",
         # 006 — l'atterrissage des mappings Kitsu, qui manquait.
         "kitsu_mappings",
+        # 009 — le staff Kitsu, confirmateur d'auteur de l'étage 2.
+        "kitsu_staff",
     }
     with psycopg.connect(base_migree) as connexion:
         lignes = connexion.execute(
@@ -549,18 +567,44 @@ def test_staging_est_en_text_partout(base_migree):
 
 
 def test_staging_porte_les_colonnes_techniques(base_migree):
+    """CHAQUE table de staging porte source_file et loaded_at — la règle vaut
+    pour toutes, pas pour un nombre.
+
+    L'inventaire est dérivé (dette 22.2) : le comptage en dur « 7 tables de 002
+    + 2 de 004 + 1 de 006 » se démentait à chaque migration. Ce qui compte n'est
+    pas qu'il y ait dix tables, mais qu'aucune n'échappe à la convention.
+    """
     with psycopg.connect(base_migree) as connexion:
-        lignes = connexion.execute(
-            "SELECT table_name FROM information_schema.columns "
-            "WHERE table_schema = 'staging' AND column_name = 'source_file'"
-        ).fetchall()
-        loaded = connexion.execute(
-            "SELECT count(*) FROM information_schema.columns "
-            "WHERE table_schema = 'staging' AND column_name = 'loaded_at' "
-            "AND column_default LIKE 'now()%'"
-        ).fetchone()
-    assert len(lignes) == 10, "7 tables de 002 + 2 de 004 + 1 de 006"
-    assert loaded[0] == 10
+        toutes = {
+            t
+            for (t,) in connexion.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'staging'"
+            ).fetchall()
+        }
+        avec_source = {
+            t
+            for (t,) in connexion.execute(
+                "SELECT table_name FROM information_schema.columns "
+                "WHERE table_schema = 'staging' AND column_name = 'source_file'"
+            ).fetchall()
+        }
+        avec_loaded = {
+            t
+            for (t,) in connexion.execute(
+                "SELECT table_name FROM information_schema.columns "
+                "WHERE table_schema = 'staging' AND column_name = 'loaded_at' "
+                "AND column_default LIKE 'now()%'"
+            ).fetchall()
+        }
+
+    assert toutes, "le schéma staging ne doit jamais être vide"
+    assert toutes - avec_source == set(), (
+        f"sans source_file : {sorted(toutes - avec_source)}"
+    )
+    assert toutes - avec_loaded == set(), (
+        f"sans loaded_at DEFAULT now() : {sorted(toutes - avec_loaded)}"
+    )
 
 
 def test_mi_sorties_porte_l_ean_et_mi_series_non(base_migree):
@@ -1022,20 +1066,48 @@ def test_wd_formes_refuse_un_qid_inexistant(base_migree):
             )
 
 
+# Les trois côtés que la cascade compare réellement. Sentinelle EN DUR : c'est
+# le contrat, pas un inventaire. Une table qui rejoint la famille (kitsu_staff
+# en 009) est couverte par la dérivation ci-dessous sans retoucher ce test ;
+# une table qui la QUITTE doit faire échouer, d'où la liste explicite.
+TABLES_DU_RAPPROCHEMENT = {"ms_formes", "wd_formes", "kitsu_formes"}
+
+
 def test_006_pose_les_index_trigram_des_deux_cotes(base_migree):
-    """La cascade compare ms_formes à wd_formes et kitsu_formes : les trois
-    colonnes forme_norm doivent porter le même outillage."""
+    """La cascade compare des colonnes normalisées entre elles : chacune doit
+    porter le MÊME outillage des deux côtés, sinon le plan d'exécution diverge.
+
+    L'inventaire est dérivé du catalogue (dette 22.2) ; le noyau attendu reste
+    écrit en dur, sans quoi le test comparerait la base à elle-même.
+    """
     with psycopg.connect(base_migree) as connexion:
-        lignes = connexion.execute(
-            "SELECT tablename FROM pg_indexes WHERE schemaname = 'manga' "
-            "AND indexdef LIKE '%gin_trgm_ops%' ORDER BY tablename"
-        ).fetchall()
-    assert [t for (t,) in lignes] == [
-        "kitsu_formes",
-        "ms_formes",
-        "wd_auteurs_formes",
-        "wd_formes",
-    ]
+        trigramme = {
+            t
+            for (t,) in connexion.execute(
+                "SELECT DISTINCT tablename FROM pg_indexes "
+                "WHERE schemaname = 'manga' AND indexdef LIKE '%gin_trgm_ops%'"
+            ).fetchall()
+        }
+        btree = {
+            t
+            for (t,) in connexion.execute(
+                "SELECT DISTINCT tablename FROM pg_indexes "
+                "WHERE schemaname = 'manga' AND indexdef LIKE '%USING btree%' "
+                "AND (indexdef LIKE '%_norm)%' OR indexdef LIKE '%_norm %')"
+            ).fetchall()
+        }
+
+    manquantes = TABLES_DU_RAPPROCHEMENT - trigramme
+    assert not manquantes, f"index trigramme absent sur {sorted(manquantes)}"
+
+    # Dérivé : toute table indexée en trigramme doit aussi l'être en btree —
+    # l'égalité exacte passe par le btree, le flou par le GIN. En avoir un seul
+    # des deux est une demi-mesure silencieuse.
+    sans_btree = trigramme - btree
+    assert not sans_btree, (
+        f"{sorted(sans_btree)} portent un index trigramme sans btree sur la "
+        "colonne normalisée"
+    )
 
 
 def test_le_pont_wikidata_kitsu_est_joignable(base_migree):
@@ -1115,3 +1187,194 @@ def test_v_mi_ean_multiples_signale_les_titres_divergents(base_migree):
             "SELECT ean, nb_sorties, titres_divergents FROM manga.v_mi_ean_multiples"
         ).fetchall()
     assert lignes == [("9782487369641", 2, True)], "un EAN seul n'est pas multiple"
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 009
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "table", ["staging.kitsu_staff", "manga.kitsu_staff", "manga.kitsu_meta"]
+)
+def test_009_cree_les_tables_du_staff_et_de_la_meta(base_migree, table):
+    with psycopg.connect(base_migree) as connexion:
+        existe = connexion.execute("SELECT to_regclass(%s)", (table,)).fetchone()
+    assert existe[0] is not None, f"{table} manque après 009"
+
+
+def test_kitsu_staff_dedoublonne_personne_et_role(base_migree):
+    """MUTATION : sans l'UNIQUE, un rechargement dupliquerait les 53 183 lignes."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.kitsu_staff "
+            "(kitsu_id, personne, personne_norm, role) "
+            "VALUES (1, 'Shouko Fukaki', 'shouko fukaki', 'Art')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_staff "
+                "(kitsu_id, personne, personne_norm, role) "
+                "VALUES (1, 'SHOUKO FUKAKI', 'shouko fukaki', 'Art')"
+            )
+
+
+def test_kitsu_staff_accepte_une_personne_dans_deux_roles(base_migree):
+    """Le rôle fait partie de la clé : un auteur crédité Story ET Art sur la
+    même œuvre est un fait de la source, pas un doublon."""
+    with psycopg.connect(base_migree) as connexion:
+        for role in ("Story", "Art"):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_staff "
+                "(kitsu_id, personne, personne_norm, role) "
+                "VALUES (1, 'Akira Toriyama', 'akira toriyama', %s)",
+                (role,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.kitsu_staff WHERE kitsu_id = 1"
+        ).fetchone()
+    assert total[0] == 2
+
+
+def test_kitsu_staff_meme_personne_sur_deux_oeuvres(base_migree):
+    """L'axe utile de l'étage 2 : un auteur signe plusieurs œuvres."""
+    with psycopg.connect(base_migree) as connexion:
+        for kitsu_id in (1, 2):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_staff "
+                "(kitsu_id, personne, personne_norm, role) "
+                "VALUES (%s, 'Naoki Urasawa', 'naoki urasawa', 'Story & Art')",
+                (kitsu_id,),
+            )
+        connexion.commit()
+        total = connexion.execute(
+            "SELECT count(*) FROM manga.kitsu_staff "
+            "WHERE personne_norm = 'naoki urasawa'"
+        ).fetchone()
+    assert total[0] == 2
+
+
+def test_kitsu_meta_refuse_un_subtype_hors_cible(base_migree):
+    """MUTATION : sans ce CHECK, les 15 224 light novels entreraient dans la
+    cible de matching par la porte de l'année."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_meta (kitsu_id, annee, subtype) "
+                "VALUES (1, 2005, 'novel')"
+            )
+
+
+def test_kitsu_meta_accepte_une_annee_absente(base_migree):
+    """44 entrées de la cible ont startDate NULL : une colonne honnêtement vide
+    vaut mieux qu'une année inventée."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.kitsu_meta (kitsu_id, annee, subtype) "
+            "VALUES (1, NULL, 'manga')"
+        )
+        connexion.commit()
+        ligne = connexion.execute(
+            "SELECT annee FROM manga.kitsu_meta WHERE kitsu_id = 1"
+        ).fetchone()
+    assert ligne[0] is None
+
+
+def test_kitsu_meta_un_seul_enregistrement_par_oeuvre(base_migree):
+    """Le grain est l'œuvre : l'année ne doit pas pouvoir diverger d'elle-même."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.kitsu_meta (kitsu_id, annee, subtype) "
+            "VALUES (1, 2005, 'manga')"
+        )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.kitsu_meta (kitsu_id, annee, subtype) "
+                "VALUES (1, 1999, 'manga')"
+            )
+
+
+@pytest.mark.parametrize("methode", ["exact_kitsu", "exact_kitsu_author", "llm_review"])
+def test_009_elargit_le_check_des_methodes(base_migree, methode):
+    """Le CHECK est un contrat : l'étage 2 et l'étage R ne s'autorisent pas une
+    méthode, ils la font ajouter par migration."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.match_decision (series_id, method, status) "
+            "VALUES (1, %s, 'needs_review')",
+            (methode,),
+        )
+        connexion.commit()
+
+
+def test_009_conserve_les_methodes_anterieures(base_migree):
+    """Élargir n'est pas remplacer : les 3 523 décisions déjà journalisées
+    doivent rester valides au regard du nouveau CHECK."""
+    with psycopg.connect(base_migree) as connexion:
+        for methode in (
+            "kitsu_bridge",
+            "exact",
+            "exact_author",
+            "trgm",
+            "embedding",
+            "manual",
+        ):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, %s, 'auto')",
+                (methode,),
+            )
+        connexion.commit()
+
+
+def test_009_refuse_toujours_une_methode_hors_cascade(base_migree):
+    """MUTATION : le CHECK élargi doit rester un CHECK."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, 'au_pif', 'auto')"
+            )
+
+
+def test_details_est_nul_par_defaut_et_accepte_du_jsonb(base_migree):
+    """Les décisions des étages 0 et 1 restent sans details : le journal est
+    append-only, on ne rétro-remplit pas."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.match_decision (series_id, method, status) "
+            "VALUES (1, 'exact', 'auto')"
+        )
+        connexion.execute(
+            "INSERT INTO manga.match_decision (series_id, method, status, details) "
+            "VALUES (2, 'exact_kitsu', 'auto', %s)",
+            ('{"case": "auto_k_historique_confirme"}',),
+        )
+        connexion.commit()
+        lignes = connexion.execute(
+            "SELECT series_id, details FROM manga.match_decision ORDER BY series_id"
+        ).fetchall()
+    assert lignes[0][1] is None, "une décision sans contexte le dit"
+    assert lignes[1][1] == {"case": "auto_k_historique_confirme"}
+
+
+def test_details_est_interrogeable_par_case(base_migree):
+    """La raison d'être de la colonne : ré-instruire un dossier depuis la SEULE
+    base, sans dépendre des CSV de rapport."""
+    with psycopg.connect(base_migree) as connexion:
+        for series_id, case in ((1, "auto_k_auteur"), (2, "review_k_sans_signal")):
+            connexion.execute(
+                "INSERT INTO manga.match_decision "
+                "(series_id, method, status, details) "
+                "VALUES (%s, 'exact_kitsu', 'auto', %s)",
+                (series_id, '{"case": "' + case + '"}'),
+            )
+        connexion.commit()
+        trouve = connexion.execute(
+            "SELECT series_id FROM manga.match_decision "
+            "WHERE details->>'case' = 'review_k_sans_signal'"
+        ).fetchall()
+    assert trouve == [(2,)]
