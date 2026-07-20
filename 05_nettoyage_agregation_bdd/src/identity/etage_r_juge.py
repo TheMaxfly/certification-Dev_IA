@@ -1,4 +1,4 @@
-"""Étage R — le juge LLM. Client Batch, régime AVIS-SEULEMENT.
+"""Étage R — le juge LLM Anthropic. Client Batch, régime AVIS-SEULEMENT.
 
     uv run python -m identity.etage_r_juge --help
 
@@ -10,13 +10,17 @@ séparée : aucun bug ni copier-coller ne peut transformer un avis en décision.
 MODÈLE ET CONTRAT DE SORTIE. `claude-sonnet-5`, via la **Batch API** (moitié
 prix, aucune latence à tenir : tout l'enrichissement est batch offline, le
 chatbot ne touche jamais l'API en ligne). Le verdict est contraint par
-`output_config.format` — le schéma EST le contrat, il n'y a pas de validation-
-relance côté client à écrire.
+`output_config.format` — le schéma EST le contrat (défini dans
+`etage_r_contrat`), il n'y a pas de validation-relance côté client à écrire.
 
   ⚠️ AUCUN PARAMÈTRE D'ÉCHANTILLONNAGE. `temperature` est refusée (400) sur
   les modèles à sorties structurées. La stabilité d'un run ne vient donc pas
   d'une température mais du couple (modele, prompt_version) : le prompt est
   figé, versionné, et journalisé avec chaque avis.
+
+FOURNISSEUR. Ce module vise Anthropic. Le juge OpenAI vit dans
+`etage_r_juge_openai` et importe le MÊME contrat (`etage_r_contrat`) : changer
+de fournisseur ne touche ni le prompt ni le schéma.
 
 CLÉ D'API. Lue dans l'environnement, jamais en dur, jamais journalisée. Son
 absence est une ERREUR EXPLICITE au démarrage — pas un plantage au premier
@@ -31,69 +35,32 @@ from pathlib import Path
 
 import typer
 
+from identity.etage_r_contrat import (
+    PROMPT_SYSTEME,
+    PROMPT_VERSION,
+    SCHEMA_VERDICT,
+    ErreurJuge,
+    identifiant,
+    relire_identifiant,
+)
+
+# Ré-exportés depuis le contrat neutre : disponibles sous `etage_r_juge.*` pour
+# le code d'appel et les tests, mais définis une seule fois (etage_r_contrat).
+__all__ = [
+    "ErreurJuge",
+    "MODELE",
+    "PROMPT_SYSTEME",
+    "PROMPT_VERSION",
+    "SCHEMA_VERDICT",
+    "cle_api",
+    "construire_requete",
+    "identifiant",
+    "relire_identifiant",
+]
+
 MODULE = Path(__file__).resolve().parents[2]
 
 MODELE = "claude-sonnet-5"
-
-# Version du prompt : la clé de stabilité du run, journalisée avec chaque avis.
-# Toute retouche du texte ci-dessous DOIT incrémenter cette valeur — sinon deux
-# runs incomparables porteraient la même étiquette.
-PROMPT_VERSION = "r1-2026-07-19"
-
-# Le schéma EST le contrat de sortie. Contraint par l'API : le modèle ne peut
-# pas répondre autre chose.
-SCHEMA_VERDICT = {
-    "type": "object",
-    "properties": {
-        "verdict": {
-            "type": "string",
-            "enum": ["same_work", "different_work", "undecidable"],
-        },
-        "confiance": {"type": "string", "enum": ["haute", "moyenne"]},
-        "justification": {"type": "string"},
-    },
-    "required": ["verdict", "confiance", "justification"],
-    "additionalProperties": False,
-}
-
-PROMPT_SYSTEME = """\
-Tu arbitres des rapprochements d'identité entre un catalogue de mangas \
-francophone (Manga Sanctuary) et deux référentiels externes (Wikidata, Kitsu).
-
-Pour chaque dossier, tu dis si la série et le candidat désignent la MÊME ŒUVRE.
-
-Règles de jugement :
-
-1. Une même œuvre peut porter des titres très différents selon la langue et le \
-marché : titre japonais, romanisation, titre français commercial. Un écart de \
-titre n'est pas une preuve de différence.
-2. Deux œuvres DIFFÉRENTES peuvent porter des titres identiques ou quasi \
-identiques — homonymes, remakes, adaptations, séries dérivées. Un titre \
-identique n'est pas une preuve d'identité.
-3. L'auteur est le signal le plus fiable dont tu disposes. Un auteur concordant \
-confirme fortement ; un auteur discordant infirme fortement.
-4. L'année est un confirmateur, jamais un discriminant à elle seule. Un écart \
-de quelques années peut refléter la différence entre publication originale et \
-sortie française.
-5. Une suite, un spin-off, une adaptation ou une nouvelle édition sont des \
-œuvres DIFFÉRENTES de l'œuvre d'origine.
-
-Sur la confiance :
-- « haute » engage : ne l'emploie que si tu confirmerais ton verdict devant \
-quelqu'un qui te contredit. Un faux « same_work » en confiance haute est la \
-seule erreur qui coûte vraiment.
-- « moyenne » est la réponse normale quand le faisceau penche sans trancher.
-- Si les éléments manquent pour décider, réponds « undecidable ». C'est une \
-réponse à part entière, pas un aveu d'échec : elle envoie le dossier à un \
-humain, ce qui est le bon sort pour un dossier indécidable.
-
-Justifie en UNE phrase, en français, en nommant l'élément qui a emporté ta \
-décision.
-"""
-
-
-class ErreurJuge(Exception):
-    """Erreur attendue : message lisible, pas de trace."""
 
 
 def cle_api() -> str:
@@ -131,27 +98,6 @@ def construire_requete(custom_id: str, texte_dossier: str) -> dict:
     }
 
 
-def identifiant(
-    phase: str, series_id: int, candidat_type: str, candidat_id: str
-) -> str:
-    """L'identifiant qui rattache une réponse à son dossier.
-
-    Les résultats d'un lot Batch arrivent DANS UN ORDRE QUELCONQUE : la seule
-    façon correcte de les rattacher est cette clé, jamais la position.
-    """
-    return f"{phase}|{series_id}|{candidat_type}|{candidat_id}"
-
-
-def relire_identifiant(custom_id: str) -> dict:
-    phase, series_id, candidat_type, candidat_id = custom_id.split("|", 3)
-    return {
-        "phase": phase,
-        "series_id": int(series_id),
-        "candidat_type": candidat_type,
-        "candidat_id": candidat_id,
-    }
-
-
 def client_anthropic():
     """Construit le client. Importé tardivement : R-a n'a pas besoin du SDK."""
     try:
@@ -168,7 +114,7 @@ app = typer.Typer(add_completion=False, help=__doc__)
 
 @app.command()
 def verifier() -> None:
-    """Contrôle que le jalon R-b est exécutable : clé, SDK, modèle."""
+    """Contrôle que le jalon R-b (Anthropic) est exécutable : clé, SDK, modèle."""
     typer.echo(f"modèle          : {MODELE}")
     typer.echo(f"prompt_version  : {PROMPT_VERSION}")
     typer.echo(f"prompt système  : {len(PROMPT_SYSTEME)} caractères")

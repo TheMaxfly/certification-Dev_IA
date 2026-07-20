@@ -19,6 +19,8 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pyarrow>=25.0.0",
   "anthropic>=0.117.0",
+  "openai>=2.46.0",
+  "tiktoken>=0.13.0",
 ]
 
 [project.optional-dependencies]

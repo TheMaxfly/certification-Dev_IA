@@ -727,7 +727,7 @@ def volumetrie_cmd(
     file_attendue: int = typer.Option(FILE_ATTENDUE),  # noqa: B008
 ) -> None:
     """Mesure la taille réelle des dossiers et chiffre le coût prévisionnel."""
-    from identity.etage_r_juge import PROMPT_SYSTEME
+    from identity.etage_r_contrat import PROMPT_SYSTEME
 
     dossier = _dossier_sortie(rapport_dir)
     dossiers, _ = _connexion_lecture(
