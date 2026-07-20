@@ -25,9 +25,11 @@ appel que sur 120.
 
 from __future__ import annotations
 
+import csv
 import json
 import sys
 import time
+from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -36,10 +38,14 @@ import typer
 
 from identity.etage_r_contrat import PROMPT_VERSION, identifiant
 from identity.etage_r_dossiers import (
+    FILE_ATTENDUE,
     RAPPORTS,
+    STRATES,
     TAILLE_ETALONNAGE,
     ErreurEtageR,
+    construire_dossiers,
     dsn,
+    echantillonner_c3,
     fabriquer_etalonnage,
     texte_dossier,
     verifier_prerequis,
@@ -410,7 +416,9 @@ def collecter_batch(client, lot) -> dict[str, dict]:
 # --------------------------------------------------------------------------- #
 # Écriture — le SEUL écrit : llm_avis
 # --------------------------------------------------------------------------- #
-def ecrire_avis(cur, modele: str, run_ts, prepares: list[dict], resultats: dict):
+def ecrire_avis(
+    cur, modele: str, run_ts, phase: str, prepares: list[dict], resultats: dict
+):
     index = {p["custom_id"]: p for p in prepares}
     for cid, res in resultats.items():
         p = index[cid]
@@ -419,12 +427,12 @@ def ecrire_avis(cur, modele: str, run_ts, prepares: list[dict], resultats: dict)
             "INSERT INTO manga.llm_avis "
             "(series_id, run_ts, phase, candidat_type, candidat_id, verdict, "
             " confiance, justification, modele, prompt_version, tokens_in, "
-            " tokens_out) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            " tokens_out, pre_validation_bandes, dossier_partiel) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 p["series_id"],
                 run_ts,
-                PHASE,
+                phase,
                 p["candidat_type"],
                 p["candidat_id"],
                 v["verdict"],
@@ -434,6 +442,8 @@ def ecrire_avis(cur, modele: str, run_ts, prepares: list[dict], resultats: dict)
                 PROMPT_VERSION,
                 res.get("tokens_in"),
                 res.get("tokens_out"),
+                p.get("pre_validation_bandes", False),
+                p.get("dossier_partiel", False),
             ),
         )
 
@@ -441,10 +451,10 @@ def ecrire_avis(cur, modele: str, run_ts, prepares: list[dict], resultats: dict)
 # --------------------------------------------------------------------------- #
 # Sorties
 # --------------------------------------------------------------------------- #
-def _dest(rapport_dir: str | None) -> Path:
+def _dest(rapport_dir: str | None, prefixe: str) -> Path:
     if rapport_dir:
         return Path(rapport_dir)
-    return RAPPORTS / ("etalonnage_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
+    return RAPPORTS / (prefixe + "_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
 
 
 def _lignes_rapport(mesures: dict, comparaison: dict, cout: dict) -> list[str]:
@@ -498,6 +508,221 @@ def _cout_modele(modele: str, resultats: dict) -> dict:
         "tokens_out": tout,
         "cout": tin * tarif["in"] + tout * tarif["out"],
     }
+
+
+# --------------------------------------------------------------------------- #
+# La file — un verdict par candidat, puis ventilation
+# --------------------------------------------------------------------------- #
+def dossier_un_candidat(dossier: dict, candidat: dict) -> dict:
+    """Vue du dossier réduite à UN candidat. Le juge tranche série vs ce
+    candidat — comme à l'étalonnage. Le format (`texte_dossier`) est identique,
+    et le drapeau `dossier_partiel` reste visible au juge."""
+    return {**dossier, "candidats": [candidat]}
+
+
+def preparer_file(cur) -> tuple[list[dict], dict]:
+    """Assemble la file et l'ÉCLATE en une requête par candidat : le schéma
+    tranche une identité à la fois. Un dossier à N candidats → N verdicts."""
+    dossiers, mesures = construire_dossiers(cur, FILE_ATTENDUE)
+    records = []
+    for d in dossiers:
+        n = len(d["candidats"])
+        for c in d["candidats"]:
+            records.append(
+                {
+                    "custom_id": identifiant(
+                        "file", d["series_id"], c["type"], c["id"]
+                    ),
+                    "texte": texte_dossier(dossier_un_candidat(d, c)),
+                    "series_id": d["series_id"],
+                    "candidat_type": c["type"],
+                    "candidat_id": c["id"],
+                    "origine": d["origine"],
+                    "cas": d["cas"] or d["origine"],
+                    "pre_validation_bandes": d["pre_validation_bandes"],
+                    "dossier_partiel": d["dossier_partiel"],
+                    "n_candidats": n,
+                }
+            )
+    return records, mesures
+
+
+_COLS = [
+    "same_work/haute",
+    "same_work/moyenne",
+    "different_work/haute",
+    "different_work/moyenne",
+    "undecidable",
+]
+
+
+def _distrib(records: list[dict]) -> Counter:
+    c: Counter = Counter()
+    for r in records:
+        if r["verdict"] == "undecidable":
+            c["undecidable"] += 1
+        else:
+            c[f"{r['verdict']}/{r['confiance']}"] += 1
+    return c
+
+
+def ventiler_file(modele: str, records: list[dict]) -> list[str]:
+    """verdict × confiance × cas d'origine ; le seau et les partiels à part ;
+    et le taux de « faux candidats francs » (candidat UNIQUE jugé different_work
+    en confiance haute) — la mesure de la qualité du filet de la cascade."""
+    series = {r["series_id"] for r in records}
+    lignes = [
+        "# Verdicts de la file — étage R (jalon R-b)",
+        "",
+        f"modèle : `{modele}` · phase : `file` · prompt_version : `{PROMPT_VERSION}`",
+        f"candidats jugés : **{len(records)}** sur **{len(series)}** séries",
+        "",
+        "## Ventilation par cas d'origine (verdict × confiance)",
+        "",
+        "| cas d'origine | n | " + " | ".join(_COLS) + " | faux cand. francs |",
+        "|---|" + "---:|" * (len(_COLS) + 1) + ":--:|",
+    ]
+    par_cas: dict[str, list[dict]] = defaultdict(list)
+    for r in records:
+        par_cas[r["cas"]].append(r)
+    for cas in sorted(par_cas):
+        sous = par_cas[cas]
+        d = _distrib(sous)
+        uniques = [r for r in sous if r["n_candidats"] == 1]
+        francs = [
+            r
+            for r in uniques
+            if r["verdict"] == "different_work" and r["confiance"] == "haute"
+        ]
+        taux = f"{len(francs)}/{len(uniques)}" if uniques else "—"
+        lignes.append(
+            f"| {cas} | {len(sous)} | "
+            + " | ".join(str(d.get(c, 0)) for c in _COLS)
+            + f" | {taux} |"
+        )
+
+    for nom, sous in (
+        (
+            "seau adjacent (pré-validation des bandes §26)",
+            [r for r in records if r["pre_validation_bandes"]],
+        ),
+        ("dossier_partiel (§28.1)", [r for r in records if r["dossier_partiel"]]),
+    ):
+        d = _distrib(sous)
+        s = len({r["series_id"] for r in sous})
+        lignes += [
+            "",
+            f"## {nom} — {len(sous)} candidats / {s} séries",
+            "",
+            "| " + " | ".join(_COLS) + " |",
+            "|" + "---:|" * len(_COLS),
+            "| " + " | ".join(str(d.get(c, 0)) for c in _COLS) + " |",
+        ]
+
+    lignes += [
+        "",
+        "**Faux candidats francs** = dossier à candidat UNIQUE jugé "
+        "`different_work` en confiance haute : la cascade n'a proposé qu'un "
+        "candidat, clairement faux — elle a eu raison de NE PAS l'auto-valider. "
+        "Le taux par cas mesure la qualité du filet (ce que le seuil a retenu à "
+        "raison).",
+        "",
+        "Régime **avis-seulement** : rien n'écrit dans `match_decision`. La "
+        "promotion des verdicts est une décision humaine sur ces mesures.",
+        "",
+    ]
+    return lignes
+
+
+# --------------------------------------------------------------------------- #
+# L'échantillon C3 — contrôle humain des AUTO (la strate pont, mesure réelle)
+# --------------------------------------------------------------------------- #
+def preparer_echantillon(cur, graine: int) -> list[dict]:
+    """Les 100 AUTO stratifiés → dossiers (série vs SON candidat auto). Pas de
+    vérité : c'est un contrôle. La strate pont y est désormais une mesure réelle
+    (l'étalonnage a montré qu'elle n'est pas 100 %)."""
+    cases = echantillonner_c3(cur, STRATES, graine)
+    records = []
+    for e in cases:
+        cur.execute(
+            "SELECT wikidata_qid, kitsu_id FROM manga.work_identity "
+            "WHERE series_id = %s",
+            (e["series_id"],),
+        )
+        row = cur.fetchone()
+        qid, kitsu_id = row if row else (None, None)
+        cur.execute(
+            "SELECT series_title, "
+            "concat_ws(' / ', series_scenariste, series_dessinateur), "
+            "series_year FROM manga.ms_series_enriched WHERE series_id = %s",
+            (e["series_id"],),
+        )
+        titre, auteurs, annee = cur.fetchone()
+        cas = {
+            "series_id": e["series_id"],
+            "titre": titre,
+            "auteurs": auteurs,
+            "annee": annee,
+            "qid": qid,
+            "kitsu_id": kitsu_id,
+            "fabrication": e["strate"],
+        }
+        serie = charger_serie(cur, cas)
+        candidat = enrichir_candidat(cur, cas)
+        dossier = assembler_dossier(cas, serie, candidat)
+        records.append(
+            {
+                "custom_id": identifiant(
+                    "echantillon", e["series_id"], candidat["type"], candidat["id"]
+                ),
+                "texte": texte_dossier(dossier),
+                "series_id": e["series_id"],
+                "candidat_type": candidat["type"],
+                "candidat_id": candidat["id"],
+                "strate": e["strate"],
+                "method": e["method"],
+                "score": e["score"],
+                "cas": e["cas"],
+            }
+        )
+    return records
+
+
+def ecrire_csv_arbitrage(chemin: Path, records: list[dict]) -> None:
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    with chemin.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(
+            [
+                "series_id",
+                "strate",
+                "method",
+                "score",
+                "cas",
+                "candidat_type",
+                "candidat_id",
+                "AVIS_LLM",
+                "CONFIANCE",
+                "JUSTIFICATION",
+                "VERDICT_HUMAIN",
+            ]
+        )
+        for r in sorted(records, key=lambda x: (x["strate"], x["series_id"])):
+            w.writerow(
+                [
+                    r["series_id"],
+                    r["strate"],
+                    r["method"],
+                    r["score"],
+                    r["cas"],
+                    r["candidat_type"],
+                    r["candidat_id"],
+                    r.get("verdict", ""),
+                    r.get("confiance", ""),
+                    r.get("justification", ""),
+                    "",
+                ]
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -571,7 +796,7 @@ def etalonnage(
     ecrire: bool = typer.Option(True),  # noqa: B008
 ) -> None:
     """Soumet le double étalonnage en Batch, note, décide, écrit les avis."""
-    dest = _dest(rapport_dir)
+    dest = _dest(rapport_dir, "etalonnage")
     dest.mkdir(parents=True, exist_ok=True)
     with psycopg.connect(dsn()) as cx, cx.cursor() as cur:
         verifier_prerequis(cur)
@@ -645,12 +870,175 @@ def _finaliser(dest: Path, prepares, resultats_par_modele, ecrire: bool) -> None
                 verifier_prerequis(cur)
                 for i, (modele, resultats) in enumerate(resultats_par_modele.items()):
                     run_ts = datetime.now(UTC).replace(microsecond=i)
-                    ecrire_avis(cur, modele, run_ts, prepares, resultats)
+                    ecrire_avis(cur, modele, run_ts, PHASE, prepares, resultats)
             cx.commit()
 
     for ligne in lignes:
         typer.echo(ligne)
     typer.echo(f"\nLivrable : {dest}/rapport.md")
+
+
+def _attacher_verdicts(records: list[dict], resultats: dict) -> None:
+    for r in records:
+        v = resultats[r["custom_id"]]["verdict"]
+        r["verdict"] = v["verdict"]
+        r["confiance"] = v["confiance"]
+        r["justification"] = v.get("justification", "")
+
+
+@app.command()
+def file(
+    rapport_dir: str = typer.Option(None),  # noqa: B008
+    modele: str = typer.Option("luna"),  # noqa: B008
+    effort: str = typer.Option(EFFORT_DEFAUT),  # noqa: B008
+    attente_max: int = typer.Option(540),  # noqa: B008
+    intervalle: int = typer.Option(20),  # noqa: B008
+    ecrire: bool = typer.Option(True),  # noqa: B008
+) -> None:
+    """Juge la file (1 932) sous le modèle retenu, un verdict par candidat.
+
+    Écrit les avis (phase='file'), ventile dans verdicts_file.md. AVIS-SEULEMENT :
+    rien n'écrit dans match_decision.
+    """
+    modele = resoudre_modele(modele)
+    dest = _dest(rapport_dir, "file")
+    dest.mkdir(parents=True, exist_ok=True)
+    with psycopg.connect(dsn()) as cx, cx.cursor() as cur:
+        verifier_prerequis(cur)
+        records, mesures = preparer_file(cur)
+        cx.rollback()
+    typer.echo(f"file : {mesures['file']} dossiers, {len(records)} candidats à juger")
+
+    client = client_openai()
+    lots = {modele: soumettre_batch(client, modele, effort, records, dest)}
+    (dest / "lots.json").write_text(json.dumps(lots, indent=2), encoding="utf-8")
+    typer.echo(f"lot soumis : {modele} → {lots[modele]}")
+
+    resultats = attendre_et_collecter(client, lots, attente_max, intervalle, typer.echo)
+    if resultats is None:
+        typer.echo(f"Reprise : `collecter --lots {dest}/lots.json` (phase file).")
+        return
+    _attacher_verdicts(records, resultats[modele])
+
+    if ecrire:
+        with psycopg.connect(dsn()) as cx:
+            with cx.cursor() as cur:
+                verifier_prerequis(cur)
+                ecrire_avis(
+                    cur, modele, datetime.now(UTC), "file", records, resultats[modele]
+                )
+            cx.commit()
+
+    lignes = ventiler_file(modele, records)
+    (dest / "verdicts_file.md").write_text("\n".join(lignes), encoding="utf-8")
+    cout = _cout_modele(modele, resultats[modele])
+    for ligne in lignes:
+        typer.echo(ligne)
+    typer.echo(f"coût file (Batch) : {cout['cout']:.4f} $")
+    typer.echo(f"Livrable : {dest}/verdicts_file.md")
+
+
+@app.command()
+def echantillon(
+    rapport_dir: str = typer.Option(None),  # noqa: B008
+    modele: str = typer.Option("luna"),  # noqa: B008
+    effort: str = typer.Option(EFFORT_DEFAUT),  # noqa: B008
+    graine: int = typer.Option(20260719),  # noqa: B008
+    attente_max: int = typer.Option(300),  # noqa: B008
+    intervalle: int = typer.Option(20),  # noqa: B008
+    ecrire: bool = typer.Option(True),  # noqa: B008
+) -> None:
+    """Juge l'échantillon C3 (100 AUTO stratifiés) sous le modèle retenu.
+
+    Écrit les avis (phase='echantillon') et livre echantillon_c3_arbitrage.csv
+    pour l'arbitrage humain. AVIS-SEULEMENT.
+    """
+    modele = resoudre_modele(modele)
+    dest = _dest(rapport_dir, "echantillon")
+    dest.mkdir(parents=True, exist_ok=True)
+    with psycopg.connect(dsn()) as cx, cx.cursor() as cur:
+        verifier_prerequis(cur)
+        records = preparer_echantillon(cur, graine)
+        cx.rollback()
+    typer.echo(f"échantillon C3 : {len(records)} AUTO à contrôler")
+
+    client = client_openai()
+    lots = {modele: soumettre_batch(client, modele, effort, records, dest)}
+    (dest / "lots.json").write_text(json.dumps(lots, indent=2), encoding="utf-8")
+    typer.echo(f"lot soumis : {modele} → {lots[modele]}")
+
+    resultats = attendre_et_collecter(client, lots, attente_max, intervalle, typer.echo)
+    if resultats is None:
+        typer.echo(f"Reprise : `collecter --lots {dest}/lots.json`.")
+        return
+    _attacher_verdicts(records, resultats[modele])
+
+    if ecrire:
+        with psycopg.connect(dsn()) as cx:
+            with cx.cursor() as cur:
+                verifier_prerequis(cur)
+                ecrire_avis(
+                    cur,
+                    modele,
+                    datetime.now(UTC),
+                    "echantillon",
+                    records,
+                    resultats[modele],
+                )
+            cx.commit()
+
+    ecrire_csv_arbitrage(dest / "echantillon_c3_arbitrage.csv", records)
+    par_strate: dict[str, Counter] = defaultdict(Counter)
+    for r in records:
+        par_strate[r["strate"]][r["verdict"]] += 1
+    typer.echo("Verdicts par strate (contrôle) :")
+    for strate in sorted(par_strate):
+        d = par_strate[strate]
+        typer.echo(
+            f"  {strate:11s} : same={d['same_work']} diff={d['different_work']} "
+            f"undecid={d['undecidable']}"
+        )
+    cout = _cout_modele(modele, resultats[modele])
+    typer.echo(f"coût échantillon (Batch) : {cout['cout']:.4f} $")
+    typer.echo(f"Livrable : {dest}/echantillon_c3_arbitrage.csv")
+
+
+@app.command()
+def couts(rapport_dir: str = typer.Option(None)) -> None:  # noqa: B008
+    """Coût RÉEL du run R-b, lu dans llm_avis (tokens facturés, tarif Batch)."""
+    dest = _dest(rapport_dir, "couts")
+    with psycopg.connect(dsn()) as cx, cx.cursor() as cur:
+        cur.execute(
+            "SELECT phase, modele, count(*), coalesce(sum(tokens_in),0), "
+            "coalesce(sum(tokens_out),0) FROM manga.llm_avis "
+            "GROUP BY phase, modele ORDER BY phase, modele"
+        )
+        rows = cur.fetchall()
+        cx.rollback()
+    lignes = [
+        "# Coût réel du run R-b (OpenAI Batch, tokenizer OpenAI)",
+        "",
+        "Tokens **facturés** relevés dans `llm_avis` ; tarifs Batch (½ prix) "
+        "de la page pricing OpenAI. Mesuré, pas estimé.",
+        "",
+        "| phase | modèle | avis | tokens in | tokens out | coût |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    total = 0.0
+    for phase, modele, n, tin, tout in rows:
+        tarif = TARIFS_BATCH.get(modele, {"in": 0.0, "out": 0.0})
+        cout = tin * tarif["in"] + tout * tarif["out"]
+        total += cout
+        lignes.append(
+            f"| {phase} | `{modele}` | {n} | {tin:,} | {tout:,} | "
+            f"{cout:.4f} $ |".replace(",", " ")
+        )
+    lignes += ["", f"**Total R-b : {total:.4f} $**", ""]
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "couts.md").write_text("\n".join(lignes), encoding="utf-8")
+    for ligne in lignes:
+        typer.echo(ligne)
+    typer.echo(f"Livrable : {dest}/couts.md")
 
 
 def main() -> int:

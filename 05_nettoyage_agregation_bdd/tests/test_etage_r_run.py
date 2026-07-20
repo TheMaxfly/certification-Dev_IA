@@ -168,3 +168,46 @@ def test_resolution_des_noms_de_modele():
     assert rr.resoudre_modele("luna") == "gpt-5.6-luna"
     assert rr.resoudre_modele("terra") == "gpt-5.6-terra"
     assert rr.resoudre_modele("gpt-5.6-sol") == "gpt-5.6-sol"  # id complet accepté
+
+
+def test_dossier_un_candidat_isole_sans_muter_l_original():
+    a, b = {"id": "A"}, {"id": "B"}
+    d = {"series_id": 1, "ms": {}, "candidats": [a, b], "dossier_partiel": True}
+    vue = rr.dossier_un_candidat(d, b)
+    assert vue["candidats"] == [b]
+    assert vue["dossier_partiel"] is True  # le drapeau reste visible au juge
+    assert d["candidats"] == [a, b]  # l'original n'est pas muté
+
+
+def _rec(**s):
+    base = {
+        "series_id": 1,
+        "cas": "review_flou",
+        "verdict": "different_work",
+        "confiance": "haute",
+        "n_candidats": 1,
+        "pre_validation_bandes": False,
+        "dossier_partiel": False,
+    }
+    base.update(s)
+    return base
+
+
+def test_ventilation_compte_les_faux_candidats_francs():
+    """Un « franc » = candidat UNIQUE jugé different_work/haute. Ni le moyenne,
+    ni le multi-candidat ne comptent."""
+    records = [
+        _rec(series_id=1),  # unique, diff/haute → FRANC
+        _rec(series_id=2, confiance="moyenne"),  # unique mais moyenne → non
+        _rec(series_id=3, n_candidats=2),  # diff/haute mais multi → non
+        _rec(
+            series_id=4,
+            cas="review_exact",
+            verdict="same_work",
+            pre_validation_bandes=True,
+        ),
+    ]
+    texte = "\n".join(rr.ventiler_file("gpt-5.6-luna", records))
+    assert "candidats jugés : **4**" in texte
+    assert "1/2" in texte  # review_flou : 1 franc sur 2 candidats uniques
+    assert "seau adjacent" in texte  # le bloc seau existe
