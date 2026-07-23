@@ -1340,6 +1340,51 @@ def test_009_refuse_toujours_une_methode_hors_cascade(base_migree):
             )
 
 
+def test_011_ajoute_human_review(base_migree):
+    """Le run 2 de l'étage R corrige les faux positifs du socle : la revue
+    HUMAINE tracée entre au CHECK, distincte du 'manual' générique (009 avait
+    déjà ajouté llm_review ; 011 complète le couple)."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.match_decision (series_id, method, status) "
+            "VALUES (1, 'human_review', 'rejected')"
+        )
+        connexion.commit()
+
+
+def test_011_conserve_les_methodes_anterieures(base_migree):
+    """Élargir n'est pas remplacer : les dix méthodes (dont llm_review de 009)
+    restent valides au regard du CHECK de 011."""
+    with psycopg.connect(base_migree) as connexion:
+        for methode in (
+            "kitsu_bridge",
+            "exact",
+            "exact_author",
+            "exact_kitsu",
+            "exact_kitsu_author",
+            "trgm",
+            "embedding",
+            "llm_review",
+            "manual",
+        ):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, %s, 'auto')",
+                (methode,),
+            )
+        connexion.commit()
+
+
+def test_011_refuse_toujours_une_methode_hors_cascade(base_migree):
+    """MUTATION : le CHECK à dix valeurs doit rester un CHECK."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, 'au_pif', 'auto')"
+            )
+
+
 def test_details_est_nul_par_defaut_et_accepte_du_jsonb(base_migree):
     """Les décisions des étages 0 et 1 restent sans details : le journal est
     append-only, on ne rétro-remplit pas."""
