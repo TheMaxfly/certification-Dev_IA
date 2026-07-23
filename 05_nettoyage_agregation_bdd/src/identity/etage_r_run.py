@@ -220,12 +220,13 @@ def enrichir_candidat(cur, cas: dict) -> dict:
 
 
 def charger_serie(cur, cas: dict) -> dict:
-    """Complète le côté MS : formes, synopsis, auteurs normalisés."""
+    """Complète le côté MS : formes, synopsis, auteurs normalisés, URL."""
     cur.execute(
         "SELECT s.series_scenariste, s.series_dessinateur, "
         "       left(coalesce(s.series_synopsis, ''), 600), "
         "       (SELECT string_agg(DISTINCT mf.forme, ' | ' ORDER BY mf.forme) "
-        "          FROM manga.ms_formes mf WHERE mf.series_id = s.series_id) "
+        "          FROM manga.ms_formes mf WHERE mf.series_id = s.series_id), "
+        "       s.series_url "
         "FROM manga.ms_series_enriched s WHERE s.series_id = %s",
         (cas["series_id"],),
     )
@@ -239,6 +240,7 @@ def charger_serie(cur, cas: dict) -> dict:
         "annee": cas["annee"],
         "synopsis": r[2],
         "formes": r[3],
+        "url": r[4],
         "auteurs_norm": auteurs_norm,
     }
 
@@ -683,9 +685,100 @@ def preparer_echantillon(cur, graine: int) -> list[dict]:
                 "method": e["method"],
                 "score": e["score"],
                 "cas": e["cas"],
+                # Dossier structuré conservé pour la grille d'arbitrage humain
+                # (le run n'utilise que `texte`, ces clés sont sans effet sur lui).
+                "serie": serie,
+                "candidat": candidat,
+                "signal_auteur": dossier["candidats"][0]["signal_auteur"],
+                "ecart_annee": dossier["candidats"][0]["ecart_annee"],
             }
         )
     return records
+
+
+def url_candidat(candidat_type: str, candidat_id: str) -> str:
+    """L'URL de la fiche publique du candidat, pour la vérification humaine."""
+    if candidat_type == "qid":
+        return f"https://www.wikidata.org/wiki/{candidat_id}"
+    return f"https://kitsu.app/manga/{candidat_id}"
+
+
+# En-têtes de la grille d'arbitrage. Les colonnes du JUGE sont EN DERNIER et
+# contiguës : un seul geste « Masquer » les cache avant l'arbitrage (grille §0.1).
+_ENTETES_GRILLE = [
+    "series_id",
+    "strate",
+    "ms_titre",
+    "ms_formes",
+    "ms_auteurs",
+    "ms_annee",
+    "ms_synopsis",
+    "ms_url",
+    "candidat_type",
+    "candidat_id",
+    "cand_label",
+    "cand_formes",
+    "cand_auteurs",
+    "cand_annee",
+    "cand_contexte",
+    "cand_url",
+    "signal_auteur",
+    "ecart_annee",
+    "VERDICT_HUMAIN",
+    "NOTES",
+    "method",
+    "score",
+    "cas",
+    "AVIS_LLM",
+    "CONFIANCE",
+    "JUSTIFICATION",
+]
+
+
+def ecrire_csv_grille(chemin: Path, records: list[dict], avis: dict) -> None:
+    """CSV prêt pour la grille : dossier lisible + URL, colonnes humaines, puis
+    les colonnes du juge en dernier (à masquer). `avis` : clé (series_id,
+    candidat_type, candidat_id) → {verdict, confiance, justification}."""
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    with chemin.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(_ENTETES_GRILLE)
+        ordre = {"standard": 0, "historique": 1, "score_bas": 2, "pont": 3}
+        for r in sorted(
+            records, key=lambda x: (ordre.get(x["strate"], 9), x["series_id"])
+        ):
+            s, c = r["serie"], r["candidat"]
+            a = avis.get((r["series_id"], r["candidat_type"], str(r["candidat_id"])))
+            w.writerow(
+                [
+                    r["series_id"],
+                    r["strate"],
+                    s["titre"],
+                    s.get("formes") or "",
+                    s.get("auteurs") or "",
+                    s.get("annee"),
+                    s.get("synopsis") or "",
+                    s.get("url") or "",
+                    r["candidat_type"],
+                    r["candidat_id"],
+                    c.get("label") or "",
+                    c.get("formes") or "",
+                    c.get("auteurs") or "",
+                    c.get("annee"),
+                    c.get("contexte") or "",
+                    url_candidat(r["candidat_type"], str(r["candidat_id"])),
+                    r["signal_auteur"],
+                    r["ecart_annee"],
+                    "",
+                    "",  # VERDICT_HUMAIN, NOTES — à remplir par l'humain
+                    r["method"],
+                    r["score"],
+                    r["cas"],
+                    a["verdict"] if a else "",
+                    a["confiance"] if a else "",
+                    a["justification"] if a else "",
+                ]
+            )
 
 
 def ecrire_csv_arbitrage(chemin: Path, records: list[dict]) -> None:
@@ -1039,6 +1132,47 @@ def couts(rapport_dir: str = typer.Option(None)) -> None:  # noqa: B008
     for ligne in lignes:
         typer.echo(ligne)
     typer.echo(f"Livrable : {dest}/couts.md")
+
+
+@app.command()
+def grille_c3(
+    rapport_dir: str = typer.Option(None),  # noqa: B008
+    graine: int = typer.Option(20260719),  # noqa: B008
+) -> None:
+    """Régénère le CSV d'arbitrage PRÊT POUR LA GRILLE (dossier lisible + URL +
+    colonnes humaines ; avis du juge en dernier, à masquer).
+
+    Lecture seule, ZÉRO réseau : relit les 100 dossiers seedés et rattache les
+    avis DÉJÀ stockés (phase='echantillon'). Aucun coût API.
+    """
+    dest = _dest(rapport_dir, "grille_c3")
+    with psycopg.connect(dsn()) as cx, cx.cursor() as cur:
+        verifier_prerequis(cur)
+        records = preparer_echantillon(cur, graine)
+        cur.execute(
+            "SELECT series_id, candidat_type, candidat_id, verdict, confiance, "
+            "justification FROM manga.llm_avis WHERE phase = 'echantillon'"
+        )
+        avis = {
+            (sid, ct, cid): {"verdict": v, "confiance": conf, "justification": j}
+            for sid, ct, cid, v, conf, j in cur.fetchall()
+        }
+        cx.rollback()
+    dest.mkdir(parents=True, exist_ok=True)
+    chemin = dest / "echantillon_c3_grille.csv"
+    ecrire_csv_grille(chemin, records, avis)
+    manquants = sum(
+        1
+        for r in records
+        if (r["series_id"], r["candidat_type"], str(r["candidat_id"])) not in avis
+    )
+    typer.echo(
+        f"CSV grille : {len(records)} cas, {len(avis)} avis stockés, "
+        f"{manquants} sans avis rattaché"
+    )
+    typer.echo("Colonnes du juge (AVIS_LLM/CONFIANCE/JUSTIFICATION) EN DERNIER : ")
+    typer.echo("  masque-les (clic droit → Masquer) AVANT d'arbitrer — grille §0.1.")
+    typer.echo(f"Livrable : {chemin}")
 
 
 def main() -> int:
