@@ -22,6 +22,14 @@ venv/
 # Databricks exports / outputs
 exports/
 
+# Lakehouse v2 : les tables Delta sont une projection reconstructible du raw,
+# jamais versionnées (comme tout data/). Les rapports générés, eux, sont suivis.
+data/
+!rapports/
+lakehouse/spark-warehouse/
+lakehouse/derby.log
+metastore_db/
+
 # Jupyter
 .ipynb_checkpoints/
 
@@ -29,3 +37,6 @@ exports/
 .DS_Store
 .vscode/
 .idea/
+
+# Logs de dev
+*.log

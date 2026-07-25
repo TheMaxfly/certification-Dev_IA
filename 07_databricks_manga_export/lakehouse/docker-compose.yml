@@ -1,0 +1,34 @@
+# Service `lakehouse` — exécution de référence du médaillon dans le conteneur.
+# Le raw est monté en LECTURE SEULE (ro) ; seuls le lakehouse et les rapports
+# sont en écriture. Le MÊME code qu'en local mode tourne ici (double chemin).
+#
+# Démo bout-en-bout :   docker compose run --rm lakehouse pipeline
+# Lecteur hors Spark :  docker compose run --rm lakehouse synthese
+services:
+  lakehouse:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: manga-lakehouse:0.2.0
+    # Non-root, aligné sur l'uid hôte pour lire le raw monté (certains fichiers
+    # sont en 0600). Surcharge : HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose ...
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      LAKEHOUSE_REPO_ROOT: /repo
+      LAKEHOUSE_ROOT: /lakehouse
+      LAKEHOUSE_RAPPORTS: /rapports
+      LAKEHOUSE_DELTA_BUNDLED: "1"
+      MASTER: local[*]
+      SPARK_LOG_LEVEL: WARN
+      HOME: /tmp
+      # L'uid hôte n'a pas d'entrée passwd : sans ça, Hadoop UGI lève une
+      # LoginException (« unable to find name for uid »). On nomme l'identité.
+      HADOOP_USER_NAME: lakehouse
+    volumes:
+      # --- RAW : lecture seule (le raw est l'archive, jamais réécrit) ---
+      - ../../04_scraping_manga_sanctuary/data/raw:/repo/04_scraping_manga_sanctuary/data/raw:ro
+      - ../../03_kitsu_api_exports/exports/full_catalog:/repo/03_kitsu_api_exports/exports/full_catalog:ro
+      - ../../05_nettoyage_agregation_bdd/data/raw:/repo/05_nettoyage_agregation_bdd/data/raw:ro
+      # --- Sorties : écriture (projections reconstructibles + rapports) ---
+      - ../data/lakehouse:/lakehouse
+      - ../rapports:/rapports
