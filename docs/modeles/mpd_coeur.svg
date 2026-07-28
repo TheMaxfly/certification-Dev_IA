@@ -1,0 +1,300 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2800" height="1980" viewBox="0 0 2800 1980">
+<rect width="2800" height="1980" fill="#FFFFFF"/>
+<style>text{font-family:Helvetica,Arial,sans-serif;fill:#000}</style>
+<text x="1400.0" y="110" font-size="30" font-weight="bold" text-anchor="middle">MPD coeur — referentiel d&#x27;identite manga</text>
+<rect x="60" y="60" width="460" height="200" fill="#FFFFFF" stroke="#37474F" stroke-width="1.5"/>
+<text x="72" y="84" font-size="12">LEGENDE</text>
+<text x="72" y="101" font-size="12">PK nom : type   cle primaire (gras + souligne)</text>
+<text x="72" y="118" font-size="12">FK nom : type   cle etrangere (italique)</text>
+<text x="72" y="135" font-size="12">U  nom : type   index UNIQUE (partiel si conditionnel)</text>
+<text x="72" y="152" font-size="12">nom : type *    colonne NOT NULL</text>
+<text x="72" y="169" font-size="12">--- trait plein : contrainte FK reelle du catalogue</text>
+<text x="72" y="186" font-size="12">--- pointille  : lien applicatif, sans contrainte FK</text>
+<text x="72" y="203" font-size="12">Couleurs : coeur / journal / Manga Sanctuary / Wikidata / Kitsu / Manga Insight</text>
+<rect x="1880" y="60" width="440" height="200" fill="#FFFDE7" stroke="#F9A825" stroke-width="1.5"/>
+<text x="1892" y="84" font-size="11">HORS PERIMETRE de cette planche</text>
+<text x="1892" y="100" font-size="11">- schema bench.* (module 06, experimental) ;</text>
+<text x="1892" y="116" font-size="11">- vues et tables RAG heritage (rag_*, manga.ms_reviews : corpus RAG de 3 187 documents, a ne pas confondre avec ms_reviews_all, le referentiel) ;</text>
+<text x="1892" y="132" font-size="11">- tables *_stg / *_stage heritage (staging deguise).</text>
+<text x="1892" y="148" font-size="11">Le detail complet des colonnes vit dans schema_reel.md.</text>
+<polyline points="2140,1066 2100,1066 2100,1358 2060,1358" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="2037" y="1347" width="126" height="18" fill="#FFFFFF" opacity="0.9"/><text x="2100" y="1361" font-size="11" text-anchor="middle">kitsu_id (0,n→1,1)</text>
+<polyline points="2140,1342 2100,1342 2100,1358 2060,1358" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="2037" y="1347" width="126" height="18" fill="#FFFFFF" opacity="0.9"/><text x="2100" y="1361" font-size="11" text-anchor="middle">kitsu_id (0,n→1,1)</text>
+<polyline points="1370,1500 1370,1278 810,1278 810,1056" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="744" y="1267" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="810" y="1281" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="320,422 500,422 500,938 680,938" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="434" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="500" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="320,875 500,875 500,938 680,938" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="434" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="500" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="320,662 500,662 500,938 680,938" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="434" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="500" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="320,1142 500,1142 500,938 680,938" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="434" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="500" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="190,1224 190,1262 190,1262 190,1300" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="120" y="1251" width="140" height="18" fill="#FFFFFF" opacity="0.9"/><text x="190" y="1265" font-size="11" text-anchor="middle">volume_url (0,n→1,1)</text>
+<polyline points="940,938 1090,938 1090,489 1240,489" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="1027" y="478" width="126" height="18" fill="#FFFFFF" opacity="0.9"/><text x="1090" y="492" font-size="11" text-anchor="middle">work_uid (0,n→1,1)</text>
+<polyline points="320,1382 500,1382 500,938 680,938" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="434" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="500" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="1370,700 1370,649 1370,649 1370,598" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="1307" y="638" width="126" height="18" fill="#FFFFFF" opacity="0.9"/><text x="1370" y="652" font-size="11" text-anchor="middle">work_uid (0,n→1,1)</text>
+<polyline points="2140,653 2100,653 2100,538 2060,538" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="2054" y="527" width="91" height="18" fill="#FFFFFF" opacity="0.9"/><text x="2100" y="541" font-size="11" text-anchor="middle">qid (0,n→1,1)</text>
+<polyline points="2140,422 2100,422 2100,538 2060,538" fill="none" stroke="#37474F" stroke-width="2"/>
+<rect x="2054" y="527" width="91" height="18" fill="#FFFFFF" opacity="0.9"/><text x="2100" y="541" font-size="11" text-anchor="middle">qid (0,n→1,1)</text>
+<polyline points="1240,1040 1090,1040 1090,938 940,938" fill="none" stroke="#78909C" stroke-dasharray="8,5" stroke-width="2"/>
+<rect x="1024" y="927" width="133" height="18" fill="#FFFFFF" opacity="0.9"/><text x="1090" y="941" font-size="11" text-anchor="middle">series_id (0,n→1,1)</text>
+<polyline points="1500,1040 1650,1040 1650,538 1800,538" fill="none" stroke="#78909C" stroke-dasharray="8,5" stroke-width="2"/>
+<rect x="1573" y="527" width="154" height="18" fill="#FFFFFF" opacity="0.9"/><text x="1650" y="541" font-size="11" text-anchor="middle">wikidata_qid (0,n→0,1)</text>
+<polyline points="1370,1220 1370,1180 1370,1180 1370,1140" fill="none" stroke="#78909C" stroke-dasharray="8,5" stroke-width="2"/>
+<rect x="1346" y="1169" width="49" height="18" fill="#FFFFFF" opacity="0.9"/><text x="1370" y="1183" font-size="11" text-anchor="middle">vue sur</text>
+<rect x="1240" y="380" width="260" height="218" fill="#E8EAF6" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1240" y="380" width="260" height="30" fill="#9FA8DA" stroke="#37474F" stroke-width="1.5"/>
+<text x="1370.0" y="400" font-size="13" font-weight="bold" text-anchor="middle">manga.work_identity</text>
+<text x="1248" y="423" font-size="11" font-weight="bold" text-decoration="underline">PK work_uid : bigint *</text>
+<text x="1248" y="441" font-size="11">U series_id : int</text>
+<text x="1248" y="459" font-size="11">U wikidata_qid : text</text>
+<text x="1248" y="477" font-size="11">U kitsu_id : text</text>
+<text x="1248" y="495" font-size="11">U mal_id : text</text>
+<text x="1248" y="513" font-size="11">U anilist_id : text</text>
+<text x="1248" y="531" font-size="11">U madb_id : text</text>
+<text x="1248" y="549" font-size="11">disponibilite : text</text>
+<text x="1248" y="567" font-size="11">created_at : timestamptz *</text>
+<text x="1248" y="585" font-size="11">updated_at : timestamptz *</text>
+<rect x="1240" y="700" width="260" height="146" fill="#E8EAF6" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1240" y="700" width="260" height="30" fill="#9FA8DA" stroke="#37474F" stroke-width="1.5"/>
+<text x="1370.0" y="720" font-size="13" font-weight="bold" text-anchor="middle">manga.volume_identity</text>
+<text x="1248" y="743" font-size="11" font-weight="bold" text-decoration="underline">PK volume_url : text *</text>
+<text x="1248" y="761" font-size="11" font-style="italic">FK work_uid : bigint</text>
+<text x="1248" y="779" font-size="11">isbn13 : char</text>
+<text x="1248" y="797" font-size="11">isbn13_valide : bool</text>
+<text x="1248" y="815" font-size="11">created_at : timestamptz *</text>
+<text x="1248" y="833" font-size="11">updated_at : timestamptz *</text>
+<rect x="1240" y="940" width="260" height="200" fill="#F3E5F5" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1240" y="940" width="260" height="30" fill="#CE93D8" stroke="#37474F" stroke-width="1.5"/>
+<text x="1370.0" y="960" font-size="13" font-weight="bold" text-anchor="middle">manga.match_decision</text>
+<text x="1248" y="983" font-size="11" font-weight="bold" text-decoration="underline">PK decision_id : bigint *</text>
+<text x="1248" y="1001" font-size="11">series_id : int *</text>
+<text x="1248" y="1019" font-size="11">wikidata_qid : text</text>
+<text x="1248" y="1037" font-size="11">method : text *</text>
+<text x="1248" y="1055" font-size="11">score : real</text>
+<text x="1248" y="1073" font-size="11">status : text *</text>
+<text x="1248" y="1091" font-size="11">decided_at : timestamptz *</text>
+<text x="1248" y="1109" font-size="11">decided_by : text *</text>
+<text x="1248" y="1127" font-size="11">details : jsonb</text>
+<rect x="1240" y="1220" width="260" height="182" fill="#F3E5F5" stroke="#37474F" stroke-width="1.5" stroke-dasharray="6,4"/>
+<rect x="1240" y="1220" width="260" height="30" fill="#CE93D8" stroke="#37474F" stroke-width="1.5" stroke-dasharray="6,4"/>
+<text x="1370.0" y="1240" font-size="13" font-weight="bold" text-anchor="middle">manga.v_match_current</text>
+<text x="1248" y="1263" font-size="11">series_id : int</text>
+<text x="1248" y="1281" font-size="11">wikidata_qid : text</text>
+<text x="1248" y="1299" font-size="11">method : text</text>
+<text x="1248" y="1317" font-size="11">score : real</text>
+<text x="1248" y="1335" font-size="11">status : text</text>
+<text x="1248" y="1353" font-size="11">decided_at : timestamptz</text>
+<text x="1248" y="1371" font-size="11">decided_by : text</text>
+<text x="1248" y="1389" font-size="11">decision_id : bigint</text>
+<rect x="1240" y="1500" width="260" height="272" fill="#F3E5F5" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1240" y="1500" width="260" height="30" fill="#CE93D8" stroke="#37474F" stroke-width="1.5"/>
+<text x="1370.0" y="1520" font-size="13" font-weight="bold" text-anchor="middle">manga.llm_avis</text>
+<text x="1248" y="1543" font-size="11" font-weight="bold" text-decoration="underline">PK avis_id : bigint *</text>
+<text x="1248" y="1561" font-size="11" font-style="italic">FK U series_id : int *</text>
+<text x="1248" y="1579" font-size="11">U run_ts : timestamptz *</text>
+<text x="1248" y="1597" font-size="11">U phase : text *</text>
+<text x="1248" y="1615" font-size="11">U candidat_type : text *</text>
+<text x="1248" y="1633" font-size="11">U candidat_id : text *</text>
+<text x="1248" y="1651" font-size="11">verdict : text *</text>
+<text x="1248" y="1669" font-size="11">confiance : text *</text>
+<text x="1248" y="1687" font-size="11">justification : text</text>
+<text x="1248" y="1705" font-size="11">modele : text *</text>
+<text x="1248" y="1723" font-size="11">prompt_version : text *</text>
+<text x="1248" y="1741" font-size="11">tokens_in : int</text>
+<text x="1248" y="1759" font-size="10" font-style="italic" fill="#455A64">… (4 autres colonnes)</text>
+<rect x="60" y="340" width="260" height="164" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="340" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="360" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_formes</text>
+<text x="68" y="383" font-size="11" font-weight="bold" text-decoration="underline">PK forme_id : bigint *</text>
+<text x="68" y="401" font-size="11" font-style="italic">FK U series_id : bigint *</text>
+<text x="68" y="419" font-size="11">forme : text *</text>
+<text x="68" y="437" font-size="11">U forme_norm : text *</text>
+<text x="68" y="455" font-size="11">forme_type : text *</text>
+<text x="68" y="473" font-size="11">U source : text *</text>
+<text x="68" y="491" font-size="10" font-style="italic" fill="#455A64">… (2 autres colonnes)</text>
+<rect x="60" y="1060" width="260" height="164" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="1060" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="1080" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_reviews_all</text>
+<text x="68" y="1103" font-size="11" font-weight="bold" text-decoration="underline">PK review_id : bigint *</text>
+<text x="68" y="1121" font-size="11" font-style="italic">FK series_id : bigint</text>
+<text x="68" y="1139" font-size="11">series_title : text</text>
+<text x="68" y="1157" font-size="11">series_url : text</text>
+<text x="68" y="1175" font-size="11" font-style="italic">FK volume_url : text</text>
+<text x="68" y="1193" font-size="11">U review_url : text</text>
+<text x="68" y="1211" font-size="10" font-style="italic" fill="#455A64">… (14 autres colonnes)</text>
+<rect x="680" y="820" width="260" height="236" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="680" y="820" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="810.0" y="840" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_series_enriched</text>
+<text x="688" y="863" font-size="11" font-weight="bold" text-decoration="underline">PK series_id : bigint *</text>
+<text x="688" y="881" font-size="11">series_url : text</text>
+<text x="688" y="899" font-size="11">series_title : text</text>
+<text x="688" y="917" font-size="11">series_type : text</text>
+<text x="688" y="935" font-size="11">series_category : text</text>
+<text x="688" y="953" font-size="11">series_year : int</text>
+<text x="688" y="971" font-size="11">series_other_titles : jsonb</text>
+<text x="688" y="989" font-size="11">series_genres : jsonb</text>
+<text x="688" y="1007" font-size="11">series_tags : jsonb</text>
+<text x="688" y="1025" font-size="11" font-style="italic">FK work_uid : bigint</text>
+<text x="688" y="1043" font-size="10" font-style="italic" fill="#455A64">… (63 autres colonnes)</text>
+<rect x="60" y="580" width="260" height="164" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="580" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="600" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_kitsu_map</text>
+<text x="68" y="623" font-size="11" font-weight="bold" text-decoration="underline" font-style="italic">PK FK series_id : bigint *</text>
+<text x="68" y="641" font-size="11">kitsu_id : bigint</text>
+<text x="68" y="659" font-size="11">match_method : text</text>
+<text x="68" y="677" font-size="11">match_score : double</text>
+<text x="68" y="695" font-size="11">matched_title_norm : text</text>
+<text x="68" y="713" font-size="11">ms_title : text</text>
+<text x="68" y="731" font-size="10" font-style="italic" fill="#455A64">… (1 autres colonnes)</text>
+<rect x="60" y="820" width="260" height="110" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="820" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="840" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_kitsu_ambiguous</text>
+<text x="68" y="863" font-size="11" font-weight="bold" text-decoration="underline" font-style="italic">PK FK series_id : bigint *</text>
+<text x="68" y="881" font-size="11">ms_title_main : text</text>
+<text x="68" y="899" font-size="11">ms_title_norm : text</text>
+<text x="68" y="917" font-size="11">n_exact_candidates : int</text>
+<rect x="60" y="1300" width="260" height="164" fill="#E3F2FD" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="1300" width="260" height="30" fill="#90CAF9" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="1320" font-size="13" font-weight="bold" text-anchor="middle">manga.ms_volumes_enriched</text>
+<text x="68" y="1343" font-size="11" font-weight="bold" text-decoration="underline">PK volume_url : text *</text>
+<text x="68" y="1361" font-size="11">volume_title : text</text>
+<text x="68" y="1379" font-size="11">volume_number : int</text>
+<text x="68" y="1397" font-size="11">volume_publication_date : date</text>
+<text x="68" y="1415" font-size="11">volume_dessinateur : text</text>
+<text x="68" y="1433" font-size="11" font-style="italic">FK series_id : bigint</text>
+<text x="68" y="1451" font-size="10" font-style="italic" fill="#455A64">… (24 autres colonnes)</text>
+<rect x="1800" y="420" width="260" height="236" fill="#E8F5E9" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1800" y="420" width="260" height="30" fill="#A5D6A7" stroke="#37474F" stroke-width="1.5"/>
+<text x="1930.0" y="440" font-size="13" font-weight="bold" text-anchor="middle">manga.wd_pivot</text>
+<text x="1808" y="463" font-size="11" font-weight="bold" text-decoration="underline">PK qid : text *</text>
+<text x="1808" y="481" font-size="11">label_principal : text</text>
+<text x="1808" y="499" font-size="11">annee : int</text>
+<text x="1808" y="517" font-size="11">mal_id : text</text>
+<text x="1808" y="535" font-size="11">anilist_id : text</text>
+<text x="1808" y="553" font-size="11">ann_id : text</text>
+<text x="1808" y="571" font-size="11">wiki_fr : text</text>
+<text x="1808" y="589" font-size="11">wiki_en : text</text>
+<text x="1808" y="607" font-size="11">loaded_at : timestamptz *</text>
+<text x="1808" y="625" font-size="11">updated_at : timestamptz *</text>
+<text x="1808" y="643" font-size="10" font-style="italic" fill="#455A64">… (1 autres colonnes)</text>
+<rect x="2140" y="340" width="260" height="164" fill="#E8F5E9" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2140" y="340" width="260" height="30" fill="#A5D6A7" stroke="#37474F" stroke-width="1.5"/>
+<text x="2270.0" y="360" font-size="13" font-weight="bold" text-anchor="middle">manga.wd_formes</text>
+<text x="2148" y="383" font-size="11" font-weight="bold" text-decoration="underline">PK forme_id : bigint *</text>
+<text x="2148" y="401" font-size="11" font-style="italic">FK U qid : text *</text>
+<text x="2148" y="419" font-size="11">forme : text *</text>
+<text x="2148" y="437" font-size="11">U forme_norm : text *</text>
+<text x="2148" y="455" font-size="11">forme_type : text *</text>
+<text x="2148" y="473" font-size="11">langue : text</text>
+<text x="2148" y="491" font-size="10" font-style="italic" fill="#455A64">… (1 autres colonnes)</text>
+<rect x="2140" y="580" width="260" height="146" fill="#E8F5E9" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2140" y="580" width="260" height="30" fill="#A5D6A7" stroke="#37474F" stroke-width="1.5"/>
+<text x="2270.0" y="600" font-size="13" font-weight="bold" text-anchor="middle">manga.wd_auteurs</text>
+<text x="2148" y="623" font-size="11" font-weight="bold" text-decoration="underline" font-style="italic">PK FK qid : text *</text>
+<text x="2148" y="641" font-size="11" font-weight="bold" text-decoration="underline">PK auteur_qid : text *</text>
+<text x="2148" y="659" font-size="11">auteur : text</text>
+<text x="2148" y="677" font-size="11">auteur_norm : text</text>
+<text x="2148" y="695" font-size="11">loaded_at : timestamptz *</text>
+<text x="2148" y="713" font-size="11">auteur_lang : text</text>
+<rect x="2480" y="340" width="260" height="164" fill="#E8F5E9" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2480" y="340" width="260" height="30" fill="#A5D6A7" stroke="#37474F" stroke-width="1.5"/>
+<text x="2610.0" y="360" font-size="13" font-weight="bold" text-anchor="middle">manga.wd_auteurs_formes</text>
+<text x="2488" y="383" font-size="11" font-weight="bold" text-decoration="underline">PK forme_id : bigint *</text>
+<text x="2488" y="401" font-size="11">U auteur_qid : text *</text>
+<text x="2488" y="419" font-size="11">forme : text *</text>
+<text x="2488" y="437" font-size="11">U forme_norm : text *</text>
+<text x="2488" y="455" font-size="11">forme_type : text *</text>
+<text x="2488" y="473" font-size="11">langue : text</text>
+<text x="2488" y="491" font-size="10" font-style="italic" fill="#455A64">… (1 autres colonnes)</text>
+<rect x="1800" y="1240" width="260" height="236" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="1800" y="1240" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="1930.0" y="1260" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_series_core</text>
+<text x="1808" y="1283" font-size="11" font-weight="bold" text-decoration="underline">PK kitsu_id : bigint *</text>
+<text x="1808" y="1301" font-size="11">slug : text</text>
+<text x="1808" y="1319" font-size="11">status : text</text>
+<text x="1808" y="1337" font-size="11">title_canonical : text</text>
+<text x="1808" y="1355" font-size="11">title_en : text</text>
+<text x="1808" y="1373" font-size="11">title_ja : text</text>
+<text x="1808" y="1391" font-size="11">title_norm_primary : text</text>
+<text x="1808" y="1409" font-size="11">title_norm_canonical : text</text>
+<text x="1808" y="1427" font-size="11">title_norm_en : text</text>
+<text x="1808" y="1445" font-size="11">title_norm_ja : text</text>
+<text x="1808" y="1463" font-size="10" font-style="italic" fill="#455A64">… (7 autres colonnes)</text>
+<rect x="2480" y="1020" width="260" height="164" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2480" y="1020" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2610.0" y="1040" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_formes</text>
+<text x="2488" y="1063" font-size="11" font-weight="bold" text-decoration="underline">PK forme_id : bigint *</text>
+<text x="2488" y="1081" font-size="11">U kitsu_id : bigint *</text>
+<text x="2488" y="1099" font-size="11">forme : text *</text>
+<text x="2488" y="1117" font-size="11">U forme_norm : text *</text>
+<text x="2488" y="1135" font-size="11">forme_type : text *</text>
+<text x="2488" y="1153" font-size="11">langue : text</text>
+<text x="2488" y="1171" font-size="10" font-style="italic" fill="#455A64">… (2 autres colonnes)</text>
+<rect x="2480" y="1260" width="260" height="110" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2480" y="1260" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2610.0" y="1280" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_mappings</text>
+<text x="2488" y="1303" font-size="11">U kitsu_id : bigint *</text>
+<text x="2488" y="1321" font-size="11">U external_site : text *</text>
+<text x="2488" y="1339" font-size="11">U external_id : text *</text>
+<text x="2488" y="1357" font-size="11">loaded_at : timestamptz *</text>
+<rect x="2480" y="1500" width="260" height="146" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2480" y="1500" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2610.0" y="1520" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_staff</text>
+<text x="2488" y="1543" font-size="11" font-weight="bold" text-decoration="underline">PK staff_row_id : bigint *</text>
+<text x="2488" y="1561" font-size="11">U kitsu_id : bigint *</text>
+<text x="2488" y="1579" font-size="11">personne : text *</text>
+<text x="2488" y="1597" font-size="11">U personne_norm : text *</text>
+<text x="2488" y="1615" font-size="11">U role : text</text>
+<text x="2488" y="1633" font-size="11">loaded_at : timestamptz *</text>
+<rect x="2140" y="1500" width="260" height="110" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2140" y="1500" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2270.0" y="1520" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_meta</text>
+<text x="2148" y="1543" font-size="11" font-weight="bold" text-decoration="underline">PK kitsu_id : bigint *</text>
+<text x="2148" y="1561" font-size="11">annee : int</text>
+<text x="2148" y="1579" font-size="11">subtype : text *</text>
+<text x="2148" y="1597" font-size="11">loaded_at : timestamptz *</text>
+<rect x="2140" y="1020" width="260" height="92" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2140" y="1020" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2270.0" y="1040" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_series_authors</text>
+<text x="2148" y="1063" font-size="11" font-weight="bold" text-decoration="underline" font-style="italic">PK FK kitsu_id : bigint *</text>
+<text x="2148" y="1081" font-size="11" font-weight="bold" text-decoration="underline">PK author_name : text *</text>
+<text x="2148" y="1099" font-size="11" font-weight="bold" text-decoration="underline">PK author_role : text *</text>
+<rect x="2140" y="1260" width="260" height="164" fill="#FFF8E1" stroke="#37474F" stroke-width="1.5"/>
+<rect x="2140" y="1260" width="260" height="30" fill="#FFD54F" stroke="#37474F" stroke-width="1.5"/>
+<text x="2270.0" y="1280" font-size="13" font-weight="bold" text-anchor="middle">manga.kitsu_weekly_snapshot</text>
+<text x="2148" y="1303" font-size="11" font-weight="bold" text-decoration="underline">PK list_name : text *</text>
+<text x="2148" y="1321" font-size="11" font-weight="bold" text-decoration="underline">PK fetched_at_ts : timestamptz *</text>
+<text x="2148" y="1339" font-size="11" font-weight="bold" text-decoration="underline" font-style="italic">PK FK kitsu_id : bigint *</text>
+<text x="2148" y="1357" font-size="11">position : int *</text>
+<text x="2148" y="1375" font-size="11">list_rank : int</text>
+<text x="2148" y="1393" font-size="11">trend_rank : int</text>
+<text x="2148" y="1411" font-size="10" font-style="italic" fill="#455A64">… (1 autres colonnes)</text>
+<rect x="60" y="1540" width="260" height="164" fill="#FCE4EC" stroke="#37474F" stroke-width="1.5"/>
+<rect x="60" y="1540" width="260" height="30" fill="#F48FB1" stroke="#37474F" stroke-width="1.5"/>
+<text x="190.0" y="1560" font-size="13" font-weight="bold" text-anchor="middle">manga.mi_series</text>
+<text x="68" y="1583" font-size="11" font-weight="bold" text-decoration="underline">PK serie_id : bigint *</text>
+<text x="68" y="1601" font-size="11">original_url : text</text>
+<text x="68" y="1619" font-size="11">adresse : text</text>
+<text x="68" y="1637" font-size="11">adresse_1 : text</text>
+<text x="68" y="1655" font-size="11">code_http : int</text>
+<text x="68" y="1673" font-size="11">title : text</text>
+<text x="68" y="1691" font-size="10" font-style="italic" fill="#455A64">… (33 autres colonnes)</text>
+<rect x="680" y="1540" width="260" height="164" fill="#FCE4EC" stroke="#37474F" stroke-width="1.5"/>
+<rect x="680" y="1540" width="260" height="30" fill="#F48FB1" stroke="#37474F" stroke-width="1.5"/>
+<text x="810.0" y="1560" font-size="13" font-weight="bold" text-anchor="middle">manga.mi_sorties</text>
+<text x="688" y="1583" font-size="11" font-weight="bold" text-decoration="underline">PK sortie_id : bigint *</text>
+<text x="688" y="1601" font-size="11">ean : text</text>
+<text x="688" y="1619" font-size="11">ean_valide : bool</text>
+<text x="688" y="1637" font-size="11">titre : text</text>
+<text x="688" y="1655" font-size="11">titre_vo : text</text>
+<text x="688" y="1673" font-size="11">editeur_vf : text</text>
+<text x="688" y="1691" font-size="10" font-style="italic" fill="#455A64">… (31 autres colonnes)</text>
+</svg>

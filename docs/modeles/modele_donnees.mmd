@@ -1,0 +1,232 @@
+%% MPD coeur — version Mermaid (SECONDAIRE).
+%% La mise en page est AUTOMATIQUE ici : Mermaid place les entites
+%% lui-meme, sans respecter la disposition en moyeu. La reference
+%% opposable reste modele_donnees.drawio (planche 1).
+%% Genere par docs/modeles/generer_diagrammes.py depuis schema.json.
+erDiagram
+    kitsu_series_core ||--o{ kitsu_series_authors : kitsu_id
+    kitsu_series_core ||--o{ kitsu_weekly_snapshot : kitsu_id
+    ms_series_enriched ||--o{ llm_avis : series_id
+    ms_series_enriched ||--o{ ms_formes : series_id
+    ms_series_enriched ||--o{ ms_kitsu_ambiguous : series_id
+    ms_series_enriched ||--o{ ms_kitsu_map : series_id
+    ms_series_enriched ||--o{ ms_reviews_all : series_id
+    ms_volumes_enriched ||--o{ ms_reviews_all : volume_url
+    work_identity ||--o{ ms_series_enriched : work_uid
+    ms_series_enriched ||--o{ ms_volumes_enriched : series_id
+    work_identity ||--o{ volume_identity : work_uid
+    wd_pivot ||--o{ wd_auteurs : qid
+    wd_pivot ||--o{ wd_formes : qid
+    ms_series_enriched |o..o{ match_decision : series_id
+    wd_pivot |o..o{ match_decision : wikidata_qid
+    match_decision |o..o{ v_match_current : vue_sur
+    work_identity {
+        bigint work_uid PK
+        int series_id
+        text wikidata_qid
+        text kitsu_id
+        text mal_id
+        text anilist_id
+        text madb_id
+        text disponibilite
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    volume_identity {
+        text volume_url PK
+        bigint work_uid FK
+        char isbn13
+        bool isbn13_valide
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    match_decision {
+        bigint decision_id PK
+        int series_id
+        text wikidata_qid
+        text method
+        real score
+        text status
+        timestamptz decided_at
+        text decided_by
+        jsonb details
+    }
+    v_match_current {
+        int series_id
+        text wikidata_qid
+        text method
+        real score
+        text status
+        timestamptz decided_at
+        text decided_by
+        bigint decision_id
+    }
+    llm_avis {
+        bigint avis_id PK
+        int series_id FK
+        timestamptz run_ts
+        text phase
+        text candidat_type
+        text candidat_id
+        text verdict
+        text confiance
+        text justification
+        text modele
+        text prompt_version
+        int tokens_in
+    }
+    ms_formes {
+        bigint forme_id PK
+        bigint series_id FK
+        text forme
+        text forme_norm
+        text forme_type
+        text source
+    }
+    ms_reviews_all {
+        bigint review_id PK
+        bigint series_id FK
+        text series_title
+        text series_url
+        text volume_url FK
+        text review_url
+    }
+    ms_series_enriched {
+        bigint series_id PK
+        text series_url
+        text series_title
+        text series_type
+        text series_category
+        int series_year
+        jsonb series_other_titles
+        jsonb series_genres
+        jsonb series_tags
+        bigint work_uid FK
+    }
+    ms_kitsu_map {
+        bigint series_id PK
+        bigint kitsu_id
+        text match_method
+        double match_score
+        text matched_title_norm
+        text ms_title
+    }
+    ms_kitsu_ambiguous {
+        bigint series_id PK
+        text ms_title_main
+        text ms_title_norm
+        int n_exact_candidates
+    }
+    ms_volumes_enriched {
+        text volume_url PK
+        text volume_title
+        int volume_number
+        date volume_publication_date
+        text volume_dessinateur
+        bigint series_id FK
+    }
+    wd_pivot {
+        text qid PK
+        text label_principal
+        int annee
+        text mal_id
+        text anilist_id
+        text ann_id
+        text wiki_fr
+        text wiki_en
+        timestamptz loaded_at
+        timestamptz updated_at
+    }
+    wd_formes {
+        bigint forme_id PK
+        text qid FK
+        text forme
+        text forme_norm
+        text forme_type
+        text langue
+    }
+    wd_auteurs {
+        text qid PK
+        text auteur_qid PK
+        text auteur
+        text auteur_norm
+        timestamptz loaded_at
+        text auteur_lang
+    }
+    wd_auteurs_formes {
+        bigint forme_id PK
+        text auteur_qid
+        text forme
+        text forme_norm
+        text forme_type
+        text langue
+    }
+    kitsu_series_core {
+        bigint kitsu_id PK
+        text slug
+        text status
+        text title_canonical
+        text title_en
+        text title_ja
+        text title_norm_primary
+        text title_norm_canonical
+        text title_norm_en
+        text title_norm_ja
+    }
+    kitsu_formes {
+        bigint forme_id PK
+        bigint kitsu_id
+        text forme
+        text forme_norm
+        text forme_type
+        text langue
+    }
+    kitsu_mappings {
+        bigint kitsu_id
+        text external_site
+        text external_id
+        timestamptz loaded_at
+    }
+    kitsu_staff {
+        bigint staff_row_id PK
+        bigint kitsu_id
+        text personne
+        text personne_norm
+        text role
+        timestamptz loaded_at
+    }
+    kitsu_meta {
+        bigint kitsu_id PK
+        int annee
+        text subtype
+        timestamptz loaded_at
+    }
+    kitsu_series_authors {
+        bigint kitsu_id PK
+        text author_name PK
+        text author_role PK
+    }
+    kitsu_weekly_snapshot {
+        text list_name PK
+        timestamptz fetched_at_ts PK
+        bigint kitsu_id PK
+        int position
+        int list_rank
+        int trend_rank
+    }
+    mi_series {
+        bigint serie_id PK
+        text original_url
+        text adresse
+        text adresse_1
+        int code_http
+        text title
+    }
+    mi_sorties {
+        bigint sortie_id PK
+        text ean
+        bool ean_valide
+        text titre
+        text titre_vo
+        text editeur_vf
+    }
