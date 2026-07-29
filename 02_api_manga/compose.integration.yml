@@ -1,3 +1,16 @@
+# Harnais d'intégration : PostgreSQL jetable, schéma reconstruit depuis
+# `database/migrations/` — la source de vérité du dépôt. Le module 02 ne
+# transporte plus de DDL : il ne peut donc plus tester un schéma périmé.
+#
+# Enchaînement : db (sain) → migrations (12 fichiers) → fixture → api → smoke.
+#
+#   docker compose -f compose.integration.yml run --rm --build smoke
+#   docker compose -f compose.integration.yml down -v
+#
+# `run` plutôt que `up --abort-on-container-exit` : `migrations` et `fixture`
+# sont des tâches qui se terminent, et l'abandon sur sortie de conteneur
+# tuerait le harnais dès la fin des migrations.
+
 services:
   db:
     image: postgres:16-alpine
@@ -12,12 +25,41 @@ services:
       retries: 15
     tmpfs:
       - /var/lib/postgresql/data
+
+  # Même runner que `database/outils/fidelite.sh` : `migrate.py up` joue les
+  # migrations dans l'ordre, une transaction par fichier, et refuse d'avancer
+  # si un fichier déjà appliqué a changé. `database/` est monté en lecture
+  # seule ; l'image de l'API fournit psycopg, seule dépendance du runner.
+  migrations:
+    build: .
+    image: api-manga-integration
+    entrypoint: ["python", "/database/migrate.py", "up"]
+    environment:
+      DATABASE_URL: postgresql://postgres:integration-test@db:5432/apimanga
     volumes:
-      - ./sql/001_api_schema.sql:/docker-entrypoint-initdb.d/001_api_schema.sql:ro
-      - ./tests/fixtures/002_sample_data.sql:/docker-entrypoint-initdb.d/002_sample_data.sql:ro
+      - ../database:/database:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Jeu d'essai réservé aux tests : un document par source du corpus RAG.
+  # `psql` vient de l'image PostgreSQL déjà utilisée par `db`.
+  fixture:
+    image: postgres:16-alpine
+    entrypoint:
+      - psql
+      - postgresql://postgres:integration-test@db:5432/apimanga
+      - --set=ON_ERROR_STOP=1
+      - --file=/fixtures/002_sample_data.sql
+    volumes:
+      - ./tests/fixtures:/fixtures:ro
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
 
   api:
     build: .
+    image: api-manga-integration
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -27,8 +69,8 @@ services:
       DB_POOL_MIN_SIZE: 1
       DB_POOL_MAX_SIZE: 3
     depends_on:
-      db:
-        condition: service_healthy
+      fixture:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD

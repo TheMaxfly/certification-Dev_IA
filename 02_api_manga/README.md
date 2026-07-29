@@ -67,25 +67,22 @@ DB_USER=postgres
 DB_PASSWORD=
 ```
 
-## Initialisation SQL
+## Schéma de la base
 
-La source de vérité du schéma de production est désormais le dossier racine
-`../database/migrations/`. L'API reste en lecture seule et ne doit pas créer les
-tables de production au démarrage.
-
-Le script `sql/001_api_schema.sql` est conservé temporairement comme contrat SQL et
-bootstrap isolé du Compose d'intégration. Il crée uniquement les objets minimaux
-nécessaires au smoke test ; il ne remplace pas les migrations racine pour une base
-réelle.
+**La source de vérité du schéma est `../database/migrations/`, et elle seule.**
+Ce module ne transporte aucun DDL : il est en lecture seule et ne crée rien, ni au
+démarrage ni ailleurs. Pour préparer une base, on joue les migrations :
 
 ```bash
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-  -f sql/001_api_schema.sql
+cd ../database
+DATABASE_URL='postgresql://…' uv run python migrate.py up
+DATABASE_URL='postgresql://…' uv run python migrate.py status
 ```
 
-Le script ne supprime aucune donnée. Le boost documenté utilise le snapshot le plus
-récent de chaque liste avec les poids suivants : tendance `3 / position`, popularité
-`2 / position`, publication en cours `1 / position`.
+Le Compose d'intégration applique ces mêmes migrations à une base jetable avant de
+démarrer l'API (cf. « Validation du module »). Le contrat SQL du module n'est donc
+plus un fichier à part susceptible de dériver : c'est le schéma de production lui-même
+qui est testé.
 
 ## Périmètre & données
 
@@ -100,9 +97,21 @@ récent de chaque liste avec les poids suivants : tendance `3 / position`, popul
 
 ### Données exposées côté RAG
 
-Le corpus RAG est assemblé dans PostgreSQL via des **vues** :
-- `manga.rag_docs_scored` : documents + score de boost (tendance/popularité/top)
-- `manga.rag_export_docs` : vue “export final” (filtrage des textes vides)
+Le corpus RAG est assemblé dans PostgreSQL via une chaîne de **vues**, que l'API
+consomme par son extrémité :
+
+```
+rag_export_docs        ← ce que lit l'API (textes vides écartés)
+  └─ rag_docs_scored   ← ajoute boost_score
+      └─ rag_docs_all_v2
+          ├─ rag_docs_all        → rag_kitsu_docs  (source « kitsu_synopsis »)
+          │                      → rag_reviews_docs (source « ms_review »)
+          └─ rag_ms_hybrid_docs  → ms_kitsu_map ⨯ les deux précédentes
+                                   (source « ms_hybrid »)
+```
+
+Trois sources cohabitent donc dans le corpus servi par `/rag/export` et `/search` :
+`kitsu_synopsis`, `ms_hybrid` et `ms_review`.
 
 ## Architecture
 
@@ -188,7 +197,21 @@ Le tri principal du corpus RAG combine :
 - score texte (FTS) via `ts_rank_cd`
 - score de boost basé sur les signaux hebdomadaires Kitsu : `trending_pos`, `popular_pos`, `top_pos`
 
-La vue `manga.rag_docs_scored` calcule le boost : plus la position est haute (`1`, `2`, `3`…), plus le boost augmente ; ce boost permet de remonter les contenus “chauds / tendance” lors de l’export et des recherches.
+La vue `manga.rag_docs_scored` calcule le boost. Les poids sont ceux de la base de
+production :
+
+| Signal | Poids | Contribution |
+| --- | --- | --- |
+| tendance (`trending_pos`) | 100 | `100 / position` |
+| popularité (`popular_pos`) | 30 | `30 / position` |
+| publication en cours (`top_pos`) | 20 | `20 / position` |
+
+Un signal absent ne contribue pas. Plus la position est haute (`1`, `2`, `3`…), plus
+le boost augmente : les contenus « chauds » remontent à l'export et à la recherche.
+Exemple, pour un document en position 1 / 2 / 4 : `100/1 + 30/2 + 20/4 = 120`.
+
+Un document sans aucun signal hebdomadaire — les critiques, notamment — a donc un
+boost nul et ne remonte que par son score texte.
 
 ## Validation du module
 
@@ -198,10 +221,16 @@ uv run ruff format --check .
 uv run pytest
 docker compose config
 docker compose build
-docker compose -f compose.integration.yml up \
-  --build --abort-on-container-exit --exit-code-from smoke
-docker compose -f compose.integration.yml down
+docker compose -f compose.integration.yml run --rm --build smoke
+docker compose -f compose.integration.yml down -v
 ```
 
-Le Compose d'intégration démarre une PostgreSQL 16 temporaire, rejoue le SQL,
-injecte une fixture puis appelle réellement tous les endpoints HTTP principaux.
+Le Compose d'intégration démarre une PostgreSQL 16 temporaire (`tmpfs`, donc
+réellement jetable), **applique les 12 migrations de `../database/migrations/`**,
+injecte la fixture de test puis appelle réellement les six endpoints HTTP. Le schéma
+vérifié est celui de la production : le smoke test contrôle notamment que la formule
+de boost servie est bien celle du tableau ci-dessus, et échoue si une pondération
+antérieure était rétablie.
+
+`down -v` est nécessaire entre deux exécutions : la fixture n'est pas rejouable sur
+une base déjà peuplée.
