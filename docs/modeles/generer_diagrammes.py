@@ -10,6 +10,7 @@ tables a montrer et leur PLACEMENT.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import sys
@@ -438,11 +439,18 @@ def style_lien(lien: Lien) -> str:
     return base + "strokeColor=#37474F;endArrow=block;endFill=1;"
 
 
+def _identifiant(nom: str) -> str:
+    """Identifiant d'onglet deterministe, derive du nom de la planche."""
+    return hashlib.md5(nom.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
+
+
 def xml_planche(
     nom: str, boites: dict[str, Boite], liens: list[Lien], legende: str, notes: str
 ) -> str:
     parties = [
-        f'<diagram name="{html.escape(nom)}" id="{abs(hash(nom)) % 10**9}">',
+        # id STABLE : `hash()` est randomise par processus (PYTHONHASHSEED),
+        # ce qui ferait varier le fichier a chaque regeneration.
+        f'<diagram name="{html.escape(nom)}" id="{_identifiant(nom)}">',
         f'<mxGraphModel dx="1400" dy="900" grid="1" gridSize="20" guides="1" '
         f'tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" '
         f'pageWidth="{PAGE_L}" pageHeight="{PAGE_H}" math="0" shadow="0">',

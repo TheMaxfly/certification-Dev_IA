@@ -1,5 +1,5 @@
 <mxfile host="app.diagrams.net" agent="generer_diagrammes.py" version="24.0.0">
-<diagram name="MPD coeur — referentiel d&#x27;identite manga" id="335284360">
+<diagram name="MPD coeur — referentiel d&#x27;identite manga" id="7e86c438d8db">
 <mxGraphModel dx="1400" dy="900" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2800" pageHeight="1980" math="0" shadow="0">
 <root>
 <mxCell id="0" />
@@ -241,7 +241,7 @@
 </root>
 </mxGraphModel>
 </diagram>
-<diagram name="MPD staging (annexe) — tables jetables" id="272045554">
+<diagram name="MPD staging (annexe) — tables jetables" id="4114f67c447c">
 <mxGraphModel dx="1400" dy="900" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2800" pageHeight="1980" math="0" shadow="0">
 <root>
 <mxCell id="0" />
@@ -306,7 +306,7 @@
 </root>
 </mxGraphModel>
 </diagram>
-<diagram name="MCD — modele conceptuel (Merise)" id="310607147">
+<diagram name="MCD — modele conceptuel (Merise)" id="d1842ff09738">
 <mxGraphModel dx="1400" dy="900" grid="1" gridSize="20" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2800" pageHeight="1980" math="0" shadow="0">
 <root>
 <mxCell id="0" />
