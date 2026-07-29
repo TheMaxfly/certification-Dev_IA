@@ -31,7 +31,10 @@ class Settings:
     db_host: str = "host.docker.internal"
     db_port: int = 5432
     db_name: str = "apimanga"
-    db_user: str = "postgres"
+    # Rôle de consultation, sans aucun droit d'écriture : il hérite ses
+    # privilèges de `manga_ro` (migration 012). Il doit exister avant le
+    # démarrage — cf. `database/outils/creer_role_lecture.sh`.
+    db_user: str = "manga_api"
     db_password: str = ""
     db_connect_timeout: int = 5
     db_pool_timeout: int = 5

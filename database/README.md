@@ -27,6 +27,11 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `005_unicite_review_url.sql` | index UNIQUE partiel sur `ms_reviews_all.review_url` — la clé d'upsert du cycle mensuel |
 | `006_referentiels.sql` | référentiels typés de la cascade : `staging.kitsu_mappings` ; `manga.wd_pivot` / `wd_formes` / `wd_auteurs` ; `manga.kitsu_mappings` / `kitsu_formes` |
 | `007_referentiel_mi.sql` | Manga Insight typé : `manga.mi_sorties` / `mi_series` + vue `v_mi_ean_multiples` |
+| `008_hydratation_auteurs_jawiki.sql` | préalables à l'étage 1 : `wd_pivot.wiki_ja`, hydratation des auteurs Wikidata |
+| `009_referentiel_kitsu_staff_meta.sql` | ce qu'exige l'étage 2 : `kitsu_staff`, `kitsu_meta`, élargissement du CHECK des méthodes |
+| `010_avis_llm.sql` | `manga.llm_avis` — le juge écrit ses avis hors du journal des décisions |
+| `011_methode_human_review.sql` | `human_review` au CHECK des méthodes : la correction humaine devient traçable |
+| `012_roles_lecture.sql` | **accès en consultation** : rôle de groupe `manga_ro`, `SELECT` sur `manga` et rien d'autre (cf. « Accès en consultation ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -57,9 +62,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 ## État de la base réelle
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
-à `007` le 2026-07-16 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
-exécution. Le contrôle final affiche **8 migrations appliquées et 0 en
-attente**.
+à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
+le 2026-07-30 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
+exécution. Le contrôle affiche **13 migrations appliquées et 0 en attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
@@ -158,9 +163,115 @@ $ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run python mig
 3 appliquée(s), 0 en attente
 ```
 
+## Accès en consultation
+
+Les données sont mises à disposition par **deux moyens** : l'API REST du module
+`02_api_manga/`, et l'**accès direct à la base** décrit ici. Les deux passent par
+le même rôle, sans aucun droit d'écriture.
+
+### Deux rôles, et pourquoi ils sont deux
+
+| Rôle | Nature | Créé par | Porte un secret |
+| --- | --- | --- | --- |
+| `manga_ro` | groupe, `NOLOGIN` | migration `012_roles_lecture.sql` | non |
+| `manga_api` | connexion, `LOGIN`, membre de `manga_ro` | `outils/creer_role_lecture.sh` | oui |
+
+La séparation n'est pas décorative. Un rôle PostgreSQL est un objet de
+**cluster** : il vit dans `pg_authid`, partagé par toutes les bases, et survit à
+un `DROP DATABASE`. Les **privilèges**, eux, sont des objets de base, inscrits
+dans les `relacl` de `manga`. Seuls les seconds se reconstruisent avec la base —
+donc seuls eux appartiennent à une migration.
+
+`manga_ro` y est quand même créé, parce qu'il ne porte aucun secret et que sa
+création est déterministe. `manga_api` n'y est pas : son mot de passe n'a pas sa
+place dans un fichier de migration, qui est **immuable** et dont le checksum est
+vérifié à chaque `up` — un secret y entrerait pour de bon.
+
+`manga_api` n'a **aucun privilège propre** : il hérite tout de `manga_ro`. Faire
+évoluer les droits de consultation, c'est donc écrire une migration ; on ne
+touche jamais au rôle de connexion.
+
+### Ce qui est accordé, et ce qui ne l'est pas
+
+| | Accordé à `manga_ro` |
+| --- | --- |
+| `CONNECT` sur la base | oui |
+| `USAGE` sur le schéma `manga` | oui |
+| `SELECT` sur les 38 relations de `manga` (30 tables + 8 vues) | oui, y compris les objets créés plus tard |
+| `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` | **non**, sur aucune relation |
+| droits sur les 13 séquences de `manga` | **non** — sans `USAGE`, `nextval` est fermé, ce qui coupe la dernière voie d'écriture indirecte |
+| `USAGE` sur le schéma `staging` | **non** — `staging` est jetable, rechargé à chaque ELT, et ne fait pas partie de la mise à disposition |
+| schéma `bench` (module 06) | **non** — hors périmètre |
+
+Le contrôle n'est pas laissé à cette table : `tests/test_roles_lecture.py` le
+vérifie relation par relation, et un **témoin positif**
+(`02_api_manga/tests/db_temoin_lecture_seule.py`) exige que six tentatives
+d'écriture sous `manga_api` échouent en `SQLSTATE 42501`. Constater que la
+lecture fonctionne encore ne prouverait rien.
+
+### Obtenir un accès
+
+Deux commandes. La première crée le groupe et ses droits, la seconde le rôle de
+connexion :
+
+```bash
+DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
+  uv run python migrate.py up
+
+MANGA_API_PASSWORD="$(openssl rand -base64 24)" \
+  sh outils/creer_role_lecture.sh 'postgresql://postgres@localhost:5432/apimanga'
+```
+
+Le script est **la** procédure — pas cette prose. Il est idempotent : rejoué, il
+met à jour le mot de passe d'un `manga_api` existant, ce qui est aussi la façon
+de le faire tourner. Il refuse de démarrer si `MANGA_API_PASSWORD` est absente
+ou si `manga_ro` n'existe pas encore, et le mot de passe ne transite ni par la
+ligne de commande (lisible par `ps`), ni par un fichier, ni par un affichage.
+
+Il est écrit en **POSIX `sh`** et non en bash : le harnais d'intégration du
+module `02` l'exécute dans l'image `postgres:16-alpine`, dont le shell est
+busybox. La procédure documentée est donc exactement celle que les tests
+exercent, à chaque exécution du harnais.
+
+### Côté client : `~/.pgpass`
+
+Le mot de passe ne se met pas dans un `DATABASE_URL` — il finirait dans
+l'historique du shell et dans la table des processus. PostgreSQL lit un fichier
+d'identifiants, une ligne par accès, `host:port:base:role:mot_de_passe` :
+
+```bash
+printf '%s\n' 'localhost:5432:apimanga:manga_api:<mot_de_passe>' >> ~/.pgpass
+chmod 600 ~/.pgpass      # PostgreSQL ignore le fichier s'il est plus permissif
+```
+
+La consultation se fait alors sans secret sur la ligne de commande :
+
+```bash
+psql 'postgresql://manga_api@localhost:5432/apimanga'
+```
+
+Côté API, le module `02` lit `DB_USER` / `DB_PASSWORD` dans son environnement ;
+son `.env` n'est pas versionné.
+
+### Ce qui n'est volontairement pas fait
+
+- **`REVOKE CONNECT ON DATABASE … FROM PUBLIC`** n'est pas exécuté. Par défaut,
+  `PUBLIC` a `CONNECT`, donc tout rôle du cluster — dont `max` et `maxime` — peut
+  ouvrir une session sur `apimanga`. Ils n'y voient rien (`USAGE` sur `manga` est
+  refusé, vérifié), mais la porte reste entrouverte. Le `REVOKE` toucherait des
+  rôles qui ne relèvent pas de ce dépôt : la décision est laissée à
+  l'administrateur du cluster.
+- **Les composants qui écrivent restent en `postgres`** : `migrate.py`,
+  `outils/fidelite.sh` et les CLI de chargement de `05`. Un rôle de lecture ne
+  peut pas jouer une migration ; les basculer n'aurait aucun sens.
+- **`demo/` et `docs/modeles/extraire_schema.py`**, qui ne lisent que, pourraient
+  passer sous `manga_api`. Ce n'est pas fait ici : ces deux composants sont
+  pilotés par `DATABASE_URL`, leur bascule est un changement de configuration
+  d'exploitation, pas de code, et elle mérite d'être décidée pour elle-même.
+
 ## Tests
 
-`uv run --extra dev pytest tests/` — 91 tests. Le harnais lance un PostgreSQL
+`uv run --extra dev pytest tests/` — 126 tests. Le harnais lance un PostgreSQL
 **jetable** en conteneur et crée une base neuve par test. Si Docker est absent,
 les tests **skippent avec un message** : ils ne se rabattent jamais sur une base
 réelle, et `apimanga` n'est jamais atteignable depuis la suite.
@@ -177,6 +288,14 @@ l'usabilité réelle de l'index trigramme (l'opérateur `%` est exercé).
 Les garde-fous ont été vérifiés **par mutation** : la garde retirée, le test
 correspondant doit virer au rouge — 4/4 pour `mark-applied`, 5/5 pour les
 contraintes de `003`. Un test qui reste vert sur du code cassé ne prouve rien.
+
+`tests/test_roles_lecture.py` (15 tests) couvre `012` : `manga_ro` lit les
+38 relations de `manga` et n'écrit sur aucune, `staging` reste hors de portée,
+les séquences aussi, les objets créés **après** la migration sont couverts par
+les privilèges par défaut, le rejeu du fichier ne change aucune ACL, et aucune
+migration ne contient le mot `PASSWORD`. L'inventaire est dérivé du catalogue,
+gardé par deux sentinelles en dur — sans elles, un catalogue vide validerait
+tout.
 
 ## Notes sur `002`
 

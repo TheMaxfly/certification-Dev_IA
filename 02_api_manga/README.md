@@ -47,8 +47,8 @@ L’API lit les variables suivantes (avec valeurs par défaut si non définies) 
 | `DB_HOST` | `host.docker.internal` | Hôte PostgreSQL |
 | `DB_PORT` | `5432` | Port PostgreSQL |
 | `DB_NAME` | `apimanga` | Base de données |
-| `DB_USER` | `postgres` | Utilisateur |
-| `DB_PASSWORD` | *(vide)* | Mot de passe |
+| `DB_USER` | `manga_api` | Rôle de connexion — consultation seule |
+| `DB_PASSWORD` | *(vide)* | Mot de passe du rôle |
 | `DB_CONNECT_TIMEOUT` | `5` | Délai de connexion PostgreSQL (secondes) |
 | `DB_POOL_TIMEOUT` | `5` | Attente maximale d'une connexion du pool |
 | `DB_POOL_MIN_SIZE` | `1` | Nombre minimal de connexions du pool |
@@ -63,8 +63,44 @@ APP_NAME=API Manga
 DB_HOST=host.docker.internal
 DB_PORT=5432
 DB_NAME=apimanga
-DB_USER=postgres
+DB_USER=manga_api
 DB_PASSWORD=
+```
+
+## Prérequis : le rôle de consultation
+
+L'API se connecte sous **`manga_api`**, un rôle qui n'a **aucun droit
+d'écriture** : il hérite ses privilèges de `manga_ro`, à qui la migration `012`
+accorde `SELECT` sur le schéma `manga` et rien d'autre. Une API en lecture seule
+qui se connecterait en superutilisateur ne serait en lecture seule que par
+convention ; ici la base refuse l'écriture, quoi que fasse le code.
+
+Le rôle doit exister avant le démarrage. Il n'est pas créé par une migration —
+il porte un mot de passe, qui n'a pas sa place dans le dépôt :
+
+```bash
+cd ../database
+DATABASE_URL='postgresql://…' uv run python migrate.py up      # crée manga_ro
+MANGA_API_PASSWORD="$(openssl rand -base64 24)" \
+  sh outils/creer_role_lecture.sh 'postgresql://postgres@…/apimanga'
+```
+
+Procédure complète, périmètre exact des droits et stockage du mot de passe :
+**`../database/README.md`, section « Accès en consultation »**.
+
+Si le rôle est absent, l'API démarre — le pool s'ouvre sans bloquer — mais
+`/health` répond `503` avec `{"status":"degraded","db":"error"}` et les endpoints
+de données `503 database unavailable`. Le journal du conteneur porte la cause
+réelle :
+
+```
+FATAL:  password authentication failed for user "manga_api"
+```
+
+ou, si le rôle existe mais n'est pas membre de `manga_ro` :
+
+```
+ERROR:  permission denied for table kitsu_series_core
 ```
 
 ## Schéma de la base

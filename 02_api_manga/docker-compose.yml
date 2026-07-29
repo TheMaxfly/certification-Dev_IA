@@ -10,7 +10,7 @@ services:
       DB_HOST: ${DB_HOST:-host.docker.internal}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-apimanga}
-      DB_USER: ${DB_USER:-postgres}
+      DB_USER: ${DB_USER:-manga_api}
       DB_PASSWORD: ${DB_PASSWORD:-}
       DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-5}
       DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-5}

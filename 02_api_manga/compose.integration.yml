@@ -2,7 +2,8 @@
 # `database/migrations/` — la source de vérité du dépôt. Le module 02 ne
 # transporte plus de DDL : il ne peut donc plus tester un schéma périmé.
 #
-# Enchaînement : db (sain) → migrations (12 fichiers) → fixture → api → smoke.
+# Enchaînement : db (sain) → migrations (13 fichiers) → role → fixture
+#              → temoin → api → smoke.
 #
 #   docker compose -f compose.integration.yml run --rm --build smoke
 #   docker compose -f compose.integration.yml down -v
@@ -42,8 +43,28 @@ services:
       db:
         condition: service_healthy
 
+  # Rôle de connexion de l'API. C'est LA procédure d'accès du dépôt qui est
+  # exécutée ici — `database/outils/creer_role_lecture.sh`, sans variante ni
+  # raccourci : une procédure que les tests n'exercent pas n'est qu'une
+  # intention. Le script est en POSIX sh pour tourner dans busybox.
+  # Mot de passe jetable, propre au harnais.
+  role:
+    image: postgres:16-alpine
+    entrypoint:
+      - sh
+      - /outils/creer_role_lecture.sh
+      - postgresql://postgres:integration-test@db:5432/apimanga
+    environment:
+      MANGA_API_PASSWORD: role-integration-test
+    volumes:
+      - ../database/outils:/outils:ro
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
   # Jeu d'essai réservé aux tests : un document par source du corpus RAG.
-  # `psql` vient de l'image PostgreSQL déjà utilisée par `db`.
+  # Chargé en `postgres` : `manga_api` ne peut pas écrire, c'est tout l'objet
+  # de l'étape.
   fixture:
     image: postgres:16-alpine
     entrypoint:
@@ -54,7 +75,31 @@ services:
     volumes:
       - ./tests/fixtures:/fixtures:ro
     depends_on:
-      migrations:
+      role:
+        condition: service_completed_successfully
+
+  # Témoin positif : prouve que la restriction EXISTE, en tentant une écriture
+  # sous le rôle de l'API et en exigeant un refus 42501. Un test qui constate
+  # que la lecture fonctionne encore ne prouverait rien.
+  temoin:
+    build: .
+    image: api-manga-integration
+    entrypoint: ["python", "/tests/db_temoin_lecture_seule.py"]
+    environment:
+      # Le témoin construit son DSN avec `app.database.build_conninfo`, comme
+      # l'API : il prouve ainsi le rôle de la connexion réelle, pas d'une
+      # connexion fabriquée pour le test. Le script étant hors de /app,
+      # PYTHONPATH doit désigner le paquet.
+      PYTHONPATH: /app
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: apimanga
+      DB_USER: manga_api
+      DB_PASSWORD: role-integration-test
+    volumes:
+      - ./tests:/tests:ro
+    depends_on:
+      fixture:
         condition: service_completed_successfully
 
   api:
@@ -64,12 +109,13 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: apimanga
-      DB_USER: postgres
-      DB_PASSWORD: integration-test
+      # L'API tourne sous le rôle de consultation, comme en production.
+      DB_USER: manga_api
+      DB_PASSWORD: role-integration-test
       DB_POOL_MIN_SIZE: 1
       DB_POOL_MAX_SIZE: 3
     depends_on:
-      fixture:
+      temoin:
         condition: service_completed_successfully
     healthcheck:
       test:
