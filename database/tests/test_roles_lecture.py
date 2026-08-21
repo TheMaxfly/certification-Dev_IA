@@ -25,7 +25,7 @@ from conftest import migrate
 UP = Namespace(commande="up", target=None)
 
 # Sentinelles : témoins indépendants du catalogue qu'on interroge.
-SENTINELLE_RELATIONS_MANGA = 38  # 30 tables + 8 vues (inventaire §34)
+SENTINELLE_RELATIONS_MANGA = 40  # 32 tables + 8 vues (§34 + genre_ref/mapping)
 SENTINELLE_TABLES_STAGING = 11
 SENTINELLE_TABLE_CONNUE = "manga.ms_series_enriched"
 

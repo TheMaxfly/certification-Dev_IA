@@ -32,6 +32,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `010_avis_llm.sql` | `manga.llm_avis` — le juge écrit ses avis hors du journal des décisions |
 | `011_methode_human_review.sql` | `human_review` au CHECK des méthodes : la correction humaine devient traçable |
 | `012_roles_lecture.sql` | **accès en consultation** : rôle de groupe `manga_ro`, `SELECT` sur `manga` et rien d'autre (cf. « Accès en consultation ») |
+| `013_referentiel_genres.sql` | **référentiel de genres** : `genre_ref` (codes + libellés fr/en/ja) et `genre_mapping` (libellé brut → code) — schéma seul, contenu dans `donnees/` (cf. « Données de référence ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -63,8 +64,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
-le 2026-07-30 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
-exécution. Le contrôle affiche **13 migrations appliquées et 0 en attente**.
+le 2026-07-30, `013` le 2026-08-21 ; `000` y a été **marquée appliquée** le
+2026-07-15, sans exécution. Le contrôle affiche **14 migrations appliquées et 0
+en attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
@@ -495,6 +497,51 @@ exclues et les séries sans `kitsu_id`, via `ms_formes` / `wd_formes` /
   `auteur_qid` mais `auteur`/`auteur_norm` sont vides. Une **hydratation
   préalable** (résolution des labels d'auteurs depuis Wikidata) est à trancher
   avant de pouvoir désambiguïser par auteur.
+
+## Données de référence — le référentiel de genres (`013`)
+
+`donnees/` porte le CONTENU des tables de référence, en CSV versionnés. La
+séparation avec `migrations/` n'est pas cosmétique : une migration est jouée une
+fois et son checksum est vérifié — elle ne peut plus bouger. Un référentiel, si.
+Un libellé nouveau apparaît chez une source, un arbitrage est rendu : le CSV
+change, le chargeur est rejoué, et le diff se relit ligne à ligne.
+
+| Fichier | Contenu |
+|---|---|
+| `donnees/genre_ref.csv` | **72 codes** — 64 genres + 8 formats (`format_*`, `ordre` ≥ 900), avec `label_fr` obligatoire, `label_en` / `label_ja` facultatifs |
+| `donnees/genre_mapping.csv` | **154 lignes** — une par libellé brut distinct observé : 99 pour `ms`, 55 pour `kitsu` |
+
+```bash
+cd 05_nettoyage_agregation_bdd
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m identity.charger_genres --dry-run   # contrôles, puis ROLLBACK
+uv run python -m identity.charger_genres
+```
+
+**Pourquoi des codes et pas des libellés.** `ms_series_enriched.series_genres`
+porte 99 libellés français à la casse incohérente (`romance` mais `Tranche de
+vie`), `series_genres_enriched` en porte 55 en anglais venus de Kitsu, et les
+deux vocabulaires ne partagent que **cinq** libellés exacts — `Ecchi`,
+`Fantasy`, `Mecha`, `Samurai`, `Vampire`. Fusionner les colonnes telles quelles
+produirait un vocabulaire bilingue où `romance` et `Romance` seraient deux
+genres sans lien.
+
+**L'invariant de `genre_mapping`** : `CHECK ((statut = 'mappe') = (code IS NOT
+NULL))`. Un libellé est mappé si et seulement s'il porte un code. Il ferme les
+deux dérives symétriques — un `mappe` sans code (décision annoncée, pas prise)
+et un `exclu`/`inconnu` qui porterait un code (décision prise en douce sous un
+statut qui prétend le contraire).
+
+**`inconnu` est une décision.** 23 libellés (dont `Suspense`, 628 séries)
+attendent un arbitrage humain plutôt que d'être rangés de force sous un code :
+une correspondance fausse ne se signale plus une fois écrite. Le rapport
+d'arbitrage les liste avec leur poids.
+
+Chargement réel du 2026-08-21 : **72** codes et **154** correspondances (123
+`mappe`, 8 `exclu`, 23 `inconnu`) en 0,0 s. Rejeu : **+0 nouveau, 0 modifié** —
+le `DO UPDATE` porte un `WHERE ... IS DISTINCT FROM`, une ligne identique n'est
+pas réécrite. Aucune écriture sur `ms_series_enriched` : appliquer la
+correspondance aux données est une étape distincte, qui attend l'arbitrage.
 
 Toute évolution doit être ajoutée comme nouveau fichier : **ne jamais modifier une
 migration déjà appliquée**.

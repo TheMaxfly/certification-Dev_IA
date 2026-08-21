@@ -1,0 +1,155 @@
+source,libelle_brut,code,statut,note
+ms,romance,romance,mappe,
+ms,comédie,comedie,mappe,
+ms,Tranche de vie,tranche_de_vie,mappe,
+ms,fantastique,surnaturel,mappe,"Arbitrage : le « fantastique » français est l'irruption du surnaturel dans le réel, pas la fantasy. MS porte Fantasy et Heroïc-Fantasy à part."
+ms,action,action,mappe,
+ms,drame,drame,mappe,
+ms,aventure,aventure,mappe,
+ms,Homosexuel,lgbt,mappe,"Arbitrage : code générique, la source ne genre pas le couple. yaoi/yuri restent distincts."
+ms,historique,historique,mappe,
+ms,Suspense,,inconnu,MS maintient Suspense ET thriller comme deux libellés : la fusion perdrait une distinction de la source. Arbitrage 4c.
+ms,érotique,erotique,mappe,Arbitrage : trois niveaux distincts ecchi < erotique < hentai.
+ms,Ecole,ecole,mappe,
+ms,horreur,horreur,mappe,
+ms,Ecchi,ecchi,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+ms,Sport,sport,mappe,
+ms,SF,science_fiction,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,Histoires courtes,format_histoires_courtes,mappe,"Arbitrage : axe format, pas un genre."
+ms,Social,social,mappe,
+ms,science fiction,science_fiction,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,Fantasy,fantasy,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+ms,policier,thriller,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,arts martiaux,arts_martiaux,mappe,
+ms,Heroïc-Fantasy,fantasy,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,thriller,thriller,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,Magie,magie,mappe,
+ms,Mecha,mecha,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+ms,Gastronomie,gastronomie,mappe,
+ms,Samurai,samurai,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+ms,Musique,musique,mappe,
+ms,Manga Hentai,hentai,mappe,Arbitrage : niveau explicite de l'axe érotique.
+ms,guerre,guerre,mappe,"Fusionné avec le Military de Kitsu : même axe, aucune source ne porte les deux."
+ms,Philosophie,philosophie,mappe,
+ms,Humour,comedie,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,Médical,medical,mappe,
+ms,Enfant,,inconnu,"Public visé, pas un genre — mais la consigne n'exclut que « Tout public ». Arbitrage 4c avec Jeunesse et Kids."
+ms,Conte,conte,mappe,
+ms,jeux vidéo,jeux_video,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,monstre,monstres,mappe,
+ms,anticipation,science_fiction,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,Vampire,vampire,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+ms,Sport mécanique,course,mappe,"Sport mécanique = course motorisée, même concept que le Racing de Kitsu."
+ms,adaptation,,exclu,"Provenance de l'œuvre (adaptée d'un roman, d'un film…), pas un genre."
+ms,Manga,,exclu,"Média, pas un genre."
+ms,animalier,animalier,mappe,
+ms,Polar/thriller,thriller,mappe,Consolidation imposée par l'arbitrage 4b.
+ms,lesbiennes,yuri,mappe,Arbitrage : rejoint yuri avec le Shoujo Ai de Kitsu.
+ms,Biographie,biographie,mappe,
+ms,politique,politique,mappe,
+ms,comédie dramatique,,inconnu,Deux genres en un libellé (comédie + drame) : un mapping ne porte qu'un code. Arbitrage 4c.
+ms,baston,,inconnu,Argot pour le combat : recouvre action et arts martiaux sans que MS tranche. Arbitrage 4c.
+ms,enigme,mystere,mappe,
+ms,Recueil,,exclu,"Format éditorial, pas un genre."
+ms,Compilation,,exclu,"Format éditorial, pas un genre."
+ms,Autobiographique,autobiographie,mappe,Code distinct de biographie : MS maintient les deux libellés.
+ms,Société,social,mappe,
+ms,Jeunesse,,inconnu,"Public visé, pas un genre. Arbitrage 4c avec Enfant et Kids."
+ms,chaos,,inconnu,Aucun sens de genre identifiable. Arbitrage 4c.
+ms,Manga Gekiga,format_gekiga,mappe,Arbitrage : axe format.
+ms,western,western,mappe,
+ms,Chronique sociale,social,mappe,
+ms,gore,gore,mappe,
+ms,espionnage,espionnage,mappe,
+ms,robot,,inconnu,"MS maintient robot ET Mecha : le mecha est piloté, le robot non. Fusionner perdrait la distinction. Arbitrage 4c."
+ms,absurde,,inconnu,"Registre d'humour, que MS distingue de comédie et de Humour noir. Arbitrage 4c."
+ms,Comics / Super Heros,,inconnu,Mêle un média (comics) et un genre (super-héros). Arbitrage 4c.
+ms,Humour noir,,inconnu,"MS distingue Humour, Humour noir et comédie : la fusion perdrait le registre. Arbitrage 4c."
+ms,Parodie,parodie,mappe,
+ms,Religion,religion,mappe,
+ms,Contes et Légendes,conte,mappe,
+ms,Conte Illustré,format_conte_illustre,mappe,Arbitrage : axe format (le conte lui-même est le code `conte`).
+ms,Satire sociale,,inconnu,Satire (registre) + social (thème) : un seul code ne peut porter les deux. Arbitrage 4c.
+ms,transgenre,gender_bender,mappe,Arbitrage : rejoint le Gender Bender de Kitsu.
+ms,Merveilleux,,inconnu,Le merveilleux se distingue du fantastique (surnaturel admis vs surnaturel intrusif) ; MS porte les deux. Arbitrage 4c.
+ms,Jeux,jeu,mappe,Même portée large que le Game de Kitsu (jeu au sens général).
+ms,Esotérique,esoterisme,mappe,
+ms,Educatif,educatif,mappe,
+ms,péplum,peplum,mappe,Code distinct d'historique : MS maintient les deux.
+ms,Pirate,pirates,mappe,
+ms,Essai,format_essai,mappe,Arbitrage : axe format (forme non fictionnelle).
+ms,Tout public,,exclu,"Public visé, pas un genre — exclusion nommée par la consigne."
+ms,Récit,,inconnu,Trop vague : tout manga est un récit. Arbitrage 4c.
+ms,Histoire ou Biographie ?,,exclu,Hésitation d'un contributeur laissée dans la donnée.
+ms,Documentaire,documentaire,mappe,
+ms,Collectif,,exclu,"Mode de création (ouvrage collectif), pas un genre."
+ms,enquête,mystere,mappe,"Même concept que enigme, déjà mappé sur mystere."
+ms,art,,inconnu,« art » seul ne désigne aucun genre identifiable. Arbitrage 4c.
+ms,Témoignages,,inconnu,"Forme non fictionnelle proche du documentaire, sans que MS les rapproche. Arbitrage 4c."
+ms,musical,musique,mappe,
+ms,Art Book,,exclu,"Format éditorial, pas un genre."
+ms,Mythologie,mythologie,mappe,
+ms,Underground,,inconnu,"Positionnement éditorial, pas un genre. Arbitrage 4c."
+ms,Jeux vidéos,jeux_video,mappe,Doublon orthographique de « jeux vidéo ». Consolidation imposée par l'arbitrage 4b.
+ms,Rêve,,inconnu,"Motif narratif, pas un genre établi. Arbitrage 4c."
+ms,Roman graphique,format_roman_graphique,mappe,Arbitrage : axe format.
+ms,Régionalisme,,inconnu,Aucun sens de genre identifiable. Arbitrage 4c.
+ms,Cyberpunk,science_fiction,mappe,Consolidation imposée par l'arbitrage 4b. Le cyberpunk est un sous-genre de la SF.
+ms,comédie musicale,,inconnu,Comédie + musique : un seul code ne peut porter les deux. Arbitrage 4c.
+ms,Carnet De Voyage,format_carnet_de_voyage,mappe,Arbitrage : axe format.
+ms,Carnet De Croquis,format_carnet_de_croquis,mappe,Arbitrage : axe format.
+kitsu,Romance,romance,mappe,
+kitsu,Comedy,comedie,mappe,
+kitsu,Drama,drame,mappe,
+kitsu,Action,action,mappe,
+kitsu,School,ecole,mappe,
+kitsu,Fantasy,fantasy,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+kitsu,Supernatural,surnaturel,mappe,Reçoit le « fantastique » de MS : même concept.
+kitsu,Sports,sport,mappe,
+kitsu,Shoujo Ai,yuri,mappe,"Arbitrage : Shoujo Ai et Yuri fusionnent, la distinction Kitsu porte sur l'explicite, pas sur le genre du couple."
+kitsu,Thriller,thriller,mappe,Consolidation imposée par l'arbitrage 4b.
+kitsu,Slice of Life,tranche_de_vie,mappe,
+kitsu,Adventure,aventure,mappe,
+kitsu,Yaoi,yaoi,mappe,"Arbitrage : Yaoi et Shounen Ai fusionnent, même raison que yuri."
+kitsu,Sci-Fi,science_fiction,mappe,
+kitsu,Ecchi,ecchi,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+kitsu,Mystery,mystere,mappe,
+kitsu,Psychological,psychologique,mappe,
+kitsu,Historical,historique,mappe,
+kitsu,Horror,horreur,mappe,
+kitsu,Shounen Ai,yaoi,mappe,Arbitrage : fusionné avec Yaoi.
+kitsu,Magic,magie,mappe,
+kitsu,Harem,harem,mappe,
+kitsu,Martial Arts,arts_martiaux,mappe,
+kitsu,Mecha,mecha,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+kitsu,Super Power,super_pouvoirs,mappe,
+kitsu,Gender Bender,gender_bender,mappe,
+kitsu,Demons,demons,mappe,
+kitsu,Cars,automobile,mappe,Distinct de course/Racing : Kitsu maintient les deux.
+kitsu,Military,guerre,mappe,Fusionné avec le « guerre » de MS.
+kitsu,Vampire,vampire,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+kitsu,Police,thriller,mappe,Consolidation imposée par l'arbitrage 4b. Même destination que le « policier » de MS.
+kitsu,Game,jeu,mappe,"Portée large (jeu vidéo, plateau, hasard) : distinct de jeux_video."
+kitsu,Music,musique,mappe,
+kitsu,Samurai,samurai,mappe,"Libellé identique dans les deux sources : même code, contrôle n°2."
+kitsu,Parody,parodie,mappe,
+kitsu,Yuri,yuri,mappe,
+kitsu,Space,espace,mappe,
+kitsu,Mahou Shoujo,mahou_shoujo,mappe,
+kitsu,Friendship,amitie,mappe,
+kitsu,Kids,,inconnu,"Public visé, pas un genre. Arbitrage 4c avec Enfant et Jeunesse."
+kitsu,Racing,course,mappe,
+kitsu,Doujinshi,format_doujinshi,mappe,Arbitrage : axe format (mode de publication).
+kitsu,Dementia,,inconnu,"Étiquette héritée de MyAnimeList, sans équivalent français stable (récit halluciné / surréaliste). Arbitrage 4c."
+kitsu,Hentai,hentai,mappe,Arbitrage : niveau explicite de l'axe érotique.
+kitsu,Medical,medical,mappe,
+kitsu,Mature,,inconnu,"Arbitrage : couvre aussi la violence et les thèmes adultes hors sexe, plus large que l'axe érotique."
+kitsu,Tragedy,tragedie,mappe,
+kitsu,Food,gastronomie,mappe,
+kitsu,Zombies,zombies,mappe,
+kitsu,Political,politique,mappe,
+kitsu,Crime,thriller,mappe,Consolidation imposée par l'arbitrage 4b. Même destination que Police et le « policier » de MS.
+kitsu,Family,famille,mappe,
+kitsu,Gore,gore,mappe,
+kitsu,Cooking,gastronomie,mappe,Fusionné avec Food : synonymes dans le vocabulaire Kitsu.
+kitsu,Youth,,inconnu,"Public visé, pas un genre. Arbitrage 4c."
