@@ -24,7 +24,7 @@ bord de rechargement.
 IDEMPOTENCE MESURÉE, PAS PROMISE. Le `DO UPDATE` porte un `WHERE ... IS
 DISTINCT FROM ...` : une ligne identique n'est pas réécrite, donc le rejeu
 annonce zéro insertion ET zéro modification. Sans ce garde-fou, un rejeu
-réécrirait 226 lignes à l'identique et l'idempotence ne serait plus qu'une
+réécrirait 227 lignes à l'identique et l'idempotence ne serait plus qu'une
 intention invérifiable.
 
 CE CHARGEUR NE TOUCHE À AUCUNE DONNÉE DE SÉRIE. Ni `ms_series_enriched`, ni
@@ -48,6 +48,12 @@ DONNEES_DEFAUT = RACINE / "database/donnees"
 
 STATUTS = ("mappe", "exclu", "inconnu")
 SOURCES = ("ms", "kitsu")
+TYPES = ("genre", "format")
+
+# Profondeur maximale de l'arbre de genres. Trois niveaux suffisent au
+# vocabulaire (adulte -> ecchi, lgbt -> yaoi) ; au-delà, la dérivation
+# ajouterait des codes qu'aucun lecteur ne relierait plus à la série.
+PROFONDEUR_MAX = 3
 
 app = typer.Typer(add_completion=False, help=__doc__)
 
@@ -85,19 +91,64 @@ def _lire_csv(chemin: Path, colonnes: tuple[str, ...]) -> list[dict[str, str]]:
 
 def lire_ref(dossier: Path) -> list[dict[str, str]]:
     lignes = _lire_csv(
-        dossier / "genre_ref.csv", ("code", "label_fr", "label_en", "label_ja", "ordre")
+        dossier / "genre_ref.csv",
+        ("code", "label_fr", "label_en", "label_ja", "ordre", "type", "parent"),
     )
-    codes = set()
+    codes = {ligne["code"] for ligne in lignes}
+    vus = set()
     for ligne in lignes:
         code = ligne["code"]
-        if code in codes:
+        if code in vus:
             raise ErreurChargement(f"genre_ref.csv : code en double — {code}")
-        codes.add(code)
+        vus.add(code)
         if not ligne["label_fr"]:
             raise ErreurChargement(f"genre_ref.csv : label_fr vide pour {code}")
+        if ligne["type"] not in TYPES:
+            raise ErreurChargement(
+                f"genre_ref.csv : type « {ligne['type']} » hors {TYPES} pour {code}"
+            )
+        # Le préfixe et le type disent la même chose : ils ne peuvent pas diverger.
+        if code.startswith("format_") != (ligne["type"] == "format"):
+            raise ErreurChargement(
+                f"genre_ref.csv : {code} — le préfixe et le type se contredisent "
+                f"(type « {ligne['type']} »)."
+            )
+        if ligne["parent"]:
+            if ligne["parent"] == code:
+                raise ErreurChargement(f"genre_ref.csv : {code} est son propre parent.")
+            if ligne["parent"] not in codes:
+                raise ErreurChargement(
+                    f"genre_ref.csv : parent « {ligne['parent']} » de {code} "
+                    "n'existe pas."
+                )
     if not lignes:
         raise ErreurChargement("genre_ref.csv est vide.")
+    _verifier_arbre(lignes)
     return lignes
+
+
+def _verifier_arbre(lignes: list[dict[str, str]]) -> None:
+    """Aucun cycle, profondeur <= PROFONDEUR_MAX.
+
+    La FK et le CHECK de 014 ne voient qu'une ligne à la fois : `a -> b -> a`
+    leur échappe. La question ne se pose que sur le contenu, donc le contrôle
+    vit ici — avant l'écriture, pas après."""
+    parent = {ligne["code"]: ligne["parent"] or None for ligne in lignes}
+    for code in parent:
+        vus, courant, profondeur = [code], parent[code], 1
+        while courant is not None:
+            if courant in vus:
+                raise ErreurChargement(
+                    "genre_ref.csv : cycle de parenté — " + " -> ".join([*vus, courant])
+                )
+            vus.append(courant)
+            profondeur += 1
+            if profondeur > PROFONDEUR_MAX:
+                raise ErreurChargement(
+                    f"genre_ref.csv : profondeur > {PROFONDEUR_MAX} — "
+                    + " -> ".join(vus)
+                )
+            courant = parent[courant]
 
 
 def lire_mapping(dossier: Path, codes: set[str]) -> list[dict[str, str]]:
@@ -148,6 +199,19 @@ def verifier_prerequis(curseur) -> None:
             "Jouer la migration 013 :\n"
             "  cd database && uv run python migrate.py up"
         )
+    # Le CSV porte `type` et `parent` depuis 014 : sans la migration, l'INSERT
+    # échouerait sur une colonne inconnue, message autrement moins parlant.
+    curseur.execute(
+        "SELECT count(*) FROM information_schema.columns "
+        "WHERE table_schema = 'manga' AND table_name = 'genre_ref' "
+        "AND column_name IN ('type', 'parent')"
+    )
+    if curseur.fetchone()[0] != 2:
+        raise ErreurChargement(
+            "manga.genre_ref.type / .parent manquent. "
+            "Jouer la migration 014 :\n"
+            "  cd database && uv run python migrate.py up"
+        )
 
 
 def _bilan(resultats: list[tuple[bool]]) -> dict[str, int]:
@@ -160,18 +224,22 @@ def _bilan(resultats: list[tuple[bool]]) -> dict[str, int]:
 def charger_ref(connexion, lignes: list[dict[str, str]]) -> dict[str, int]:
     with connexion.cursor() as curseur:
         curseur.execute(
-            "INSERT INTO manga.genre_ref (code, label_fr, label_en, label_ja, ordre) "
+            "INSERT INTO manga.genre_ref "
+            "  (code, label_fr, label_en, label_ja, ordre, type, parent) "
             "SELECT * FROM unnest(%s::text[], %s::text[], %s::text[], %s::text[], "
-            "                     %s::int[]) "
+            "                     %s::int[], %s::text[], %s::text[]) "
             "ON CONFLICT (code) DO UPDATE SET "
             "  label_fr = EXCLUDED.label_fr, "
             "  label_en = EXCLUDED.label_en, "
             "  label_ja = EXCLUDED.label_ja, "
-            "  ordre    = EXCLUDED.ordre "
+            "  ordre    = EXCLUDED.ordre, "
+            "  type     = EXCLUDED.type, "
+            "  parent   = EXCLUDED.parent "
             "WHERE (genre_ref.label_fr, genre_ref.label_en, genre_ref.label_ja, "
-            "       genre_ref.ordre) IS DISTINCT FROM "
+            "       genre_ref.ordre, genre_ref.type, genre_ref.parent) "
+            "      IS DISTINCT FROM "
             "      (EXCLUDED.label_fr, EXCLUDED.label_en, EXCLUDED.label_ja, "
-            "       EXCLUDED.ordre) "
+            "       EXCLUDED.ordre, EXCLUDED.type, EXCLUDED.parent) "
             "RETURNING (xmax = 0)",
             (
                 [ligne["code"] for ligne in lignes],
@@ -179,6 +247,8 @@ def charger_ref(connexion, lignes: list[dict[str, str]]) -> dict[str, int]:
                 [ligne["label_en"] or None for ligne in lignes],
                 [ligne["label_ja"] or None for ligne in lignes],
                 [int(ligne["ordre"]) if ligne["ordre"] else None for ligne in lignes],
+                [ligne["type"] for ligne in lignes],
+                [ligne["parent"] or None for ligne in lignes],
             ),
         )
         bilan = _bilan(curseur.fetchall())

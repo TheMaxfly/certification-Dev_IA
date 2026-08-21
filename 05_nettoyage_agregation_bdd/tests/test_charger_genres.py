@@ -71,12 +71,44 @@ def test_csv_du_depot_valides():
 
 
 def test_aucun_code_orphelin():
-    """Un code du référentiel que rien ne mappe serait du vocabulaire mort."""
+    """Un code que rien ne mappe est du vocabulaire mort — SAUF s'il est le
+    parent d'un code mappé.
+
+    La règle de 013 (« tout code a une correspondance ») ne tient plus depuis
+    014 : `adulte` est le parent commun de ecchi/erotique/hentai et n'est le
+    reflet d'aucun libellé observé. La règle qui la remplace est plus juste —
+    un code doit être atteignable, directement ou par un de ses enfants.
+    """
     ref = lire_ref(DONNEES)
     mapping = lire_mapping(DONNEES, {ligne["code"] for ligne in ref})
-    utilises = {ligne["code"] for ligne in mapping if ligne["code"]}
-    orphelins = {ligne["code"] for ligne in ref} - utilises
+    mappes = {ligne["code"] for ligne in mapping if ligne["code"]}
+    parents = {ligne["parent"] for ligne in ref if ligne["parent"]}
+    orphelins = {ligne["code"] for ligne in ref} - mappes - parents
     assert orphelins == set()
+
+
+def test_adulte_est_le_seul_code_sans_correspondance():
+    """Le contraire de l'assouplissement précédent : la dérogation reste UNE."""
+    ref = lire_ref(DONNEES)
+    mapping = lire_mapping(DONNEES, {ligne["code"] for ligne in ref})
+    mappes = {ligne["code"] for ligne in mapping if ligne["code"]}
+    assert {ligne["code"] for ligne in ref} - mappes == {"adulte"}
+
+
+def test_hierarchie_attendue():
+    """Les parentés que l'arbitrage 4c a fixées, nommément."""
+    parent = {ligne["code"]: ligne["parent"] or None for ligne in lire_ref(DONNEES)}
+    assert parent["yaoi"] == parent["yuri"] == parent["gender_bender"] == "lgbt"
+    assert parent["ecchi"] == parent["erotique"] == parent["hentai"] == "adulte"
+    # Et ce que l'arbitrage a REFUSÉ : pas de chaîne entre les niveaux de
+    # l'axe érotique — un filtre `ecchi` ne doit pas remonter de l'explicite.
+    assert parent["adulte"] is None
+    assert parent["lgbt"] is None
+
+
+def test_types_coherents_avec_le_prefixe():
+    for ligne in lire_ref(DONNEES):
+        assert ligne["code"].startswith("format_") == (ligne["type"] == "format")
 
 
 def test_libelles_communs_meme_code():
@@ -107,7 +139,9 @@ def test_codes_en_snake_case_ascii():
 def _ecrire(dossier: Path, ref: list[tuple], mapping: list[tuple]) -> Path:
     with (dossier / "genre_ref.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["code", "label_fr", "label_en", "label_ja", "ordre"])
+        w.writerow(
+            ["code", "label_fr", "label_en", "label_ja", "ordre", "type", "parent"]
+        )
         w.writerows(ref)
     with (dossier / "genre_mapping.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
@@ -116,7 +150,7 @@ def _ecrire(dossier: Path, ref: list[tuple], mapping: list[tuple]) -> Path:
     return dossier
 
 
-REF_MINIMAL = [("romance", "Romance", "Romance", "恋愛", 10)]
+REF_MINIMAL = [("romance", "Romance", "Romance", "恋愛", 10, "genre", "")]
 
 
 @pytest.mark.parametrize(
@@ -160,10 +194,10 @@ def test_chargement_puis_rejeu(base: str):
     """Le chargement écrit tout ; le rejeu ne change rien — contrôle n°6."""
     premier = executer(base, "--donnees", str(DONNEES))
     assert premier.returncode == 0, premier.stderr
-    assert "+72 nouveaux" in premier.stdout
+    assert "+73 nouveaux" in premier.stdout
     assert "+154 nouveaux" in premier.stdout
 
-    assert lire(base, "SELECT count(*) FROM manga.genre_ref")[0][0] == 72
+    assert lire(base, "SELECT count(*) FROM manga.genre_ref")[0][0] == 73
     assert lire(base, "SELECT count(*) FROM manga.genre_mapping")[0][0] == 154
 
     second = executer(base, "--donnees", str(DONNEES))
@@ -259,12 +293,12 @@ def test_charge_sans_le_cli(base: str):
     ref = lire_ref(DONNEES)
     mapping = lire_mapping(DONNEES, {ligne["code"] for ligne in ref})
     with psycopg.connect(base) as connexion:
-        assert charger_ref(connexion, ref)["inseres"] == 72
+        assert charger_ref(connexion, ref)["inseres"] == 73
         assert charger_mapping(connexion, mapping)["inseres"] == 154
         connexion.commit()
     with psycopg.connect(base) as connexion:
         assert charger_ref(connexion, ref) == {
             "inseres": 0,
             "modifies": 0,
-            "total": 72,
+            "total": 73,
         }

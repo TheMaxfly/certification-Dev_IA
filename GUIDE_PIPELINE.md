@@ -176,6 +176,41 @@ PYTHONPATH=src uv run python -m identity.etage_r_promotion --appliquer   # écri
   journalisée transforme cet avis en décision, et on peut la rejouer à
   l'identique. »
 
+### 2.3bis Enrichir — les colonnes dérivées, APRÈS la promotion
+
+La promotion écrit ce que les sources disent. L'enrichissement écrit ce qu'on
+en **dérive** : les genres normalisés en codes, et le synopsis retenu.
+
+```bash
+cd 05_nettoyage_agregation_bdd
+PYTHONPATH=src uv run python -m identity.charger_genres            # référentiel
+PYTHONPATH=src uv run python -m identity.enrichir --dry-run        # mesure
+PYTHONPATH=src uv run python -m identity.enrichir                  # écrit
+```
+
+**L'ordre n'est pas négociable** : `enrichir` lit `series_genres` et
+`kitsu_genres_json`, que la promotion vient de rafraîchir. L'inverser
+recalculerait la dérivée à partir du snapshot du mois précédent.
+
+**Pourquoi ce n'est PAS greffé dans `promotion_ms.sql`.** Ce fichier est
+volontairement inoffensif — « UPSERT, JAMAIS DE DELETE », et chaque `DO UPDATE`
+n'énumère que les colonnes du scraping. Y ajouter le recalcul le rendrait plus
+puissant, donc plus dangereux : la promotion pourrait alors écraser une colonne
+dérivée sur un incident de référentiel. Deux commandes, deux responsabilités,
+et l'une peut échouer sans emporter l'autre.
+
+- **Affiche** : la couverture avant/après, le ratio source → dérivée, la part
+  des codes issus des sources vs ajoutés par la hiérarchie, et les occurrences
+  de libellés non tranchés.
+- **Échoue volontairement** si un libellé de genre est absent du référentiel.
+  C'est le garde-fou : en juin 2026, un sélecteur cassé avait vidé les genres
+  MS et la dérivée s'est construite sur du Kitsu seul, sans que rien ne le
+  signale. Il a fallu deux mois pour s'en apercevoir. Désormais, un libellé
+  inconnu **arrête** le recalcul au lieu de disparaître.
+- **À dire** : « La colonne dérivée n'est plus le résidu d'un notebook qui a
+  tourné une fois. Elle se reconstruit à la commande, elle se mesure, et elle
+  refuse de se calculer sur une donnée qu'elle ne sait pas interpréter. »
+
 ### 2.4 Qualité — le lakehouse (module 07, consultatif)
 
 ```bash

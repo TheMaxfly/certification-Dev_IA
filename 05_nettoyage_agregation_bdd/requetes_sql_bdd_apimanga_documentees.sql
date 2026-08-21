@@ -1,4 +1,28 @@
 -- =====================================================================
+-- ⚠️  DOCUMENT D'ARCHIVE — NE PAS REJOUER SUR UNE BASE VIVANTE  ⚠️
+-- =====================================================================
+-- Ce fichier décrit le chargement INITIAL de juin 2026. Il est conservé
+-- comme trace du pattern ELT (livrable C2/C3), pas comme script exécutable.
+--
+-- Il porte un `TRUNCATE TABLE manga.ms_series_enriched` (section 1bis).
+-- Sur la base d'aujourd'hui :
+--   - tel quel, il ÉCHOUERAIT — PostgreSQL refuse de tronquer une table
+--     référencée par une clé étrangère ;
+--   - en `TRUNCATE ... CASCADE`, ou converti en `DELETE`, il DÉTRUIRAIT les
+--     quatre tables filles en ON DELETE CASCADE : manga.llm_avis (2 759
+--     avis du juge LLM), manga.ms_formes (31 904 formes normalisées),
+--     manga.ms_kitsu_map (5 608 appariements) et manga.ms_kitsu_ambiguous
+--     (264 cas). Aucune de ces lignes n'est reconstructible depuis un CSV :
+--     ce sont des DÉCISIONS, pas des données de source.
+--
+-- Le chargement vivant se fait par :
+--   uv run python -m identity.charger_ms      # snapshot -> staging -> manga.*
+--   uv run python -m identity.charger_genres  # référentiel de genres
+--   uv run python -m identity.enrichir        # colonnes dérivées
+-- Tous trois sont des UPSERT/UPDATE, sans aucun DELETE. Cf. GUIDE_PIPELINE.md.
+-- =====================================================================
+
+-- =====================================================================
 -- ApiManga - Script SQL documenté pour la création et le chargement BDD
 -- Contexte certification Bloc 1 : C2 (SQL), C3 (agrégation), C4 (BDD)
 -- Base cible : PostgreSQL 16 / schéma manga
@@ -141,6 +165,9 @@ CREATE TABLE manga.ms_series_stage (
 -- Commande à lancer dans psql, pas dans pgAdmin Query Tool :
 -- \copy manga.ms_series_stage FROM '/mnt/c/Users/maxim/Downloads/ms_series_enriched_plus_kitsu.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 
+-- ⚠️  LIGNE DANGEREUSE — cf. l'avertissement en tête de fichier.
+-- Échoue aujourd'hui (FK) ; en CASCADE, détruirait llm_avis, ms_formes,
+-- ms_kitsu_map et ms_kitsu_ambiguous. Ne pas « réparer » en ajoutant CASCADE.
 TRUNCATE TABLE manga.ms_series_enriched;
 INSERT INTO manga.ms_series_enriched (
   series_id, series_url, series_title, series_type, series_category, series_year,

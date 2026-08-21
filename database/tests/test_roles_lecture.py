@@ -25,7 +25,14 @@ from conftest import migrate
 UP = Namespace(commande="up", target=None)
 
 # Sentinelles : témoins indépendants du catalogue qu'on interroge.
-SENTINELLE_RELATIONS_MANGA = 40  # 32 tables + 8 vues (§34 + genre_ref/mapping)
+# PLANCHERS, pas des égalités — même formulation que `SENTINELLE_PLANCHER` de
+# test_migrate.py. Un littéral exact demandait un ajustement manuel à CHAQUE
+# migration qui ajoute une table (012 -> 013 -> 014), sans rien attraper de
+# plus : ce que la sentinelle doit empêcher, c'est qu'un inventaire vide ou
+# effondré rende toutes les assertions dérivées vraies en silence. Un plancher
+# le fait, et ne peut que monter. Le dériver de `pg_class` serait pire encore :
+# la sentinelle validerait alors la requête par elle-même.
+SENTINELLE_RELATIONS_MANGA = 40  # 32 tables + 8 vues au 014 ; ne peut que monter
 SENTINELLE_TABLES_STAGING = 11
 SENTINELLE_TABLE_CONNUE = "manga.ms_series_enriched"
 
@@ -83,8 +90,12 @@ def test_inventaire_derive_reste_sous_temoin(base_migree):
         manga = relations(connexion, "manga")
         staging = relations(connexion, "staging")
 
-    assert len(manga) == SENTINELLE_RELATIONS_MANGA
-    assert len(staging) == SENTINELLE_TABLES_STAGING
+    assert len(manga) >= SENTINELLE_RELATIONS_MANGA, (
+        f"{len(manga)} relations dans manga : le plancher "
+        f"{SENTINELLE_RELATIONS_MANGA} est franchi vers le BAS — "
+        "l'inventaire s'est effondré, ou une table a disparu."
+    )
+    assert len(staging) >= SENTINELLE_TABLES_STAGING
     assert SENTINELLE_TABLE_CONNUE in manga
 
 

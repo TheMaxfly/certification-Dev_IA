@@ -33,6 +33,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `011_methode_human_review.sql` | `human_review` au CHECK des méthodes : la correction humaine devient traçable |
 | `012_roles_lecture.sql` | **accès en consultation** : rôle de groupe `manga_ro`, `SELECT` sur `manga` et rien d'autre (cf. « Accès en consultation ») |
 | `013_referentiel_genres.sql` | **référentiel de genres** : `genre_ref` (codes + libellés fr/en/ja) et `genre_mapping` (libellé brut → code) — schéma seul, contenu dans `donnees/` (cf. « Données de référence ») |
+| `014_hierarchie_genres.sql` | `genre_ref.type` (genre \| format) et `genre_ref.parent` — FK **DEFERRABLE**, auto-référencée : c'est l'état à la validation qui doit être correct, pas l'ordre d'écriture |
 
 ## `000` — la frontière héritage / versionné
 
@@ -64,9 +65,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
-le 2026-07-30, `013` le 2026-08-21 ; `000` y a été **marquée appliquée** le
-2026-07-15, sans exécution. Le contrôle affiche **14 migrations appliquées et 0
-en attente**.
+le 2026-07-30, `013` et `014` le 2026-08-21 ; `000` y a été **marquée
+appliquée** le 2026-07-15, sans exécution. Le contrôle affiche **15 migrations
+appliquées et 0 en attente**.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
@@ -508,7 +509,7 @@ change, le chargeur est rejoué, et le diff se relit ligne à ligne.
 
 | Fichier | Contenu |
 |---|---|
-| `donnees/genre_ref.csv` | **72 codes** — 64 genres + 8 formats (`format_*`, `ordre` ≥ 900), avec `label_fr` obligatoire, `label_en` / `label_ja` facultatifs |
+| `donnees/genre_ref.csv` | **73 codes** — 65 genres + 8 formats (`format_*`, `ordre` ≥ 900), avec `label_fr` obligatoire, `label_en` / `label_ja` facultatifs, `type` et `parent` (014) |
 | `donnees/genre_mapping.csv` | **154 lignes** — une par libellé brut distinct observé : 99 pour `ms`, 55 pour `kitsu` |
 
 ```bash
@@ -532,13 +533,28 @@ deux dérives symétriques — un `mappe` sans code (décision annoncée, pas pr
 et un `exclu`/`inconnu` qui porterait un code (décision prise en douce sous un
 statut qui prétend le contraire).
 
-**`inconnu` est une décision.** 23 libellés (dont `Suspense`, 628 séries)
-attendent un arbitrage humain plutôt que d'être rangés de force sous un code :
-une correspondance fausse ne se signale plus une fois écrite. Le rapport
-d'arbitrage les liste avec leur poids.
+**`inconnu` est une décision.** 22 libellés attendent un arbitrage humain
+plutôt que d'être rangés de force sous un code : une correspondance fausse ne se
+signale plus une fois écrite. (`Suspense`, 628 séries, a été tranché en 4c et
+rejoint `thriller`.)
 
-Chargement réel du 2026-08-21 : **72** codes et **154** correspondances (123
-`mappe`, 8 `exclu`, 23 `inconnu`) en 0,0 s. Rejeu : **+0 nouveau, 0 modifié** —
+**Un seul code n'a aucune correspondance : `adulte`**, parent commun de
+`ecchi` / `erotique` / `hentai`, introduit par 014. Il appartient au vocabulaire
+cible sans être le reflet d'un libellé observé. La règle qui en découle — *un
+code sans correspondance doit être le parent d'au moins un code mappé* — est
+tenue par un test : elle porte sur deux tables, qu'aucune contrainte ne peut
+lier.
+
+**Le recalcul des colonnes dérivées** est le travail d'`identity.enrichir`, pas
+de ce chargeur :
+
+```bash
+uv run python -m identity.enrichir --dry-run   # mesure le delta, n'écrit rien
+uv run python -m identity.enrichir             # UPDATE ciblé, aucun DELETE
+```
+
+Chargement réel du 2026-08-21 : **73** codes et **154** correspondances (124
+`mappe`, 8 `exclu`, 22 `inconnu`) en 0,0 s. Rejeu : **+0 nouveau, 0 modifié** —
 le `DO UPDATE` porte un `WHERE ... IS DISTINCT FROM`, une ligne identique n'est
 pas réécrite. Aucune écriture sur `ms_series_enriched` : appliquer la
 correspondance aux données est une étape distincte, qui attend l'arbitrage.

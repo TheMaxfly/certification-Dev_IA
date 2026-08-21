@@ -1,73 +1,74 @@
-code,label_fr,label_en,label_ja,ordre
-romance,Romance,Romance,恋愛,10
-comedie,Comédie,Comedy,コメディ,20
-action,Action,Action,アクション,30
-tranche_de_vie,Tranche de vie,Slice of Life,日常,40
-surnaturel,Fantastique,Supernatural,超自然,50
-drame,Drame,Drama,ドラマ,60
-aventure,Aventure,Adventure,冒険,70
-ecole,École,School,学園,80
-science_fiction,Science-fiction,Sci-Fi,SF,90
-fantasy,Fantasy,Fantasy,ファンタジー,100
-sport,Sport,Sports,スポーツ,110
-thriller,Thriller,Thriller,スリラー,120
-historique,Historique,Historical,歴史,130
-ecchi,Ecchi,Ecchi,エッチ,140
-lgbt,LGBT,LGBT,,150
-horreur,Horreur,Horror,ホラー,160
-yaoi,Yaoi,Yaoi,やおい,170
-yuri,Yuri,Yuri,百合,180
-erotique,Érotique,Erotic,,190
-social,Social,Social,社会,200
-mystere,Mystère,Mystery,ミステリー,210
-psychologique,Psychologique,Psychological,心理,220
-arts_martiaux,Arts martiaux,Martial Arts,格闘技,230
-magie,Magie,Magic,魔法,240
-mecha,Mecha,Mecha,メカ,250
-musique,Musique,Music,音楽,260
-samurai,Samouraï,Samurai,侍,270
-harem,Harem,Harem,ハーレム,280
-guerre,Guerre,Military,戦争,290
-super_pouvoirs,Super-pouvoirs,Super Power,超能力,300
-gender_bender,Gender bender,Gender Bender,性転換,310
-gastronomie,Gastronomie,Food,料理,320
-hentai,Hentai,Hentai,変態,330
-vampire,Vampire,Vampire,吸血鬼,340
-demons,Démons,Demons,悪魔,350
-automobile,Automobile,Cars,車,360
-philosophie,Philosophie,Philosophy,哲学,370
-jeu,Jeu,Game,ゲーム,380
-medical,Médical,Medical,医療,390
-conte,Conte,Fairy Tale,おとぎ話,400
-parodie,Parodie,Parody,パロディ,410
-course,Course,Racing,レース,420
-jeux_video,Jeux vidéo,Video Games,テレビゲーム,430
-monstres,Monstres,Monsters,怪物,440
-animalier,Animalier,Animals,動物,450
-espace,Espace,Space,宇宙,460
-politique,Politique,Political,政治,470
-mahou_shoujo,Magical girl,Mahou Shoujo,魔法少女,480
-biographie,Biographie,Biography,伝記,490
-amitie,Amitié,Friendship,友情,500
-autobiographie,Autobiographie,Autobiography,自伝,510
-gore,Gore,Gore,,520
-western,Western,Western,西部劇,530
-espionnage,Espionnage,Espionage,スパイ,540
-tragedie,Tragédie,Tragedy,悲劇,550
-religion,Religion,Religion,宗教,560
-zombies,Zombies,Zombies,ゾンビ,570
-esoterisme,Ésotérisme,Occult,オカルト,580
-educatif,Éducatif,Educational,教育,590
-famille,Famille,Family,家族,600
-peplum,Péplum,Peplum,,610
-pirates,Pirates,Pirates,海賊,620
-documentaire,Documentaire,Documentary,ドキュメンタリー,630
-mythologie,Mythologie,Mythology,神話,640
-format_carnet_de_croquis,Carnet de croquis,Sketchbook,画集,910
-format_carnet_de_voyage,Carnet de voyage,Travelogue,旅行記,920
-format_conte_illustre,Conte illustré,Illustrated Tale,,930
-format_doujinshi,Doujinshi,Doujinshi,同人誌,940
-format_essai,Essai,Essay,評論,950
-format_gekiga,Gekiga,Gekiga,劇画,960
-format_histoires_courtes,Histoires courtes,Short Stories,短編,970
-format_roman_graphique,Roman graphique,Graphic Novel,,980
+code,label_fr,label_en,label_ja,ordre,type,parent
+romance,Romance,Romance,恋愛,10,genre,
+comedie,Comédie,Comedy,コメディ,20,genre,
+action,Action,Action,アクション,30,genre,
+tranche_de_vie,Tranche de vie,Slice of Life,日常,40,genre,
+surnaturel,Fantastique,Supernatural,超自然,50,genre,
+drame,Drame,Drama,ドラマ,60,genre,
+aventure,Aventure,Adventure,冒険,70,genre,
+ecole,École,School,学園,80,genre,
+science_fiction,Science-fiction,Sci-Fi,SF,90,genre,
+fantasy,Fantasy,Fantasy,ファンタジー,100,genre,
+sport,Sport,Sports,スポーツ,110,genre,
+thriller,Thriller,Thriller,スリラー,120,genre,
+historique,Historique,Historical,歴史,130,genre,
+ecchi,Ecchi,Ecchi,エッチ,140,genre,adulte
+lgbt,LGBT,LGBT,,150,genre,
+horreur,Horreur,Horror,ホラー,160,genre,
+yaoi,Yaoi,Yaoi,やおい,170,genre,lgbt
+yuri,Yuri,Yuri,百合,180,genre,lgbt
+erotique,Érotique,Erotic,,190,genre,adulte
+social,Social,Social,社会,200,genre,
+mystere,Mystère,Mystery,ミステリー,210,genre,
+psychologique,Psychologique,Psychological,心理,220,genre,
+arts_martiaux,Arts martiaux,Martial Arts,格闘技,230,genre,
+magie,Magie,Magic,魔法,240,genre,
+mecha,Mecha,Mecha,メカ,250,genre,
+musique,Musique,Music,音楽,260,genre,
+samurai,Samouraï,Samurai,侍,270,genre,
+harem,Harem,Harem,ハーレム,280,genre,
+guerre,Guerre,Military,戦争,290,genre,
+super_pouvoirs,Super-pouvoirs,Super Power,超能力,300,genre,
+gender_bender,Gender bender,Gender Bender,性転換,310,genre,lgbt
+gastronomie,Gastronomie,Food,料理,320,genre,
+hentai,Hentai,Hentai,変態,330,genre,adulte
+vampire,Vampire,Vampire,吸血鬼,340,genre,
+demons,Démons,Demons,悪魔,350,genre,
+automobile,Automobile,Cars,車,360,genre,
+philosophie,Philosophie,Philosophy,哲学,370,genre,
+jeu,Jeu,Game,ゲーム,380,genre,
+medical,Médical,Medical,医療,390,genre,
+conte,Conte,Fairy Tale,おとぎ話,400,genre,
+parodie,Parodie,Parody,パロディ,410,genre,
+course,Course,Racing,レース,420,genre,sport
+jeux_video,Jeux vidéo,Video Games,テレビゲーム,430,genre,jeu
+monstres,Monstres,Monsters,怪物,440,genre,
+animalier,Animalier,Animals,動物,450,genre,
+espace,Espace,Space,宇宙,460,genre,
+politique,Politique,Political,政治,470,genre,
+mahou_shoujo,Magical girl,Mahou Shoujo,魔法少女,480,genre,magie
+biographie,Biographie,Biography,伝記,490,genre,
+amitie,Amitié,Friendship,友情,500,genre,
+autobiographie,Autobiographie,Autobiography,自伝,510,genre,biographie
+gore,Gore,Gore,,520,genre,
+western,Western,Western,西部劇,530,genre,
+espionnage,Espionnage,Espionage,スパイ,540,genre,
+tragedie,Tragédie,Tragedy,悲劇,550,genre,drame
+religion,Religion,Religion,宗教,560,genre,
+zombies,Zombies,Zombies,ゾンビ,570,genre,horreur
+esoterisme,Ésotérisme,Occult,オカルト,580,genre,surnaturel
+educatif,Éducatif,Educational,教育,590,genre,
+famille,Famille,Family,家族,600,genre,
+peplum,Péplum,Peplum,,610,genre,historique
+pirates,Pirates,Pirates,海賊,620,genre,
+documentaire,Documentaire,Documentary,ドキュメンタリー,630,genre,
+mythologie,Mythologie,Mythology,神話,640,genre,
+adulte,Adulte,Adult,成人向け,650,genre,
+format_carnet_de_croquis,Carnet de croquis,Sketchbook,画集,910,format,
+format_carnet_de_voyage,Carnet de voyage,Travelogue,旅行記,920,format,
+format_conte_illustre,Conte illustré,Illustrated Tale,,930,format,
+format_doujinshi,Doujinshi,Doujinshi,同人誌,940,format,
+format_essai,Essai,Essay,評論,950,format,
+format_gekiga,Gekiga,Gekiga,劇画,960,format,
+format_histoires_courtes,Histoires courtes,Short Stories,短編,970,format,
+format_roman_graphique,Roman graphique,Graphic Novel,,980,format,
