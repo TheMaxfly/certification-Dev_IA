@@ -9,6 +9,7 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from datetime import date as DateISO  # cf. le champ `date` de `Review`
 from typing import Annotated, Any
 
 from fastapi import (
@@ -55,6 +56,29 @@ TAGS_METADATA = [
         ),
     },
     {"name": "search", "description": "PostgreSQL full-text search."},
+    {
+        "name": "catalogue",
+        "description": (
+            "The Manga Sanctuary catalogue: series, their volumes, and the "
+            "**complete** review reference (`ms_reviews_all`, 11 074 rows) — "
+            "not the 3 187-row legacy RAG corpus."
+        ),
+    },
+    {
+        "name": "identity",
+        "description": (
+            "Cross-platform identity. No shared identifier exists between "
+            "sources, so every link is a scored decision with a method and a "
+            "status, never a join."
+        ),
+    },
+    {
+        "name": "coverage",
+        "description": (
+            "What the corpus holds — and what it does not. Known limits are "
+            "reported here rather than left to be discovered."
+        ),
+    },
 ]
 
 APP_DESCRIPTION = """
@@ -139,6 +163,234 @@ class RagDocumentResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+class GenreCode(BaseModel):
+    """Un genre normalisé : le code d'abord, le libellé comme commodité.
+
+    Le code est la valeur STABLE — il survit à un changement de libellé
+    d'affichage, il est indexable, il tient dans une URL. Le libellé change
+    avec la langue et l'humeur éditoriale. Rendre le libellé seul obligerait
+    un client à faire de la chaîne de caractères la clé de son filtre.
+    """
+
+    code: str = Field(description="Stable identifier from `manga.genre_ref`.")
+    label_fr: str = Field(description="French display label. A convenience.")
+    type: str = Field(description="`genre` or `format`.")
+
+
+class SeriesResponse(BaseModel):
+    """Une série du socle catalogue Manga Sanctuary.
+
+    Les colonnes internes du rapprochement (`ms_title_norm_x`,
+    `_other_titles_list`, `matched_title_norm`, `fuzzy_low_score`…) ne sont PAS
+    exposées : ce sont des états intermédiaires d'un calcul, pas des faits sur
+    l'œuvre. Ce que le rapprochement a conclu se lit sur `/identity/{work_uid}`.
+    """
+
+    series_id: int
+    work_uid: int | None = Field(
+        description="Identity hub key. Use it on `/identity/{work_uid}`."
+    )
+    title: str | None
+    url: str | None
+    type: str | None
+    category: str | None
+    year: int | None
+    other_titles: list[str] = Field(default_factory=list)
+    dessinateur: str | None
+    scenariste: str | None
+    magazine_prepublication: str | None
+    statuses: list[str] = Field(default_factory=list)
+
+    genres_source: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Raw Manga Sanctuary labels, in French, exactly as the source "
+            "wrote them — casing included."
+        ),
+    )
+    genres_enriched: list[GenreCode] = Field(
+        default_factory=list,
+        description=(
+            "Normalised codes from the genre reference, merging both sources "
+            "and their hierarchy. **Not** a fallback for `genres_source`: the "
+            "two answer different questions and neither replaces the other."
+        ),
+    )
+    tags_source: list[str] = Field(
+        default_factory=list,
+        description="Raw Manga Sanctuary tags. Open vocabulary, not normalised.",
+    )
+
+    synopsis: str | None = Field(description="Manga Sanctuary synopsis.")
+    synopsis_enriched: str | None = Field(
+        description="Manga Sanctuary synopsis, or the Kitsu one when MS has none."
+    )
+
+    popularity_rank: int | None
+    members_rating: float | None
+    members_votes: int | None
+    experts_rating: float | None
+    experts_votes: int | None
+
+    volume_count: int | None
+    review_count: int | None
+    score_mean: float | None
+    score_min: float | None
+    score_max: float | None
+    first_review_date: DateISO | None
+    last_review_date: DateISO | None
+
+    kitsu_id: int | None = Field(
+        description="Kitsu identifier, or `null`. Full metadata: `/kitsu/{kitsu_id}`."
+    )
+    needs_review: bool | None = Field(
+        description=(
+            "The identity decision behind this series is flagged for human "
+            "review. Method, score and reason live on `/identity/{work_uid}`."
+        )
+    )
+
+
+class Volume(BaseModel):
+    volume_url: str
+    title: str | None
+    number: int | None
+    publication_date: DateISO | None
+    ean: str | None = Field(description="As displayed by the source, unvalidated.")
+    editeur: str | None = Field(
+        description=(
+            "**Known source defect — do not use as a filter.** The Manga "
+            "Sanctuary selector captured a field *label* instead of its value: "
+            "all 104 050 populated rows hold the literal string "
+            "`Mag. de prépublication`. Exposed rather than hidden so the "
+            "defect is visible; fixing it needs a module 04 selector fix and a "
+            "re-crawl."
+        )
+    )
+    dessinateur: str | None
+    scenariste: str | None
+    format: str | None
+    pages: int | None
+    country: str | None
+    status: str | None = Field(
+        description=(
+            "**Known source defect.** 44 910 rows read `Complète Complète` — "
+            "the label was captured twice. The value is usable once "
+            "de-duplicated; it is served raw here, as collected."
+        )
+    )
+    tomes_published: int | None
+    tomes_total: int | None
+    experts_rating: float | None
+    experts_votes: int | None
+    review_count: int | None
+    synopsis: str | None
+
+
+class VolumesResponse(BaseModel):
+    series_id: int
+    total: int
+    limit: int
+    offset: int
+    items: list[Volume]
+
+
+class Review(BaseModel):
+    review_id: int
+    volume_number: int | None
+    volume_url: str | None
+    title: str | None
+    score: float | None
+    author: str | None
+    date: DateISO | None = Field(
+        description=(
+            "Parsed date, or `null` when the source truncated it to a weekday "
+            "(29.65 % of the corpus). `date_raw` keeps what was displayed."
+        )
+    )
+    date_raw: str | None
+    type: str | None
+    grain: str
+    body: str | None
+
+
+class ReviewsResponse(BaseModel):
+    series_id: int
+    total: int
+    limit: int
+    offset: int
+    items: list[Review]
+
+
+class IdentityResponse(BaseModel):
+    """Ce que l'on sait de l'identité d'une œuvre, et comment on le sait.
+
+    Aucun identifiant n'est partagé entre les plateformes : chaque lien est une
+    DÉCISION, avec une méthode, un score et un statut. Les rendre sans leur
+    provenance laisserait croire à une jointure.
+    """
+
+    work_uid: int
+    series_id: int | None
+    series_title: str | None
+    wikidata_qid: str | None
+    kitsu_id: str | None
+    mal_id: str | None
+    anilist_id: str | None
+    madb_id: str | None
+    disponibilite: str | None
+    method: str | None = Field(
+        description="How the current decision was reached. `null` if none yet."
+    )
+    score: float | None
+    status: str | None
+    decided_at: datetime | None
+    decided_by: str | None
+
+
+class CoverageTotals(BaseModel):
+    series: int
+    volumes: int
+    reviews: int = Field(description="From `ms_reviews_all`, the full reference.")
+    reviews_rag_legacy: int = Field(
+        description=(
+            "The legacy RAG corpus (`ms_reviews`), kept for comparison. "
+            "Smaller by construction — it is a filtered subset, not a shortfall."
+        )
+    )
+
+
+class CoverageMethod(BaseModel):
+    method: str
+    decisions: int
+
+
+class CoverageGenres(BaseModel):
+    series_with_source_genres: int
+    series_with_enriched_genres: int
+    series_without_any_genre: int = Field(
+        description="Documented by neither source. No reference can fix these."
+    )
+    series_on_generic_lgbt_only: int = Field(
+        description=(
+            "Carry the generic `lgbt` code with no finer one, because no "
+            "reliable Kitsu match exists. A source limit, not a bug."
+        )
+    )
+
+
+class CoverageResponse(BaseModel):
+    """Les limites connues, mesurées et affichées.
+
+    Une limite mesurée est une force ; découverte par un tiers, c'est une faute.
+    """
+
+    totals: CoverageTotals
+    identity_by_method: list[CoverageMethod]
+    genres: CoverageGenres
+    measured_at: datetime
+
+
 class SearchResult(RagPreview):
     text_score: float
 
@@ -170,6 +422,30 @@ RESPONSE_404_DOC = {
     "model": ErrorResponse,
     "description": "No RAG document with this key.",
 }
+RESPONSE_404_SERIES = {
+    "model": ErrorResponse,
+    "description": (
+        "No series with this identifier. Distinct from an empty collection: "
+        "a series with no volume or no review answers 200 with `items: []`."
+    ),
+}
+RESPONSE_404_IDENTITY = {
+    "model": ErrorResponse,
+    "description": "No work with this `work_uid`.",
+}
+
+# Bornes de pagination des collections LIÉES À UNE SÉRIE.
+#
+# `limit`/`offset` ici, curseur sur `/rag/export` : le choix inverse, pour la
+# raison inverse. Un curseur protège d'un `OFFSET` profond sur un corpus de
+# plusieurs dizaines de milliers de lignes parcouru en entier. Ces deux
+# collections-ci sont bornées par la série qui les porte : la plus fournie du
+# catalogue compte quelques centaines de volumes, une poignée de critiques. La
+# profondeur est structurellement faible, `OFFSET` n'y coûte rien, et un
+# curseur opaque imposerait au client un protocole pour parcourir dix lignes.
+COLLECTION_LIMIT_MAX = 200
+COLLECTION_LIMIT_DEFAUT = 50
+COLLECTION_OFFSET_MAX = 10_000
 
 # Dépendance d'autorisation, posée route par route plutôt que sur le routeur :
 # la liste des routes protégées doit se lire à l'endroit où les routes sont
@@ -609,6 +885,435 @@ def search(
         limit=limit,
         offset=offset,
         items=items,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Catalogue — le socle Manga Sanctuary
+# ---------------------------------------------------------------------------
+# `_serie_existe` est appelée par les trois routes de série. Elle fait la
+# différence entre les deux 404 qu'on confond d'habitude : un identifiant
+# INCONNU (404) et une collection VIDE (200 + `items: []`). Une série sans
+# critique existe ; répondre 404 dirait à un client qu'elle n'existe pas, et il
+# en conclurait la mauvaise chose.
+def _serie_existe(cur: Any, series_id: int) -> None:
+    cur.execute(
+        "SELECT 1 FROM manga.ms_series_enriched WHERE series_id = %s", (series_id,)
+    )
+    if cur.fetchone() is None:
+        raise HTTPException(status_code=404, detail="series_id not found")
+
+
+def _liste(valeur: Any) -> list[str]:
+    """Un tableau jsonb en liste de chaînes, tolérant au NULL et au scalaire."""
+    if not isinstance(valeur, list):
+        return []
+    return [str(element) for element in valeur if element is not None]
+
+
+@router.get(
+    "/series/{series_id}",
+    response_model=SeriesResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 404: RESPONSE_404_SERIES, 503: RESPONSE_503},
+    tags=["catalogue"],
+    summary="One series from the Manga Sanctuary catalogue",
+    description=(
+        "The catalogue record: titles, authors, publication data, ratings and "
+        "review aggregates.\n\n"
+        "**Genres come in two fields, and neither replaces the other.** "
+        "`genres_source` holds the raw French labels Manga Sanctuary wrote "
+        "(12 652 series); `genres_enriched` holds normalised codes merged from "
+        "both sources and expanded through the genre hierarchy (12 952 "
+        "series). No `COALESCE` is applied here: collapsing them would invent "
+        "a definition of *genre* that exists nowhere in the database. "
+        "*The API exposes; it does not create.*"
+    ),
+)
+def get_series(
+    pool: PoolDependency,
+    series_id: Annotated[int, Path(ge=1)],
+) -> SeriesResponse:
+    """Expose une série du socle catalogue."""
+    sql = """
+    SELECT s.series_id, s.work_uid, s.series_title, s.series_url, s.series_type,
+           s.series_category, s.series_year, s.series_other_titles,
+           s.series_dessinateur, s.series_scenariste, s.series_mag_prepub,
+           s.series_statuses, s.series_genres, s.series_tags, s.series_synopsis,
+           s.series_synopsis_enriched, s.series_popularity_rank,
+           s.series_members_rating, s.series_members_votes,
+           s.series_experts_rating, s.series_experts_votes,
+           s.series_volume_count, s.series_review_count, s.series_score_mean,
+           s.series_score_min, s.series_score_max,
+           s.series_first_review_date_iso, s.series_last_review_date_iso,
+           s.kitsu_id, s.needs_review,
+           COALESCE(
+               (SELECT jsonb_agg(jsonb_build_object(
+                           'code', r.code, 'label_fr', r.label_fr, 'type', r.type)
+                        ORDER BY r.ordre NULLS LAST, r.code)
+                  FROM jsonb_array_elements_text(
+                           COALESCE(s.series_genres_enriched, '[]'::jsonb)) g
+                  JOIN manga.genre_ref r ON r.code = g),
+               '[]'::jsonb) AS genres_enriched
+    FROM manga.ms_series_enriched s
+    WHERE s.series_id = %s
+    """
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (series_id,))
+                row = cur.fetchone()
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="series_id not found")
+
+    return SeriesResponse(
+        series_id=row[0],
+        work_uid=row[1],
+        title=row[2],
+        url=row[3],
+        type=row[4],
+        category=row[5],
+        year=row[6],
+        other_titles=_liste(row[7]),
+        dessinateur=row[8],
+        scenariste=row[9],
+        magazine_prepublication=row[10],
+        statuses=_liste(row[11]),
+        genres_source=_liste(row[12]),
+        tags_source=_liste(row[13]),
+        synopsis=row[14],
+        synopsis_enriched=row[15],
+        popularity_rank=row[16],
+        members_rating=row[17],
+        members_votes=row[18],
+        experts_rating=row[19],
+        experts_votes=row[20],
+        volume_count=row[21],
+        review_count=row[22],
+        score_mean=row[23],
+        score_min=row[24],
+        score_max=row[25],
+        first_review_date=row[26],
+        last_review_date=row[27],
+        kitsu_id=row[28],
+        needs_review=row[29],
+        genres_enriched=[GenreCode(**item) for item in (row[30] or [])],
+    )
+
+
+@router.get(
+    "/series/{series_id}/volumes",
+    response_model=VolumesResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 404: RESPONSE_404_SERIES, 503: RESPONSE_503},
+    tags=["catalogue"],
+    summary="Volumes of one series",
+    description=(
+        "Tomaison, EAN, publisher, format and page count — what a bookseller "
+        "actually sells. Ordered by volume number, `NULL` last.\n\n"
+        "`ean` is the barcode **as the source displayed it**, unvalidated: its "
+        "checked reading lives in `manga.volume_identity`.\n\n"
+        "**Two fields carry a known source defect** and say so in their own "
+        "description: `editeur` (a captured label, not a publisher) and "
+        "`status` (a doubled label). They are served as collected rather "
+        "than quietly dropped — a defect that is visible can be fixed.\n\n"
+        "Paginated with "
+        "`limit`/`offset` rather than a cursor — see `/rag/export` for the "
+        "opposite choice and its reason."
+    ),
+)
+def get_series_volumes(
+    pool: PoolDependency,
+    series_id: Annotated[int, Path(ge=1)],
+    limit: Annotated[int, Query(ge=1, le=COLLECTION_LIMIT_MAX)] = (
+        COLLECTION_LIMIT_DEFAUT
+    ),
+    offset: Annotated[int, Query(ge=0, le=COLLECTION_OFFSET_MAX)] = 0,
+) -> VolumesResponse:
+    """Expose les volumes d'une série, paginés."""
+    sql = """
+    SELECT volume_url, volume_title, volume_number, volume_publication_date,
+           volume_ean, volume_editeur, volume_dessinateur, volume_scenariste,
+           volume_format, volume_pages, volume_country, volume_status,
+           volume_tomes_published, volume_tomes_total, volume_experts_rating,
+           volume_experts_votes, review_count, volume_synopsis
+    FROM manga.ms_volumes_enriched
+    WHERE series_id = %s
+    ORDER BY volume_number NULLS LAST, volume_url
+    LIMIT %s OFFSET %s
+    """
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                _serie_existe(cur, series_id)
+                cur.execute(
+                    "SELECT count(*) FROM manga.ms_volumes_enriched "
+                    "WHERE series_id = %s",
+                    (series_id,),
+                )
+                total_row = cur.fetchone()
+                cur.execute(sql, (series_id, limit, offset))
+                rows = cur.fetchall()
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    return VolumesResponse(
+        series_id=series_id,
+        total=int(total_row[0]) if total_row else 0,
+        limit=limit,
+        offset=offset,
+        items=[
+            Volume(
+                volume_url=row[0],
+                title=row[1],
+                number=row[2],
+                publication_date=row[3],
+                ean=row[4],
+                editeur=row[5],
+                dessinateur=row[6],
+                scenariste=row[7],
+                format=row[8],
+                pages=row[9],
+                country=row[10],
+                status=row[11],
+                tomes_published=row[12],
+                tomes_total=row[13],
+                experts_rating=row[14],
+                experts_votes=row[15],
+                review_count=row[16],
+                synopsis=row[17],
+            )
+            for row in rows
+        ],
+    )
+
+
+@router.get(
+    "/series/{series_id}/reviews",
+    response_model=ReviewsResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 404: RESPONSE_404_SERIES, 503: RESPONSE_503},
+    tags=["catalogue"],
+    summary="Reviews of one series (complete reference)",
+    description=(
+        "Reads **`manga.ms_reviews_all`** — the complete review reference, "
+        "11 074 rows.\n\n"
+        "This is deliberately **not** `manga.ms_reviews` (3 187 rows), the "
+        "legacy RAG corpus: that table is a filtered subset built for "
+        "retrieval, and serving it here would silently hide two thirds of what "
+        "was collected. Reading a table is not rebuilding a corpus — the RAG "
+        "corpus keeps its own source and its own endpoints."
+    ),
+)
+def get_series_reviews(
+    pool: PoolDependency,
+    series_id: Annotated[int, Path(ge=1)],
+    limit: Annotated[int, Query(ge=1, le=COLLECTION_LIMIT_MAX)] = (
+        COLLECTION_LIMIT_DEFAUT
+    ),
+    offset: Annotated[int, Query(ge=0, le=COLLECTION_OFFSET_MAX)] = 0,
+) -> ReviewsResponse:
+    """Expose les critiques d'une série, depuis le référentiel COMPLET."""
+    sql = """
+    SELECT review_id, volume_number, volume_url, review_title, review_score,
+           review_author, review_date_iso, review_date_raw, review_type,
+           review_grain, review_body
+    FROM manga.ms_reviews_all
+    WHERE series_id = %s
+    ORDER BY review_date_iso DESC NULLS LAST, review_id
+    LIMIT %s OFFSET %s
+    """
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                _serie_existe(cur, series_id)
+                cur.execute(
+                    "SELECT count(*) FROM manga.ms_reviews_all WHERE series_id = %s",
+                    (series_id,),
+                )
+                total_row = cur.fetchone()
+                cur.execute(sql, (series_id, limit, offset))
+                rows = cur.fetchall()
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    return ReviewsResponse(
+        series_id=series_id,
+        total=int(total_row[0]) if total_row else 0,
+        limit=limit,
+        offset=offset,
+        items=[
+            Review(
+                review_id=row[0],
+                volume_number=row[1],
+                volume_url=row[2],
+                title=row[3],
+                score=row[4],
+                author=row[5],
+                date=row[6],
+                date_raw=row[7],
+                type=row[8],
+                grain=row[9],
+                body=row[10],
+            )
+            for row in rows
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Identité
+# ---------------------------------------------------------------------------
+@router.get(
+    "/identity/{work_uid}",
+    response_model=IdentityResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 404: RESPONSE_404_IDENTITY, 503: RESPONSE_503},
+    tags=["identity"],
+    summary="Cross-platform identity of one work",
+    description=(
+        "The identifiers a work carries across platforms, and **how each link "
+        "was established**: method, score, status.\n\n"
+        "No identifier is shared between Manga Sanctuary, Kitsu and Wikidata. "
+        "Every link here is therefore a scored decision taken by a documented "
+        "method, never a join on a common key. `method`, `score` and `status` "
+        "are `null` when no decision has been recorded yet — 9 366 of 14 670 "
+        "works have one. A work without a decision still exists: it answers "
+        "200, not 404."
+    ),
+)
+def get_identity(
+    pool: PoolDependency,
+    work_uid: Annotated[int, Path(ge=1)],
+) -> IdentityResponse:
+    """Expose l'identité croisée d'une œuvre et la provenance de chaque lien.
+
+    La jointure passe par `work_identity` : `v_match_current` est indexée par
+    `series_id`, pas par `work_uid` — vérifié par `\\d`, pas supposé. La
+    relation est 1-1 (14 670 séries, 14 670 `work_uid`, index unique sur
+    `series_id`), donc un `work_uid` désigne au plus une série.
+    """
+    sql = """
+    SELECT w.work_uid, w.series_id, s.series_title, w.wikidata_qid, w.kitsu_id,
+           w.mal_id, w.anilist_id, w.madb_id, w.disponibilite,
+           m.method, m.score, m.status, m.decided_at, m.decided_by
+    FROM manga.work_identity w
+    LEFT JOIN manga.ms_series_enriched s ON s.work_uid = w.work_uid
+    LEFT JOIN manga.v_match_current m ON m.series_id = w.series_id
+    WHERE w.work_uid = %s
+    """
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (work_uid,))
+                row = cur.fetchone()
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="work_uid not found")
+
+    return IdentityResponse(
+        work_uid=row[0],
+        series_id=row[1],
+        series_title=row[2],
+        wikidata_qid=row[3],
+        kitsu_id=row[4],
+        mal_id=row[5],
+        anilist_id=row[6],
+        madb_id=row[7],
+        disponibilite=row[8],
+        method=row[9],
+        score=row[10],
+        status=row[11],
+        decided_at=row[12],
+        decided_by=row[13],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Couverture
+# ---------------------------------------------------------------------------
+@router.get(
+    "/coverage",
+    response_model=CoverageResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 503: RESPONSE_503},
+    tags=["coverage"],
+    summary="What the corpus holds, and what it does not",
+    description=(
+        "Reference totals, identity decisions by method, and genre coverage — "
+        "**including the known limits**.\n\n"
+        "Two of them are structural and will not be fixed by any further "
+        "work: 1 694 series carry no genre in *either* source, and 526 series "
+        "carry only the generic `lgbt` code because no reliable Kitsu match "
+        "exists to refine it. Both are reported here rather than left for a "
+        "reader to discover."
+    ),
+)
+def get_coverage(pool: PoolDependency) -> CoverageResponse:
+    """Rend les totaux du référentiel et les limites connues, mesurés à l'appel."""
+    totaux_sql = """
+    SELECT (SELECT count(*) FROM manga.ms_series_enriched),
+           (SELECT count(*) FROM manga.ms_volumes_enriched),
+           (SELECT count(*) FROM manga.ms_reviews_all),
+           (SELECT count(*) FROM manga.ms_reviews)
+    """
+    methodes_sql = """
+    SELECT COALESCE(method, 'sans_decision') AS method, count(*)
+    FROM manga.v_match_current
+    GROUP BY 1
+    ORDER BY 2 DESC, 1
+    """
+    # Les deux limites structurelles sont CALCULÉES, pas écrites en dur : un
+    # chiffre figé dans le code cesserait d'être vrai au premier recalcul sans
+    # que personne ne s'en aperçoive — le défaut même que 4c a corrigé.
+    genres_sql = """
+    SELECT count(*) FILTER (
+               WHERE COALESCE(series_genres, '[]'::jsonb) <> '[]'::jsonb),
+           count(*) FILTER (
+               WHERE COALESCE(series_genres_enriched, '[]'::jsonb) <> '[]'::jsonb),
+           count(*) FILTER (
+               WHERE COALESCE(series_genres, '[]'::jsonb) = '[]'::jsonb
+                 AND COALESCE(series_genres_enriched, '[]'::jsonb) = '[]'::jsonb),
+           count(*) FILTER (
+               WHERE series_genres_enriched ? 'lgbt'
+                 AND NOT series_genres_enriched ?| array['yaoi', 'yuri',
+                                                         'gender_bender'])
+    FROM manga.ms_series_enriched
+    """
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(totaux_sql)
+                totaux = cur.fetchone()
+                cur.execute(methodes_sql)
+                methodes = cur.fetchall()
+                cur.execute(genres_sql)
+                genres = cur.fetchone()
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    return CoverageResponse(
+        totals=CoverageTotals(
+            series=totaux[0],
+            volumes=totaux[1],
+            reviews=totaux[2],
+            reviews_rag_legacy=totaux[3],
+        ),
+        identity_by_method=[
+            CoverageMethod(method=row[0], decisions=row[1]) for row in methodes
+        ],
+        genres=CoverageGenres(
+            series_with_source_genres=genres[0],
+            series_with_enriched_genres=genres[1],
+            series_without_any_genre=genres[2],
+            series_on_generic_lgbt_only=genres[3],
+        ),
+        measured_at=datetime.now(UTC),
     )
 
 

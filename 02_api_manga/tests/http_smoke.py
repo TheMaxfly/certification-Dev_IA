@@ -24,7 +24,7 @@ BASE_URL = "http://api:8000"
 API_KEY = os.environ["API_KEY"]
 API_KEY_HEADER = "X-API-Key"
 
-# Les six routes de données, et les routes qui restent ouvertes. Ces deux
+# Les onze routes de données, et les routes qui restent ouvertes. Ces deux
 # listes sont le contrat d'accès du module, vérifié ici contre une API réelle
 # et non contre un client de test en mémoire.
 ROUTES_PROTEGEES = (
@@ -34,6 +34,12 @@ ROUTES_PROTEGEES = (
     "/rag/export/composition",
     f"/rag/doc/{quote_plus('kitsu:38')}",
     "/search?q=one",
+    # 3b — catalogue, identité, couverture.
+    "/series/736",
+    "/series/736/volumes",
+    "/series/736/reviews",
+    "/identity/4242",
+    "/coverage",
 )
 ROUTES_OUVERTES = ("/live", "/health", "/docs", "/openapi.json")
 
@@ -91,11 +97,17 @@ def get_json(path: str) -> dict[str, Any]:
     return corps
 
 
+def statut_http(path: str) -> int:
+    """Le statut seul, pour les cas où c'est LUI qu'on affirme (404, 200)."""
+    statut, _ = appeler(path)
+    return statut
+
+
 def verifier_le_controle_d_acces() -> None:
     """Contrôles 3 et 4, exercés contre l'API réelle.
 
     Sans en-tête, avec une clé invalide, et avec la bonne clé à un caractère
-    près : les six routes de données doivent refuser. Les sondes et la
+    près : les onze routes de données doivent refuser. Les sondes et la
     documentation doivent répondre SANS clé — c'est une règle du module, pas
     une omission, et elle mérite donc d'être testée comme telle.
     """
@@ -324,6 +336,91 @@ def main() -> None:
     verifier_le_texte_integral()
     verifier_la_composition()
     verifier_que_l_export_ignore_offset()
+    verifier_le_catalogue()
+    verifier_l_identite()
+    verifier_la_couverture()
+
+
+# ---------------------------------------------------------------------------
+# 3b
+# ---------------------------------------------------------------------------
+def verifier_le_catalogue() -> None:
+    """La fiche série, ses volumes, et LA BONNE TABLE DE CRITIQUES.
+
+    La fixture pose 3 lignes dans `ms_reviews_all` et 1 seule dans
+    `ms_reviews`. Un endpoint qui se tromperait de table renverrait 1 : c'est
+    la seule assertion qui distingue les deux, puisque les deux tables portent
+    les mêmes colonnes et qu'aucune erreur ne se produirait.
+    """
+    serie = get_json("/series/736")
+    assert serie["series_id"] == 736
+    assert serie["title"] == "One Piece"
+    assert serie["work_uid"] == 4242
+
+    # Aucune colonne de travail du rapprochement ne doit sortir par HTTP.
+    for interdit in ("ms_title_norm_x", "_other_titles_list", "match_score"):
+        assert interdit not in serie
+
+    volumes = get_json("/series/736/volumes")
+    assert volumes["total"] == 1
+    assert volumes["items"][0]["volume_url"].endswith("tome-1.html")
+
+    critiques = get_json("/series/736/reviews")
+    assert critiques["total"] == 3, (
+        f"{critiques['total']} critiques : l'endpoint lit `ms_reviews` "
+        "(corpus RAG hérité) au lieu de `ms_reviews_all` (le référentiel)."
+    )
+    assert len(critiques["items"]) == 3
+
+    # La date non analysable de la fixture (« jeu. ») reste NULL sans faire
+    # échouer la ligne : `date_raw` conserve ce que la source affichait.
+    par_titre = {item["title"]: item for item in critiques["items"]}
+    assert par_titre["Le souffle tient"]["date"] is None
+    assert par_titre["Le souffle tient"]["date_raw"] == "jeu."
+
+    # Une série qui EXISTE mais n'a rien : 200 et une liste vide, jamais 404.
+    vide = get_json("/series/999/reviews")
+    assert vide["total"] == 0 and vide["items"] == []
+
+    # Une série qui n'existe pas : 404. La distinction d'avec le cas précédent
+    # est tout l'intérêt des deux assertions.
+    assert statut_http("/series/99999999") == 404
+    assert statut_http("/series/99999999/reviews") == 404
+
+
+def verifier_l_identite() -> None:
+    """Les identifiants croisés ET la provenance du lien.
+
+    `v_match_current` est indexée par `series_id` : la route doit joindre
+    `work_identity` pour répondre sur un `work_uid`.
+    """
+    identite = get_json("/identity/4242")
+    assert identite["work_uid"] == 4242
+    assert identite["series_id"] == 736
+    assert identite["wikidata_qid"] == "Q173065"
+    assert identite["kitsu_id"] == "38"
+    assert identite["method"] == "exact"
+    assert identite["status"] == "auto"
+
+    assert statut_http("/identity/99999999") == 404
+
+
+def verifier_la_couverture() -> None:
+    """Chaque total se dérive de la fixture, pas d'un chiffre de production."""
+    couverture = get_json("/coverage")
+    totaux = couverture["totals"]
+
+    # 736 et 999 posées par la fixture.
+    assert totaux["series"] == 2
+    assert totaux["volumes"] == 1
+    # 3 dans le référentiel contre 1 dans le corpus hérité : l'écart est le
+    # sujet même de 3b, et il doit être LISIBLE dans la réponse.
+    assert totaux["reviews"] == 3
+    assert totaux["reviews_rag_legacy"] == 1
+    assert totaux["reviews"] > totaux["reviews_rag_legacy"]
+
+    assert couverture["identity_by_method"] == [{"method": "exact", "decisions": 1}]
+    assert "measured_at" in couverture
 
 
 if __name__ == "__main__":

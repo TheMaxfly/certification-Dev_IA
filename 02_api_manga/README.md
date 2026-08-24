@@ -232,6 +232,26 @@ qui est testé.
 - **Manga Sanctuary** (scraping / exports)
   - séries / volumes / critiques (reviews)
 
+### `ms_reviews` et `ms_reviews_all` : deux tables, un piège
+
+Deux tables de critiques coexistent dans le schéma `manga`. Confondre les deux
+fait disparaître les deux tiers du corpus **sans qu'aucune erreur ne se
+produise** — elles portent les mêmes colonnes.
+
+| Table | Lignes | Ce que c'est |
+|---|---:|---|
+| `manga.ms_reviews_all` | **11 074** | le **référentiel complet** des critiques collectées |
+| `manga.ms_reviews` | 3 187 | le corpus RAG **historique**, un sous-ensemble filtré pour la recherche |
+
+`GET /series/{series_id}/reviews` lit **`ms_reviews_all`**. Le corpus RAG, lui,
+garde `ms_reviews` et ses propres endpoints (`/rag/*`, `/search`) : lire une
+table n'est pas reconstruire un corpus, et les deux besoins n'ont pas le même
+filtre.
+
+Un test unitaire vérifie la table interrogée
+(`test_reviews_lit_le_referentiel_complet_pas_le_corpus_rag`), parce qu'une
+régression y serait invisible à la relecture.
+
 ### Données exposées côté RAG
 
 Le corpus RAG est assemblé dans PostgreSQL via une chaîne de **vues**, que l'API
@@ -249,6 +269,71 @@ rag_export_docs        ← ce que lit l'API (textes vides écartés)
 
 Trois sources cohabitent donc dans le corpus servi par `/rag/export` et `/search` :
 `kitsu_synopsis`, `ms_hybrid` et `ms_review`.
+
+### 7) Catalogue, identité et couverture
+
+Cinq endpoints exposent ce que le projet a construit : le socle catalogue Manga
+Sanctuary, le référentiel d'identité et le référentiel complet des critiques.
+Tous sont protégés par `X-API-Key`, comme le reste des routes de données.
+
+| Endpoint | Source | Sa raison d'être |
+|---|---|---|
+| `GET /series/{series_id}` | `ms_series_enriched` | sans elle, une application sait quoi conseiller mais pas quoi afficher |
+| `GET /series/{series_id}/volumes` | `ms_volumes_enriched` | tomaison, EAN, format — ce qu'un libraire vend |
+| `GET /series/{series_id}/reviews` | **`ms_reviews_all`** | le référentiel complet, 11 074 critiques |
+| `GET /identity/{work_uid}` | `work_identity` ⨝ `v_match_current` | les identifiants croisés **et la provenance de chaque lien** |
+| `GET /coverage` | agrégats | ce que le corpus contient, et ce qu'il ne contient pas |
+
+```bash
+curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/series/8514
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/volumes?limit=20"
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/reviews?limit=20"
+curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/identity/14689
+curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/coverage
+```
+
+**Les genres viennent en deux champs, et aucun ne remplace l'autre.**
+`genres_source` porte les libellés bruts de Manga Sanctuary (français, casse
+d'origine, 12 652 séries) ; `genres_enriched` porte les codes normalisés du
+référentiel, fusionnant les deux sources et leur hiérarchie (12 952 séries).
+Aucun `COALESCE` n'est appliqué côté HTTP : il fabriquerait une définition de
+« genres » qui n'existe nulle part en base. *L'API expose, elle ne crée pas.*
+Chaque code normalisé est rendu avec son libellé d'affichage — le code est la
+valeur stable, le libellé une commodité.
+
+**Ce qui n'est pas exposé.** `ms_series_enriched` porte des colonnes de travail
+du rapprochement (`ms_title_norm_x`, `_other_titles_list`, `matched_title_norm`,
+`fuzzy_low_score`…) : ce sont des états intermédiaires d'un calcul, pas des
+faits sur l'œuvre. Ce que le rapprochement a *conclu* se lit sur
+`/identity/{work_uid}`. Sur la fiche, seul le drapeau `needs_review` subsiste,
+pour qu'une application puisse signaler une donnée sous réserve sans second
+appel. Le bloc Kitsu est réduit à `kitsu_id` : `/kitsu/{kitsu_id}` reste
+l'endroit unique de ces métadonnées. Les tags dérivés ne sont pas exposés — ils
+sont périmés depuis juin 2026, faute de référentiel de tags.
+
+**404 ou liste vide.** Une série inexistante répond **404** ; une série qui
+existe mais n'a aucun volume ni aucune critique répond **200 avec `items: []`**.
+Confondre les deux dirait à un client qu'une série n'existe pas alors qu'elle
+n'a simplement pas encore été commentée.
+
+**Pagination `limit`/`offset`, et non un curseur** — le choix inverse de
+`/rag/export`, pour la raison inverse. Un curseur protège d'un `OFFSET` profond
+sur un corpus parcouru en entier ; ces collections-ci sont bornées par la série
+qui les porte (la plus fournie compte 279 volumes). La profondeur est
+structurellement faible, et un curseur opaque imposerait un protocole pour
+parcourir dix lignes.
+
+**Deux défauts de source sont exposés, pas masqués.** `volume.editeur` contient
+le libellé `Mag. de prépublication` sur ses 104 050 lignes renseignées — le
+sélecteur du module 04 a capturé une étiquette au lieu d'une valeur — et
+`volume.status` lit `Complète Complète` sur 44 910 lignes. Les deux le disent
+dans leur description OpenAPI. Un défaut visible peut être corrigé ; masqué, il
+se transmet.
+
+**`/coverage` affiche les limites connues**, mesurées à l'appel et jamais
+codées en dur : 1 694 séries sans genre dans aucune source, 525 séries sur le
+seul code générique `lgbt` faute d'appariement Kitsu fiable. Une limite mesurée
+et affichée est une force ; découverte par un tiers, c'est une faute.
 
 ## Architecture
 

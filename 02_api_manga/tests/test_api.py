@@ -10,7 +10,12 @@ from psycopg import OperationalError
 from app.main import (
     decode_cursor,
     encode_cursor,
+    get_coverage,
+    get_identity,
     get_kitsu_core,
+    get_series,
+    get_series_reviews,
+    get_series_volumes,
     health,
     live,
     rag_doc,
@@ -214,3 +219,223 @@ def test_search_rejects_whitespace_only_query() -> None:
         search(FakePool(), "  ", limit=10, offset=0)
 
     assert error.value.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# 3b — catalogue, identité, couverture
+# ---------------------------------------------------------------------------
+# Ce que ces tests protègent en priorité n'est pas la forme des réponses : c'est
+# la table LUE. `/series/{id}/reviews` doit interroger `ms_reviews_all` (11 074)
+# et jamais `ms_reviews` (3 187, corpus RAG héritage). Une régression y serait
+# invisible à l'œil — les deux tables ont les mêmes colonnes.
+LIGNE_SERIE = (
+    8514,
+    14700,
+    "Kingdom",
+    "https://ms/8514",
+    "Seinen",
+    "Shonen",
+    2006,
+    ["Kingudamu"],
+    "Hara",
+    "Hara",
+    "Young Jump",
+    ["En cours"],
+    ["action", "guerre"],
+    ["antiquité"],
+    "Synopsis MS",
+    "Synopsis retenu",
+    120,
+    8.7,
+    3400,
+    9.1,
+    12,
+    77,
+    77,
+    8.4,
+    2.0,
+    10.0,
+    None,
+    None,
+    3480,
+    False,
+    [{"code": "action", "label_fr": "Action", "type": "genre"}],
+)
+
+
+def test_series_expose_les_deux_champs_de_genres_sans_les_fusionner() -> None:
+    """`genres_source` et `genres_enriched` répondent à deux questions.
+
+    Les fusionner par COALESCE fabriquerait une définition de « genres »
+    n'existant nulle part en base — l'API exposerait alors une donnée qu'elle
+    a créée."""
+    reponse = get_series(FakePool([LIGNE_SERIE]), 8514)
+
+    assert reponse.genres_source == ["action", "guerre"]
+    assert [g.code for g in reponse.genres_enriched] == ["action"]
+    assert reponse.genres_enriched[0].label_fr == "Action"
+
+
+def test_series_n_expose_aucune_colonne_interne() -> None:
+    """Le rapprochement laisse des colonnes de travail dans la table ; aucune
+    ne doit sortir par HTTP. Seul `needs_review` passe, comme drapeau."""
+    champs = set(get_series(FakePool([LIGNE_SERIE]), 8514).model_dump())
+
+    interdits = {
+        "ms_title_norm_x",
+        "ms_title_norm_y",
+        "_other_titles_list",
+        "matched_title_norm",
+        "fuzzy_low_score",
+        "title_too_short",
+        "kitsu_id_collision",
+        "review_reason",
+        "match_method",
+        "match_score",
+        "tags_enriched",
+        "kitsu_slug",
+        "kitsu_title_canonical",
+    }
+    assert champs & interdits == set()
+    assert "needs_review" in champs
+
+
+def test_series_404_sur_identifiant_inconnu() -> None:
+    with pytest.raises(HTTPException) as erreur:
+        get_series(FakePool([None]), 999999999)
+
+    assert erreur.value.status_code == 404
+
+
+def test_reviews_lit_le_referentiel_complet_pas_le_corpus_rag() -> None:
+    """LE test de non-régression de 3b, cité dans le README."""
+    pool = FakePool([(1,), (11074,), []])
+
+    get_series_reviews(pool, 8514, limit=50, offset=0)
+
+    sql_execute = " ".join(sql for sql, _ in pool.cursor.executions)
+    assert "manga.ms_reviews_all" in sql_execute
+    assert "manga.ms_reviews " not in sql_execute.replace("ms_reviews_all", "")
+
+
+def test_reviews_rend_200_et_une_liste_vide_sur_serie_sans_critique() -> None:
+    """Une série sans critique EXISTE. Répondre 404 dirait le contraire."""
+    reponse = get_series_reviews(FakePool([(1,), (0,), []]), 12, limit=50, offset=0)
+
+    assert reponse.total == 0
+    assert reponse.items == []
+
+
+def test_reviews_404_quand_la_serie_n_existe_pas() -> None:
+    """La distinction d'avec le test précédent est tout l'intérêt des deux."""
+    with pytest.raises(HTTPException) as erreur:
+        get_series_reviews(FakePool([None]), 999999999, limit=50, offset=0)
+
+    assert erreur.value.status_code == 404
+
+
+def test_volumes_lie_ses_parametres_et_ordonne_les_nuls_en_dernier() -> None:
+    pool = FakePool([(1,), (3,), []])
+
+    get_series_volumes(pool, 8514, limit=10, offset=5)
+
+    sql_volumes, params = pool.cursor.executions[-1]
+    assert params == (8514, 10, 5)
+    assert "NULLS LAST" in sql_volumes
+
+
+def test_volumes_404_quand_la_serie_n_existe_pas() -> None:
+    with pytest.raises(HTTPException) as erreur:
+        get_series_volumes(FakePool([None]), 999999999, limit=50, offset=0)
+
+    assert erreur.value.status_code == 404
+
+
+def test_identity_rend_200_sans_decision_enregistree() -> None:
+    """5 304 œuvres n'ont aucune décision courante. Elles existent quand même."""
+    ligne = (
+        14682,
+        406,
+        "Titre",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    reponse = get_identity(FakePool([ligne]), 14682)
+
+    assert reponse.work_uid == 14682
+    assert reponse.method is None and reponse.score is None
+
+
+def test_identity_passe_par_work_identity_et_pas_par_la_vue_seule() -> None:
+    """`v_match_current` est indexée par `series_id`, pas par `work_uid` :
+    la jointure doit exister, sans quoi la route ne peut pas répondre."""
+    ligne = (
+        14689,
+        415,
+        "Titre",
+        None,
+        "11349",
+        None,
+        None,
+        None,
+        None,
+        "exact_kitsu",
+        0.96,
+        "auto",
+        None,
+        None,
+    )
+    pool = FakePool([ligne])
+
+    get_identity(pool, 14689)
+
+    sql_identity = pool.cursor.executions[0][0]
+    assert "manga.work_identity" in sql_identity
+    assert "manga.v_match_current" in sql_identity
+    assert pool.cursor.executions[0][1] == (14689,)
+
+
+def test_identity_404_sur_work_uid_inconnu() -> None:
+    with pytest.raises(HTTPException) as erreur:
+        get_identity(FakePool([None]), 999999999)
+
+    assert erreur.value.status_code == 404
+
+
+def test_coverage_distingue_le_referentiel_du_corpus_rag_heritage() -> None:
+    pool = FakePool(
+        [
+            (14670, 104107, 11074, 3187),
+            [("exact_kitsu", 3584)],
+            (12652, 12952, 1694, 525),
+        ]
+    )
+
+    reponse = get_coverage(pool)
+
+    assert reponse.totals.reviews == 11074
+    assert reponse.totals.reviews_rag_legacy == 3187
+    assert reponse.genres.series_without_any_genre == 1694
+    assert reponse.identity_by_method[0].method == "exact_kitsu"
+
+
+def test_coverage_ne_code_en_dur_aucune_limite() -> None:
+    """Les limites connues sont MESURÉES à l'appel. Un chiffre figé dans le
+    code cesserait d'être vrai au premier recalcul, sans que rien ne le dise —
+    c'est exactement le défaut corrigé par le recalcul de l'enrichissement."""
+    pool = FakePool([(1, 2, 3, 4), [], (10, 20, 30, 40)])
+
+    reponse = get_coverage(pool)
+
+    assert reponse.genres.series_without_any_genre == 30
+    assert reponse.genres.series_on_generic_lgbt_only == 40

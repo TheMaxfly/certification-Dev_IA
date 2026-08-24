@@ -29,14 +29,29 @@ ROUTES_PROTEGEES = {
     "/rag/export/composition",
     "/rag/doc/{doc_key}",
     "/search",
+    # 3b — catalogue, identité, couverture. Protégées comme les autres : la
+    # règle d'accès n'a pas de variante par famille de ressource.
+    "/series/{series_id}",
+    "/series/{series_id}/volumes",
+    "/series/{series_id}/reviews",
+    "/identity/{work_uid}",
+    "/coverage",
 }
 ROUTES_OUVERTES = {"/live", "/health"}
 
 # Toute route qui interroge PostgreSQL peut renvoyer 503.
 ROUTES_BASE_DE_DONNEES = ROUTES_PROTEGEES | {"/health"}
 
-# Les deux seules routes qui lèvent un 404 dans le code.
-ROUTES_404 = {"/kitsu/{kitsu_id}", "/rag/doc/{doc_key}"}
+# Les routes qui lèvent un 404 dans le code. `/coverage` n'y figure pas :
+# une mesure d'ensemble n'a pas d'identifiant à ne pas trouver.
+ROUTES_404 = {
+    "/kitsu/{kitsu_id}",
+    "/rag/doc/{doc_key}",
+    "/series/{series_id}",
+    "/series/{series_id}/volumes",
+    "/series/{series_id}/reviews",
+    "/identity/{work_uid}",
+}
 
 # Routes portant des paramètres validés : FastAPI y génère un 422.
 ROUTES_422 = {
@@ -45,6 +60,13 @@ ROUTES_422 = {
     "/rag/export",
     "/rag/doc/{doc_key}",
     "/search",
+    # 3b : `series_id` et `work_uid` sont bornés par `Path(ge=1)`, les
+    # collections par `Query`. `/coverage` ne prend aucun paramètre et n'a
+    # donc pas de 422 à déclarer.
+    "/series/{series_id}",
+    "/series/{series_id}/volumes",
+    "/series/{series_id}/reviews",
+    "/identity/{work_uid}",
 }
 
 

@@ -89,4 +89,60 @@ INSERT INTO manga.ms_kitsu_map (
   736, 38, 'exact', 100.0, 'One Piece', 'one piece'
 );
 
+-- 7. Critiques : les DEUX tables, avec des comptes DIFFÉRENTS.
+--
+--    C'est le cœur de la fixture pour 3b. `ms_reviews_all` est le référentiel
+--    complet (11 074 lignes en production), `ms_reviews` le corpus RAG
+--    historique (3 187). Elles portent les mêmes colonnes : servir l'une pour
+--    l'autre ne produit aucune erreur, seulement deux tiers de données en
+--    moins. La fixture pose donc 3 lignes d'un côté, 1 de l'autre — un
+--    endpoint qui se tromperait de table renverrait 1 au lieu de 3, et le
+--    smoke test le verrait.
+INSERT INTO manga.ms_reviews_all (
+  series_id, volume_number, volume_url, review_url, review_title,
+  review_score, review_author, review_date_iso, review_date_raw, review_body
+) VALUES
+  (736, 1, 'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/tome-1.html',
+   'https://www.manga-sanctuary.com/critique/1-tome-1.html', 'Un abordage lisible',
+   9.0, 'lecteur_a', DATE '2024-03-01', '1 mars 2024',
+   'Avis de lecteur sur le tome 1 : un abordage lisible, un rythme qui tient.'),
+  (736, 2, NULL, 'https://www.manga-sanctuary.com/critique/2-tome-2.html',
+   'Le souffle tient', 8.0, 'lecteur_b', NULL, 'jeu.',
+   'Deuxieme tome, le souffle tient.'),
+  (736, NULL, NULL, 'https://www.manga-sanctuary.com/critique/3-serie.html',
+   'Sur la serie entiere', 7.5, 'lecteur_c', DATE '2024-05-10', '10 mai 2024',
+   'Un avis qui porte sur la serie et non sur un tome.');
+
+-- Le corpus RAG hérité : UNE seule des trois critiques. Le filtre qui a
+-- produit cette table en production n'est pas rejoué ici — seul l'écart de
+-- volume compte pour le contrôle.
+INSERT INTO manga.ms_reviews (
+  series_id, volume_url, review_url, review_title, review_score, review_body
+) VALUES (
+  736, 'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/tome-1.html',
+  'https://www.manga-sanctuary.com/critique/1-tome-1.html', 'Un abordage lisible',
+  9.0, 'Avis de lecteur sur le tome 1 : un abordage lisible, un rythme qui tient.'
+);
+
+-- 8. Une série SANS aucune critique — le témoin du 200-liste-vide.
+--    Sans elle, rien ne distinguerait « série inconnue » de « série sans
+--    critique », et c'est la confusion classique de ce genre d'API.
+INSERT INTO manga.ms_series_enriched (series_id, series_title) VALUES
+  (999, 'Serie sans critique');
+
+-- 9. Identité : le moyeu, et une décision courante.
+--    `work_identity` porte les identifiants croisés ; `v_match_current` (vue
+--    sur match_decision) porte la provenance du lien. La route `/identity`
+--    joint les deux, car la vue est indexée par `series_id`, pas par
+--    `work_uid`.
+INSERT INTO manga.work_identity (work_uid, series_id, wikidata_qid, kitsu_id)
+  OVERRIDING SYSTEM VALUE
+VALUES (4242, 736, 'Q173065', '38');
+
+UPDATE manga.ms_series_enriched SET work_uid = 4242 WHERE series_id = 736;
+
+INSERT INTO manga.match_decision (
+  series_id, wikidata_qid, method, score, status, decided_by
+) VALUES (736, 'Q173065', 'exact', 1.0, 'auto', 'fixture');
+
 COMMIT;
