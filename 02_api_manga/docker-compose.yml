@@ -6,7 +6,13 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-API Manga}
-      APP_VERSION: ${APP_VERSION:-0.3.0}
+      APP_VERSION: ${APP_VERSION:-0.4.0}
+      # Trousseau d'autorisation. Transmis vide s'il est absent de
+      # l'environnement : c'est alors l'API qui refuse de démarrer, avec un
+      # message explicite. Le refus appartient à l'application, en un seul
+      # endroit — un `${API_KEYS:?}` le dupliquerait ici et casserait
+      # `docker compose config`, qui n'a pas à connaître de clé.
+      API_KEYS: ${API_KEYS:-}
       DB_HOST: ${DB_HOST:-host.docker.internal}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-apimanga}

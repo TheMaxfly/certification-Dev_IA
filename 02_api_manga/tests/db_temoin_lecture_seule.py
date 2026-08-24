@@ -43,7 +43,11 @@ def echouer(message: str) -> None:
 
 
 def main() -> None:
-    conninfo = build_conninfo(Settings.from_env())
+    # `database_from_env` et non `from_env` : ce témoin prouve un RÔLE
+    # PostgreSQL, il ne sert aucune requête HTTP et n'a donc pas de clé d'API.
+    # Lui en fabriquer une pour satisfaire la validation du trousseau
+    # ajouterait au harnais un secret qui n'ouvre rien.
+    conninfo = build_conninfo(Settings.database_from_env())
 
     with psycopg.connect(conninfo, autocommit=True) as connexion:
         (utilisateur,) = connexion.execute("SELECT current_user").fetchone()

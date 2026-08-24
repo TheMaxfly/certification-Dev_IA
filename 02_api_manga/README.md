@@ -23,11 +23,16 @@ uv run uvicorn app.main:app --reload --env-file .env
 ### Avec Docker Compose
 
 ```bash
+export API_KEYS="app_backend:$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-40)"
 docker compose up --build
 ```
 
+`API_KEYS` est **obligatoire** : sans elle l'API refuse de démarrer (cf.
+« Autorisation : clé d'API »). Le Compose la transmet depuis l'environnement et
+n'en contient aucune.
+
 API : `http://localhost:8000`  
-Swagger UI : `http://localhost:8000/docs`
+Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
 
 ## Prérequis
 
@@ -44,6 +49,8 @@ L’API lit les variables suivantes (avec valeurs par défaut si non définies) 
 
 | Variable | Défaut | Description |
 | --- | --- | --- |
+| `API_KEYS` | *(aucun)* | **Obligatoire.** Trousseau `nom:clé,…` — sans lui l'API refuse de démarrer |
+| `LOG_LEVEL` | `INFO` | Niveau du journal applicatif |
 | `DB_HOST` | `host.docker.internal` | Hôte PostgreSQL |
 | `DB_PORT` | `5432` | Port PostgreSQL |
 | `DB_NAME` | `apimanga` | Base de données |
@@ -60,11 +67,105 @@ Exemple de `.env` :
 APP_ENV=development
 APP_NAME=API Manga
 
+API_KEYS=app_backend:une-cle-de-32-caracteres-minimum-ici
+
 DB_HOST=host.docker.internal
 DB_PORT=5432
 DB_NAME=apimanga
 DB_USER=manga_api
 DB_PASSWORD=
+```
+
+## Autorisation : clé d'API
+
+Les endpoints de **données** exigent un en-tête `X-API-Key`. La **documentation**
+et les **sondes** restent ouvertes.
+
+| Ouvert, sans clé | Fermé, clé exigée |
+| --- | --- |
+| `/live`, `/health` | `/kitsu/{kitsu_id}` |
+| `/docs`, `/redoc`, `/openapi.json` | `/rag/preview`, `/rag/export`, `/rag/export/composition` |
+| | `/rag/doc/{doc_key}`, `/search` |
+
+**C'est une règle, pas une omission : la documentation est ouverte, les données
+sont fermées.** Un contrat qu'on ne peut pas lire ne s'intègre pas ; une donnée
+qu'on peut lire sans s'annoncer n'est pas protégée. Les sondes restent ouvertes
+pour la raison symétrique : un `/live` sous clé rend l'API impilotable par un
+orchestrateur, qui n'a pas à porter de secret pour demander si le processus vit.
+
+### La clé nomme un consommateur, pas une personne
+
+`API_KEYS` se lit `nom:clé`, plusieurs entrées séparées par des virgules :
+
+```bash
+API_KEYS=app_backend:<clé>,batch_rag:<autre clé>
+```
+
+Le nom désigne le **consommateur** — `app_backend`, `batch_rag` — jamais un rôle
+humain. Le client final ne détient aucune clé : c'est le back-end qui la porte et
+qui, lui, authentifie ses utilisateurs. Ce nom est ce qui apparaît dans le
+journal ; il permet de répondre à « quel service a lu quoi », et de révoquer un
+consommateur sans toucher aux autres.
+
+Contraintes, vérifiées au démarrage : nom en `[a-z0-9_-]+` non vide, clé de
+**32 caractères minimum**, noms et clés uniques.
+
+### Défaillance fermée
+
+Si `API_KEYS` est **absente, vide ou malformée**, l'application **refuse de
+démarrer** :
+
+```
+ValueError: API_KEYS est absente : l'API refuse de démarrer sans trousseau.
+```
+
+Il n'existe aucun chemin par lequel l'API démarrerait en accès ouvert. Une API
+de données qui démarre sans trousseau est une API publique : c'est un incident,
+pas un mode dégradé. C'est aussi pourquoi `.env.example` porte `API_KEYS=` vide —
+copié tel quel, il fait échouer le démarrage, ce qui est le comportement voulu.
+
+### Obtenir et faire tourner une clé
+
+```bash
+# Générer une clé (40 caractères, alphabet URL-sûr)
+openssl rand -base64 32 | tr -d '=+/' | cut -c1-40
+```
+
+Elle se pose dans `.env` (non versionné) ou dans le secret store de la
+plateforme — **jamais dans le dépôt**, jamais dans `docker-compose.yml`.
+
+**Rotation, sans interruption** — le format multi-entrées existe pour ça :
+
+1. ajouter la nouvelle clé à côté de l'ancienne :
+   `API_KEYS=app_backend:<ancienne>,app_backend_v2:<nouvelle>` ;
+2. redémarrer l'API — les deux clés sont acceptées ;
+3. basculer le consommateur sur la nouvelle clé ;
+4. vérifier dans le journal que le libellé `app_backend` n'apparaît plus ;
+5. retirer l'ancienne entrée et redémarrer.
+
+Une clé compromise se révoque en la retirant d'`API_KEYS` et en redémarrant.
+
+### Ce que le journal consigne
+
+Le journal **ne contient jamais de clé** — ni valide, ni rejetée. Une clé
+rejetée reste une clé : la journaliser la publierait à quiconque lit les
+journaux. Il porte le libellé du consommateur, ou rien :
+
+```
+INFO  app.security: appel autorisé sur /rag/export/composition, consommateur « app_backend »
+WARN  app.security: appel refusé sur /rag/export/composition : clé d'API inconnue
+WARN  app.security: appel refusé sur /rag/export : en-tête X-API-Key absent
+```
+
+Le journal distingue les deux causes de refus ; **la réponse HTTP, non**. Les
+deux cas renvoient un `401` au message identique, pour ne pas indiquer à un
+appelant que sa clé a bien été lue puis rejetée — donc qu'elle a la bonne forme.
+
+### Appeler l'API
+
+```bash
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/rag/export?limit=5"
+curl -s "http://localhost:8000/health"      # ouvert, sans clé
 ```
 
 ## Prérequis : le rôle de consultation
@@ -167,6 +268,9 @@ Réponse attendue :
 {"status":"ok","db":"ok"}
 ```
 
+Ces deux sondes sont **ouvertes** : ni l'une ni l'autre n'exige de clé, un
+orchestrateur n'ayant pas à porter de secret pour demander si le processus vit.
+
 `/live` teste seulement le processus API. `/health` teste aussi PostgreSQL et renvoie
 HTTP 503 avec une réponse neutralisée lorsque la base est indisponible.
 
@@ -189,29 +293,105 @@ curl -s http://localhost:8000/health
 `GET /kitsu/{kitsu_id}` — lit `manga.kitsu_series_core`.
 
 ```bash
-curl -s http://localhost:8000/kitsu/38
+curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/kitsu/38
 ```
 
 Champs (exemple) :
 `kitsu_id`, `slug`, `title_canonical`, `synopsis_clean`, `rating_average_10`, `rating_rank`, `popularity_rank`.
 
-### 4) Export RAG (aperçu)
+### 4) Aperçu du corpus RAG — `GET /rag/preview`
 
-`GET /rag/export?limit=20&offset=0` — pagine `manga.rag_export_docs` et retourne un aperçu.
+`GET /rag/preview?limit=20&offset=0` — échantillon classé par pertinence métier.
 
 - `limit` : `1..200` (défaut `20`)
-- `offset` : `>= 0` (défaut `0`)
+- `offset` : `0..20000` (défaut `0`)
+- tri : `boost_score DESC NULLS LAST, doc_key`
+
+**Cet endpoint n'est ni exhaustif ni complet, par décision.** `doc_text` y est
+coupé à 500 caractères et `offset` y est plafonné : le fond du corpus est
+inatteignable ici. C'est ce qu'est un aperçu — il sert à regarder ce que
+contient le corpus, classé par intérêt. Pour lire la totalité, voir
+`/rag/export`.
 
 ```bash
-curl -s "http://localhost:8000/rag/export?limit=3&offset=0"
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/rag/preview?limit=3"
 ```
+
+### 4 bis) Export exhaustif — `GET /rag/export`
+
+`GET /rag/export?limit=200&cursor=<curseur>` — **la totalité** du corpus, en
+**texte intégral**, paginée par **curseur**.
+
+| | `/rag/preview` | `/rag/export` |
+| --- | --- | --- |
+| Texte | tronqué à 500 caractères | **intégral** |
+| Ordre | `boost_score DESC NULLS LAST, doc_key` | `doc_key COLLATE "C"` croissant |
+| Pagination | `offset`/`limit`, plafonnée | **curseur, sans limite de profondeur** |
+| Exhaustivité | **non** — assumé | **oui** — vérifiée par les tests |
+
+- `limit` : `1..200` (défaut `20`). Conservé bas à dessein : à texte intégral,
+  une page pèse ~142 ko en moyenne et un document seul peut atteindre 148 ko.
+- `cursor` : opaque, renvoyé dans `next_cursor`. À repasser tel quel.
+- **`offset` a été retiré** — pas déprécié, retiré. Un `OFFSET` plafonné rend le
+  fond du corpus inatteignable, et un `OFFSET` profond coûte un parcours complet
+  à chaque page. Le paramètre est simplement ignoré s'il est fourni.
+
+**Contrat de parcours.** Suivre `next_cursor` jusqu'à ce qu'il vaille `null` :
+chaque document est alors vu **une fois et une seule**. Une page renvoyant moins
+de `limit` éléments est la dernière ; si la taille du corpus est un multiple
+exact de `limit`, une dernière page vide clôt le parcours.
+
+```bash
+CURSOR=""
+while : ; do
+  PAGE=$(curl -s -H "X-API-Key: $API_KEY" \
+    "http://localhost:8000/rag/export?limit=200&cursor=$CURSOR")
+  echo "$PAGE" | jq -c '.items[] | {doc_key, source}'
+  CURSOR=$(echo "$PAGE" | jq -r '.next_cursor // empty')
+  [ -z "$CURSOR" ] && break
+done
+```
+
+Le curseur est le `doc_key` de la dernière ligne rendue, encodé en base64url.
+Il est **opaque** : sa forme peut changer sans préavis, un client ne doit ni le
+fabriquer ni l'interpréter. Un curseur illisible — hors alphabet base64, tronqué,
+non décodable — donne un **`422`**, jamais un `500`.
+
+L'ordre de parcours est `doc_key COLLATE "C"`, c'est-à-dire octet par octet.
+Il **n'a aucune signification métier** : il ne sert qu'à garantir qu'aucun
+document n'est sauté ni rendu deux fois. Une comparaison binaire est stable quelle
+que soit la collation de la base ou la locale du système, là où un tri
+linguistique peut changer entre deux versions d'ICU et faire silencieusement
+dériver le parcours.
+
+### 4 ter) Composition du corpus — `GET /rag/export/composition`
+
+`GET /rag/export/composition` — total, décompte par source, horodatage de la
+mesure.
+
+```json
+{
+  "total": 51880,
+  "by_source": [
+    {"source": "kitsu_synopsis", "documents": 43085},
+    {"source": "ms_hybrid", "documents": 5608},
+    {"source": "ms_review", "documents": 3187}
+  ],
+  "measured_at": "2026-08-24T18:41:48.835429Z"
+}
+```
+
+Cet endpoint existe **par conception, non par confort** : une pagination par
+curseur ne peut renvoyer aucun total, et le `COUNT(*)` — mesuré à ~330 ms —
+disparaît ainsi du coût de *chaque* page. Effet second assumé : la composition
+du corpus devient explicite au lieu de rester tacite.
 
 ### 5) Récupération d’un document complet
 
 `GET /rag/doc/{doc_key}` — retourne `doc_text` complet + métadonnées (issu de `manga.rag_export_docs`).
 
 ```bash
-curl -s "http://localhost:8000/rag/doc/kitsu:38" | head
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/rag/doc/kitsu:38" | head
 ```
 
 ### 6) Recherche plein texte (PostgreSQL FTS)
@@ -223,8 +403,8 @@ curl -s "http://localhost:8000/rag/doc/kitsu:38" | head
 - `offset` : `>= 0`
 
 ```bash
-curl -s "http://localhost:8000/search?q=one%20piece&limit=5" | head
-curl -s "http://localhost:8000/search?q=shounen%20fantasy&limit=5" | head
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=one%20piece&limit=5" | head
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=shounen%20fantasy&limit=5" | head
 ```
 
 ## Modèle de scoring : `boost_score`
@@ -262,11 +442,18 @@ docker compose -f compose.integration.yml down -v
 ```
 
 Le Compose d'intégration démarre une PostgreSQL 16 temporaire (`tmpfs`, donc
-réellement jetable), **applique les 12 migrations de `../database/migrations/`**,
-injecte la fixture de test puis appelle réellement les six endpoints HTTP. Le schéma
+réellement jetable), **applique les 15 migrations de `../database/migrations/`**,
+injecte la fixture de test puis appelle réellement les endpoints HTTP. Le schéma
 vérifié est celui de la production : le smoke test contrôle notamment que la formule
 de boost servie est bien celle du tableau ci-dessus, et échoue si une pondération
 antérieure était rétablie.
+
+Le harnais couvre aussi le contrat d'accès : il vérifie que les six routes de
+données refusent un appel sans clé, avec une clé invalide et avec la bonne clé à
+un caractère près ; que les sondes et la documentation répondent sans clé ; et
+que le parcours complet de `/rag/export` par curseur rend chaque document une
+fois et une seule, en texte intégral. Le service `api` du Compose reçoit une clé
+jetable, propre au harnais.
 
 `down -v` est nécessaire entre deux exécutions : la fixture n'est pas rejouable sur
 une base déjà peuplée.

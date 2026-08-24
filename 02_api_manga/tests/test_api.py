@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
-from contextlib import contextmanager
-from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -11,70 +8,18 @@ from fastapi.responses import JSONResponse
 from psycopg import OperationalError
 
 from app.main import (
+    decode_cursor,
+    encode_cursor,
     get_kitsu_core,
     health,
     live,
     rag_doc,
     rag_export,
+    rag_export_composition,
+    rag_preview,
     search,
 )
-
-
-class FakeCursor:
-    def __init__(
-        self,
-        results: list[Any],
-        error: Exception | None = None,
-    ) -> None:
-        self.results = results
-        self.error = error
-        self.current: Any = None
-        self.executions: list[tuple[str, Any]] = []
-
-    def __enter__(self) -> FakeCursor:
-        return self
-
-    def __exit__(self, *_args: Any) -> None:
-        return None
-
-    def execute(self, sql: str, params: Any = None) -> None:
-        self.executions.append((sql, params))
-        if self.error is not None:
-            raise self.error
-        self.current = self.results.pop(0)
-
-    def fetchone(self) -> Any:
-        return self.current
-
-    def fetchall(self) -> Any:
-        return self.current
-
-
-class FakeConnection:
-    def __init__(self, cursor: FakeCursor) -> None:
-        self._cursor = cursor
-
-    def __enter__(self) -> FakeConnection:
-        return self
-
-    def __exit__(self, *_args: Any) -> None:
-        return None
-
-    def cursor(self) -> FakeCursor:
-        return self._cursor
-
-
-class FakePool:
-    def __init__(
-        self,
-        results: list[Any] | None = None,
-        error: Exception | None = None,
-    ) -> None:
-        self.cursor = FakeCursor(results or [], error)
-
-    @contextmanager
-    def connection(self) -> Iterator[FakeConnection]:
-        yield FakeConnection(self.cursor)
+from tests.faux_pool import FakePool
 
 
 def test_live_does_not_require_database() -> None:
@@ -126,12 +71,118 @@ def test_database_errors_become_a_neutral_503() -> None:
     assert error.value.detail == "database unavailable"
 
 
-def test_rag_export_accepts_a_null_boost() -> None:
+def test_rag_preview_accepts_a_null_boost() -> None:
     rows = [("kitsu:38", "kitsu", None, "Titres: One Piece")]
 
-    response = rag_export(FakePool([(1,), rows]), limit=1, offset=0)
+    response = rag_preview(FakePool([(1,), rows]), limit=1, offset=0)
 
     assert response.items[0].boost_score == 0.0
+
+
+def test_rag_preview_conserve_la_troncature_et_le_tri_par_pertinence() -> None:
+    """L'aperçu garde le contrat de l'ancien `/rag/export` : c'est son objet."""
+    rows = [("kitsu:38", "kitsu", 120.0, "Titres: One Piece")]
+    pool = FakePool([(1,), rows])
+
+    rag_preview(pool, limit=1, offset=0)
+
+    sql = pool.cursor.executions[1][0]
+    assert "left(doc_text, 500)" in sql
+    assert "ORDER BY boost_score DESC NULLS LAST, doc_key" in sql
+
+
+def test_rag_export_lit_le_texte_integral_sans_troncature() -> None:
+    """Contrat décisif de l'export : aucune fonction de coupe dans le SQL."""
+    rows = [("kitsu:38", "kitsu", 120.0, "x" * 10_000, {"kitsu_id": 38})]
+    pool = FakePool([rows])
+
+    response = rag_export(pool, limit=1, cursor=None)
+
+    sql = pool.cursor.executions[0][0]
+    assert "left(" not in sql
+    assert "doc_text" in sql
+    assert response.items[0].doc_text == "x" * 10_000
+
+
+def test_rag_export_ordonne_en_collation_c() -> None:
+    """Le prédicat et le tri portent la MÊME collation, sinon la borne dérive."""
+    pool = FakePool([[]])
+
+    rag_export(pool, limit=10, cursor=encode_cursor("kitsu:38"))
+
+    sql, params = pool.cursor.executions[0]
+    assert 'WHERE doc_key COLLATE "C" > %s' in sql
+    assert 'ORDER BY doc_key COLLATE "C"' in sql
+    # Le curseur est décodé puis LIÉ, jamais interpolé dans le SQL.
+    assert params == ("kitsu:38", 10)
+    assert "kitsu:38" not in sql
+
+
+def test_rag_export_n_expose_plus_offset() -> None:
+    """`offset` est retiré, pas déprécié : un export plafonné n'est pas un export."""
+    import inspect
+
+    assert "offset" not in inspect.signature(rag_export).parameters
+
+
+def test_rag_export_ferme_le_parcours_sur_une_page_incomplete() -> None:
+    rows = [("kitsu:38", "kitsu", 1.0, "texte", {})]
+
+    response = rag_export(FakePool([rows]), limit=10, cursor=None)
+
+    assert response.next_cursor is None
+
+
+def test_rag_export_propose_un_curseur_sur_une_page_pleine() -> None:
+    rows = [
+        ("kitsu:38", "kitsu", 1.0, "texte", {}),
+        ("kitsu:39", "kitsu", 1.0, "texte", {}),
+    ]
+
+    response = rag_export(FakePool([rows]), limit=2, cursor=None)
+
+    assert response.next_cursor is not None
+    assert decode_cursor(response.next_cursor) == "kitsu:39"
+
+
+def test_le_curseur_fait_un_aller_retour_fidele() -> None:
+    for doc_key in ("kitsu:1", "ms_review:6374", "ms_hybrid:8514"):
+        assert decode_cursor(encode_cursor(doc_key)) == doc_key
+
+
+@pytest.mark.parametrize(
+    ("curseur", "cas"),
+    [
+        ("!!!pas-du-base64!!!", "hors alphabet base64"),
+        ("YWJ", "tronqué : longueur non multiple de 4"),
+        ("////", "base64 valide mais octets non décodables en UTF-8"),
+        ("", "vide"),
+        ("é" * 4, "non ASCII"),
+        (encode_cursor("x" * 256), "clé plus longue que doc_key ne peut l'être"),
+    ],
+)
+def test_un_curseur_illisible_donne_422_jamais_500(curseur: str, cas: str) -> None:
+    with pytest.raises(HTTPException) as error:
+        decode_cursor(curseur)
+
+    assert error.value.status_code == 422, cas
+
+
+def test_composition_totalise_ce_qu_elle_detaille() -> None:
+    """Un seul GROUP BY : le total ne peut pas dater d'un autre instant."""
+    rows = [("kitsu_synopsis", 43085), ("ms_hybrid", 5608), ("ms_review", 3187)]
+    pool = FakePool([rows])
+
+    response = rag_export_composition(pool)
+
+    assert response.total == 51880
+    assert response.total == sum(entry.documents for entry in response.by_source)
+    assert [entry.source for entry in response.by_source] == [
+        "kitsu_synopsis",
+        "ms_hybrid",
+        "ms_review",
+    ]
+    assert response.measured_at.tzinfo is not None
 
 
 def test_rag_document_returns_metadata() -> None:

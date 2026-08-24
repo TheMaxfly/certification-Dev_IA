@@ -2,7 +2,7 @@
 # `database/migrations/` — la source de vérité du dépôt. Le module 02 ne
 # transporte plus de DDL : il ne peut donc plus tester un schéma périmé.
 #
-# Enchaînement : db (sain) → migrations (13 fichiers) → role → fixture
+# Enchaînement : db (sain) → migrations (15 fichiers) → role → fixture
 #              → temoin → api → smoke.
 #
 #   docker compose -f compose.integration.yml run --rm --build smoke
@@ -112,6 +112,11 @@ services:
       # L'API tourne sous le rôle de consultation, comme en production.
       DB_USER: manga_api
       DB_PASSWORD: role-integration-test
+      # Trousseau jetable du harnais. L'API refusant de démarrer sans clé, ce
+      # service ne peut plus passer `healthy` si la variable disparaît : le
+      # harnais teste donc aussi, par construction, que l'autorisation est
+      # câblée. Le smoke reçoit LA MÊME valeur et rien d'autre.
+      API_KEYS: app_backend:cle-jetable-du-harnais-0123456789abcdef
       DB_POOL_MIN_SIZE: 1
       DB_POOL_MAX_SIZE: 3
     depends_on:
@@ -132,6 +137,8 @@ services:
   smoke:
     image: python:3.12-slim
     command: ["python", "/tests/http_smoke.py"]
+    environment:
+      API_KEY: cle-jetable-du-harnais-0123456789abcdef
     volumes:
       - ./tests:/tests:ro
     depends_on:

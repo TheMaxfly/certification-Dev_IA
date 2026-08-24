@@ -1,6 +1,6 @@
 """Smoke test HTTP exécuté dans le Compose d'intégration.
 
-La base visée est jetable, son schéma reconstruit par les 12 migrations de
+La base visée est jetable, son schéma reconstruit par les 15 migrations de
 `database/migrations/`, son contenu posé par `tests/fixtures/002_sample_data.sql`.
 Chaque attendu chiffré ci-dessous se dérive de cette fixture et de la formule
 de boost de PRODUCTION ; la dérivation est écrite en commentaire au-dessus de
@@ -10,11 +10,32 @@ l'assertion, jamais laissée au lecteur.
 from __future__ import annotations
 
 import json
+import os
+import time
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote_plus
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 BASE_URL = "http://api:8000"
+
+# Clé jetable du harnais, posée par `compose.integration.yml`. Elle n'ouvre
+# rien : elle ne vaut que pour la base temporaire de ce Compose.
+API_KEY = os.environ["API_KEY"]
+API_KEY_HEADER = "X-API-Key"
+
+# Les six routes de données, et les routes qui restent ouvertes. Ces deux
+# listes sont le contrat d'accès du module, vérifié ici contre une API réelle
+# et non contre un client de test en mémoire.
+ROUTES_PROTEGEES = (
+    "/kitsu/38",
+    "/rag/preview",
+    "/rag/export",
+    "/rag/export/composition",
+    f"/rag/doc/{quote_plus('kitsu:38')}",
+    "/search?q=one",
+)
+ROUTES_OUVERTES = ("/live", "/health", "/docs", "/openapi.json")
 
 # Formule de boost de la vue `manga.rag_docs_scored` en production :
 #   100 / trending_pos + 30 / popular_pos + 20 / top_pos
@@ -35,10 +56,175 @@ DOCS_ATTENDUS = {"kitsu:38", "ms_hybrid:736", "ms_review:1"}
 SOURCES_ATTENDUES = {"kitsu_synopsis", "ms_hybrid", "ms_review"}
 
 
+def _corps(brut: bytes, type_contenu: str) -> Any:
+    """Décode le corps en JSON quand c'en est, en texte sinon.
+
+    `/docs` et `/redoc` renvoient du HTML : les routes ouvertes ne sont pas
+    toutes des routes de données, et une aide qui exigerait du JSON partout
+    échouerait sur elles.
+    """
+    if not brut:
+        return None
+    if "application/json" in type_contenu:
+        return json.loads(brut)
+    return brut.decode("utf-8", errors="replace")
+
+
+def appeler(path: str, *, cle: str | None = API_KEY) -> tuple[int, Any]:
+    """Appelle l'API et renvoie (statut, corps), sans lever sur une erreur HTTP."""
+    entetes = {API_KEY_HEADER: cle} if cle is not None else {}
+    requete = Request(f"{BASE_URL}{path}", headers=entetes)  # noqa: S310
+    try:
+        with urlopen(requete, timeout=60) as response:  # noqa: S310
+            return response.status, _corps(
+                response.read(), response.headers.get("content-type", "")
+            )
+    except HTTPError as erreur:
+        return erreur.code, _corps(
+            erreur.read(), erreur.headers.get("content-type", "")
+        )
+
+
 def get_json(path: str) -> dict[str, Any]:
-    with urlopen(f"{BASE_URL}{path}", timeout=10) as response:  # noqa: S310
-        assert response.status == 200, f"{path} → HTTP {response.status}"
-        return json.load(response)
+    statut, corps = appeler(path)
+    assert statut == 200, f"{path} → HTTP {statut}"
+    return corps
+
+
+def verifier_le_controle_d_acces() -> None:
+    """Contrôles 3 et 4, exercés contre l'API réelle.
+
+    Sans en-tête, avec une clé invalide, et avec la bonne clé à un caractère
+    près : les six routes de données doivent refuser. Les sondes et la
+    documentation doivent répondre SANS clé — c'est une règle du module, pas
+    une omission, et elle mérite donc d'être testée comme telle.
+    """
+    presque = API_KEY[:-1] + ("z" if API_KEY[-1] != "z" else "a")
+    assert presque != API_KEY and len(presque) == len(API_KEY)
+
+    for route in ROUTES_PROTEGEES:
+        sans_cle, corps_sans = appeler(route, cle=None)
+        assert sans_cle == 401, f"{route} sans clé → {sans_cle}, attendu 401"
+
+        invalide, corps_invalide = appeler(
+            route, cle="cle-inventee-de-la-bonne-taille-1234"
+        )
+        assert invalide == 401, f"{route} clé invalide → {invalide}"
+
+        voisine, _ = appeler(route, cle=presque)
+        assert voisine == 401, f"{route} clé à un caractère près → {voisine}"
+
+        # Pas d'oracle : les deux refus sont indiscernables du dehors.
+        assert corps_sans == corps_invalide, route
+
+        autorise, _ = appeler(route)
+        assert autorise == 200, f"{route} avec la bonne clé → {autorise}"
+
+    for route in ROUTES_OUVERTES:
+        statut, _ = appeler(route, cle=None)
+        assert statut == 200, (
+            f"{route} sans clé → {statut}, attendu 200 (route ouverte)"
+        )
+
+
+def verifier_les_curseurs_illisibles() -> None:
+    """Contrôle 6 : un curseur illisible donne 422, jamais 500."""
+    for curseur in ("!!!pas-du-base64!!!", "YWJ", "////", quote_plus("é" * 4)):
+        statut, _ = appeler(f"/rag/export?cursor={curseur}")
+        assert statut == 422, f"curseur {curseur!r} → {statut}, attendu 422"
+
+
+def parcourir_l_export(limit: int = 1) -> tuple[list[str], int, float]:
+    """Parcourt `/rag/export` par curseur jusqu'à épuisement.
+
+    Renvoie les `doc_key` DANS L'ORDRE DE PARCOURS — et non un ensemble : c'est
+    la liste qui permet de distinguer un document manquant d'un document rendu
+    deux fois. Un parcours qui boucle est coupé net plutôt que laissé tourner.
+    """
+    doc_keys: list[str] = []
+    cursor: str | None = None
+    pages = 0
+    depart = time.monotonic()
+
+    while True:
+        chemin = f"/rag/export?limit={limit}"
+        if cursor is not None:
+            chemin += f"&cursor={quote_plus(cursor)}"
+        page = get_json(chemin)
+        pages += 1
+        doc_keys.extend(item["doc_key"] for item in page["items"])
+
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+        assert pages < 100_000, "parcours non convergent : le curseur n'avance pas"
+
+    return doc_keys, pages, time.monotonic() - depart
+
+
+def verifier_l_exhaustivite_de_l_export() -> None:
+    """Contrôle 1, transposé au harnais : rien de perdu, rien de rendu deux fois.
+
+    `limit=1` sur un corpus de 3 documents force un parcours à plusieurs pages
+    et exerce la clôture par page vide (3 est un multiple exact de 1) — le seul
+    endroit où une erreur de borne « > » / « >= » se verrait.
+    """
+    doc_keys, pages, _ = parcourir_l_export(limit=1)
+
+    assert len(doc_keys) == len(set(doc_keys)), (
+        f"doublons dans le parcours : {doc_keys}"
+    )
+    assert set(doc_keys) == DOCS_ATTENDUS, f"parcours incomplet : {set(doc_keys)}"
+    # 3 documents à 1 par page, plus la page vide qui clôt le parcours.
+    assert pages == len(DOCS_ATTENDUS) + 1, (
+        f"{pages} pages, attendu {len(DOCS_ATTENDUS) + 1}"
+    )
+    # L'ordre est celui de `doc_key COLLATE "C"`, croissant.
+    assert doc_keys == sorted(doc_keys), doc_keys
+
+
+def verifier_le_texte_integral() -> None:
+    """Contrôle 2 : l'export ne tronque pas, l'aperçu tronque.
+
+    Les deux moitiés comptent. Un export qui rendrait 500 caractères serait un
+    aperçu déguisé ; un aperçu qui rendrait tout aurait perdu son objet.
+    """
+    export = {
+        item["doc_key"]: item for item in get_json("/rag/export?limit=200")["items"]
+    }
+
+    for doc_key in DOCS_ATTENDUS:
+        complet = get_json(f"/rag/doc/{quote_plus(doc_key)}")
+        assert export[doc_key]["doc_text"] == complet["doc_text"], doc_key
+
+    apercu = {
+        item["doc_key"]: item for item in get_json("/rag/preview?limit=200")["items"]
+    }
+    for doc_key, item in apercu.items():
+        assert len(item["preview"]) <= 500, doc_key
+        assert item["preview"] == export[doc_key]["doc_text"][:500], doc_key
+
+
+def verifier_la_composition() -> None:
+    """Contrôle 8 : le total et les décomptes par source s'accordent."""
+    composition = get_json("/rag/export/composition")
+
+    assert composition["total"] == len(DOCS_ATTENDUS)
+    assert composition["total"] == sum(
+        entree["documents"] for entree in composition["by_source"]
+    )
+    assert {
+        entree["source"] for entree in composition["by_source"]
+    } == SOURCES_ATTENDUES
+    assert composition["measured_at"]
+
+
+def verifier_que_l_export_ignore_offset() -> None:
+    """`offset` est retiré : la page renvoyée est la première, pas la seconde."""
+    premiere = get_json("/rag/export?limit=1")
+    avec_offset = get_json("/rag/export?limit=1&offset=2")
+
+    assert premiere["items"][0]["doc_key"] == avec_offset["items"][0]["doc_key"]
 
 
 def verifier_formule_de_production(doc_key: str, boost: float) -> None:
@@ -60,6 +246,9 @@ def verifier_formule_de_production(doc_key: str, boost: float) -> None:
 
 
 def main() -> None:
+    verifier_le_controle_d_acces()
+    verifier_les_curseurs_illisibles()
+
     assert get_json("/live") == {"status": "ok", "db": "not_checked"}
     assert get_json("/health") == {"status": "ok", "db": "ok"}
 
@@ -69,13 +258,15 @@ def main() -> None:
     assert kitsu["slug"] == "one-piece"
     assert kitsu["rating_rank"] == 2
 
-    # /rag/export : les 3 documents de la fixture, un par source.
-    export = get_json("/rag/export?limit=10&offset=0")
+    # /rag/preview : les 3 documents de la fixture, un par source. Ce bloc
+    # teste l'APERÇU — c'est lui qui a hérité du tri par pertinence et de la
+    # troncature de l'ancien `/rag/export`.
+    export = get_json("/rag/preview?limit=10&offset=0")
     assert export["total"] == len(DOCS_ATTENDUS)
     assert {item["doc_key"] for item in export["items"]} == DOCS_ATTENDUS
     assert {item["source"] for item in export["items"]} == SOURCES_ATTENDUES
 
-    # Tri de l'endpoint : `boost_score DESC NULLS LAST, doc_key`. Les deux
+    # Tri de l'aperçu : `boost_score DESC NULLS LAST, doc_key`. Les deux
     # documents porteurs des signaux hebdomadaires valent 120.0 ; l'égalité est
     # tranchée par doc_key, et 'kitsu:38' précède 'ms_hybrid:736'. La critique
     # n'a aucune position dans ses métadonnées, donc un boost nul, et ferme la
@@ -128,6 +319,11 @@ def main() -> None:
         "ms_review:1",
         "ms_hybrid:736",
     }
+
+    verifier_l_exhaustivite_de_l_export()
+    verifier_le_texte_integral()
+    verifier_la_composition()
+    verifier_que_l_export_ignore_offset()
 
 
 if __name__ == "__main__":

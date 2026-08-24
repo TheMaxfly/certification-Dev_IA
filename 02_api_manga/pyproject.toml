@@ -1,6 +1,6 @@
 [project]
 name = "api-manga-http"
-version = "0.3.0"
+version = "0.4.0"
 description = "FastAPI read API for the PostgreSQL manga corpus."
 requires-python = ">=3.12"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.3.4,<10",
     "ruff>=0.8.4,<1",
 ]
