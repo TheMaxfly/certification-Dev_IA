@@ -18,9 +18,14 @@ pipeline de nettoyage, PostgreSQL et RAG du projet.
   hub expose bien 27 liens (`#` et `A-Z`) et le listing `A` contient 874 liens
   de fiches détectés. Le crawl complet des milliers de fiches n'avait pas été
   lancé lors de cette vérification initiale.
-- Les crawls autorisés du 14 juillet 2026 sont maintenant terminés et validés :
-  **11 717 séries** et **50 entrées populaires**, sans URL dupliquée. Les validations
-  Great Expectations critique et warning réussissent pour les deux datasets.
+- Collecte réalisée sur des pages publiques, sans compte ni cookie.
+  `ROBOTSTXT_OBEY = True` ; consultation de `robots.txt` attestée `HTTP 200` dans
+  les statistiques d'exécution, aucune interdiction enregistrée sur les routes
+  parcourues. Aucune autorisation du titulaire n'a été sollicitée ni obtenue. Les
+  CGU du site réservent la reproduction et la diffusion.
+- Les crawls du 14 juillet 2026 sont terminés et validés : **11 717 séries** et
+  **50 entrées populaires**, sans URL dupliquée. Les validations Great
+  Expectations critique et warning réussissent pour les deux datasets.
 - Le snapshot précédent du 31 décembre 2025 (11 415 séries et 50 populaires) reste
   archivé dans `data/archive/2025-12-31/`.
 

@@ -2,7 +2,7 @@
 
 Copie de sauvegarde retrouvée dans
 `/home/maxime/certification/scrapping_manga-news/data/enriched/` le 14 juillet
-2026, avant le nouveau crawl autorisé.
+2026, avant le nouveau crawl.
 
 | Fichier | Lignes | SHA-256 |
 |---|---:|---|
