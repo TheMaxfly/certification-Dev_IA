@@ -14,6 +14,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    # Validateur OpenAPI 3.1 tiers. « Généré par FastAPI » n'est pas une preuve
+    # de conformité au standard ; la sortie d'un validateur indépendant en est
+    # une. Groupe DEV uniquement : l'API ne l'embarque pas en production.
+    "openapi-spec-validator>=0.7,<1",
     "pytest>=8.3.4,<10",
     "ruff>=0.8.4,<1",
 ]

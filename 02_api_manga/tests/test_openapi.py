@@ -174,3 +174,135 @@ def test_la_version_du_module_suit_pyproject() -> None:
     ]
 
     assert API_VERSION == declaree
+
+
+# --------------------------------------------------------------------------
+# Conformité au standard, prouvée par un validateur tiers
+# --------------------------------------------------------------------------
+def test_le_schema_est_conforme_a_openapi_31(schema: dict[str, Any]) -> None:
+    """« Généré par FastAPI » n'est pas une preuve de conformité.
+
+    Un générateur peut produire un document que le standard refuse — et le
+    refus n'apparaîtrait nulle part, puisque c'est le même générateur qui sert
+    `/docs`. Seule une lecture par un validateur INDÉPENDANT tranche. Il est en
+    dépendance de dev : l'API ne l'embarque pas en production.
+    """
+    from openapi_spec_validator import OpenAPIV31SpecValidator
+
+    assert schema["openapi"].startswith("3.1.")
+
+    erreurs = [
+        f"{list(e.absolute_path)} : {e.message}"
+        for e in OpenAPIV31SpecValidator(schema).iter_errors()
+    ]
+
+    assert erreurs == [], "\n".join(erreurs)
+
+
+# --------------------------------------------------------------------------
+# Le contrat versionné
+# --------------------------------------------------------------------------
+def test_le_contrat_versionne_correspond_au_schema_genere() -> None:
+    """`openapi.json` du dépôt EST le schéma servi, pas une copie qui vieillit.
+
+    Sans ce test, le fichier versionné deviendrait une documentation parallèle :
+    plausible, diffable, et fausse. Il est régénéré par
+    `uv run python outils/exporter_openapi.py`.
+    """
+    import json
+
+    from outils.exporter_openapi import DESTINATION, contrat, serialiser
+
+    assert DESTINATION.exists(), (
+        f"{DESTINATION.name} est absent — le régénérer par "
+        "`uv run python outils/exporter_openapi.py`"
+    )
+
+    versionne = DESTINATION.read_text(encoding="utf-8")
+    attendu = serialiser(contrat())
+
+    assert json.loads(versionne) == json.loads(attendu), (
+        f"{DESTINATION.name} a dérivé du schéma généré — le régénérer par "
+        "`uv run python outils/exporter_openapi.py`"
+    )
+    assert versionne == attendu, (
+        f"{DESTINATION.name} a le bon contenu mais pas la forme stable "
+        "(clés triées, indentation 2) — le régénérer."
+    )
+
+
+# --------------------------------------------------------------------------
+# La règle d'accès écrite COMME une règle
+# --------------------------------------------------------------------------
+# Routes servies par FastAPI lui-même : elles ne sont pas dans le schéma (un
+# contrat ne se décrit pas dans son propre contrat), mais la règle d'accès doit
+# les couvrir — ce sont elles que « la documentation est ouverte » désigne.
+ROUTES_DE_DOCUMENTATION = {"/docs", "/redoc", "/openapi.json"}
+
+
+def regle_du_readme() -> dict[str, bool]:
+    """Le tableau d'autorisation du README, relu comme une donnée.
+
+    Le critère 2 porte sur des règles DOCUMENTÉES. Un test qui ne lirait que le
+    code vérifierait le comportement et raterait le critère : c'est le texte
+    qui doit être exact, et c'est donc le texte qu'on relit.
+    """
+    import re
+
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(
+        encoding="utf-8"
+    )
+    dans_le_tableau = re.search(
+        r"^\| Routes \| Clé exigée \| Pourquoi \|\n\|[-| ]+\|\n((?:\|.*\n)+)",
+        readme,
+        re.MULTILINE,
+    )
+    assert dans_le_tableau, "le tableau d'autorisation est introuvable dans le README"
+
+    regle: dict[str, bool] = {}
+    for ligne in dans_le_tableau.group(1).strip().splitlines():
+        colonnes = [c.strip() for c in ligne.strip().strip("|").split("|")]
+        exigee = colonnes[1].strip("*") == "oui"
+        for chemin in re.findall(r"`([^`]+)`", colonnes[0]):
+            regle[chemin] = exigee
+    return regle
+
+
+def test_le_readme_enonce_la_regle_d_acces_route_par_route(
+    schema: dict[str, Any],
+) -> None:
+    """Le tableau du README couvre TOUTES les routes, et dit vrai sur chacune.
+
+    C'est ce test qui aurait dû tomber quand les cinq routes de catalogue sont
+    arrivées : elles étaient protégées dans le code, absentes de la règle
+    écrite. Le comportement était bon, la documentation ne l'était pas — et le
+    critère porte sur la documentation.
+    """
+    regle = regle_du_readme()
+
+    assert set(regle) == set(schema["paths"]) | ROUTES_DE_DOCUMENTATION
+
+    for chemin, operation in operations(schema).items():
+        protegee_dans_le_schema = bool(operation.get("security"))
+        assert regle[chemin] == protegee_dans_le_schema, (
+            f"le README dit « clé exigée : "
+            f"{'oui' if regle[chemin] else 'non'} » pour {chemin}, "
+            f"le schéma dit le contraire"
+        )
+    for chemin in ROUTES_DE_DOCUMENTATION:
+        assert regle[chemin] is False, f"{chemin} doit rester ouverte"
+
+
+def test_le_readme_couvre_les_quatre_regles_d_acces() -> None:
+    """Les quatre points que le critère 2 exige d'écrire, et leur ancre."""
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    for ancre in (
+        "la documentation est ouverte, les données",  # ce qui est protégé, et pourquoi
+        "Le client final ne détient aucune clé",  # qui détient une clé
+        "### Obtenir et faire tourner une clé",  # obtention et rotation
+        "### Défaillance fermée",  # démarrage sans clé
+    ):
+        assert ancre in readme, f"le README ne couvre plus : {ancre}"

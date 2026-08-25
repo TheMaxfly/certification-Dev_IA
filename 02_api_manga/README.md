@@ -79,19 +79,28 @@ DB_PASSWORD=
 ## Autorisation : clé d'API
 
 Les endpoints de **données** exigent un en-tête `X-API-Key`. La **documentation**
-et les **sondes** restent ouvertes.
+et les **sondes** restent ouvertes. La règle vaut **route par route**, sans
+exception ni variante par famille de ressource :
 
-| Ouvert, sans clé | Fermé, clé exigée |
-| --- | --- |
-| `/live`, `/health` | `/kitsu/{kitsu_id}` |
-| `/docs`, `/redoc`, `/openapi.json` | `/rag/preview`, `/rag/export`, `/rag/export/composition` |
-| | `/rag/doc/{doc_key}`, `/search` |
+| Routes | Clé exigée | Pourquoi |
+| --- | --- | --- |
+| `/live` · `/health` | **non** | sondes : un orchestrateur n'a pas à porter de secret pour demander si le processus vit |
+| `/docs` · `/redoc` · `/openapi.json` | **non** | contrat : un contrat qu'on ne peut pas lire ne s'intègre pas |
+| `/kitsu/{kitsu_id}` · `/search` | **oui** | données |
+| `/rag/preview` · `/rag/export` · `/rag/export/composition` · `/rag/doc/{doc_key}` | **oui** | données |
+| `/series/{series_id}` · `/series/{series_id}/volumes` · `/series/{series_id}/reviews` | **oui** | données |
+| `/identity/{work_uid}` · `/coverage` | **oui** | données |
 
 **C'est une règle, pas une omission : la documentation est ouverte, les données
 sont fermées.** Un contrat qu'on ne peut pas lire ne s'intègre pas ; une donnée
 qu'on peut lire sans s'annoncer n'est pas protégée. Les sondes restent ouvertes
 pour la raison symétrique : un `/live` sous clé rend l'API impilotable par un
 orchestrateur, qui n'a pas à porter de secret pour demander si le processus vit.
+
+Ce tableau n'est pas maintenu à la main : `tests/test_openapi.py` le relit et
+le confronte au schéma OpenAPI. Une route ajoutée sans y être inscrite fait
+tomber la suite — **c'est exactement la dérive qui s'était produite**, les cinq
+routes de catalogue ayant été livrées sans que la règle les mentionne.
 
 ### La clé nomme un consommateur, pas une personne
 
@@ -496,6 +505,20 @@ curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=one%20piece&lim
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=shounen%20fantasy&limit=5" | head
 ```
 
+> **La section 7) est ailleurs, à dessein.** Les cinq routes de catalogue —
+> `/series/{series_id}`, `/series/{series_id}/volumes`,
+> `/series/{series_id}/reviews`, `/identity/{work_uid}`, `/coverage` — sont
+> documentées avec leurs sources sous
+> [« 7) Catalogue, identité et couverture »](#7-catalogue-identité-et-couverture),
+> parce que ce qu'elles exposent ne se lit qu'avec le périmètre en main. Elles
+> sont protégées comme les autres routes de données.
+>
+> **Les 13 routes de l'API sont ainsi couvertes** : `/live`, `/health`, puis
+> 1) à 7). Le contrat complet, machine-lisible, est dans
+> [`openapi.json`](openapi.json), régénéré par
+> `uv run python outils/exporter_openapi.py` et tenu à jour par la suite de
+> tests.
+
 ## Modèle de scoring : `boost_score`
 
 Le tri principal du corpus RAG combine :
@@ -537,12 +560,40 @@ vérifié est celui de la production : le smoke test contrôle notamment que la 
 de boost servie est bien celle du tableau ci-dessus, et échoue si une pondération
 antérieure était rétablie.
 
-Le harnais couvre aussi le contrat d'accès : il vérifie que les six routes de
-données refusent un appel sans clé, avec une clé invalide et avec la bonne clé à
-un caractère près ; que les sondes et la documentation répondent sans clé ; et
+Le harnais couvre aussi le contrat d'accès : il vérifie que les **onze** routes
+de données refusent un appel sans clé, avec une clé invalide et avec la bonne
+clé à un caractère près ; que les sondes et la documentation répondent sans clé ; et
 que le parcours complet de `/rag/export` par curseur rend chaque document une
 fois et une seule, en texte intégral. Le service `api` du Compose reçoit une clé
 jetable, propre au harnais.
 
 `down -v` est nécessaire entre deux exécutions : la fixture n'est pas rejouable sur
 une base déjà peuplée.
+
+### Le contrat OpenAPI, versionné et validé
+
+```bash
+uv run python outils/exporter_openapi.py   # régénère openapi.json
+uv run pytest tests/test_openapi.py        # le contrat, relu route par route
+```
+
+[`openapi.json`](openapi.json) est le schéma que sert `/openapi.json`, écrit
+dans le dépôt. Une sortie volatile ne se relit pas à une date donnée et ne se
+compare pas entre deux versions ; écrit ici, le contrat devient **opposable et
+diffable** — un changement de route apparaît en revue au même titre que le code
+qui le produit. Il n'est pas maintenu à la main : un test refuse tout écart avec
+le schéma généré.
+
+Ce que la suite vérifie sur le contrat, et qui ne se déduit pas du code :
+
+- **conformité au standard**, par un validateur OpenAPI 3.1 **indépendant**
+  (`openapi-spec-validator`, dépendance de dev — l'API ne l'embarque pas).
+  « Généré par FastAPI » n'est pas une preuve : c'est le même générateur qui
+  sert `/docs`, il ne peut pas s'auditer lui-même ;
+- **les 13 routes déclarées = les 13 chemins du schéma**, égalité d'ensembles,
+  `/live` et `/health` compris ;
+- `summary`, `tags` et description **non vides sur 100 % des routes**, et
+  aucun `summary` laissé à la génération automatique de FastAPI ;
+- **chaque code de réponse levé est déclaré** — les 404 et 503 du code, le 401
+  de l'autorisation, le 422 des paramètres validés ;
+- **le tableau d'autorisation du README dit vrai**, route par route.
