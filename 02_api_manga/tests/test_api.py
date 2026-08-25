@@ -318,6 +318,73 @@ def test_reviews_lit_le_referentiel_complet_pas_le_corpus_rag() -> None:
     assert "manga.ms_reviews " not in sql_execute.replace("ms_reviews_all", "")
 
 
+@pytest.mark.parametrize(
+    ("series_id", "review_id", "review_url"),
+    [
+        (736, 1, "https://www.manga-sanctuary.com/critique/1-tome-1.html"),
+        (8514, 4, "https://www.manga-sanctuary.com/critique/4-serie.html"),
+        (9999, 5, "https://www.manga-sanctuary.com/critique/5-serie.html"),
+    ],
+)
+def test_reviews_aligne_review_url_sur_le_referentiel_pour_trois_series(
+    series_id: int, review_id: int, review_url: str
+) -> None:
+    ligne = (
+        review_id,
+        1,
+        "https://www.manga-sanctuary.com/tome-1.html",
+        review_url,
+        "Titre",
+        8.0,
+        "lecteur",
+        None,
+        "jeu.",
+        "volume",
+        "volume",
+        "Corps",
+    )
+    reponse = get_series_reviews(
+        FakePool([(1,), (1,), [ligne]]), series_id, limit=1, offset=0
+    )
+
+    assert reponse.items[0].review_url == review_url
+
+
+def test_reviews_expose_exactement_la_liste_de_champs_arretee() -> None:
+    ligne = (
+        1,
+        1,
+        "https://www.manga-sanctuary.com/tome-1.html",
+        "https://www.manga-sanctuary.com/critique/1-tome-1.html",
+        "Titre",
+        8.0,
+        "lecteur",
+        None,
+        "jeu.",
+        "volume",
+        "volume",
+        "Corps",
+    )
+    reponse = get_series_reviews(
+        FakePool([(1,), (1,), [ligne]]), 736, limit=1, offset=0
+    )
+
+    assert set(reponse.items[0].model_dump()) == {
+        "review_id",
+        "volume_number",
+        "volume_url",
+        "review_url",
+        "title",
+        "score",
+        "author",
+        "date",
+        "date_raw",
+        "type",
+        "grain",
+        "body",
+    }
+
+
 def test_reviews_rend_200_et_une_liste_vide_sur_serie_sans_critique() -> None:
     """Une série sans critique EXISTE. Répondre 404 dirait le contraire."""
     reponse = get_series_reviews(FakePool([(1,), (0,), []]), 12, limit=50, offset=0)

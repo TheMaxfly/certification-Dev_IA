@@ -299,6 +299,12 @@ class Review(BaseModel):
     review_id: int
     volume_number: int | None
     volume_url: str | None
+    review_url: str | None = Field(
+        description=(
+            "URL of the published review at the source; it points to the review, "
+            "not the author's profile."
+        )
+    )
     title: str | None
     score: float | None
     author: str | None
@@ -1118,9 +1124,9 @@ def get_series_reviews(
 ) -> ReviewsResponse:
     """Expose les critiques d'une série, depuis le référentiel COMPLET."""
     sql = """
-    SELECT review_id, volume_number, volume_url, review_title, review_score,
-           review_author, review_date_iso, review_date_raw, review_type,
-           review_grain, review_body
+    SELECT review_id, volume_number, volume_url, review_url, review_title,
+           review_score, review_author, review_date_iso, review_date_raw,
+           review_type, review_grain, review_body
     FROM manga.ms_reviews_all
     WHERE series_id = %s
     ORDER BY review_date_iso DESC NULLS LAST, review_id
@@ -1150,14 +1156,15 @@ def get_series_reviews(
                 review_id=row[0],
                 volume_number=row[1],
                 volume_url=row[2],
-                title=row[3],
-                score=row[4],
-                author=row[5],
-                date=row[6],
-                date_raw=row[7],
-                type=row[8],
-                grain=row[9],
-                body=row[10],
+                review_url=row[3],
+                title=row[4],
+                score=row[5],
+                author=row[6],
+                date=row[7],
+                date_raw=row[8],
+                type=row[9],
+                grain=row[10],
+                body=row[11],
             )
             for row in rows
         ],

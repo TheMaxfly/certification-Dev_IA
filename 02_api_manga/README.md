@@ -248,6 +248,10 @@ garde `ms_reviews` et ses propres endpoints (`/rag/*`, `/search`) : lire une
 table n'est pas reconstruire un corpus, et les deux besoins n'ont pas le même
 filtre.
 
+Pour rendre vérifiable la source d'une citation, les deux chemins de mise à
+disposition exposent `review_url`, qui pointe la critique publiée à la source ;
+ils n'exposent nulle part ni identifiant de membre ni URL de profil.
+
 Un test unitaire vérifie la table interrogée
 (`test_reviews_lit_le_referentiel_complet_pas_le_corpus_rag`), parce qu'une
 régression y serait invisible à la relecture.

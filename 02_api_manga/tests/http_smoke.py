@@ -61,6 +61,21 @@ BOOST_FORMULE_ABANDONNEE = 4.25
 DOCS_ATTENDUS = {"kitsu:38", "ms_hybrid:736", "ms_review:1"}
 SOURCES_ATTENDUES = {"kitsu_synopsis", "ms_hybrid", "ms_review"}
 
+CHAMPS_CRITIQUE_ATTENDUS = {
+    "review_id",
+    "volume_number",
+    "volume_url",
+    "review_url",
+    "title",
+    "score",
+    "author",
+    "date",
+    "date_raw",
+    "type",
+    "grain",
+    "body",
+}
+
 
 def _corps(brut: bytes, type_contenu: str) -> Any:
     """Décode le corps en JSON quand c'en est, en texte sinon.
@@ -372,6 +387,32 @@ def verifier_le_catalogue() -> None:
     )
     assert len(critiques["items"]) == 3
 
+    urls_attendues = {
+        "Un abordage lisible": (
+            "https://www.manga-sanctuary.com/critique/1-tome-1.html"
+        ),
+        "Le souffle tient": ("https://www.manga-sanctuary.com/critique/2-tome-2.html"),
+        "Sur la serie entiere": (
+            "https://www.manga-sanctuary.com/critique/3-serie.html"
+        ),
+    }
+    for critique in critiques["items"]:
+        assert set(critique) == CHAMPS_CRITIQUE_ATTENDUS
+        assert critique["review_url"] == urls_attendues[critique["title"]]
+
+    urls_par_serie = {
+        736: "https://www.manga-sanctuary.com/critique/1-tome-1.html",
+        8514: "https://www.manga-sanctuary.com/critique/4-serie.html",
+        9999: "https://www.manga-sanctuary.com/critique/5-serie.html",
+    }
+    for series_id, review_url in urls_par_serie.items():
+        reponse = get_json(f"/series/{series_id}/reviews?limit=100&offset=0")
+        critique = next(
+            item for item in reponse["items"] if item["review_url"] == review_url
+        )
+        assert set(critique) == CHAMPS_CRITIQUE_ATTENDUS
+        assert critique["review_url"] == review_url
+
     # La date non analysable de la fixture (« jeu. ») reste NULL sans faire
     # échouer la ligne : `date_raw` conserve ce que la source affichait.
     par_titre = {item["title"]: item for item in critiques["items"]}
@@ -410,12 +451,12 @@ def verifier_la_couverture() -> None:
     couverture = get_json("/coverage")
     totaux = couverture["totals"]
 
-    # 736 et 999 posées par la fixture.
-    assert totaux["series"] == 2
+    # 736, 8514, 9999 et 999 posées par la fixture.
+    assert totaux["series"] == 4
     assert totaux["volumes"] == 1
-    # 3 dans le référentiel contre 1 dans le corpus hérité : l'écart est le
+    # 5 dans le référentiel contre 1 dans le corpus hérité : l'écart est le
     # sujet même de 3b, et il doit être LISIBLE dans la réponse.
-    assert totaux["reviews"] == 3
+    assert totaux["reviews"] == 5
     assert totaux["reviews_rag_legacy"] == 1
     assert totaux["reviews"] > totaux["reviews_rag_legacy"]
 

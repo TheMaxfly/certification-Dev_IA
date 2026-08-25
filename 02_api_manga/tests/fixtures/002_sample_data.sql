@@ -34,12 +34,19 @@ INSERT INTO manga.kitsu_series_core (
 --    rag_reviews_docs. Seul `series_id` est NOT NULL ; le reste documente.
 INSERT INTO manga.ms_series_enriched (
   series_id, series_url, series_title, series_synopsis_enriched
-) VALUES (
-  736,
-  'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/',
-  'One Piece',
-  'Gol D. Roger, roi des pirates, a cache son tresor a Raftel.'
-);
+) VALUES
+  (736,
+   'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/',
+   'One Piece',
+   'Gol D. Roger, roi des pirates, a cache son tresor a Raftel.'),
+  (8514,
+   'https://www.manga-sanctuary.com/bdd/manga/8514-serie-b/',
+   'Serie B',
+   NULL),
+  (9999,
+   'https://www.manga-sanctuary.com/bdd/manga/9999-serie-c/',
+   'Serie C',
+   NULL);
 
 -- 3. Référentiel volumes — cible de rag_reviews_docs.volume_url.
 INSERT INTO manga.ms_volumes_enriched (volume_url, series_id) VALUES (
@@ -95,9 +102,10 @@ INSERT INTO manga.ms_kitsu_map (
 --    complet (11 074 lignes en production), `ms_reviews` le corpus RAG
 --    historique (3 187). Elles portent les mêmes colonnes : servir l'une pour
 --    l'autre ne produit aucune erreur, seulement deux tiers de données en
---    moins. La fixture pose donc 3 lignes d'un côté, 1 de l'autre — un
---    endpoint qui se tromperait de table renverrait 1 au lieu de 3, et le
---    smoke test le verrait.
+--    moins. La fixture pose donc 5 lignes d'un côté, 1 de l'autre, dont 3
+--    contre 1 pour la série 736 : un endpoint qui se tromperait de table
+--    renverrait 1 au lieu de 3, et le smoke test le verrait. Deux séries
+--    supplémentaires exercent l'alignement de review_url sur trois séries.
 INSERT INTO manga.ms_reviews_all (
   series_id, volume_number, volume_url, review_url, review_title,
   review_score, review_author, review_date_iso, review_date_raw, review_body
@@ -111,11 +119,17 @@ INSERT INTO manga.ms_reviews_all (
    'Deuxieme tome, le souffle tient.'),
   (736, NULL, NULL, 'https://www.manga-sanctuary.com/critique/3-serie.html',
    'Sur la serie entiere', 7.5, 'lecteur_c', DATE '2024-05-10', '10 mai 2024',
-   'Un avis qui porte sur la serie et non sur un tome.');
+   'Un avis qui porte sur la serie et non sur un tome.'),
+  (8514, NULL, NULL, 'https://www.manga-sanctuary.com/critique/4-serie.html',
+   'Critique serie B', 7.0, 'lecteur_d', DATE '2024-06-01', '1 juin 2024',
+   'Un avis sur la serie B.'),
+  (9999, NULL, NULL, 'https://www.manga-sanctuary.com/critique/5-serie.html',
+   'Critique serie C', 6.5, 'lecteur_e', DATE '2024-07-01', '1 juillet 2024',
+   'Un avis sur la serie C.');
 
--- Le corpus RAG hérité : UNE seule des trois critiques. Le filtre qui a
--- produit cette table en production n'est pas rejoué ici — seul l'écart de
--- volume compte pour le contrôle.
+-- Le corpus RAG hérité : UNE seule des trois critiques de la série 736. Le
+-- filtre qui a produit cette table en production n'est pas rejoué ici — seul
+-- l'écart de volume compte pour le contrôle.
 INSERT INTO manga.ms_reviews (
   series_id, volume_url, review_url, review_title, review_score, review_body
 ) VALUES (

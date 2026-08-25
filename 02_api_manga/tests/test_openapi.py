@@ -157,6 +157,15 @@ def test_les_tags_utilises_sont_tous_documentes(schema: dict[str, Any]) -> None:
     assert utilises == documentes
 
 
+def test_review_url_est_documentee_comme_source_de_la_critique(
+    schema: dict[str, Any],
+) -> None:
+    propriete = schema["components"]["schemas"]["Review"]["properties"]["review_url"]
+
+    assert "published review at the source" in propriete["description"]
+    assert "not the author's profile" in propriete["description"]
+
+
 def test_la_version_du_module_suit_pyproject() -> None:
     """La constante et `pyproject.toml` ne peuvent pas diverger en silence."""
     pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
