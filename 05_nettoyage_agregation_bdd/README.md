@@ -55,6 +55,28 @@ uv run python -m preparation_bdd json --help
 uv run python src/identity/wikidata_dump.py --help
 ```
 
+### Mesures (lecture seule)
+
+Elles ne décident rien et n'écrivent rien en base : elles instruisent, et
+produisent un rapport JSON horodaté dans `data/rapports/`.
+
+```bash
+# Par quel SCRIPT passent les concordances d'auteur de l'étage 1 (dette 22.3).
+DATABASE_URL='postgresql://manga_api@localhost:5432/apimanga' \
+    PYTHONPATH=src uv run python -m identity.mesure_formes_auteur
+```
+
+**Ce que ce chiffre veut dire.** Dénominateur : les séries dont la décision
+courante est `method='exact_author'`, `status='auto'` — celles dont l'identité
+existe parce que le signal auteur a tranché. « Forme latine » : `forme_norm`
+sans idéogramme ni kana — c'est la **graphie** qui est mesurée, pas le tag
+`langue` de Wikidata, les deux ne coïncidant pas.
+
+Mesure du **2026-08-25** : **100,00 %** (1 058 / 1 058). Sans
+`wd_auteurs_formes`, l'étage 1 tomberait à **21** séries. Ces valeurs
+remplacent les chiffres indicatifs antérieurs (99,6 % et 4 séries), qui
+venaient d'une requête de diagnostic non conservée — cf. ETAT §44.
+
 ## Makefile
 
 ```bash
