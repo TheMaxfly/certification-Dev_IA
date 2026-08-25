@@ -65,6 +65,10 @@ PLANCHE1 = {
         "manga.kitsu_weekly_snapshot",
     ],
     "mi": ["manga.mi_series", "manga.mi_sorties"],
+    # Referentiel de genres : ilot sans lien vers le reste du schema. Il ne
+    # decrit pas une source, il decrit le VOCABULAIRE CIBLE vers lequel les
+    # libelles bruts des sources sont ramenes.
+    "genre": ["manga.genre_ref", "manga.genre_mapping"],
 }
 
 # Placement : (x, y) pour le coeur et le journal (corridor central) ;
@@ -86,6 +90,9 @@ POSITIONS = {
     "manga.ms_kitsu_ambiguous": (60, 820),
     "manga.ms_reviews_all": (60, 1060),
     "manga.ms_volumes_enriched": (60, 1300),
+    # --- Referentiel de genres : ilot en haut, sous la legende ---
+    "manga.genre_ref": (680, 340),
+    "manga.genre_mapping": (680, 620),
     # --- Manga Insight : aucune FK, cluster compact en bas a gauche ---
     "manga.mi_series": (60, 1540),
     "manga.mi_sorties": (680, 1540),
@@ -128,6 +135,10 @@ PIVOTS = {
     "manga.ms_series_enriched",
     "manga.wd_pivot",
     "manga.kitsu_series_core",
+    # `genre_ref` y figure pour une raison precise : `parent` est sa 7e
+    # colonne. Au plafond peripherique (6), elle serait tronquee — et la
+    # planche perdrait justement ce qu'elle doit montrer.
+    "manga.genre_ref",
 }
 MAX_COLONNES_PIVOT = 10
 
@@ -529,12 +540,27 @@ def xml_planche(
                 if lien.etiquette
                 else f"{lien.cardinalite_source} → {lien.cardinalite_cible}"
             )
+        # Boucle reflexive : on impose les points de passage, sinon draw.io
+        # choisit sa propre boucle et la planche editable ne montre plus le
+        # meme trace que le PNG. Les points sont ceux de `route()`, aux
+        # extremites pres (draw.io les deduit des ancres).
+        geometrie = '<mxGeometry relative="1" as="geometry" />'
+        if lien.source == lien.cible:
+            intermediaires = route(a, b, lien)[1:-1]
+            points = "".join(
+                f'<mxPoint x="{x:.0f}" y="{y:.0f}" />' for x, y in intermediaires
+            )
+            geometrie = (
+                '<mxGeometry relative="1" as="geometry">'
+                f'<Array as="points">{points}</Array>'
+                "</mxGeometry>"
+            )
         parties.append(
             f'<mxCell id="e{k}" value="{html.escape(etiquette)}" '
             f'style="{style_lien(lien)}exitX={sx};exitY={sy};exitDx=0;exitDy=0;'
             f'entryX={tx};entryY={ty};entryDx=0;entryDy=0;" edge="1" parent="1" '
             f'source="{ident[lien.source]}" target="{ident[lien.cible]}">'
-            f'<mxGeometry relative="1" as="geometry" /></mxCell>'
+            f"{geometrie}</mxCell>"
         )
 
     parties += ["</root>", "</mxGraphModel>", "</diagram>"]
@@ -549,8 +575,9 @@ LEGENDE_MPD = html.escape(
     "nom : type *    colonne NOT NULL\n"
     "--- trait plein : contrainte FK reelle du catalogue\n"
     "--- pointille  : lien applicatif, sans contrainte FK\n"
+    "boucle sur la boite : FK d'une table VERS ELLE-MEME (hierarchie)\n"
     "Couleurs : coeur / journal / Manga Sanctuary / Wikidata / Kitsu / "
-    "Manga Insight"
+    "Manga Insight / Referentiel de genres"
 ).replace("\n", "&#10;")
 
 NOTES_MPD = html.escape(

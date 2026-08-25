@@ -21,6 +21,15 @@ GOUTTIERE_MIN = 60
 # par onglet, pour rester imprimable en A3 sans reduction illisible.
 PAGE_L, PAGE_H = 2800, 1980
 
+# Boucle reflexive : une FK d'une table VERS ELLE-MEME (genre_ref.parent).
+# Elle sort du bord droit, contourne par le haut et rentre par le bord
+# superieur. Ces deux marges reservent le couloir qu'elle emprunte ; aucune
+# autre boite ne doit s'y trouver, et `verifier_disposition` le controle.
+BOUCLE_DEPORT_X = 60
+BOUCLE_DEPORT_Y = 50
+BOUCLE_SORTIE = (1.0, 0.3)  # bord droit, au tiers superieur
+BOUCLE_ENTREE = (0.7, 0.0)  # bord superieur, aux trois quarts
+
 HAUTEUR_ENTETE = 30
 HAUTEUR_LIGNE = 18
 MARGE_BOITE = 8
@@ -41,6 +50,9 @@ FAMILLES: dict[str, Famille] = {
     "wd": Famille("wd", "Wikidata (pivot d'identifiants)", "#E8F5E9", "#A5D6A7"),
     "kitsu": Famille("kitsu", "Kitsu (enrichissement)", "#FFF8E1", "#FFD54F"),
     "mi": Famille("mi", "Manga Insight (corpus de comparaison)", "#FCE4EC", "#F48FB1"),
+    "genre": Famille(
+        "genre", "Referentiel de genres (vocabulaire cible)", "#EFEBE9", "#BCAAA4"
+    ),
 }
 
 
@@ -155,6 +167,8 @@ def ancres(a: Boite, b: Boite) -> tuple[tuple[float, float], tuple[float, float]
     Renvoie deux couples (x, y) en coordonnees relatives (0..1), tels que
     draw.io les attend dans exitX/exitY et entryX/entryY.
     """
+    if a.cle == b.cle:  # boucle reflexive : pas de direction a deduire
+        return BOUCLE_SORTIE, BOUCLE_ENTREE
     ax, ay = a.centre
     bx, by = b.centre
     dx, dy = bx - ax, by - ay
@@ -185,6 +199,15 @@ def route(a: Boite, b: Boite, lien: Lien | None = None) -> list[tuple[float, flo
     explicites ; la calculer ici permet de COMPTER les croisements au lieu de
     les affirmer.
     """
+    if a.cle == b.cle:
+        # Sortie a droite -> couloir vertical a droite -> retour par le haut.
+        # Quatre segments orthogonaux, comme n'importe quel autre lien : les
+        # controles de croisement et de traversee s'y appliquent a l'identique.
+        sortie = point_absolu(a, BOUCLE_SORTIE)
+        entree = point_absolu(a, BOUCLE_ENTREE)
+        droite = a.x2 + BOUCLE_DEPORT_X
+        haut = a.y - BOUCLE_DEPORT_Y
+        return [sortie, (droite, sortie[1]), (droite, haut), (entree[0], haut), entree]
     anc_a, anc_b = ancres_du_lien(a, b, lien)
     decalage = lien.decalage if lien else 0
     p1 = point_absolu(a, anc_a)

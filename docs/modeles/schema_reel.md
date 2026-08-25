@@ -1,6 +1,6 @@
 # Schema reel — inventaire extrait de la base
 
-> Extrait de `apimanga` le 2026-07-28 par `extraire_schema.py` (lecture seule : uniquement des SELECT sur `information_schema` et `pg_catalog`).
+> Extrait de `apimanga` le 2026-08-25 par `extraire_schema.py`, sous le role de consultation `manga_api` en session `default_transaction_read_only = on` (lecture seule : uniquement des SELECT sur `pg_catalog`).
 
 Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **preuve de fidelite** : rien n'y est saisi a la main, tout vient de la base. Une table dessinee qui ne figurerait pas ici serait une invention.
 
@@ -8,18 +8,18 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 | Element | Nombre |
 | --- | --- |
-| Tables `manga` | 30 |
+| Tables `manga` | 32 |
 | Tables `staging` | 11 |
 | Vues (`manga`) | 8 |
-| Colonnes (total) | 647 |
-| Cles etrangeres | 18 |
-| Index (dont UNIQUE) | 96 |
-| Contraintes declarees | 67 |
+| Colonnes (total) | 659 |
+| Cles etrangeres | 20 |
+| Index (dont UNIQUE) | 100 |
+| Contraintes declarees | 78 |
 
 ## Confrontation base <-> migrations `000` a `011`
 
-- tables `manga` + `staging` **declarees par les migrations** : **41**
-- tables `manga` + `staging` **presentes en base** : **41**
+- tables `manga` + `staging` **declarees par les migrations** : **43**
+- tables `manga` + `staging` **presentes en base** : **43**
 
 **Aucun ecart.** Chaque table de la base est creee par une migration du depot, et chaque table declaree existe en base. Le depot sait reconstruire ce qu'il decrit.
 
@@ -37,6 +37,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `008_hydratation_auteurs_jawiki.sql` | `manga.wd_auteurs_formes` |
 | `009_referentiel_kitsu_staff_meta.sql` | `manga.kitsu_meta`, `manga.kitsu_staff`, `staging.kitsu_staff` |
 | `010_avis_llm.sql` | `manga.llm_avis` |
+| `013_referentiel_genres.sql` | `manga.genre_mapping`, `manga.genre_ref` |
 
 ## Vues
 
@@ -55,6 +56,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 | Source | Colonnes | Cible | Colonnes cible |
 | --- | --- | --- | --- |
+| `manga.genre_mapping` | code | `manga.genre_ref` | code |
+| `manga.genre_ref` | parent | `manga.genre_ref` | code |
 | `manga.kitsu_series_authors` | kitsu_id | `manga.kitsu_series_core` | kitsu_id |
 | `manga.kitsu_weekly_snapshot` | kitsu_id | `manga.kitsu_series_core` | kitsu_id |
 | `manga.llm_avis` | series_id | `manga.ms_series_enriched` | series_id |
@@ -75,6 +78,45 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `manga.wd_formes` | qid | `manga.wd_pivot` | qid |
 
 ## Detail par table
+
+### `manga.genre_mapping`
+
+154 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `source` | text | NON |  |
+| `libelle_brut` | text | NON |  |
+| `code` | text | oui |  |
+| `statut` | text | NON |  |
+| `note` | text | oui |  |
+
+- **PK** : `CREATE UNIQUE INDEX genre_mapping_pkey ON manga.genre_mapping USING btree (source, libelle_brut)`
+- **FK** : (code) -> `manga.genre_ref`(code)
+- **CHECK** `genre_mapping_check` : `CHECK (((statut = 'mappe'::text) = (code IS NOT NULL)))`
+- **CHECK** `genre_mapping_source_check` : `CHECK ((source = ANY (ARRAY['ms'::text, 'kitsu'::text])))`
+- **CHECK** `genre_mapping_statut_check` : `CHECK ((statut = ANY (ARRAY['mappe'::text, 'exclu'::text, 'inconnu'::text])))`
+
+### `manga.genre_ref`
+
+73 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `code` | text | NON |  |
+| `label_fr` | text | NON |  |
+| `label_en` | text | oui |  |
+| `label_ja` | text | oui |  |
+| `ordre` | int4 | oui |  |
+| `type` | text | NON | 'genre'::text |
+| `parent` | text | oui |  |
+
+- **PK** : `CREATE UNIQUE INDEX genre_ref_pkey ON manga.genre_ref USING btree (code)`
+- **FK** : (parent) -> `manga.genre_ref`(code)
+- **CHECK** `genre_ref_code_check` : `CHECK ((code ~ '^[a-z][a-z0-9_]*$'::text))`
+- **CHECK** `genre_ref_label_fr_check` : `CHECK ((label_fr <> ''::text))`
+- **CHECK** `genre_ref_parent_pas_soi_meme` : `CHECK (((parent IS NULL) OR (parent <> code)))`
+- **CHECK** `genre_ref_type_check` : `CHECK ((type = ANY (ARRAY['genre'::text, 'format'::text])))`
 
 ### `manga.kitsu_formes`
 
@@ -805,7 +847,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.kitsu_formes`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -821,7 +863,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.kitsu_mappings`
 
-104726 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -835,7 +877,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.kitsu_staff`
 
-53183 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -850,7 +892,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.mi_series`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -895,7 +937,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.mi_sorties`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -937,7 +979,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.ms_reviews`
 
-11052 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -960,7 +1002,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.ms_volumes`
 
-103811 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1010,7 +1052,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.wd_auteurs`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1022,7 +1064,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.wd_entities`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1040,7 +1082,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.wd_formes`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1055,7 +1097,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.wd_pivot`
 
-0 lignes.
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |

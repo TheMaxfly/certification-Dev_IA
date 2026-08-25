@@ -4,6 +4,8 @@
 %% opposable reste modele_donnees.drawio (planche 1).
 %% Genere par docs/modeles/generer_diagrammes.py depuis schema.json.
 erDiagram
+    genre_ref ||--o{ genre_mapping : code
+    genre_ref ||--o{ genre_ref : parent
     kitsu_series_core ||--o{ kitsu_series_authors : kitsu_id
     kitsu_series_core ||--o{ kitsu_weekly_snapshot : kitsu_id
     ms_series_enriched ||--o{ llm_avis : series_id
@@ -229,4 +231,20 @@ erDiagram
         text titre
         text titre_vo
         text editeur_vf
+    }
+    genre_ref {
+        text code PK
+        text label_fr
+        text label_en
+        text label_ja
+        int ordre
+        text type
+        text parent FK
+    }
+    genre_mapping {
+        text source PK
+        text libelle_brut PK
+        text code FK
+        text statut
+        text note
     }

@@ -200,7 +200,7 @@ touche jamais au rôle de connexion.
 | --- | --- |
 | `CONNECT` sur la base | oui |
 | `USAGE` sur le schéma `manga` | oui |
-| `SELECT` sur les 38 relations de `manga` (30 tables + 8 vues) | oui, y compris les objets créés plus tard |
+| `SELECT` sur les 40 relations de `manga` (32 tables + 8 vues) | oui, y compris les objets créés plus tard — `genre_ref` et `genre_mapping`, créées par `013` après `012`, l'ont reçu **sans intervention** : 40 / 40 relations lisibles au 2026-08-25 |
 | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` | **non**, sur aucune relation |
 | droits sur les 13 séquences de `manga` | **non** — sans `USAGE`, `nextval` est fermé, ce qui coupe la dernière voie d'écriture indirecte |
 | `USAGE` sur le schéma `staging` | **non** — `staging` est jetable, rechargé à chaque ELT, et ne fait pas partie de la mise à disposition |

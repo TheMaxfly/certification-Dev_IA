@@ -67,6 +67,7 @@ def main() -> int:
         if t["table_type"] == "VIEW"
     )
     comptes = brut["comptes"]
+    comptes_indisponibles = brut.get("comptes_indisponibles", {})
 
     par_fichier, declarees = tables_des_migrations()
     pertinentes = {t for t in declarees if t.split(".")[0] in ("manga", "staging")}
@@ -79,8 +80,9 @@ def main() -> int:
     a("")
     a(
         f"> Extrait de `apimanga` le {date.today().isoformat()} par "
-        "`extraire_schema.py` (lecture seule : uniquement des SELECT sur "
-        "`information_schema` et `pg_catalog`)."
+        "`extraire_schema.py`, sous le role de consultation `manga_api` en "
+        "session `default_transaction_read_only = on` (lecture seule : "
+        "uniquement des SELECT sur `pg_catalog`)."
     )
     a("")
     a(
@@ -152,9 +154,7 @@ def main() -> int:
     a("| --- | --- |")
     for v in brut["vues"]:
         cible = ", ".join(
-            sorted(
-                set(re.findall(r"\b(manga\.[a-z_0-9]+)", v["definition"], re.I))
-            )
+            sorted(set(re.findall(r"\b(manga\.[a-z_0-9]+)", v["definition"], re.I)))
         )
         a(f"| `{v['schema']}.{v['nom']}` | {cible or '—'} |")
     a("")
@@ -177,7 +177,14 @@ def main() -> int:
     for cle in base_tables:
         a(f"### `{cle}`")
         a("")
-        a(f"{comptes.get(cle, '?')} lignes.")
+        if cle in comptes:
+            a(f"{comptes[cle]} lignes.")
+        else:
+            # Le role d'extraction voit la structure mais pas le contenu :
+            # dire lequel, plutot que d'ecrire un `?` qu'on prendrait pour
+            # une defaillance de l'extraction.
+            motif = comptes_indisponibles.get(cle, "compte non releve")
+            a(f"Nombre de lignes **non lisible** sous `manga_api` ({motif}).")
         a("")
         a("| Colonne | Type | Null | Defaut |")
         a("| --- | --- | --- | --- |")

@@ -2,6 +2,16 @@
   "tables": [
     {
       "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "manga",
       "table_name": "kitsu_formes",
       "table_type": "BASE TABLE"
     },
@@ -247,6 +257,150 @@
     }
   ],
   "colonnes": [
+    {
+      "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "ordinal_position": 1,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "ordinal_position": 2,
+      "column_name": "libelle_brut",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "ordinal_position": 3,
+      "column_name": "code",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "ordinal_position": 4,
+      "column_name": "statut",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_mapping",
+      "ordinal_position": 5,
+      "column_name": "note",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 1,
+      "column_name": "code",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 2,
+      "column_name": "label_fr",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 3,
+      "column_name": "label_en",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 4,
+      "column_name": "label_ja",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 5,
+      "column_name": "ordre",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 6,
+      "column_name": "type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": "'genre'::text",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "genre_ref",
+      "ordinal_position": 7,
+      "column_name": "parent",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
     {
       "table_schema": "manga",
       "table_name": "kitsu_formes",
@@ -8015,6 +8169,83 @@
   "contraintes": [
     {
       "schema": "manga",
+      "table": "genre_mapping",
+      "nom": "genre_mapping_check",
+      "type": "c",
+      "definition": "CHECK (((statut = 'mappe'::text) = (code IS NOT NULL)))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "nom": "genre_mapping_source_check",
+      "type": "c",
+      "definition": "CHECK ((source = ANY (ARRAY['ms'::text, 'kitsu'::text])))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "nom": "genre_mapping_statut_check",
+      "type": "c",
+      "definition": "CHECK ((statut = ANY (ARRAY['mappe'::text, 'exclu'::text, 'inconnu'::text])))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "nom": "genre_mapping_code_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (code) REFERENCES manga.genre_ref(code)"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "nom": "genre_mapping_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (source, libelle_brut)"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_code_check",
+      "type": "c",
+      "definition": "CHECK ((code ~ '^[a-z][a-z0-9_]*$'::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_label_fr_check",
+      "type": "c",
+      "definition": "CHECK ((label_fr <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_parent_pas_soi_meme",
+      "type": "c",
+      "definition": "CHECK (((parent IS NULL) OR (parent <> code)))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_type_check",
+      "type": "c",
+      "definition": "CHECK ((type = ANY (ARRAY['genre'::text, 'format'::text])))"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_parent_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (parent) REFERENCES manga.genre_ref(code) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "nom": "genre_ref_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (code)"
+    },
+    {
+      "schema": "manga",
       "table": "kitsu_formes",
       "nom": "kitsu_formes_forme_type_check",
       "type": "c",
@@ -8484,6 +8715,38 @@
     }
   ],
   "index": [
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "index": "genre_mapping_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX genre_mapping_pkey ON manga.genre_mapping USING btree (source, libelle_brut)"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_mapping",
+      "index": "idx_genre_mapping_code",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_genre_mapping_code ON manga.genre_mapping USING btree (code)"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "index": "genre_ref_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX genre_ref_pkey ON manga.genre_ref USING btree (code)"
+    },
+    {
+      "schema": "manga",
+      "table": "genre_ref",
+      "index": "idx_genre_ref_parent",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_genre_ref_parent ON manga.genre_ref USING btree (parent)"
+    },
     {
       "schema": "manga",
       "table": "kitsu_formes",
@@ -9256,6 +9519,34 @@
   "fk": [
     {
       "schema_source": "manga",
+      "table_source": "genre_mapping",
+      "nom": "genre_mapping_code_fkey",
+      "colonnes_source": [
+        "code"
+      ],
+      "schema_cible": "manga",
+      "table_cible": "genre_ref",
+      "colonnes_cible": [
+        "code"
+      ],
+      "on_delete": "a"
+    },
+    {
+      "schema_source": "manga",
+      "table_source": "genre_ref",
+      "nom": "genre_ref_parent_fkey",
+      "colonnes_source": [
+        "parent"
+      ],
+      "schema_cible": "manga",
+      "table_cible": "genre_ref",
+      "colonnes_cible": [
+        "code"
+      ],
+      "on_delete": "a"
+    },
+    {
+      "schema_source": "manga",
       "table_source": "kitsu_series_authors",
       "nom": "kitsu_series_authors_kitsu_id_fkey",
       "colonnes_source": [
@@ -9550,6 +9841,8 @@
     }
   ],
   "comptes": {
+    "manga.genre_mapping": 154,
+    "manga.genre_ref": 73,
     "manga.kitsu_formes": 155003,
     "manga.kitsu_mappings": 74866,
     "manga.kitsu_meta": 41249,
@@ -9579,17 +9872,19 @@
     "manga.wd_auteurs_formes": 9090,
     "manga.wd_formes": 26103,
     "manga.wd_pivot": 8214,
-    "manga.work_identity": 14670,
-    "staging.kitsu_formes": 0,
-    "staging.kitsu_mappings": 104726,
-    "staging.kitsu_staff": 53183,
-    "staging.mi_series": 0,
-    "staging.mi_sorties": 0,
-    "staging.ms_reviews": 11052,
-    "staging.ms_volumes": 103811,
-    "staging.wd_auteurs": 0,
-    "staging.wd_entities": 0,
-    "staging.wd_formes": 0,
-    "staging.wd_pivot": 0
+    "manga.work_identity": 14670
+  },
+  "comptes_indisponibles": {
+    "staging.kitsu_formes": "permission denied for schema staging",
+    "staging.kitsu_mappings": "permission denied for schema staging",
+    "staging.kitsu_staff": "permission denied for schema staging",
+    "staging.mi_series": "permission denied for schema staging",
+    "staging.mi_sorties": "permission denied for schema staging",
+    "staging.ms_reviews": "permission denied for schema staging",
+    "staging.ms_volumes": "permission denied for schema staging",
+    "staging.wd_auteurs": "permission denied for schema staging",
+    "staging.wd_entities": "permission denied for schema staging",
+    "staging.wd_formes": "permission denied for schema staging",
+    "staging.wd_pivot": "permission denied for schema staging"
   }
 }
