@@ -1,7 +1,7 @@
 -- Jeu d'essai du harnais d'intégration. RÉSERVÉ AUX TESTS : monté uniquement
 -- par `compose.integration.yml`, jamais joué contre une base réelle.
 --
--- Il s'applique APRÈS les 12 migrations de `database/migrations/` : le schéma
+-- Il s'applique APRÈS toutes les migrations de `database/migrations/` : le schéma
 -- est celui de la production, ce fichier n'en crée aucun objet.
 --
 -- Les six tables peuplées sont exactement celles dont dépend la vue

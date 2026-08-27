@@ -1,4 +1,4 @@
-"""Étage R, run 2 — tests d'INTÉGRATION sur base jetable (schéma réel 000→011).
+"""Étage R, run 2 — tests d'INTÉGRATION sur le schéma réel versionné.
 
 On vérifie les invariants qui protègent la première écriture décisionnelle :
 la règle de collision (groupe entier exclu), l'unicité (candidats multiples

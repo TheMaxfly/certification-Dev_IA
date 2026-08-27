@@ -234,8 +234,8 @@ uv run python migrate.py status     # ~0,2 s
 bash outils/fidelite.sh             # rejeu sur PostgreSQL jetable (~1 min)
 ```
 
-- **Vérifier** : `12 appliquée(s), 0 en attente` ; `fidelite.sh` sort un **diff
-  vide**.
+- **Vérifier** : toutes les migrations sont `appliquée` et le statut termine par
+  `0 en attente` ; `fidelite.sh` sort un **diff vide**.
 - **À dire** : « Le schéma est versionné comme du code. Et on le prouve : on
   rejoue toutes les migrations sur une base jetable et on compare le schéma
   obtenu à la vraie base. Un diff vide veut dire que le dépôt sait reconstruire
@@ -249,8 +249,8 @@ Sur données **déjà en place**, en mode lecture seule. Aucune écriture en bas
 
 | # | Temps | Commande | Ce qu'on montre | Ce qu'on dit |
 |---|---|---|---|---|
-| 1 | 0:00 | `manga-pipeline --etat` | L'écran d'état complet | « Voici l'état réel du système : 12 migrations appliquées, 14 670 séries, 104 107 volumes, 57,3 % d'identités automatiques. » |
-| 2 | 1:30 | `cd database && uv run python migrate.py status` | 12 appliquées, 0 en attente | « Le schéma est versionné et le runner vérifie les checksums : une migration modifiée après coup est refusée. » |
+| 1 | 0:00 | `manga-pipeline --etat` | L'écran d'état complet | « Voici l'état réel du système : toutes les migrations sont appliquées, avec 14 670 séries, 104 107 volumes et 57,3 % d'identités automatiques. » |
+| 2 | 1:30 | `cd database && uv run python migrate.py status` | Toutes appliquées, 0 en attente | « Le schéma est versionné et le runner vérifie les checksums : une migration modifiée après coup est refusée. » |
 | 3 | 2:30 | `PYTHONPATH=src uv run python -m identity.etage1_exact --dry-run` | La matrice + `⚠ DRY-RUN : transaction annulée` (1,1 s) | « Un étage de la cascade, en dry-run : il calcule tout et n'écrit rien. La base est intacte à la fin. » |
 | 4 | 5:00 | la requête d'identité ci-dessous | 5 séries → QID Wikidata | « Aucune plateforme ne partage d'identifiant. On reconstruit l'identité, et chaque décision garde sa méthode et son score. » |
 | 5 | 6:00 | `uv run lakehouse verifier` | `TOUT VERT` | « Douze contrôles confrontent le lakehouse aux comptes attendus et aux trois incidents historiques. » |

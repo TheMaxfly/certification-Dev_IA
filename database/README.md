@@ -221,8 +221,10 @@ connexion :
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
   uv run python migrate.py up
 
-MANGA_API_PASSWORD="$(openssl rand -base64 24)" \
-  sh outils/creer_role_lecture.sh 'postgresql://postgres@localhost:5432/apimanga'
+# Réutilise une valeur déjà choisie, ou en génère une fois et la conserve.
+MANGA_API_PASSWORD="${MANGA_API_PASSWORD:-$(openssl rand -hex 24)}"
+export MANGA_API_PASSWORD
+sh outils/creer_role_lecture.sh 'postgresql://postgres@localhost:5432/apimanga'
 ```
 
 Le script est **la** procédure — pas cette prose. Il est idempotent : rejoué, il
@@ -235,6 +237,11 @@ Il est écrit en **POSIX `sh`** et non en bash : le harnais d'intégration du
 module `02` l'exécute dans l'image `postgres:16-alpine`, dont le shell est
 busybox. La procédure documentée est donc exactement celle que les tests
 exercent, à chaque exécution du harnais.
+
+La variable reste disponible dans le shell après le script : c'est cette même
+valeur qu'il faut écrire dans `~/.pgpass` ou dans `02_api_manga/.env` sous
+`DB_PASSWORD`. La procédure complète, depuis la création de la base, est dans
+[`../INSTALLATION.md`](../INSTALLATION.md).
 
 ### Côté client : `~/.pgpass`
 

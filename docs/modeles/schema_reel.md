@@ -16,7 +16,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | Index (dont UNIQUE) | 100 |
 | Contraintes declarees | 78 |
 
-## Confrontation base <-> migrations `000` a `011`
+## Confrontation base <-> toutes les migrations versionnees
 
 - tables `manga` + `staging` **declarees par les migrations** : **43**
 - tables `manga` + `staging` **presentes en base** : **43**
@@ -1106,5 +1106,4 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 | `anilist_id` | text | oui |  |
 | `loaded_at` | timestamptz | NON | now() |
 | `source_file` | text | oui |  |
-
 

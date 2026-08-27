@@ -47,7 +47,7 @@ Le depot est organise par etapes numerotees.
 | `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source et preparation PostgreSQL. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2) ; 247 tests. |
 | `06_benchmark_embeddings_llm/` | Benchmark embeddings, FAISS, recall@K, MRR et evaluation LLM. | Scripts experimentaux relies au schema `bench`. |
 | `07_databricks_manga_export/` | Lakehouse Spark + Delta conteneurise : medaillon bronze / silver / gold sur le raw multi-snapshots, controles qualite historises. | v2 livree : 4 sources en bronze, silver Manga Sanctuary, 5 tables gold ; 18 tests, 12 / 12 verifications en conteneur. Couche consultative, hors chemin critique. |
-| `database/` | Migrations PostgreSQL partagees et versionnees. | 12 migrations `000` a `011` appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee. |
+| `database/` | Migrations PostgreSQL partagees et versionnees. | Toutes les migrations de `database/migrations/` sont appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
 
 ## Sources de donnees
@@ -202,7 +202,7 @@ Exports Kitsu prepares dans `Preparation_weekly/export/` :
 ## Stockage PostgreSQL
 
 La source de verite du DDL partage est `database/migrations/`, joue par un runner
-a checksums. **Douze migrations, `000` a `011`, sont appliquees a la base
+a checksums. **Toutes les migrations versionnees sont appliquees a la base
 `apimanga` ; 0 en attente.**
 
 Deux garanties tenues par le depot :
@@ -211,7 +211,8 @@ Deux garanties tenues par le depot :
   refuse d'avancer si un fichier deja joue change ; toute evolution passe par un
   nouveau fichier ;
 - **la reconstruction est verifiee** — `database/outils/fidelite.sh` rejoue
-  `000` a `011` sur une base jetable et compare son `pg_dump` a celui d'`apimanga`.
+  toutes les migrations sur une base jetable et compare son `pg_dump` a celui
+  d'`apimanga`.
   Dernier controle : **diff vide**, le depot reconstruit la base de reference a
   l'identique.
 
@@ -364,6 +365,11 @@ d'execution. Les artefacts lourds et secrets locaux restent ignores par Git :
 - sorties FAISS ;
 - tables Delta du lakehouse, reconstructibles depuis le raw.
 
+La procedure executable par un tiers est dans **[`INSTALLATION.md`](INSTALLATION.md)**.
+Elle distingue la verification C4, autonome sur une fixture jetable, de
+l'installation de production, qui suppose les snapshots et les autorisations de
+collecte.
+
 ## Demonstration
 
 Le deroule complet est dans **`GUIDE_PIPELINE.md`** : le pipeline ELT commande
@@ -390,7 +396,7 @@ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run manga-pipeli
 - Les notebooks de nettoyage Kitsu et Manga Sanctuary contiennent encore une
   partie importante de la logique metier ; leur extraction vers des modules Python
   et une CLI reste en cours.
-- La centralisation PostgreSQL est **etablie** : `000` a `011` appliquees, schema
+- La centralisation PostgreSQL est **etablie** : toutes les migrations appliquees, schema
   reconstructible depuis le depot et fidelite verifiee. La migration `000` est une
   baseline d'heritage, enregistree sans etre executee sur `apimanga` : elle date
   le constat, elle ne reconstruit pas l'historique.

@@ -11,11 +11,20 @@ Objectif : valider le **Bloc 1** (collecte → nettoyage/normalisation → stock
 > dans PostgreSQL. La collecte Kitsu est réalisée dans `03_kitsu_api_exports/` et le
 > scraping Manga-News dans `01_scraping_manganews/`.
 
-## Démarrage rapide
+## Démarrage après préparation de la base
+
+La procédure complète — création de la base, migrations, mot de passe conservé,
+configuration et contrôles HTTP — est dans
+[`../INSTALLATION.md`](../INSTALLATION.md). Les raccourcis ci-dessous supposent
+que `manga_ro` et `manga_api` existent déjà et que `.env` contient à la fois
+`API_KEYS` et le `DB_PASSWORD` choisi lors de la création de `manga_api`.
 
 ### En local avec `uv`
 
 ```bash
+cp .env.example .env
+# Renseigner API_KEYS et DB_PASSWORD selon ../INSTALLATION.md.
+# Pour ce lancement local, poser DB_HOST=localhost.
 uv sync --all-groups
 uv run uvicorn app.main:app --reload --env-file .env
 ```
@@ -23,13 +32,17 @@ uv run uvicorn app.main:app --reload --env-file .env
 ### Avec Docker Compose
 
 ```bash
-export API_KEYS="app_backend:$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-40)"
+cp .env.example .env
+# Renseigner API_KEYS et DB_PASSWORD selon ../INSTALLATION.md.
+# DB_HOST=host.docker.internal convient à ce lancement en conteneur.
 docker compose up --build
 ```
 
 `API_KEYS` est **obligatoire** : sans elle l'API refuse de démarrer (cf.
 « Autorisation : clé d'API »). Le Compose la transmet depuis l'environnement et
-n'en contient aucune.
+n'en contient aucune. **Exporter uniquement `API_KEYS` ne suffit pas** : sans le
+mot de passe de `manga_api` dans `DB_PASSWORD`, le processus peut vivre mais
+`/health` répond en état dégradé.
 
 API : `http://localhost:8000`  
 Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
@@ -51,7 +64,7 @@ L’API lit les variables suivantes (avec valeurs par défaut si non définies) 
 | --- | --- | --- |
 | `API_KEYS` | *(aucun)* | **Obligatoire.** Trousseau `nom:clé,…` — sans lui l'API refuse de démarrer |
 | `LOG_LEVEL` | `INFO` | Niveau du journal applicatif |
-| `DB_HOST` | `host.docker.internal` | Hôte PostgreSQL |
+| `DB_HOST` | `host.docker.internal` | Hôte PostgreSQL vu depuis Docker ; utiliser `localhost` pour un lancement local avec `uvicorn` |
 | `DB_PORT` | `5432` | Port PostgreSQL |
 | `DB_NAME` | `apimanga` | Base de données |
 | `DB_USER` | `manga_api` | Rôle de connexion — consultation seule |
@@ -191,8 +204,9 @@ il porte un mot de passe, qui n'a pas sa place dans le dépôt :
 ```bash
 cd ../database
 DATABASE_URL='postgresql://…' uv run python migrate.py up      # crée manga_ro
-MANGA_API_PASSWORD="$(openssl rand -base64 24)" \
-  sh outils/creer_role_lecture.sh 'postgresql://postgres@…/apimanga'
+MANGA_API_PASSWORD="${MANGA_API_PASSWORD:-$(openssl rand -hex 24)}"
+export MANGA_API_PASSWORD
+sh outils/creer_role_lecture.sh 'postgresql://postgres@…/apimanga'
 ```
 
 Procédure complète, périmètre exact des droits et stockage du mot de passe :
@@ -553,8 +567,14 @@ docker compose -f compose.integration.yml run --rm --build smoke
 docker compose -f compose.integration.yml down -v
 ```
 
+Lancer `pytest` dans un terminal sans variables de connexion héritées
+(`DB_HOST`, `DB_PASSWORD`, `DATABASE_URL`). Si l'une d'elles subsiste, certains
+tests peuvent tenter une connexion réelle au lieu d'utiliser leurs doubles : le
+symptôme est alors un **blocage jusqu'au délai réseau**, pas un échec de test.
+
 Le Compose d'intégration démarre une PostgreSQL 16 temporaire (`tmpfs`, donc
-réellement jetable), **applique les 15 migrations de `../database/migrations/`**,
+réellement jetable), **applique toutes les migrations de
+`../database/migrations/`**,
 injecte la fixture de test puis appelle réellement les endpoints HTTP. Le schéma
 vérifié est celui de la production : le smoke test contrôle notamment que la formule
 de boost servie est bien celle du tableau ci-dessus, et échoue si une pondération

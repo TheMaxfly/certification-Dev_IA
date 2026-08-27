@@ -1,6 +1,6 @@
 """Smoke test HTTP exécuté dans le Compose d'intégration.
 
-La base visée est jetable, son schéma reconstruit par les 15 migrations de
+La base visée est jetable, son schéma reconstruit par toutes les migrations de
 `database/migrations/`, son contenu posé par `tests/fixtures/002_sample_data.sql`.
 Chaque attendu chiffré ci-dessous se dérive de cette fixture et de la formule
 de boost de PRODUCTION ; la dérivation est écrite en commentaire au-dessus de

@@ -2,7 +2,7 @@
 # `database/migrations/` — la source de vérité du dépôt. Le module 02 ne
 # transporte plus de DDL : il ne peut donc plus tester un schéma périmé.
 #
-# Enchaînement : db (sain) → migrations (15 fichiers) → role → fixture
+# Enchaînement : db (sain) → toutes les migrations → role → fixture
 #              → temoin → api → smoke.
 #
 #   docker compose -f compose.integration.yml run --rm --build smoke

@@ -2,7 +2,7 @@
 
 C'est la PREUVE DE FIDELITE des planches : tout ce qui est dessine doit se
 retrouver ici, et ce fichier ne contient que ce que la base a repondu. Il porte
-aussi la confrontation base <-> migrations `000` a `011`.
+aussi la confrontation avec toutes les migrations de `database/migrations/`.
 
     uv run python docs/modeles/generer_schema_reel.py
 """
@@ -108,7 +108,7 @@ def main() -> int:
     a(f"| Contraintes declarees | {len(brut['contraintes'])} |")
     a("")
 
-    a("## Confrontation base <-> migrations `000` a `011`")
+    a("## Confrontation base <-> toutes les migrations versionnees")
     a("")
     a(
         f"- tables `manga` + `staging` **declarees par les migrations** : "
