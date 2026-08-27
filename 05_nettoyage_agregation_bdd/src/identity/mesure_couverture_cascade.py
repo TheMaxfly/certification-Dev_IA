@@ -30,9 +30,7 @@ MODULE = Path(__file__).resolve().parents[2]
 REQUETE = Path(__file__).resolve().parent / "sql" / "mesure_couverture_cascade.sql"
 ECHANTILLON = (
     MODULE
-    / "data"
-    / "rapports"
-    / "etage_r"
+    / "arbitrage"
     / "grille_c3_20260721T162953Z"
     / "echantillon_c3_grille.csv"
 )

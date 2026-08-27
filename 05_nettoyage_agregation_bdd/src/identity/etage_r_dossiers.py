@@ -62,7 +62,7 @@ FENETRE_ANNEE = (0, 2)
 # Stratification de l'échantillon C3 — la composition est une DÉCISION, pas un
 # hasard. Chaque strate répond à une question distincte :
 #   standard    : la précision d'ensemble de la cascade (≥ 95 % attendu)
-#   historique  : les 340 auto à année hors fenêtre, sous surveillance (§26.3)
+#   historique  : les auto à année hors fenêtre, sous surveillance (§26.3)
 #   score_bas   : les décisions les moins confiantes (0.90 / 0.93)
 #   pont        : témoin — apparié par identifiants, précision attendue ~100 %.
 #                 Une strate dont on connaît la réponse mesure l'ARBITRE.

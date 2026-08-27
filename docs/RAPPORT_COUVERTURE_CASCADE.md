@@ -82,15 +82,16 @@ La confrontation n'a produit aucun écart depuis l'arrêté initial :
 | Orphelines | ~5 304 | 5 304 | 0 |
 | Rejetées | 1 | 1 | 0 |
 | Total catalogue | 14 670 | 14 670 | 0 |
-| Précision sur l'échantillon arbitré | 100/100 | 100/100 | 0 |
+| Cas confirmés dans l'échantillon stratifié | 100/100 | 100/100 | 0 |
 
 Somme de contrôle **[M2]** : **8 413 + 952 + 5 304 + 1 = 14 670**.
 
-**Lecture** : 57,3 % du catalogue est relié automatiquement et sans erreur
-détectée (précision mesurée 100/100 sur échantillon arbitré, §4). 6,5 %
-supplémentaires ont des candidats et attendent un arbitrage léger. Les 36,2 %
-restants n'ont **aucun** candidat — non par échec du matching, mais parce que
-l'œuvre n'existe pas dans les référentiels occidentaux (§5).
+**Lecture** : 57,3 % du catalogue est relié automatiquement. Le contrôle humain
+du socle antérieur aux promotions LLM n'a détecté aucun faux positif sur 100 cas
+stratifiés (§4). 6,5 % supplémentaires ont des candidats et attendent un
+arbitrage léger. Les 36,2 % restants n'ont **aucun** candidat — non par échec du
+matching, mais parce que l'œuvre n'existe pas dans les référentiels occidentaux
+(§5).
 
 La v2 atteint 57,3 % de rattachements sûrs *et* une frontière nette et
 expliquée entre le reliable-relié et l'absent-des-référentiels. Le chiffre
@@ -168,16 +169,26 @@ le prédicat, pas sur la nationalité ni sur le statut de la personne.
 
 ---
 
-## 4. La qualité des 8 413 — mesurée, pas supposée
+## 4. Contrôle humain du socle automatique — 100 cas sur 7 434
 
-**Précision de la cascade : 100/100 [M4].** Un échantillon de 100 décisions
-automatiques, **stratifié** (25 cas historiques sous surveillance, 20 aux
-scores les plus bas, 15 du pont et 40 cas standard) et **arbitré par l'humain
-en aveugle** (colonnes du juge masquées avant jugement, sources primaires
-uniquement, aucune IA dans la boucle des verdicts) : aucun faux positif. Le
-critère de certification « ≥ 95 % » est saturé. Le script recompte directement
-les lignes et les libellés de
-`data/rapports/etage_r/grille_c3_20260721T162953Z/echantillon_c3_grille.csv`.
+**Aucun faux positif détecté sur 100 cas stratifiés [M4].** Le 21 juillet 2026,
+avant les promotions LLM, 100 décisions ont été tirées sans remise parmi les
+**7 434 décisions automatiques alors courantes**. L'échantillon était
+volontairement **surpondéré en risques**, et non proportionnel : 25 cas
+historiques parmi 2 677, 20 scores bas parmi 729, 15 cas du pont parmi 1 689 et
+40 cas standard parmi 2 339. La graine `20260719` rend le tirage contrôlable.
+
+L'arbitrage a été réalisé par l'humain **en aveugle** : colonnes du juge
+masquées avant jugement, sources primaires uniquement et aucune IA dans la
+boucle des verdicts. Les 100 rapprochements ont été confirmés. Cette mesure
+satisfait le critère interne « ≥ 95 % sur l'échantillon », mais ne prouve pas
+une précision de 100 % sur toute la population.
+
+La grille et son protocole sont versionnés sous
+`05_nettoyage_agregation_bdd/arbitrage/grille_c3_20260721T162953Z/`. Le script
+recompte directement ses lignes et ses libellés. Les **980** décisions
+`llm_review`, promues le 24 juillet, sont postérieures au tirage et ne sont donc
+pas directement couvertes par ce 100/100.
 
 **Le juge LLM corrige le socle dans les deux sens** — la valeur de l'étage R
 n'est pas de trancher la file, c'est d'attraper les erreurs des étages
