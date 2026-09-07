@@ -617,3 +617,36 @@ Ce que la suite vérifie sur le contrat, et qui ne se déduit pas du code :
 - **chaque code de réponse levé est déclaré** — les 404 et 503 du code, le 401
   de l'autorisation, le 422 des paramètres validés ;
 - **le tableau d'autorisation du README dit vrai**, route par route.
+
+#### Lister les routes du contrat
+
+**Par défaut, hors ligne.** Rien à démarrer : ni serveur, ni base, ni
+`API_KEYS`.
+
+```bash
+python3 -c "import json; print(*sorted(json.load(open('openapi.json'))['paths']), sep='\n')"
+```
+
+**Variante, si l'API tourne déjà** — utile pour vérifier qu'un serveur donné
+sert bien le contrat attendu :
+
+```bash
+curl -s localhost:8000/openapi.json | python3 -m json.tool | grep '"/'
+```
+
+> **`python3`, pas `python`.** Sur une Ubuntu récente, `/usr/bin/python`
+> n'existe pas : `python` ne résout que si un environnement virtuel est actif.
+> Une commande de documentation doit marcher dans un terminal neuf.
+
+Les deux voies donnent le même résultat, et c'est vérifiable :
+
+```bash
+diff <(curl -s localhost:8000/openapi.json | python3 -m json.tool --sort-keys) \
+     <(python3 -m json.tool --sort-keys < openapi.json)
+```
+
+Un diff vide signifie que le serveur sert exactement le contrat versionné. Un
+diff non vide signifie que `openapi.json` n'a pas été régénéré après un
+changement de route — ce que `tests/test_openapi.py` refuse déjà, mais que ce
+contrôle permet de constater contre un serveur **réellement en marche**, sans
+passer par la suite de tests.

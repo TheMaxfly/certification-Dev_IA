@@ -4,6 +4,29 @@ Schéma de la base `apimanga` en **fichiers SQL versionnés**, joués par un run
 minimal. Objectif : que le schéma soit reconstructible depuis le dépôt, et que
 l'écart entre le dépôt et une base réelle soit **détectable**.
 
+## Pourquoi PostgreSQL
+
+Trois contraintes du projet ont dicté ce choix.
+
+Le modèle est **multi-entités et fortement contraint** : 32 tables, 20 clés
+étrangères, des identités qui doivent rester cohérentes entre quatre sources.
+L'intégrité référentielle et les transactions DDL sont ici des besoins — une
+migration qui échoue à mi-parcours ne doit laisser aucun schéma intermédiaire.
+
+Les données sont **partiellement semi-structurées** : genres, tags et
+correspondances externes vivent en `jsonb`, indexés en GIN. Le référentiel
+accueille donc du vocabulaire ouvert sans renoncer aux contraintes sur le reste.
+
+La **mise à disposition** suppose une recherche plein texte, des vues, et des
+rôles de lecture seule vérifiables. Trois mécanismes natifs, sans composant
+supplémentaire à installer ni à documenter — ce qui compte pour une procédure
+d'installation reproductible.
+
+Un moteur documentaire aurait accueilli le semi-structuré sans porter les
+contraintes d'intégrité que la cascade d'identité exige. Un moteur strictement
+relationnel aurait imposé de normaliser des vocabulaires dont la forme varie
+selon la source.
+
 ## Usage
 
 ```bash
