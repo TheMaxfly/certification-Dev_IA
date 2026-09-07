@@ -11,10 +11,10 @@
   },
   "dataset": "populaires",
   "file": "data/enriched/populaires.jsonl",
-  "git_commit": "ada4c8575b6f14e702ab89f86750add5c9b9aa86",
+  "git_commit": "6644a33600841c5fe49a19d198e871235d1d587a",
   "gx_version": "1.19.0",
   "rows": 50,
-  "run_at_utc": "2026-07-14T12:55:29.452114+00:00",
+  "run_at_utc": "2026-09-07T20:31:08.572204+00:00",
   "warning": {
     "failed_expectations": [],
     "statistics": {

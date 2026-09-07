@@ -11,10 +11,10 @@
   },
   "dataset": "manganews_series",
   "file": "data/enriched/manganews_series.jsonl",
-  "git_commit": "f9f46a30bd1a8e3e9ffba7024c2f023da7985d27",
+  "git_commit": "6644a33600841c5fe49a19d198e871235d1d587a",
   "gx_version": "1.19.0",
-  "rows": 11717,
-  "run_at_utc": "2026-07-14T22:05:45.363088+00:00",
+  "rows": 11781,
+  "run_at_utc": "2026-09-07T20:31:05.919164+00:00",
   "warning": {
     "failed_expectations": [],
     "statistics": {
