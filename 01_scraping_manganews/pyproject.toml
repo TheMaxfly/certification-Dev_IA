@@ -33,15 +33,9 @@ line-length = 88
 target-version = "py310"
 # force-exclude : respecter l'exclusion même en pre-commit (fichiers passés explicitement).
 force-exclude = true
-# Exclus du lint : scaffolding Scrapy non activé + scripts auto-nommés obsolètes
-# (versions abandonnées, non maintenues).
+# Exclus du lint : scaffolding Scrapy non activé.
 extend-exclude = [
     "src/manga_news_scraper/middlewares.py",
-    "scripts/obsolateimport_series_backfilled_to_postgres.py",
-    "scripts/obsolateload_populaires_to_postgres.py",
-    "scripts/obsolatevalidate_populaires_gx110v1.py",
-    "scripts/obsoletevalidate_manganews_series_gx110v1.py",
-    "scripts/obsoletevalidate_runtime_jsonl_gx110.py",
 ]
 
 [tool.ruff.lint]
