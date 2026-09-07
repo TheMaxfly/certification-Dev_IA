@@ -17,7 +17,22 @@ manga_sanctuary/*.jsonl
 
 # Données collectées — volumineuses (>100 Mo : au-delà de la limite par fichier de
 # GitHub) et régénérables par crawl. Jamais versionnées.
-data/
+#
+# EXCEPTION : `data/raw/<AAAA-MM>/MANIFEST.md`. Le manifeste n'est pas de la
+# donnée collectée, c'est ce qui permet de la vérifier — taille, SHA-256 et
+# nombre de lignes de fichiers qui, eux, restent hors dépôt. Sans lui, une copie
+# locale du raw n'est confrontable à rien. Même choix qu'au module 01, dont
+# `data/archive/2025-12-31/MANIFEST.md` est versionné.
+#
+# Git n'entre jamais dans un répertoire exclu : une négation à l'intérieur de
+# `data/` serait sans effet. D'où le dépliage — rendre chaque niveau descendable,
+# puis en ré-ignorer le contenu.
+data/*
+!data/raw/
+data/raw/*
+!data/raw/*/
+data/raw/*/*
+!data/raw/*/MANIFEST.md
 *.jsonl
 
 # Canari (test de non-régression des sélecteurs avant re-crawl) : les scripts et
