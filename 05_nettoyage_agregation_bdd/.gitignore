@@ -48,4 +48,24 @@ data/*
 !data/sample.jsonl
 !data/.gitkeep
 
+# EXCEPTION : les manifestes du raw. Un manifeste n'est pas de la donnée
+# collectée, c'est ce qui permet de la vérifier — taille, SHA-256, provenance de
+# fichiers qui, eux, restent hors dépôt. Sans lui, une copie locale du raw n'est
+# confrontable à rien. Même décision qu'au module 04 (`b889d6a`).
+#
+# Git n'entre jamais dans un répertoire exclu : une négation à l'intérieur de
+# `data/` serait sans effet. D'où le dépliage — rendre chaque niveau
+# descendable, puis en ré-ignorer le contenu.
+!data/raw/
+data/raw/*
+!data/raw/mi/
+!data/raw/wikidata/
+data/raw/mi/*
+!data/raw/mi/*/
+data/raw/mi/*/*
+!data/raw/mi/*/MANIFEST.md
+data/raw/wikidata/*
+!data/raw/wikidata/MANIFEST.md
+!data/raw/wikidata/MANIFEST_FICHIERS.txt
+
 *.parquet
