@@ -75,7 +75,8 @@ sans idéogramme ni kana — c'est la **graphie** qui est mesurée, pas le tag
 Mesure du **2026-08-25** : **100,00 %** (1 058 / 1 058). Sans
 `wd_auteurs_formes`, l'étage 1 tomberait à **21** séries. Ces valeurs
 remplacent les chiffres indicatifs antérieurs (99,6 % et 4 séries), qui
-venaient d'une requête de diagnostic non conservée — cf. ETAT §44.
+venaient d'une requête de diagnostic non conservée — cf. ETAT,
+section « Dette 22.3 — le 99,6 % certifié : il vaut 100,00 % ».
 
 ## Makefile
 

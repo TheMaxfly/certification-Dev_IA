@@ -1,0 +1,247 @@
+=====================================================================
+ REPLI DE SOUTENANCE — sorties enregistrées le 2026-09-09
+ Base apimanga (schéma manga), API Manga 0.4.0, exécution locale.
+
+ À QUOI ÇA SERT : si l'API ne démarre pas le jour J, la séquence reste
+ montrable. Ces sorties ont été produites par les commandes de
+ commandes.sh, sans retouche. La clé de démonstration en est absente.
+=====================================================================
+
+ GESTE 1 · LE CONTRAT — la documentation est servie par l'API           
+ Critères 1, 2, 3 de C5 : couverture, autorisation, standard OpenAPI
+
+  Combien de routes ?
+  $ curl -s http://127.0.0.1:8000/openapi.json | jq '.paths | length'
+13
+
+  Combien sont protégées par une clé ?
+  $ curl -s http://127.0.0.1:8000/openapi.json | jq '[.paths[][] | select(.security)] | length'
+11
+
+  Lesquelles sont ouvertes ?
+  $ curl -s http://127.0.0.1:8000/openapi.json | jq -r '.paths | to_entries[] | select(.value.get.security == null) | .key'
+/live
+/health
+
+  $ xdg-open http://127.0.0.1:8000/docs >/dev/null 2>&1 &
+
+
+ GESTE 2 · LE REFUS, PUIS L'ACCÈS — même route, une seule différence    
+ Critère 4 de C5 : l'API restreint l'accès aux données
+
+  ── SANS clé ──
+  $ curl -si http://127.0.0.1:8000/rag/export/composition | head -1
+HTTP/1.1 401 Unauthorized
+
+  $ curl -s http://127.0.0.1:8000/rag/export/composition | jq -c .
+{"detail":"invalid or missing API key"}
+
+  ── AVEC la clé, même route ──
+  $ curl -si -H "X-API-Key: $CLE" http://127.0.0.1:8000/rag/export/composition | head -1
+HTTP/1.1 200 OK
+
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/rag/export/composition | jq '{total, by_source: [.by_source[] | "\(.source): \(.documents)"]}'
+{
+  "total": 51880,
+  "by_source": [
+    "kitsu_synopsis: 43085",
+    "ms_hybrid: 5608",
+    "ms_review: 3187"
+  ]
+}
+
+
+ GESTE 3 · LE TÉMOIN DE LECTURE SEULE — le second moyen d'accès         
+ Spécifications C5 : API REST *et* accès direct à la base de données
+
+  $ psql "$PSQL_RO" -tAc 'SELECT current_user;'
+manga_api
+
+  $ psql "$PSQL_RO" -tAc "SELECT 'lecture OK, ' || count(*) || ' séries' FROM manga.ms_series_enriched;"
+lecture OK, 14670 séries
+
+  ── et maintenant, une écriture ──
+  $ psql "$PSQL_RO" -c '\set VERBOSITY verbose' -c "UPDATE manga.ms_series_enriched SET series_title='piraté' WHERE series_id=11455;" 2>&1 | grep -E 'ERROR|EMPLACEMENT|LOCATION'
+ERROR:  42501: permission denied for table ms_series_enriched
+EMPLACEMENT : aclcheck_error, aclchk.c : 2812
+
+
+ GESTE 4 · /series/11455 — non appariée à Kitsu, et pourtant des genres 
+ JoJo's Bizarre Adventure : Jojolion — le correctif en un écran : 0 → 7 487
+
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/11455 | jq '{series_id, title, kitsu_id, work_uid, genres_source: (.genres_source|join(", ")), genres_enriched: ([.genres_enriched[].code]|join(", "))}'
+{
+  "series_id": 11455,
+  "title": "Jojo's Bizarre Adventure - Jojolion",
+  "kitsu_id": null,
+  "work_uid": 19599,
+  "genres_source": "fantastique, aventure",
+  "genres_enriched": "surnaturel, aventure"
+}
+
+
+ GESTE 5 · LES DEUX NORMALISATIONS — consolider n'est pas traduire      
+ 746 Monster : trois libellés, un code · 11455 Jojolion : le faux ami
+
+  ── 746 Monster · CONSOLIDATION ──
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/746 | jq '{series_id, title, kitsu_id, work_uid, genres_source: (.genres_source|join(", ")), genres_enriched: ([.genres_enriched[].code]|join(", "))}'
+{
+  "series_id": 746,
+  "title": "Monster",
+  "kitsu_id": null,
+  "work_uid": 14796,
+  "genres_source": "thriller, Suspense, policier",
+  "genres_enriched": "thriller"
+}
+
+  ── 11455 Jojolion · TRADUCTION NON LITTÉRALE ──
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/11455 | jq '{series_id, title, kitsu_id, work_uid, genres_source: (.genres_source|join(", ")), genres_enriched: ([.genres_enriched[].code]|join(", "))}'
+{
+  "series_id": 11455,
+  "title": "Jojo's Bizarre Adventure - Jojolion",
+  "kitsu_id": null,
+  "work_uid": 19599,
+  "genres_source": "fantastique, aventure",
+  "genres_enriched": "surnaturel, aventure"
+}
+
+
+ GESTE 5 bis · LA TABLE D'ARBITRAGE — libellé par libellé               
+ Pourquoi une table écrite à la main plutôt qu'une similarité de chaîne
+
+  $ psql "$PSQL_RO" -P pager=off -c "SELECT source, libelle_brut AS libelle_source, code AS code_normalise FROM manga.genre_mapping WHERE lower(libelle_brut) IN ('fantastique','fantasy','supernatural','thriller','suspense','policier') ORDER BY code, source, libelle_brut;"
+ source | libelle_source | code_normalise 
+--------+----------------+----------------
+ kitsu  | Fantasy        | fantasy
+ ms     | Fantasy        | fantasy
+ kitsu  | Supernatural   | surnaturel
+ ms     | fantastique    | surnaturel
+ kitsu  | Thriller       | thriller
+ ms     | policier       | thriller
+ ms     | Suspense       | thriller
+ ms     | thriller       | thriller
+(8 rows)
+
+
+  ── la justification de la ligne « ms / fantastique » ──
+  $ psql "$PSQL_RO" -tAc "SELECT note FROM manga.genre_mapping WHERE source='ms' AND libelle_brut='fantastique';"
+Arbitrage : le « fantastique » français est l'irruption du surnaturel dans le réel, pas la fantasy. MS porte Fantasy et Heroïc-Fantasy à part.
+
+
+ GESTE 7 · LA COUVERTURE — ce que le référentiel sait, et ce qu'il ignore 
+ Les limites sont calculées à chaque appel, jamais écrites en dur
+
+  Ce que le référentiel contient
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/coverage | jq '{totaux: .totals, genres: .genres}'
+{
+  "totaux": {
+    "series": 14670,
+    "volumes": 104107,
+    "reviews": 11074,
+    "reviews_rag_legacy": 3187
+  },
+  "genres": {
+    "series_with_source_genres": 12652,
+    "series_with_enriched_genres": 12952,
+    "series_without_any_genre": 1694,
+    "series_on_generic_lgbt_only": 525
+  }
+}
+
+  Et les séries qu'aucun rapprochement n'a pu identifier
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/coverage | jq '.totals.series - ([.identity_by_method[].decisions] | add)'
+5304
+
+
+=====================================================================
+ GESTE 6 — les quatre cas d'essai
+=====================================================================
+
+ GESTE 6 · UN TITRE DE VOTRE CHOIX — de son nom à sa fiche              
+ SQL en lecture seule pour trouver l'identifiant, puis l'API pour la fiche
+
+  $ $DEMO_DIR/titre.sh "One Piece"
+  1. Trouver l'identifiant à partir du titre — en SQL, en lecture seule
+  $ psql "$PSQL_RO" -v titre="One Piece" -c "SELECT series_id, series_title
+        FROM manga.ms_series_enriched
+        WHERE series_title ILIKE '%' || :'titre' || '%' ORDER BY … LIMIT 5;"
+
+    736      One Piece
+    46520    One Piece Party
+    61632    One Piece Episode A
+
+  2. Demander sa fiche à l'API — avec la clé
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/736 | jq '{series_id, title, kitsu_id, work_uid, genres_source, genres_enriched}'
+{
+  "series_id": 736,
+  "title": "One Piece",
+  "kitsu_id": 38,
+  "work_uid": 14786,
+  "genres_source": "fantastique, comédie, aventure, action",
+  "genres_enriched": "comedie, action, surnaturel, aventure, fantasy, sport, super_pouvoirs, amitie"
+}
+
+
+ GESTE 6 · UN TITRE DE VOTRE CHOIX — de son nom à sa fiche              
+ SQL en lecture seule pour trouver l'identifiant, puis l'API pour la fiche
+
+  $ $DEMO_DIR/titre.sh "Akame ga Kill"
+  1. Trouver l'identifiant à partir du titre — en SQL, en lecture seule
+  $ psql "$PSQL_RO" -v titre="Akame ga Kill" -c "SELECT series_id, series_title
+        FROM manga.ms_series_enriched
+        WHERE series_title ILIKE '%' || :'titre' || '%' ORDER BY … LIMIT 5;"
+
+    15101    Red Eyes Sword - Akame ga Kill !
+    42614    Red eyes sword 0 - Akame ga kill ! Zero
+    58562    Akame ga Kill! 1.5
+
+  2. Demander sa fiche à l'API — avec la clé
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/15101 | jq '{series_id, title, kitsu_id, work_uid, genres_source, genres_enriched}'
+{
+  "series_id": 15101,
+  "title": "Red Eyes Sword - Akame ga Kill !",
+  "kitsu_id": null,
+  "work_uid": 22306,
+  "genres_source": "gore, fantastique, aventure, action",
+  "genres_enriched": "action, surnaturel, aventure, gore"
+}
+
+
+ GESTE 6 · UN TITRE DE VOTRE CHOIX — de son nom à sa fiche              
+ SQL en lecture seule pour trouver l'identifiant, puis l'API pour la fiche
+
+  $ $DEMO_DIR/titre.sh "Moriarty"
+  1. Trouver l'identifiant à partir du titre — en SQL, en lecture seule
+  $ psql "$PSQL_RO" -v titre="Moriarty" -c "SELECT series_id, series_title
+        FROM manga.ms_series_enriched
+        WHERE series_title ILIKE '%' || :'titre' || '%' ORDER BY … LIMIT 5;"
+
+    49246    Moriarty
+    74575    Moriarty - The remains
+
+  2. Demander sa fiche à l'API — avec la clé
+  $ curl -s -H "X-API-Key: $CLE" http://127.0.0.1:8000/series/49246 | jq '{series_id, title, kitsu_id, work_uid, genres_source, genres_enriched}'
+{
+  "series_id": 49246,
+  "title": "Moriarty",
+  "kitsu_id": null,
+  "work_uid": 24057,
+  "genres_source": "",
+  "genres_enriched": ""
+}
+
+
+ GESTE 6 · UN TITRE DE VOTRE CHOIX — de son nom à sa fiche              
+ SQL en lecture seule pour trouver l'identifiant, puis l'API pour la fiche
+
+  $ $DEMO_DIR/titre.sh "Calvin and Hobbes"
+  1. Trouver l'identifiant à partir du titre — en SQL, en lecture seule
+  $ psql "$PSQL_RO" -v titre="Calvin and Hobbes" -c "SELECT series_id, series_title
+        FROM manga.ms_series_enriched
+        WHERE series_title ILIKE '%' || :'titre' || '%' ORDER BY … LIMIT 5;"
+
+  Aucune série ne porte ce titre : « Calvin and Hobbes »
+  → Le catalogue est celui du MARCHÉ FRANÇAIS (Manga Sanctuary),
+    pas un catalogue mondial. Une absence est une frontière connue.
+
+
