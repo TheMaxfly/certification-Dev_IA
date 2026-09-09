@@ -49,6 +49,7 @@ VUE_SERIE='{series_id, title, kitsu_id, work_uid, genres_source: (.genres_source
 # --- 1. LE CONTRAT ------------------------------------------- 20 s ---
 # Prouve : 13 points de terminaison, chacun résumé ; 11 sous cadenas,
 # les 2 sondes ouvertes. Critères 1, 2, 3 de C5.
+# L'onglet /docs doit être OUVERT AVANT la séance — ce geste ne l'ouvre pas.
 g1() {
   titre "GESTE 1 · LE CONTRAT — la documentation est servie par l'API" \
         "Critères 1, 2, 3 de C5 : couverture, autorisation, standard OpenAPI"
@@ -61,7 +62,13 @@ g1() {
   cmd "curl -s $BASE/openapi.json | jq '[.paths[][] | select(.security)] | length'"
   printf '\033[2m  Lesquelles sont ouvertes ?\033[0m\n'
   cmd "curl -s $BASE/openapi.json | jq -r '.paths | to_entries[] | select(.value.get.security == null) | .key'"
-  cmd "xdg-open $BASE/docs >/dev/null 2>&1 &"
+  # Aucun lancement de navigateur ici : l'onglet /docs est ouvert AVANT
+  # d'entrer (cf. README, mise en route). L'ouvrir en séance ferait un second
+  # onglet sur la même page — un jury y lit un raté — et dépendrait d'un
+  # utilitaire qui peut ne trouver aucun navigateur selon l'environnement
+  # graphique. Les trois comptages ci-dessus occupent le temps de basculer
+  # sur l'onglet déjà prêt.
+  printf '\033[2m  → basculer sur l’onglet /docs (Alt+Tab)\033[0m\n\n'
 }
 
 # --- 2. LE REFUS, PUIS L'ACCÈS -------------------------------- 20 s ---
@@ -89,7 +96,13 @@ g3() {
   cmd "psql \"\$PSQL_RO\" -tAc 'SELECT current_user;'"
   cmd "psql \"\$PSQL_RO\" -tAc \"SELECT 'lecture OK, ' || count(*) || ' séries' FROM manga.ms_series_enriched;\""
   printf '\033[1m  ── et maintenant, une écriture ──\033[0m\n'
-  cmd "psql \"\$PSQL_RO\" -c '\\set VERBOSITY verbose' -c \"UPDATE manga.ms_series_enriched SET series_title='piraté' WHERE series_id=11455;\" 2>&1 | grep -E 'ERROR|EMPLACEMENT|LOCATION'"
+  # `series_id = -1` et non 11455 : PostgreSQL vérifie le privilège AVANT
+  # d'évaluer la clause WHERE — le 42501 tombe à l'identique, vérifié. Mais si
+  # l'écriture passait un jour (un PGPASSFILE qui résout autrement, une variable
+  # héritée), aucune ligne existante ne serait touchée : le plus petit
+  # series_id du catalogue est 12. Viser 11455 exposait la série des gestes 4
+  # et 5 à s'appeler « piraté » devant le jury.
+  cmd "psql \"\$PSQL_RO\" -c '\\set VERBOSITY verbose' -c \"UPDATE manga.ms_series_enriched SET series_title='piraté' WHERE series_id=-1;\" 2>&1 | grep -E 'ERROR|EMPLACEMENT|LOCATION'"
 }
 
 # --- 4. LE GESTE CENTRAL -------------------------------------- 40 s ---

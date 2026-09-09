@@ -31,6 +31,11 @@ source demo_soutenance/commandes.sh
 verif        # doit afficher : db ok · clé de démo · manga_api · jq
 ```
 
+**4. Ouvrir `http://127.0.0.1:8000/docs` dans un onglet du navigateur — et l'y
+laisser.** C'est une étape de la mise en route, pas un geste de séance : rien de
+la démonstration ne lance de navigateur. `g1` affiche ses trois comptages, ce
+qui vous laisse le temps de basculer sur l'onglet déjà prêt (`Alt+Tab`).
+
 Pour repartir d'une API propre : `pkill -f "uvicorn app.main"` puis relancer.
 Si le port est déjà pris, c'est qu'une instance tourne : `verif` vous le dira.
 
@@ -71,7 +76,14 @@ Deux conséquences sur la façon de parler :
 ## La séquence
 
 ### `g1` — Le contrat · 20 s
-Affiche le décompte, puis ouvre `/docs`.
+Affiche trois comptages — 13 routes, 11 sous cadenas, les 2 ouvertes nommées —
+puis vous invite à basculer sur l'onglet `/docs`, **ouvert avant la séance**.
+
+> Le geste ne lance aucun navigateur, volontairement. L'ouvrir en séance ferait
+> un second onglet sur la même page si celui-ci est déjà prêt — un jury y lit un
+> raté — et dépendrait d'un utilitaire qui peut ne trouver aucun navigateur
+> selon l'environnement graphique. **Rien de la séquence ne dépend plus du
+> poste graphique.**
 
 > « La documentation n'est pas écrite à côté du code : elle est **servie par
 > l'API elle-même**. Treize points de terminaison, chacun avec son résumé. Le
@@ -100,6 +112,13 @@ Le rôle de l'API lit 14 670 séries, puis échoue à en modifier une.
 > pas mon code qui refuse : c'est PostgreSQL, `SQLSTATE 42501`, dans
 > `aclcheck_error`. Une garantie applicative se contourne ; un privilège
 > retiré, non. »
+
+> **Pourquoi l'écriture vise `series_id = -1`.** PostgreSQL vérifie le privilège
+> **avant** d'évaluer la clause `WHERE` : le refus est identique, mot pour mot.
+> Mais si l'écriture passait un jour — un `PGPASSFILE` qui résout autrement, une
+> variable héritée —, aucune ligne existante ne serait touchée : le plus petit
+> `series_id` du catalogue est **12**. Viser 11455 exposait la série des gestes
+> 4 et 5 à s'appeler « piraté » deux gestes plus tard, devant le jury.
 
 ### `g4` — Le geste central · 40 s
 `/series/11455` — JoJo's Bizarre Adventure : Jojolion.
@@ -238,8 +257,9 @@ seule mesure qui manque, et je ne peux pas la produire à votre place.
 | `verif` dit `INJOIGNABLE` | Relancer l'uvicorn ; 0,7 s. |
 | `verif` dit `db` autre que `ok` | PostgreSQL est tombé : `pg_isready`. Les gestes 1 et 2 (401) fonctionnent quand même. |
 | Rien ne démarre | Ouvrir `repli_2026-09-08.txt` : la séquence entière y est, sorties comprises. |
-| `xdg-open` n'ouvre rien | Ouvrir `http://127.0.0.1:8000/docs` à la main dans un onglet déjà prêt. |
 | Le jury creuse la sécurité | `logs` affiche le journal : le refus y figure, **la clé jamais**. |
 
-Avoir **l'onglet `/docs` déjà ouvert** avant d'entrer évite le seul aléa
-visuel de la séquence.
+L'onglet `/docs` **ouvert avant d'entrer** fait partie de la mise en route
+(étape 4). Depuis que `g1` ne lance plus de navigateur, la séquence ne dépend
+plus du tout de l'environnement graphique : elle tient entièrement dans le
+terminal, l'onglet ne servant qu'à montrer la page.
