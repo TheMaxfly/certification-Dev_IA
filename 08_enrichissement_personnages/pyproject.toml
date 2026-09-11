@@ -1,0 +1,35 @@
+[project]
+name = "enrichissement-personnages"
+version = "0.1.0"
+description = "Collecte des personnages depuis Wikipedia francais et AniList, perimetre derive du catalogue."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["commun"]
+
+[tool.ruff.lint.per-file-ignores]
+# Les fixtures reproduisent du wikitexte reel : sur frwiki un element de liste
+# tient sur une seule ligne. Les replier rendrait la fixture fausse — et c'est
+# precisement ce repli artificiel qui avait fait echouer le test a tort.
+"**/test_extraction_wikipedia.py" = ["E501"]

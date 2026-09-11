@@ -543,6 +543,13 @@ def test_staging_tables_creees(base_migree):
         "kitsu_mappings",
         # 009 — le staff Kitsu, confirmateur d'auteur de l'étage 2.
         "kitsu_staff",
+        # 015 — les personnages, socle multi-sources. Quatre grains distincts :
+        # le personnage, ses formes nominales, ses descriptions (une par
+        # source), et ses liens aux œuvres — le rôle appartenant au lien.
+        "characters",
+        "character_forms",
+        "character_descriptions",
+        "character_work",
     }
     with psycopg.connect(base_migree) as connexion:
         lignes = connexion.execute(

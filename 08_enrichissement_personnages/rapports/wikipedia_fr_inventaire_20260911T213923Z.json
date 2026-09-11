@@ -1,0 +1,4829 @@
+{
+  "graine": 20260911,
+  "part_strate": 0.1,
+  "taille_strate_tete": 136,
+  "taille_strate_queue": 136,
+  "releves": [
+    {
+      "series_id": 1629,
+      "rang_popularite": 4,
+      "strate": "tete",
+      "titre_sitelink": "Fullmetal Alchemist",
+      "titre_servi": "Fullmetal Alchemist",
+      "redirige": false,
+      "existe": true,
+      "revid": 234383735,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Univers",
+          "index": "1"
+        },
+        {
+          "niveau": "3",
+          "titre": "Synopsis",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Personnages principaux",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Géographie",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Amestris",
+          "index": "5"
+        },
+        {
+          "niveau": "5",
+          "titre": "Histoire",
+          "index": "6"
+        },
+        {
+          "niveau": "5",
+          "titre": "Population",
+          "index": "7"
+        },
+        {
+          "niveau": "5",
+          "titre": "Gouvernement",
+          "index": "8"
+        },
+        {
+          "niveau": "5",
+          "titre": "Géographie",
+          "index": "9"
+        },
+        {
+          "niveau": "4",
+          "titre": "Xing",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "Xerxes",
+          "index": "11"
+        },
+        {
+          "niveau": "5",
+          "titre": "Légendes",
+          "index": "12"
+        },
+        {
+          "niveau": "5",
+          "titre": "Habitants actuels",
+          "index": "13"
+        },
+        {
+          "niveau": "5",
+          "titre": "Rôle dans l'alchimie",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "15"
+        },
+        {
+          "niveau": "2",
+          "titre": "Animation",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Fullmetal Alchemist</i>",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Fullmetal Alchemist: Conqueror of Shamballa</i>",
+          "index": "18"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Fullmetal Alchemist: Brotherhood</i>",
+          "index": "19"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Fullmetal Alchemist: L'Étoile sacrée de Milos</i>",
+          "index": "20"
+        },
+        {
+          "niveau": "2",
+          "titre": "Films",
+          "index": "21"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux",
+          "index": "22"
+        },
+        {
+          "niveau": "2",
+          "titre": "Romans",
+          "index": "23"
+        },
+        {
+          "niveau": "2",
+          "titre": "Accueil",
+          "index": "24"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "25"
+        },
+        {
+          "niveau": "2",
+          "titre": "Voir aussi",
+          "index": "26"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bibliographie",
+          "index": "27"
+        },
+        {
+          "niveau": "3",
+          "titre": "Articles connexes",
+          "index": "28"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "29"
+        }
+      ]
+    },
+    {
+      "series_id": 559,
+      "rang_popularite": 18,
+      "strate": "tete",
+      "titre_sitelink": "Samurai Deeper Kyo",
+      "titre_servi": "Samurai Deeper Kyo",
+      "redirige": false,
+      "existe": true,
+      "revid": 236298527,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages et trame principale",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Univers",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Aspect historique",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Armes",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Combats",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Similitudes avec les RPG",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Thèmes abordés",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musique",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux vidéo",
+          "index": "13"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Annexes",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Documentation",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "17"
+        }
+      ]
+    },
+    {
+      "series_id": 1710,
+      "rang_popularite": 27,
+      "strate": "tete",
+      "titre_sitelink": "Negima ! Le Maître magicien",
+      "titre_servi": "Negima ! Le Maître magicien",
+      "redirige": false,
+      "existe": true,
+      "revid": 221180817,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Le <i>Mundus Magicus</i>",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Monde Magique",
+          "index": "3"
+        },
+        {
+          "niveau": "4",
+          "titre": "Faune",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Population",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Organisation politique",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Géographie",
+          "index": "7"
+        },
+        {
+          "niveau": "4",
+          "titre": "Carte",
+          "index": "8"
+        },
+        {
+          "niveau": "4",
+          "titre": "Cités",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Distribution",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux vidéo",
+          "index": "13"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Autres sources",
+          "index": "15"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "16"
+        }
+      ]
+    },
+    {
+      "series_id": 38583,
+      "rang_popularite": 28,
+      "strate": "tete",
+      "titre_sitelink": "My Hero Academia",
+      "titre_servi": "My Hero Academia",
+      "redirige": false,
+      "existe": true,
+      "revid": 236586463,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "<i>Anime</i>",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Série télévisée",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musique",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Films d'animation",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Séries dérivées",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i><span>My Hero Academia Smash!!</span></i>",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i><span>Vigilante: My Hero Academia Illegals</span></i>",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i><span>My Hero Academia: Team Up Mission</span></i>",
+          "index": "13"
+        },
+        {
+          "niveau": "2",
+          "titre": "<i><span>Light novel</span></i>",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux vidéo",
+          "index": "15"
+        },
+        {
+          "niveau": "2",
+          "titre": "Accueil",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Ventes",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "Récompenses",
+          "index": "18"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "20"
+        }
+      ]
+    },
+    {
+      "series_id": 591,
+      "rang_popularite": 37,
+      "strate": "tete",
+      "titre_sitelink": "Saint Seiya",
+      "titre_servi": "Saint Seiya",
+      "redirige": false,
+      "existe": true,
+      "revid": 239155872,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Introduction",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages principaux",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Non-chevaliers",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Chevaliers",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Chevaliers de Bronze",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Chevaliers d'Argent",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Chevaliers d'Or",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arcs",
+          "index": "9"
+        },
+        {
+          "niveau": "4",
+          "titre": "Arc Sanctuaire",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "Arc Poséidon / Asgard",
+          "index": "11"
+        },
+        {
+          "niveau": "4",
+          "titre": "Arc Hadès",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "Les éditeurs du manga à travers le monde",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Série télévisée",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "OAV",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "Films",
+          "index": "18"
+        },
+        {
+          "niveau": "3",
+          "titre": "Original net animation",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Accueil",
+          "index": "20"
+        },
+        {
+          "niveau": "2",
+          "titre": "Suppléments officiels",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya : épisode G</i>",
+          "index": "22"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Gigantomachia</i>",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Next Dimension</i>",
+          "index": "24"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: The Lost Canvas</i>",
+          "index": "25"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Omega</i>",
+          "index": "26"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Saintia Shō</i>",
+          "index": "27"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Soul of Gold</i>",
+          "index": "28"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Episode Zero</i>, <i>Origin</i> et <i>Destiny</i>",
+          "index": "29"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Meiō Iden – Dark Wing</i>",
+          "index": "30"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Saint Seiya: Time Odyssey</i>",
+          "index": "31"
+        },
+        {
+          "niveau": "3",
+          "titre": "Saint Seiya Then",
+          "index": "32"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux vidéo",
+          "index": "33"
+        },
+        {
+          "niveau": "3",
+          "titre": "Jeux principaux",
+          "index": "34"
+        },
+        {
+          "niveau": "3",
+          "titre": "Apparitions en tant qu'invités",
+          "index": "35"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeu de société",
+          "index": "36"
+        },
+        {
+          "niveau": "2",
+          "titre": "Conventions commémoratives des 30 ans de <i>Saint Seiya</i>",
+          "index": "37"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "38"
+        },
+        {
+          "niveau": "2",
+          "titre": "Annexes",
+          "index": "39"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bibliographie",
+          "index": "40"
+        },
+        {
+          "niveau": "3",
+          "titre": "Ressource radiophonique",
+          "index": "41"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "42"
+        }
+      ]
+    },
+    {
+      "series_id": 1679,
+      "rang_popularite": 40,
+      "strate": "tete",
+      "titre_sitelink": "Satan 666",
+      "titre_servi": "Satan 666",
+      "redirige": false,
+      "existe": true,
+      "revid": 230669495,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Univers",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "O-Parts",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des volumes et chapitres",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Annexes",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bibliographie",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "9"
+        }
+      ]
+    },
+    {
+      "series_id": 2605,
+      "rang_popularite": 53,
+      "strate": "tete",
+      "titre_sitelink": "Claymore (manga)",
+      "titre_servi": "Claymore (manga)",
+      "redirige": false,
+      "existe": true,
+      "revid": 233640321,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des chapitres et volumes",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musique",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeu vidéo",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "9"
+        }
+      ]
+    },
+    {
+      "series_id": 1106,
+      "rang_popularite": 76,
+      "strate": "tete",
+      "titre_sitelink": "Ken le Survivant",
+      "titre_servi": "Ken le Survivant",
+      "redirige": false,
+      "existe": true,
+      "revid": 238759792,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Étymologie",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Production",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Supports",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Manga",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Éditions <i>J'ai lu</i>",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Éditions <i>Asuka</i>",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime 2026",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Polémiques et censures",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Particularités du dessin",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Violence",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "Adaptation française",
+          "index": "13"
+        },
+        {
+          "niveau": "2",
+          "titre": "Films dérivés et adaptations",
+          "index": "14"
+        },
+        {
+          "niveau": "3",
+          "titre": "Films et OAV",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Productions scéniques",
+          "index": "16"
+        },
+        {
+          "niveau": "4",
+          "titre": "Spectacle",
+          "index": "17"
+        },
+        {
+          "niveau": "4",
+          "titre": "Comédie musicale",
+          "index": "18"
+        },
+        {
+          "niveau": "2",
+          "titre": "Distribution",
+          "index": "19"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime",
+          "index": "20"
+        },
+        {
+          "niveau": "4",
+          "titre": "Voix originales",
+          "index": "21"
+        },
+        {
+          "niveau": "4",
+          "titre": "Voix françaises",
+          "index": "22"
+        },
+        {
+          "niveau": "3",
+          "titre": "Films",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime 2026",
+          "index": "24"
+        },
+        {
+          "niveau": "4",
+          "titre": "Voix originales",
+          "index": "25"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "26"
+        },
+        {
+          "niveau": "3",
+          "titre": "DVD",
+          "index": "27"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musique",
+          "index": "28"
+        },
+        {
+          "niveau": "3",
+          "titre": "Jeux vidéo",
+          "index": "29"
+        },
+        {
+          "niveau": "2",
+          "titre": "Accueil",
+          "index": "30"
+        },
+        {
+          "niveau": "3",
+          "titre": "Impact",
+          "index": "31"
+        },
+        {
+          "niveau": "3",
+          "titre": "Mèmes Internet",
+          "index": "32"
+        },
+        {
+          "niveau": "3",
+          "titre": "Pachinko",
+          "index": "33"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "34"
+        },
+        {
+          "niveau": "2",
+          "titre": "Voir aussi",
+          "index": "35"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bibliographie",
+          "index": "36"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "37"
+        }
+      ]
+    },
+    {
+      "series_id": 2741,
+      "rang_popularite": 81,
+      "strate": "tete",
+      "titre_sitelink": "Rosario + Vampire",
+      "titre_servi": "Rosario + Vampire",
+      "redirige": false,
+      "existe": true,
+      "revid": 238978244,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Histoire",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "L’univers de <i>Rosario + Vampire</i>",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Les monstres",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Techniques de combat des personnages",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des chapitres",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Voir aussi",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "14"
+        }
+      ]
+    },
+    {
+      "series_id": 733,
+      "rang_popularite": 100,
+      "strate": "tete",
+      "titre_sitelink": "Alice 19th",
+      "titre_servi": "Alice 19th",
+      "redirige": false,
+      "existe": true,
+      "revid": 212711187,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Résumé de l'histoire",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Les personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Les 24 <i>Lotis</i> ou mots sacrés",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des tomes",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "5"
+        }
+      ]
+    },
+    {
+      "series_id": 6453,
+      "rang_popularite": 101,
+      "strate": "tete",
+      "titre_sitelink": "Monster Hunter Orage",
+      "titre_servi": "Monster Hunter Orage",
+      "redirige": false,
+      "existe": true,
+      "revid": 209988539,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages principaux",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des volumes et chapitres",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "5"
+        }
+      ]
+    },
+    {
+      "series_id": 38014,
+      "rang_popularite": 115,
+      "strate": "tete",
+      "titre_sitelink": "Darwin's Game",
+      "titre_servi": "Darwin's Game",
+      "redirige": false,
+      "existe": true,
+      "revid": 234829831,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Terminologie",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Clans",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Les Sunset Ravens",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Les Eighth",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Sigils",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Annotations",
+          "index": "14"
+        },
+        {
+          "niveau": "3",
+          "titre": "Sources",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Édition japonaise",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Édition française",
+          "index": "17"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "18"
+        }
+      ]
+    },
+    {
+      "series_id": 48895,
+      "rang_popularite": 121,
+      "strate": "tete",
+      "titre_sitelink": "L'Atelier des sorciers",
+      "titre_servi": "L'Atelier des sorciers",
+      "redirige": false,
+      "existe": true,
+      "revid": 239031851,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Atelier de Kieffrey",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Les Trois Sages",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "La Milice magique",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Autres sorciers",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>L'Atelier des sorciers</i>",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>La Cuisine des sorciers</i>",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Adaptation en anime",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Annotations",
+          "index": "14"
+        },
+        {
+          "niveau": "3",
+          "titre": "Références",
+          "index": "15"
+        },
+        {
+          "niveau": "2",
+          "titre": "Œuvres",
+          "index": "16"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "17"
+        }
+      ]
+    },
+    {
+      "series_id": 499,
+      "rang_popularite": 141,
+      "strate": "tete",
+      "titre_sitelink": "D.N.Angel",
+      "titre_servi": "D.N.Angel",
+      "redirige": false,
+      "existe": true,
+      "revid": 229278298,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des volumes",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musique",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Remarques",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "12"
+        }
+      ]
+    },
+    {
+      "series_id": 9034,
+      "rang_popularite": 150,
+      "strate": "tete",
+      "titre_sitelink": "Noragami",
+      "titre_servi": "Noragami",
+      "redirige": false,
+      "existe": true,
+      "revid": 235572884,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Protagonistes",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Dieux",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Shinki",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Humains",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Série télévisée",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "11"
+        },
+        {
+          "niveau": "5",
+          "titre": "Saison 1",
+          "index": "12"
+        },
+        {
+          "niveau": "5",
+          "titre": "Saison 2",
+          "index": "13"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musique",
+          "index": "14"
+        },
+        {
+          "niveau": "4",
+          "titre": "Différences avec le manga",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "OAV",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "17"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "18"
+        },
+        {
+          "niveau": "3",
+          "titre": "DVD et Blu-ray",
+          "index": "19"
+        },
+        {
+          "niveau": "3",
+          "titre": "CD Drama",
+          "index": "20"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "21"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "22"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "23"
+        }
+      ]
+    },
+    {
+      "series_id": 1385,
+      "rang_popularite": 154,
+      "strate": "tete",
+      "titre_sitelink": "Pokémon - La Grande Aventure",
+      "titre_servi": "Pokémon - La Grande Aventure",
+      "redirige": false,
+      "existe": true,
+      "revid": 236942204,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 1 : Rouge / Bleu",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 2 : Jaune",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 3 : Or / Argent / Cristal",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 4 : Rubis et Saphir",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 5 : Rouge Feu et Vert Feuille",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc  6 : Émeraude",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 7 : Diamant et Perle",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 8 : Platine",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 9 : Or HeartGold et Argent SoulSilver",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 10 : Noir et Blanc",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 11 : Noir 2 et Blanc 2",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 12 : X et Y",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 13 : Rubis Oméga et Saphir Alpha",
+          "index": "14"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 14 : Soleil et Lune / Ultra-Soleil et Ultra-Lune",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arc 15 : Épée et Bouclier",
+          "index": "16"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "Kanto",
+          "index": "18"
+        },
+        {
+          "niveau": "3",
+          "titre": "Johto",
+          "index": "19"
+        },
+        {
+          "niveau": "3",
+          "titre": "Hoenn",
+          "index": "20"
+        },
+        {
+          "niveau": "3",
+          "titre": "Sinnoh",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "Unys",
+          "index": "22"
+        },
+        {
+          "niveau": "3",
+          "titre": "Kalos",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "Alola",
+          "index": "24"
+        },
+        {
+          "niveau": "3",
+          "titre": "Galar",
+          "index": "25"
+        },
+        {
+          "niveau": "2",
+          "titre": "Publication",
+          "index": "26"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des tomes français",
+          "index": "27"
+        },
+        {
+          "niveau": "3",
+          "titre": "La Grande Aventure (Rouge et Bleu / Jaune)",
+          "index": "28"
+        },
+        {
+          "niveau": "3",
+          "titre": "Or et Argent / Cristal",
+          "index": "29"
+        },
+        {
+          "niveau": "3",
+          "titre": "Rubis et Saphir",
+          "index": "30"
+        },
+        {
+          "niveau": "3",
+          "titre": "Rouge Feu et Vert Feuille / Émeraude",
+          "index": "31"
+        },
+        {
+          "niveau": "3",
+          "titre": "Diamant et Perle / Platine",
+          "index": "32"
+        },
+        {
+          "niveau": "3",
+          "titre": "Or Heart Gold et Argent Soul Silver",
+          "index": "33"
+        },
+        {
+          "niveau": "3",
+          "titre": "Noir et Blanc",
+          "index": "34"
+        },
+        {
+          "niveau": "4",
+          "titre": "Format simple",
+          "index": "35"
+        },
+        {
+          "niveau": "4",
+          "titre": "Format double",
+          "index": "36"
+        },
+        {
+          "niveau": "3",
+          "titre": "Noir 2 et Blanc 2",
+          "index": "37"
+        },
+        {
+          "niveau": "3",
+          "titre": "XY",
+          "index": "38"
+        },
+        {
+          "niveau": "3",
+          "titre": "Soleil et Lune",
+          "index": "39"
+        },
+        {
+          "niveau": "3",
+          "titre": "Épée et Bouclier",
+          "index": "40"
+        },
+        {
+          "niveau": "2",
+          "titre": "Place dans la franchise",
+          "index": "41"
+        },
+        {
+          "niveau": "2",
+          "titre": "Ventes",
+          "index": "42"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "43"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "44"
+        }
+      ]
+    },
+    {
+      "series_id": 15123,
+      "rang_popularite": 156,
+      "strate": "tete",
+      "titre_sitelink": "Food Wars!",
+      "titre_servi": "Food Wars!",
+      "redirige": false,
+      "existe": true,
+      "revid": 237859204,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Personnages principaux",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Antagonistes",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Résidents de l’Étoile Polaire",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Personnages secondaires",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "L'académie Tootsuki",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Conseil des dix maîtres",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Les duels",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Les duels de chefs officiels",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Les duels de chefs non officiels",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "14"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 1",
+          "index": "15"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 2",
+          "index": "16"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 3",
+          "index": "17"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 4",
+          "index": "18"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 5",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "20"
+        },
+        {
+          "niveau": "3",
+          "titre": "Publications",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "Jeu vidéo",
+          "index": "22"
+        },
+        {
+          "niveau": "2",
+          "titre": "Accueil",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "Ventes",
+          "index": "24"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "25"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "26"
+        }
+      ]
+    },
+    {
+      "series_id": 895,
+      "rang_popularite": 168,
+      "strate": "tete",
+      "titre_sitelink": "Beck (manga)",
+      "titre_servi": "Beck (manga)",
+      "redirige": false,
+      "existe": true,
+      "revid": 234465044,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références au rock",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bande son",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "O.S.T. 1 : Beck",
+          "index": "11"
+        },
+        {
+          "niveau": "4",
+          "titre": "O.S.T. 2 : Keith",
+          "index": "12"
+        },
+        {
+          "niveau": "4",
+          "titre": "Beat Crusaders - <i>Hit in America</i> (opening single)",
+          "index": "13"
+        },
+        {
+          "niveau": "4",
+          "titre": "Meister - <i>Above the Clouds</i> (ending single)",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Film en prise de vues réelles",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Distribution",
+          "index": "17"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "18"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "19"
+        }
+      ]
+    },
+    {
+      "series_id": 7099,
+      "rang_popularite": 169,
+      "strate": "tete",
+      "titre_sitelink": "Kuroko's Basket",
+      "titre_servi": "Kuroko's Basket",
+      "redirige": false,
+      "existe": true,
+      "revid": 239050568,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Série télévisée",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musiques",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Films d'animation",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Distribution",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Théâtre",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Genèse",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Distribution principale",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Analyse de l’œuvre",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "Réception et critique",
+          "index": "13"
+        },
+        {
+          "niveau": "3",
+          "titre": "Menaces",
+          "index": "14"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "15"
+        },
+        {
+          "niveau": "3",
+          "titre": "Publications",
+          "index": "16"
+        },
+        {
+          "niveau": "3",
+          "titre": "Jeux vidéo",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "Autres produits",
+          "index": "18"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "20"
+        }
+      ]
+    },
+    {
+      "series_id": 6448,
+      "rang_popularite": 176,
+      "strate": "tete",
+      "titre_sitelink": "Blazer Drive",
+      "titre_servi": "Blazer Drive",
+      "redirige": false,
+      "existe": true,
+      "revid": 205175370,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des chapitres",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Produits dérivés",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "5"
+        }
+      ]
+    },
+    {
+      "series_id": 6531,
+      "rang_popularite": 11384,
+      "strate": "queue",
+      "titre_sitelink": "Iron Wok Jan!",
+      "titre_servi": "Iron Wok Jan!",
+      "redirige": false,
+      "existe": true,
+      "revid": 213489714,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Voir aussi",
+          "index": "3"
+        }
+      ]
+    },
+    {
+      "series_id": 52308,
+      "rang_popularite": 11475,
+      "strate": "queue",
+      "titre_sitelink": "MF Ghost",
+      "titre_servi": "MF Ghost",
+      "redirige": false,
+      "existe": true,
+      "revid": 235432253,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Histoire",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Production et supports",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "4",
+          "titre": "Volumes",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Animé",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Épisodes",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Notes",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Références",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "11"
+        }
+      ]
+    },
+    {
+      "series_id": 46378,
+      "rang_popularite": 11720,
+      "strate": "queue",
+      "titre_sitelink": "Keijo!!!!!!!!",
+      "titre_servi": "Keijo!!!!!!!!",
+      "redirige": false,
+      "existe": true,
+      "revid": 235266958,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "7"
+        }
+      ]
+    },
+    {
+      "series_id": 38431,
+      "rang_popularite": 11758,
+      "strate": "queue",
+      "titre_sitelink": "Boku Girl",
+      "titre_servi": "Boku Girl",
+      "redirige": false,
+      "existe": true,
+      "revid": 227261880,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Personnages principaux",
+          "index": "3"
+        },
+        {
+          "niveau": "4",
+          "titre": "Suzushiro Mizuki",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Fujiwara Yumeko",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Ichimonji Takeru",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Loki",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Personnages secondaires",
+          "index": "8"
+        },
+        {
+          "niveau": "4",
+          "titre": "Ide",
+          "index": "9"
+        },
+        {
+          "niveau": "4",
+          "titre": "Nanatarou Yamada",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "Ichimonji Mei",
+          "index": "11"
+        },
+        {
+          "niveau": "4",
+          "titre": "Corbeau",
+          "index": "12"
+        },
+        {
+          "niveau": "4",
+          "titre": "Daikawa Tamako",
+          "index": "13"
+        },
+        {
+          "niveau": "4",
+          "titre": "Le père de Mizuki",
+          "index": "14"
+        },
+        {
+          "niveau": "4",
+          "titre": "Suzushiro Akihiko",
+          "index": "15"
+        },
+        {
+          "niveau": "4",
+          "titre": "Yukie",
+          "index": "16"
+        },
+        {
+          "niveau": "4",
+          "titre": "Les parents de Takeru",
+          "index": "17"
+        },
+        {
+          "niveau": "4",
+          "titre": "Asao Reiji",
+          "index": "18"
+        },
+        {
+          "niveau": "4",
+          "titre": "Thor",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Productions et supports",
+          "index": "20"
+        },
+        {
+          "niveau": "3",
+          "titre": "Manga",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des tomes",
+          "index": "22"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Light novel</i>",
+          "index": "23"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "24"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "25"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "26"
+        }
+      ]
+    },
+    {
+      "series_id": 11038,
+      "rang_popularite": 12083,
+      "strate": "queue",
+      "titre_sitelink": "Servant × Service",
+      "titre_servi": "Servant × Service",
+      "redirige": false,
+      "existe": true,
+      "revid": 235977321,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Génériques",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "8"
+        }
+      ]
+    },
+    {
+      "series_id": 55793,
+      "rang_popularite": 12294,
+      "strate": "queue",
+      "titre_sitelink": "Beelzebub-jō no okinimesu mama.",
+      "titre_servi": "Beelzebub-jō no okinimesu mama.",
+      "redirige": false,
+      "existe": true,
+      "revid": 221178945,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Productions et supports",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Manga",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des volumes",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "<i>Anime</i>",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Sources",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Œuvres",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "11"
+        }
+      ]
+    },
+    {
+      "series_id": 11482,
+      "rang_popularite": 12447,
+      "strate": "queue",
+      "titre_sitelink": "Danshi kōkōsei no nichijō",
+      "titre_servi": "Danshi kōkōsei no nichijō",
+      "redirige": false,
+      "existe": true,
+      "revid": 234821989,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Élèves de la classe 2-A du lycée pour garçons <i>Sanada Nord</i>",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Autres",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "<i>Manga</i>",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "<i>Anime</i>",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Film en prise de vues réelles",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Autour de l’œuvre",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "9"
+        }
+      ]
+    },
+    {
+      "series_id": 5524,
+      "rang_popularite": 12627,
+      "strate": "queue",
+      "titre_sitelink": "Historiē",
+      "titre_servi": "Historiē",
+      "redirige": false,
+      "existe": true,
+      "revid": 236837254,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liste des volumes et chapitres",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Lien externe",
+          "index": "6"
+        }
+      ]
+    },
+    {
+      "series_id": 49666,
+      "rang_popularite": 12763,
+      "strate": "queue",
+      "titre_sitelink": "Tsukimichi -Moonlit Fantasy-",
+      "titre_servi": "Tsukimichi -Moonlit Fantasy-",
+      "redirige": false,
+      "existe": true,
+      "revid": 237856648,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Principaux",
+          "index": "3"
+        },
+        {
+          "niveau": "4",
+          "titre": "Protagoniste",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Cercle rapproché de Makoto Misumi",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Secondaires",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "<i>Sous‐dimension</i>",
+          "index": "7"
+        },
+        {
+          "niveau": "5",
+          "titre": "Orques des Montagnes",
+          "index": "8"
+        },
+        {
+          "niveau": "5",
+          "titre": "Nains Anciens",
+          "index": "9"
+        },
+        {
+          "niveau": "5",
+          "titre": "Lézards des Brumes",
+          "index": "10"
+        },
+        {
+          "niveau": "5",
+          "titre": "Alkeys",
+          "index": "11"
+        },
+        {
+          "niveau": "5",
+          "titre": "Ogres des Forêts",
+          "index": "12"
+        },
+        {
+          "niveau": "4",
+          "titre": "Compagnie <i>Kuzunoha</i>",
+          "index": "13"
+        },
+        {
+          "niveau": "4",
+          "titre": "Alliés de Makoto",
+          "index": "14"
+        },
+        {
+          "niveau": "5",
+          "titre": "Compagnie <i>Rembrandt</i>",
+          "index": "15"
+        },
+        {
+          "niveau": "5",
+          "titre": "Compagnie <i>Alpine</i>",
+          "index": "16"
+        },
+        {
+          "niveau": "4",
+          "titre": "Divinités",
+          "index": "17"
+        },
+        {
+          "niveau": "3",
+          "titre": "Arlésiennes",
+          "index": "18"
+        },
+        {
+          "niveau": "2",
+          "titre": "Production et supports",
+          "index": "19"
+        },
+        {
+          "niveau": "3",
+          "titre": "Roman illustré",
+          "index": "20"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des volumes",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "Adaptation dessinée",
+          "index": "22"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des tomes",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "Adaptation animée",
+          "index": "24"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "25"
+        },
+        {
+          "niveau": "5",
+          "titre": "Saison 1",
+          "index": "26"
+        },
+        {
+          "niveau": "5",
+          "titre": "Saison 2",
+          "index": "27"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musique",
+          "index": "28"
+        },
+        {
+          "niveau": "5",
+          "titre": "Génériques",
+          "index": "29"
+        },
+        {
+          "niveau": "5",
+          "titre": "Bande originale",
+          "index": "30"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "31"
+        },
+        {
+          "niveau": "3",
+          "titre": "Notes",
+          "index": "32"
+        },
+        {
+          "niveau": "3",
+          "titre": "Références",
+          "index": "33"
+        }
+      ]
+    },
+    {
+      "series_id": 47394,
+      "rang_popularite": 12777,
+      "strate": "queue",
+      "titre_sitelink": "Kin-iro Mosaic",
+      "titre_servi": "Kin-iro Mosaic",
+      "redirige": false,
+      "existe": true,
+      "revid": 235274974,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Kin-iro Mosaic",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Hello!! Kin-iro Mosaic",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "8"
+        }
+      ]
+    },
+    {
+      "series_id": 8124,
+      "rang_popularite": 13175,
+      "strate": "queue",
+      "titre_sitelink": "Baby Steps",
+      "titre_servi": "Baby Steps",
+      "redirige": false,
+      "existe": true,
+      "revid": 234414887,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "5"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 1",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Saison 2",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musique",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "11"
+        }
+      ]
+    },
+    {
+      "series_id": 48892,
+      "rang_popularite": 13455,
+      "strate": "queue",
+      "titre_sitelink": "Today's Menu for the Emiya Family",
+      "titre_servi": "Today's Menu for the Emiya Family",
+      "redirige": false,
+      "existe": true,
+      "revid": 234462075,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Production et supports",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Manga",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des volumes",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Jeu vidéo",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Références",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Œuvres",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "13"
+        }
+      ]
+    },
+    {
+      "series_id": 10018,
+      "rang_popularite": 14051,
+      "strate": "queue",
+      "titre_sitelink": "L'Ère des Shura",
+      "titre_servi": "L'Ère des Shura",
+      "redirige": false,
+      "existe": true,
+      "revid": 221179563,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Histoire",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Fiche technique",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Doublage",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Épisodes",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Arbre généalogique de la famille Mutsu",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "7"
+        }
+      ]
+    },
+    {
+      "series_id": 12147,
+      "rang_popularite": 15733,
+      "strate": "queue",
+      "titre_sitelink": "Saiki Kusuo no Psi-nan",
+      "titre_servi": "Saiki Kusuo no Psi-nan",
+      "redirige": false,
+      "existe": true,
+      "revid": 234714760,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Trame",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Temporalité",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Famille Saiki",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Lycée PK",
+          "index": "5"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Adaptations",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Anime",
+          "index": "8"
+        },
+        {
+          "niveau": "4",
+          "titre": "Doublage",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Film live",
+          "index": "10"
+        },
+        {
+          "niveau": "4",
+          "titre": "Distribution",
+          "index": "11"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "12"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "13"
+        }
+      ]
+    },
+    {
+      "series_id": 8867,
+      "rang_popularite": 16310,
+      "strate": "queue",
+      "titre_sitelink": "Pyū to fuku! Jaguar",
+      "titre_servi": "Pyū to fuku! Jaguar",
+      "redirige": false,
+      "existe": true,
+      "revid": 201832140,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Adaptations",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeux vidéo",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "5"
+        }
+      ]
+    },
+    {
+      "series_id": 7403,
+      "rang_popularite": 16513,
+      "strate": "queue",
+      "titre_sitelink": "Chocolat (manga)",
+      "titre_servi": "Chocolat (manga)",
+      "redirige": false,
+      "existe": true,
+      "revid": 235310127,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Drama japonais",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Casting",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Drama taïwanais",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Casting",
+          "index": "6"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "7"
+        }
+      ]
+    },
+    {
+      "series_id": 50290,
+      "rang_popularite": 17993,
+      "strate": "queue",
+      "titre_sitelink": "Science Fell in Love, So I Tried to Prove it",
+      "titre_servi": "Science Fell in Love, So I Tried to Prove it",
+      "redirige": false,
+      "existe": true,
+      "revid": 231825772,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Intrigue",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "3",
+          "titre": "Principaux",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Secondaires",
+          "index": "4"
+        },
+        {
+          "niveau": "4",
+          "titre": "Université de Saitama",
+          "index": "5"
+        },
+        {
+          "niveau": "5",
+          "titre": "Laboratoire <i>Ikeda</i>",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Autres",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Production et supports",
+          "index": "8"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bande dessinée",
+          "index": "9"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des volumes",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Adaptation en prise de vues réelles",
+          "index": "11"
+        },
+        {
+          "niveau": "4",
+          "titre": "Distribution",
+          "index": "12"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "13"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musique",
+          "index": "14"
+        },
+        {
+          "niveau": "3",
+          "titre": "Adaptation animée",
+          "index": "15"
+        },
+        {
+          "niveau": "4",
+          "titre": "Liste des épisodes",
+          "index": "16"
+        },
+        {
+          "niveau": "4",
+          "titre": "Musique",
+          "index": "17"
+        },
+        {
+          "niveau": "5",
+          "titre": "Génériques",
+          "index": "18"
+        },
+        {
+          "niveau": "5",
+          "titre": "Bande originale",
+          "index": "19"
+        },
+        {
+          "niveau": "2",
+          "titre": "Réception",
+          "index": "20"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "21"
+        },
+        {
+          "niveau": "3",
+          "titre": "Annotations",
+          "index": "22"
+        },
+        {
+          "niveau": "3",
+          "titre": "Sources",
+          "index": "23"
+        },
+        {
+          "niveau": "3",
+          "titre": "Œuvres",
+          "index": "24"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "25"
+        }
+      ]
+    },
+    {
+      "series_id": 46903,
+      "rang_popularite": 18202,
+      "strate": "queue",
+      "titre_sitelink": "Gochūmon wa usagi desu ka?",
+      "titre_servi": "Gochūmon wa usagi desu ka?",
+      "redirige": false,
+      "existe": true,
+      "revid": 230448783,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Musiques",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Doublage",
+          "index": "7"
+        },
+        {
+          "niveau": "2",
+          "titre": "Jeu vidéo",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anecdotes",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "10"
+        },
+        {
+          "niveau": "2",
+          "titre": "Annexes",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Bibliographie",
+          "index": "12"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liens externes",
+          "index": "13"
+        }
+      ]
+    },
+    {
+      "series_id": 10739,
+      "rang_popularite": 21235,
+      "strate": "queue",
+      "titre_sitelink": "RideBack",
+      "titre_servi": "RideBack",
+      "redirige": false,
+      "existe": true,
+      "revid": 226307555,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Univers",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "3"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "4"
+        },
+        {
+          "niveau": "3",
+          "titre": "Fiche technique",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Voix",
+          "index": "6"
+        },
+        {
+          "niveau": "3",
+          "titre": "Génériques",
+          "index": "7"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Références",
+          "index": "9"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "10"
+        }
+      ]
+    },
+    {
+      "series_id": 9308,
+      "rang_popularite": 21615,
+      "strate": "queue",
+      "titre_sitelink": "Sengoku Youko",
+      "titre_servi": "Sengoku Youko",
+      "redirige": false,
+      "existe": true,
+      "revid": 237712280,
+      "motif_absence": null,
+      "sections": [
+        {
+          "niveau": "2",
+          "titre": "Synopsis",
+          "index": "1"
+        },
+        {
+          "niveau": "2",
+          "titre": "Personnages",
+          "index": "2"
+        },
+        {
+          "niveau": "2",
+          "titre": "Manga",
+          "index": "3"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des volumes",
+          "index": "4"
+        },
+        {
+          "niveau": "2",
+          "titre": "Anime",
+          "index": "5"
+        },
+        {
+          "niveau": "3",
+          "titre": "Liste des épisodes",
+          "index": "6"
+        },
+        {
+          "niveau": "4",
+          "titre": "Partie 1",
+          "index": "7"
+        },
+        {
+          "niveau": "4",
+          "titre": "Partie 2",
+          "index": "8"
+        },
+        {
+          "niveau": "2",
+          "titre": "Notes et références",
+          "index": "9"
+        },
+        {
+          "niveau": "3",
+          "titre": "Annotations",
+          "index": "10"
+        },
+        {
+          "niveau": "3",
+          "titre": "Références",
+          "index": "11"
+        },
+        {
+          "niveau": "3",
+          "titre": "Œuvre",
+          "index": "12"
+        },
+        {
+          "niveau": "4",
+          "titre": "Édition japonaise",
+          "index": "13"
+        },
+        {
+          "niveau": "2",
+          "titre": "Liens externes",
+          "index": "14"
+        }
+      ]
+    }
+  ],
+  "titres_de_section": [
+    [
+      "Liens externes",
+      34
+    ],
+    [
+      "Synopsis",
+      32
+    ],
+    [
+      "Manga",
+      26
+    ],
+    [
+      "Personnages",
+      26
+    ],
+    [
+      "Notes et références",
+      23
+    ],
+    [
+      "Anime",
+      22
+    ],
+    [
+      "Liste des épisodes",
+      22
+    ],
+    [
+      "Références",
+      20
+    ],
+    [
+      "Liste des volumes",
+      11
+    ],
+    [
+      "Musique",
+      10
+    ],
+    [
+      "Doublage",
+      9
+    ],
+    [
+      "Réception",
+      8
+    ],
+    [
+      "Jeux vidéo",
+      7
+    ],
+    [
+      "Fiche technique",
+      7
+    ],
+    [
+      "Distribution",
+      6
+    ],
+    [
+      "Produits dérivés",
+      6
+    ],
+    [
+      "Personnages principaux",
+      5
+    ],
+    [
+      "Accueil",
+      5
+    ],
+    [
+      "Bibliographie",
+      5
+    ],
+    [
+      "Univers",
+      4
+    ],
+    [
+      "Histoire",
+      4
+    ],
+    [
+      "Voir aussi",
+      4
+    ],
+    [
+      "Annexes",
+      4
+    ],
+    [
+      "Série télévisée",
+      4
+    ],
+    [
+      "Jeu vidéo",
+      4
+    ],
+    [
+      "Annotations",
+      4
+    ],
+    [
+      "Œuvres",
+      4
+    ],
+    [
+      "Saison 1",
+      4
+    ],
+    [
+      "Saison 2",
+      4
+    ],
+    [
+      "Production et supports",
+      4
+    ],
+    [
+      "Génériques",
+      4
+    ],
+    [
+      "Géographie",
+      3
+    ],
+    [
+      "Films",
+      3
+    ],
+    [
+      "<i>Anime</i>",
+      3
+    ],
+    [
+      "Ventes",
+      3
+    ],
+    [
+      "Liste des volumes et chapitres",
+      3
+    ],
+    [
+      "Liste des tomes",
+      3
+    ],
+    [
+      "Sources",
+      3
+    ],
+    [
+      "Population",
+      2
+    ],
+    [
+      "Films d'animation",
+      2
+    ],
+    [
+      "OAV",
+      2
+    ],
+    [
+      "Anime 2026",
+      2
+    ],
+    [
+      "Voix originales",
+      2
+    ],
+    [
+      "Liste des chapitres",
+      2
+    ],
+    [
+      "Édition japonaise",
+      2
+    ],
+    [
+      "Personnages secondaires",
+      2
+    ],
+    [
+      "Publications",
+      2
+    ],
+    [
+      "Film en prise de vues réelles",
+      2
+    ],
+    [
+      "Musiques",
+      2
+    ],
+    [
+      "Épisodes",
+      2
+    ],
+    [
+      "Notes",
+      2
+    ],
+    [
+      "Productions et supports",
+      2
+    ],
+    [
+      "Autres",
+      2
+    ],
+    [
+      "Principaux",
+      2
+    ],
+    [
+      "Secondaires",
+      2
+    ],
+    [
+      "Adaptation animée",
+      2
+    ],
+    [
+      "Bande originale",
+      2
+    ],
+    [
+      "Adaptations",
+      2
+    ],
+    [
+      "Casting",
+      2
+    ],
+    [
+      "Amestris",
+      1
+    ],
+    [
+      "Gouvernement",
+      1
+    ],
+    [
+      "Xing",
+      1
+    ],
+    [
+      "Xerxes",
+      1
+    ],
+    [
+      "Légendes",
+      1
+    ],
+    [
+      "Habitants actuels",
+      1
+    ],
+    [
+      "Rôle dans l'alchimie",
+      1
+    ],
+    [
+      "Animation",
+      1
+    ],
+    [
+      "<i>Fullmetal Alchemist</i>",
+      1
+    ],
+    [
+      "<i>Fullmetal Alchemist: Conqueror of Shamballa</i>",
+      1
+    ],
+    [
+      "<i>Fullmetal Alchemist: Brotherhood</i>",
+      1
+    ],
+    [
+      "<i>Fullmetal Alchemist: L'Étoile sacrée de Milos</i>",
+      1
+    ],
+    [
+      "Jeux",
+      1
+    ],
+    [
+      "Romans",
+      1
+    ],
+    [
+      "Articles connexes",
+      1
+    ],
+    [
+      "Personnages et trame principale",
+      1
+    ],
+    [
+      "Aspect historique",
+      1
+    ],
+    [
+      "Armes",
+      1
+    ],
+    [
+      "Combats",
+      1
+    ],
+    [
+      "Similitudes avec les RPG",
+      1
+    ],
+    [
+      "Thèmes abordés",
+      1
+    ],
+    [
+      "Documentation",
+      1
+    ],
+    [
+      "Le <i>Mundus Magicus</i>",
+      1
+    ],
+    [
+      "Monde Magique",
+      1
+    ],
+    [
+      "Faune",
+      1
+    ],
+    [
+      "Organisation politique",
+      1
+    ],
+    [
+      "Carte",
+      1
+    ],
+    [
+      "Cités",
+      1
+    ],
+    [
+      "Autres sources",
+      1
+    ],
+    [
+      "Séries dérivées",
+      1
+    ],
+    [
+      "<i><span>My Hero Academia Smash!!</span></i>",
+      1
+    ],
+    [
+      "<i><span>Vigilante: My Hero Academia Illegals</span></i>",
+      1
+    ],
+    [
+      "<i><span>My Hero Academia: Team Up Mission</span></i>",
+      1
+    ],
+    [
+      "<i><span>Light novel</span></i>",
+      1
+    ],
+    [
+      "Récompenses",
+      1
+    ],
+    [
+      "Introduction",
+      1
+    ],
+    [
+      "Non-chevaliers",
+      1
+    ],
+    [
+      "Chevaliers",
+      1
+    ],
+    [
+      "Chevaliers de Bronze",
+      1
+    ],
+    [
+      "Chevaliers d'Argent",
+      1
+    ],
+    [
+      "Chevaliers d'Or",
+      1
+    ],
+    [
+      "Arcs",
+      1
+    ],
+    [
+      "Arc Sanctuaire",
+      1
+    ],
+    [
+      "Arc Poséidon / Asgard",
+      1
+    ],
+    [
+      "Arc Hadès",
+      1
+    ],
+    [
+      "Les éditeurs du manga à travers le monde",
+      1
+    ],
+    [
+      "Original net animation",
+      1
+    ],
+    [
+      "Suppléments officiels",
+      1
+    ],
+    [
+      "<i>Saint Seiya : épisode G</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Gigantomachia</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Next Dimension</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: The Lost Canvas</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Omega</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Saintia Shō</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Soul of Gold</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Episode Zero</i>, <i>Origin</i> et <i>Destiny</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Meiō Iden – Dark Wing</i>",
+      1
+    ],
+    [
+      "<i>Saint Seiya: Time Odyssey</i>",
+      1
+    ],
+    [
+      "Saint Seiya Then",
+      1
+    ],
+    [
+      "Jeux principaux",
+      1
+    ],
+    [
+      "Apparitions en tant qu'invités",
+      1
+    ],
+    [
+      "Jeu de société",
+      1
+    ],
+    [
+      "Conventions commémoratives des 30 ans de <i>Saint Seiya</i>",
+      1
+    ],
+    [
+      "Ressource radiophonique",
+      1
+    ],
+    [
+      "O-Parts",
+      1
+    ],
+    [
+      "Liste des chapitres et volumes",
+      1
+    ],
+    [
+      "Étymologie",
+      1
+    ],
+    [
+      "Production",
+      1
+    ],
+    [
+      "Supports",
+      1
+    ],
+    [
+      "Éditions <i>J'ai lu</i>",
+      1
+    ],
+    [
+      "Éditions <i>Asuka</i>",
+      1
+    ],
+    [
+      "Polémiques et censures",
+      1
+    ],
+    [
+      "Particularités du dessin",
+      1
+    ],
+    [
+      "Violence",
+      1
+    ],
+    [
+      "Adaptation française",
+      1
+    ],
+    [
+      "Films dérivés et adaptations",
+      1
+    ],
+    [
+      "Films et OAV",
+      1
+    ],
+    [
+      "Productions scéniques",
+      1
+    ],
+    [
+      "Spectacle",
+      1
+    ],
+    [
+      "Comédie musicale",
+      1
+    ],
+    [
+      "Voix françaises",
+      1
+    ],
+    [
+      "DVD",
+      1
+    ],
+    [
+      "Impact",
+      1
+    ],
+    [
+      "Mèmes Internet",
+      1
+    ],
+    [
+      "Pachinko",
+      1
+    ],
+    [
+      "L’univers de <i>Rosario + Vampire</i>",
+      1
+    ],
+    [
+      "Les monstres",
+      1
+    ],
+    [
+      "Techniques de combat des personnages",
+      1
+    ],
+    [
+      "Résumé de l'histoire",
+      1
+    ],
+    [
+      "Les personnages",
+      1
+    ],
+    [
+      "Les 24 <i>Lotis</i> ou mots sacrés",
+      1
+    ],
+    [
+      "Terminologie",
+      1
+    ],
+    [
+      "Clans",
+      1
+    ],
+    [
+      "Les Sunset Ravens",
+      1
+    ],
+    [
+      "Les Eighth",
+      1
+    ],
+    [
+      "Sigils",
+      1
+    ],
+    [
+      "Édition française",
+      1
+    ],
+    [
+      "Atelier de Kieffrey",
+      1
+    ],
+    [
+      "Les Trois Sages",
+      1
+    ],
+    [
+      "La Milice magique",
+      1
+    ],
+    [
+      "Autres sorciers",
+      1
+    ],
+    [
+      "<i>L'Atelier des sorciers</i>",
+      1
+    ],
+    [
+      "<i>La Cuisine des sorciers</i>",
+      1
+    ],
+    [
+      "Adaptation en anime",
+      1
+    ],
+    [
+      "Remarques",
+      1
+    ],
+    [
+      "Protagonistes",
+      1
+    ],
+    [
+      "Dieux",
+      1
+    ],
+    [
+      "Shinki",
+      1
+    ],
+    [
+      "Humains",
+      1
+    ],
+    [
+      "Différences avec le manga",
+      1
+    ],
+    [
+      "DVD et Blu-ray",
+      1
+    ],
+    [
+      "CD Drama",
+      1
+    ],
+    [
+      "Arc 1 : Rouge / Bleu",
+      1
+    ],
+    [
+      "Arc 2 : Jaune",
+      1
+    ],
+    [
+      "Arc 3 : Or / Argent / Cristal",
+      1
+    ],
+    [
+      "Arc 4 : Rubis et Saphir",
+      1
+    ],
+    [
+      "Arc 5 : Rouge Feu et Vert Feuille",
+      1
+    ],
+    [
+      "Arc  6 : Émeraude",
+      1
+    ],
+    [
+      "Arc 7 : Diamant et Perle",
+      1
+    ],
+    [
+      "Arc 8 : Platine",
+      1
+    ],
+    [
+      "Arc 9 : Or HeartGold et Argent SoulSilver",
+      1
+    ],
+    [
+      "Arc 10 : Noir et Blanc",
+      1
+    ],
+    [
+      "Arc 11 : Noir 2 et Blanc 2",
+      1
+    ],
+    [
+      "Arc 12 : X et Y",
+      1
+    ],
+    [
+      "Arc 13 : Rubis Oméga et Saphir Alpha",
+      1
+    ],
+    [
+      "Arc 14 : Soleil et Lune / Ultra-Soleil et Ultra-Lune",
+      1
+    ],
+    [
+      "Arc 15 : Épée et Bouclier",
+      1
+    ],
+    [
+      "Kanto",
+      1
+    ],
+    [
+      "Johto",
+      1
+    ],
+    [
+      "Hoenn",
+      1
+    ],
+    [
+      "Sinnoh",
+      1
+    ],
+    [
+      "Unys",
+      1
+    ],
+    [
+      "Kalos",
+      1
+    ],
+    [
+      "Alola",
+      1
+    ],
+    [
+      "Galar",
+      1
+    ],
+    [
+      "Publication",
+      1
+    ],
+    [
+      "Liste des tomes français",
+      1
+    ],
+    [
+      "La Grande Aventure (Rouge et Bleu / Jaune)",
+      1
+    ],
+    [
+      "Or et Argent / Cristal",
+      1
+    ],
+    [
+      "Rubis et Saphir",
+      1
+    ],
+    [
+      "Rouge Feu et Vert Feuille / Émeraude",
+      1
+    ],
+    [
+      "Diamant et Perle / Platine",
+      1
+    ],
+    [
+      "Or Heart Gold et Argent Soul Silver",
+      1
+    ],
+    [
+      "Noir et Blanc",
+      1
+    ],
+    [
+      "Format simple",
+      1
+    ],
+    [
+      "Format double",
+      1
+    ],
+    [
+      "Noir 2 et Blanc 2",
+      1
+    ],
+    [
+      "XY",
+      1
+    ],
+    [
+      "Soleil et Lune",
+      1
+    ],
+    [
+      "Épée et Bouclier",
+      1
+    ],
+    [
+      "Place dans la franchise",
+      1
+    ],
+    [
+      "Antagonistes",
+      1
+    ],
+    [
+      "Résidents de l’Étoile Polaire",
+      1
+    ],
+    [
+      "L'académie Tootsuki",
+      1
+    ],
+    [
+      "Conseil des dix maîtres",
+      1
+    ],
+    [
+      "Les duels",
+      1
+    ],
+    [
+      "Les duels de chefs officiels",
+      1
+    ],
+    [
+      "Les duels de chefs non officiels",
+      1
+    ],
+    [
+      "Saison 3",
+      1
+    ],
+    [
+      "Saison 4",
+      1
+    ],
+    [
+      "Saison 5",
+      1
+    ],
+    [
+      "Références au rock",
+      1
+    ],
+    [
+      "Bande son",
+      1
+    ],
+    [
+      "O.S.T. 1 : Beck",
+      1
+    ],
+    [
+      "O.S.T. 2 : Keith",
+      1
+    ],
+    [
+      "Beat Crusaders - <i>Hit in America</i> (opening single)",
+      1
+    ],
+    [
+      "Meister - <i>Above the Clouds</i> (ending single)",
+      1
+    ],
+    [
+      "Théâtre",
+      1
+    ],
+    [
+      "Genèse",
+      1
+    ],
+    [
+      "Distribution principale",
+      1
+    ],
+    [
+      "Analyse de l’œuvre",
+      1
+    ],
+    [
+      "Réception et critique",
+      1
+    ],
+    [
+      "Menaces",
+      1
+    ],
+    [
+      "Autres produits",
+      1
+    ],
+    [
+      "Volumes",
+      1
+    ],
+    [
+      "Animé",
+      1
+    ],
+    [
+      "Suzushiro Mizuki",
+      1
+    ],
+    [
+      "Fujiwara Yumeko",
+      1
+    ],
+    [
+      "Ichimonji Takeru",
+      1
+    ],
+    [
+      "Loki",
+      1
+    ],
+    [
+      "Ide",
+      1
+    ],
+    [
+      "Nanatarou Yamada",
+      1
+    ],
+    [
+      "Ichimonji Mei",
+      1
+    ],
+    [
+      "Corbeau",
+      1
+    ],
+    [
+      "Daikawa Tamako",
+      1
+    ],
+    [
+      "Le père de Mizuki",
+      1
+    ],
+    [
+      "Suzushiro Akihiko",
+      1
+    ],
+    [
+      "Yukie",
+      1
+    ],
+    [
+      "Les parents de Takeru",
+      1
+    ],
+    [
+      "Asao Reiji",
+      1
+    ],
+    [
+      "Thor",
+      1
+    ],
+    [
+      "<i>Light novel</i>",
+      1
+    ],
+    [
+      "Élèves de la classe 2-A du lycée pour garçons <i>Sanada Nord</i>",
+      1
+    ],
+    [
+      "<i>Manga</i>",
+      1
+    ],
+    [
+      "Autour de l’œuvre",
+      1
+    ],
+    [
+      "Lien externe",
+      1
+    ],
+    [
+      "Protagoniste",
+      1
+    ],
+    [
+      "Cercle rapproché de Makoto Misumi",
+      1
+    ],
+    [
+      "<i>Sous‐dimension</i>",
+      1
+    ],
+    [
+      "Orques des Montagnes",
+      1
+    ],
+    [
+      "Nains Anciens",
+      1
+    ],
+    [
+      "Lézards des Brumes",
+      1
+    ],
+    [
+      "Alkeys",
+      1
+    ],
+    [
+      "Ogres des Forêts",
+      1
+    ],
+    [
+      "Compagnie <i>Kuzunoha</i>",
+      1
+    ],
+    [
+      "Alliés de Makoto",
+      1
+    ],
+    [
+      "Compagnie <i>Rembrandt</i>",
+      1
+    ],
+    [
+      "Compagnie <i>Alpine</i>",
+      1
+    ],
+    [
+      "Divinités",
+      1
+    ],
+    [
+      "Arlésiennes",
+      1
+    ],
+    [
+      "Roman illustré",
+      1
+    ],
+    [
+      "Adaptation dessinée",
+      1
+    ],
+    [
+      "Kin-iro Mosaic",
+      1
+    ],
+    [
+      "Hello!! Kin-iro Mosaic",
+      1
+    ],
+    [
+      "Arbre généalogique de la famille Mutsu",
+      1
+    ],
+    [
+      "Trame",
+      1
+    ],
+    [
+      "Temporalité",
+      1
+    ],
+    [
+      "Famille Saiki",
+      1
+    ],
+    [
+      "Lycée PK",
+      1
+    ],
+    [
+      "Film live",
+      1
+    ],
+    [
+      "Drama japonais",
+      1
+    ],
+    [
+      "Drama taïwanais",
+      1
+    ],
+    [
+      "Intrigue",
+      1
+    ],
+    [
+      "Université de Saitama",
+      1
+    ],
+    [
+      "Laboratoire <i>Ikeda</i>",
+      1
+    ],
+    [
+      "Bande dessinée",
+      1
+    ],
+    [
+      "Adaptation en prise de vues réelles",
+      1
+    ],
+    [
+      "Anecdotes",
+      1
+    ],
+    [
+      "Voix",
+      1
+    ],
+    [
+      "Partie 1",
+      1
+    ],
+    [
+      "Partie 2",
+      1
+    ],
+    [
+      "Œuvre",
+      1
+    ]
+  ]
+}

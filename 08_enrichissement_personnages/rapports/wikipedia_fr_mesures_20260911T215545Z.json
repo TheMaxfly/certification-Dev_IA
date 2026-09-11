@@ -1,0 +1,1206 @@
+{
+  "releves": [
+    {
+      "series_id": 1629,
+      "rang_popularite": 4,
+      "strate": "tete",
+      "titre_servi": "Fullmetal Alchemist",
+      "revid": 234383735,
+      "sections_c1": [
+        "Personnages principaux"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 6,
+      "personnages_decrits": 6,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        299,
+        482,
+        622,
+        653,
+        711,
+        845
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Edward Elric",
+        "Alphonse Elric",
+        "Roy Mustang",
+        "Winry Rockbell",
+        "Scar"
+      ]
+    },
+    {
+      "series_id": 559,
+      "rang_popularite": 18,
+      "strate": "tete",
+      "titre_servi": "Samurai Deeper Kyo",
+      "revid": 236298527,
+      "sections_c1": [
+        "Personnages et trame principale"
+      ],
+      "article_dedie": "Personnages de Samurai Deeper Kyo",
+      "exploitable": false,
+      "prose": true,
+      "motif_rejet": "prose continue, personnages non isoles",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 1710,
+      "rang_popularite": 27,
+      "strate": "tete",
+      "titre_servi": "Negima ! Le Maître magicien",
+      "revid": 221180817,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 38583,
+      "rang_popularite": 28,
+      "strate": "tete",
+      "titre_servi": "My Hero Academia",
+      "revid": 236586463,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 7,
+      "personnages_decrits": 7,
+      "personnages_avec_japonais": 6,
+      "longueurs_description": [
+        183,
+        552,
+        644,
+        766,
+        862,
+        1248,
+        1646
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Izuku Midoriya (Deku)",
+        "Katsuki Bakugo (Katchan)",
+        "All Might",
+        "Ochako Uraraka",
+        "Shoto Todoroki"
+      ]
+    },
+    {
+      "series_id": 591,
+      "rang_popularite": 37,
+      "strate": "tete",
+      "titre_servi": "Saint Seiya",
+      "revid": 239155872,
+      "sections_c1": [
+        "Personnages principaux"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 9,
+      "personnages_decrits": 7,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        128,
+        368,
+        550,
+        1036,
+        1784,
+        3141,
+        3486
+      ],
+      "marqueurs_denouement": [
+        "ressuscite"
+      ],
+      "noms": [
+        "Saori Kido",
+        "Mitsumasa Kido",
+        "Aldebaran",
+        "Kanon",
+        "Non-chevaliers"
+      ]
+    },
+    {
+      "series_id": 1679,
+      "rang_popularite": 40,
+      "strate": "tete",
+      "titre_servi": "Satan 666",
+      "revid": 230669495,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": "Personnages de Satan 666",
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 7,
+      "personnages_decrits": 7,
+      "personnages_avec_japonais": 6,
+      "longueurs_description": [
+        187,
+        195,
+        207,
+        240,
+        300,
+        350,
+        522
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Jio Fleed",
+        "Ruby Crescent",
+        "Cross Bianchina",
+        "Ball",
+        "Kirin"
+      ]
+    },
+    {
+      "series_id": 2605,
+      "rang_popularite": 53,
+      "strate": "tete",
+      "titre_servi": "Claymore (manga)",
+      "revid": 233640321,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 1106,
+      "rang_popularite": 76,
+      "strate": "tete",
+      "titre_servi": "Ken le Survivant",
+      "revid": 238759792,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 2741,
+      "rang_popularite": 81,
+      "strate": "tete",
+      "titre_servi": "Rosario + Vampire",
+      "revid": 238978244,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 733,
+      "rang_popularite": 100,
+      "strate": "tete",
+      "titre_servi": "Alice 19th",
+      "revid": 212711187,
+      "sections_c1": [
+        "Les personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 8,
+      "personnages_decrits": 8,
+      "personnages_avec_japonais": 4,
+      "longueurs_description": [
+        237,
+        239,
+        313,
+        353,
+        398,
+        441,
+        550,
+        585
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Alice Séno",
+        "Mayura Séno",
+        "Kyô Wakamiya",
+        "Nyozeka",
+        "Frey Wilhazen"
+      ]
+    },
+    {
+      "series_id": 6453,
+      "rang_popularite": 101,
+      "strate": "tete",
+      "titre_servi": "Monster Hunter Orage",
+      "revid": 209988539,
+      "sections_c1": [
+        "Personnages principaux"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "1 personnage(s) decrit(s) sur 1 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 1,
+      "personnages_decrits": 1,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        447
+      ],
+      "marqueurs_denouement": [
+        "en realite"
+      ],
+      "noms": [
+        "Eilee"
+      ]
+    },
+    {
+      "series_id": 38014,
+      "rang_popularite": 115,
+      "strate": "tete",
+      "titre_servi": "Darwin's Game",
+      "revid": 234829831,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 22,
+      "personnages_decrits": 22,
+      "personnages_avec_japonais": 21,
+      "longueurs_description": [
+        230,
+        352,
+        417,
+        456,
+        469,
+        480,
+        534,
+        558,
+        625,
+        709,
+        714,
+        729,
+        743,
+        764,
+        769,
+        771,
+        787,
+        1166,
+        1315,
+        1503,
+        1572,
+        2225
+      ],
+      "marqueurs_denouement": [
+        "sa vraie identite",
+        "meurt dans"
+      ],
+      "noms": [
+        "Kaname Sudo",
+        "Shuka Karino",
+        "Rain Kashiwagi",
+        "Banda-Boy",
+        "Inukai"
+      ]
+    },
+    {
+      "series_id": 48895,
+      "rang_popularite": 121,
+      "strate": "tete",
+      "titre_servi": "L'Atelier des sorciers",
+      "revid": 239031851,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 24,
+      "personnages_decrits": 12,
+      "personnages_avec_japonais": 24,
+      "longueurs_description": [
+        102,
+        119,
+        131,
+        181,
+        243,
+        309,
+        368,
+        394,
+        534,
+        938,
+        2729,
+        3058
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Coco",
+        "Kieffrey",
+        "Tetia",
+        "Trice",
+        "Agathe"
+      ]
+    },
+    {
+      "series_id": 499,
+      "rang_popularite": 141,
+      "strate": "tete",
+      "titre_servi": "D.N.Angel",
+      "revid": 229278298,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": true,
+      "motif_rejet": "prose continue, personnages non isoles",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [
+        "en realite"
+      ],
+      "noms": []
+    },
+    {
+      "series_id": 9034,
+      "rang_popularite": 150,
+      "strate": "tete",
+      "titre_servi": "Noragami",
+      "revid": 235572884,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 41,
+      "personnages_decrits": 35,
+      "personnages_avec_japonais": 12,
+      "longueurs_description": [
+        93,
+        126,
+        136,
+        137,
+        138,
+        144,
+        144,
+        145,
+        145,
+        148,
+        150,
+        151,
+        156,
+        157,
+        169,
+        172,
+        173,
+        183,
+        184,
+        208,
+        209,
+        224,
+        227,
+        229,
+        238,
+        303,
+        419,
+        422,
+        429,
+        464,
+        602,
+        1124,
+        1870,
+        2348,
+        2460
+      ],
+      "marqueurs_denouement": [
+        "se revele etre",
+        "veritable identite",
+        "se sacrifie"
+      ],
+      "noms": [
+        "Ebisu",
+        "Ookuninushi",
+        "Benzaiten",
+        "Hotei",
+        "Fukurokuju"
+      ]
+    },
+    {
+      "series_id": 1385,
+      "rang_popularite": 154,
+      "strate": "tete",
+      "titre_servi": "Pokémon - La Grande Aventure",
+      "revid": 236942204,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 9,
+      "personnages_decrits": 8,
+      "personnages_avec_japonais": 1,
+      "longueurs_description": [
+        605,
+        723,
+        837,
+        1248,
+        1404,
+        1544,
+        1568,
+        2660
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Kanto",
+        "Johto",
+        "Hoenn",
+        "Sinnoh",
+        "Unys"
+      ]
+    },
+    {
+      "series_id": 15123,
+      "rang_popularite": 156,
+      "strate": "tete",
+      "titre_servi": "Food Wars!",
+      "revid": 237859204,
+      "sections_c1": [
+        "Personnages",
+        "Personnages principaux",
+        "Personnages secondaires"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": true,
+      "motif_rejet": "prose continue, personnages non isoles",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 895,
+      "rang_popularite": 168,
+      "strate": "tete",
+      "titre_servi": "Beck (manga)",
+      "revid": 234465044,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 12,
+      "personnages_decrits": 5,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        80,
+        94,
+        103,
+        134,
+        137
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Beck",
+        "Yukio « Koyuki » Tanaka",
+        "Ryûsuke « Ray » Minami",
+        "Tsunemi Chiba",
+        "Yoshiyuki Taira"
+      ]
+    },
+    {
+      "series_id": 7099,
+      "rang_popularite": 169,
+      "strate": "tete",
+      "titre_servi": "Kuroko's Basket",
+      "revid": 239050568,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 6448,
+      "rang_popularite": 176,
+      "strate": "tete",
+      "titre_servi": "Blazer Drive",
+      "revid": 205175370,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 6531,
+      "rang_popularite": 11384,
+      "strate": "queue",
+      "titre_servi": "Iron Wok Jan!",
+      "revid": 213489714,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "1 personnage(s) decrit(s) sur 1 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 1,
+      "personnages_decrits": 1,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        450
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Jan Akiyama"
+      ]
+    },
+    {
+      "series_id": 52308,
+      "rang_popularite": 11475,
+      "strate": "queue",
+      "titre_servi": "MF Ghost",
+      "revid": 235432253,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 46378,
+      "rang_popularite": 11720,
+      "strate": "queue",
+      "titre_servi": "Keijo!!!!!!!!",
+      "revid": 235266958,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 0 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 38431,
+      "rang_popularite": 11758,
+      "strate": "queue",
+      "titre_servi": "Boku Girl",
+      "revid": 227261880,
+      "sections_c1": [
+        "Personnages",
+        "Personnages principaux",
+        "Personnages secondaires"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 15,
+      "personnages_decrits": 12,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [
+        87,
+        113,
+        140,
+        150,
+        158,
+        169,
+        172,
+        225,
+        235,
+        279,
+        287,
+        482
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Suzushiro Mizuki",
+        "Fujiwara Yumeko",
+        "Ichimonji Takeru",
+        "Loki",
+        "Ide"
+      ]
+    },
+    {
+      "series_id": 11038,
+      "rang_popularite": 12083,
+      "strate": "queue",
+      "titre_servi": "Servant × Service",
+      "revid": 235977321,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 6 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 6,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 6,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Lucy Yamagami",
+        "Yutaka Hasebe",
+        "Saya Miyoshi",
+        "Megumi Chihaya",
+        "Tōko Ichimiya"
+      ]
+    },
+    {
+      "series_id": 55793,
+      "rang_popularite": 12294,
+      "strate": "queue",
+      "titre_servi": "Beelzebub-jō no okinimesu mama.",
+      "revid": 221178945,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 12,
+      "personnages_decrits": 12,
+      "personnages_avec_japonais": 12,
+      "longueurs_description": [
+        174,
+        402,
+        515,
+        575,
+        725,
+        793,
+        868,
+        888,
+        894,
+        902,
+        1008,
+        1067
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Belzébuth",
+        "Mullin",
+        "Azazel",
+        "Belphégor",
+        "Astaroth"
+      ]
+    },
+    {
+      "series_id": 11482,
+      "rang_popularite": 12447,
+      "strate": "queue",
+      "titre_servi": "Danshi kōkōsei no nichijō",
+      "revid": 234821989,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "2 personnage(s) decrit(s) sur 9 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 9,
+      "personnages_decrits": 2,
+      "personnages_avec_japonais": 9,
+      "longueurs_description": [
+        2247,
+        2475
+      ],
+      "marqueurs_denouement": [
+        "en realite",
+        "trahit"
+      ],
+      "noms": [
+        "Tadakuni",
+        "Hidenori Tabata",
+        "Yoshitake Tanaka",
+        "La fille littéraire",
+        "La petite sœur de Tadakuni"
+      ]
+    },
+    {
+      "series_id": 5524,
+      "rang_popularite": 12627,
+      "strate": "queue",
+      "titre_servi": "Historiē",
+      "revid": 236837254,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 6 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 6,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Eumenes",
+        "Charon",
+        "Hieronymus",
+        "Tolmides",
+        "Hecatee"
+      ]
+    },
+    {
+      "series_id": 49666,
+      "rang_popularite": 12763,
+      "strate": "queue",
+      "titre_servi": "Tsukimichi -Moonlit Fantasy-",
+      "revid": 237856648,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 54,
+      "personnages_decrits": 51,
+      "personnages_avec_japonais": 51,
+      "longueurs_description": [
+        190,
+        199,
+        206,
+        218,
+        232,
+        263,
+        286,
+        286,
+        305,
+        309,
+        315,
+        332,
+        351,
+        359,
+        364,
+        370,
+        398,
+        410,
+        427,
+        483,
+        488,
+        512,
+        531,
+        533,
+        548,
+        551,
+        572,
+        579,
+        600,
+        626,
+        679,
+        692,
+        731,
+        756,
+        845,
+        903,
+        973,
+        974,
+        1002,
+        1014,
+        1259,
+        1301,
+        1404,
+        1539,
+        1595,
+        1766,
+        2110,
+        2269,
+        2677,
+        3597,
+        4037
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Tomoe Misumi / Shin (ancien nom) / l’« Invincible » (surnom)",
+        "Mio Misumi / l’« Araignée noire du fléau » (anciens noms)",
+        "Shiki Misumi / Larva (ancien nom)",
+        "Ema",
+        "Agares"
+      ]
+    },
+    {
+      "series_id": 47394,
+      "rang_popularite": 12777,
+      "strate": "queue",
+      "titre_servi": "Kin-iro Mosaic",
+      "revid": 235274974,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 10 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 10,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 10,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Shinobu Omiya",
+        "Alice Cartalet",
+        "Aya Komichi",
+        "Yoko Inokuma",
+        "Karen Kujô"
+      ]
+    },
+    {
+      "series_id": 8124,
+      "rang_popularite": 13175,
+      "strate": "queue",
+      "titre_servi": "Baby Steps",
+      "revid": 234414887,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 0 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 48892,
+      "rang_popularite": 13455,
+      "strate": "queue",
+      "titre_servi": "Today's Menu for the Emiya Family",
+      "revid": 234462075,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": "Personnages de Fate/stay night",
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 24,
+      "personnages_decrits": 13,
+      "personnages_avec_japonais": 24,
+      "longueurs_description": [
+        108,
+        121,
+        130,
+        131,
+        135,
+        160,
+        221,
+        222,
+        263,
+        271,
+        283,
+        497,
+        558
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Shirō Emiya",
+        "Saber",
+        "Sakura Matō",
+        "Rider",
+        "Illyasviel von Einzbern"
+      ]
+    },
+    {
+      "series_id": 10018,
+      "rang_popularite": 14051,
+      "strate": "queue",
+      "titre_servi": "L'Ère des Shura",
+      "revid": 221179563,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 12147,
+      "rang_popularite": 15733,
+      "strate": "queue",
+      "titre_servi": "Saiki Kusuo no Psi-nan",
+      "revid": 234714760,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 5,
+      "personnages_decrits": 5,
+      "personnages_avec_japonais": 2,
+      "longueurs_description": [
+        493,
+        647,
+        648,
+        2844,
+        6918
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Famille Saiki",
+        "Lycée PK",
+        "Grands-parents de Kusuo",
+        "Iguchi-san",
+        "Hii Suzumiya"
+      ]
+    },
+    {
+      "series_id": 8867,
+      "rang_popularite": 16310,
+      "strate": "queue",
+      "titre_servi": "Pyū to fuku! Jaguar",
+      "revid": 201832140,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": true,
+      "motif_rejet": "prose continue, personnages non isoles",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 7403,
+      "rang_popularite": 16513,
+      "strate": "queue",
+      "titre_servi": "Chocolat (manga)",
+      "revid": 235310127,
+      "sections_c1": [],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "aucune section satisfaisant C1",
+      "personnages_isoles": 0,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 0,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": []
+    },
+    {
+      "series_id": 50290,
+      "rang_popularite": 17993,
+      "strate": "queue",
+      "titre_servi": "Science Fell in Love, So I Tried to Prove it",
+      "revid": 231825772,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 13,
+      "personnages_decrits": 11,
+      "personnages_avec_japonais": 11,
+      "longueurs_description": [
+        258,
+        363,
+        405,
+        415,
+        585,
+        682,
+        720,
+        926,
+        929,
+        1887,
+        2691
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Shinya Yukimura",
+        "Ayame Himuro",
+        "Kotonoha Kanade",
+        "Ena Ibarada",
+        "Kosuke Inukai"
+      ]
+    },
+    {
+      "series_id": 46903,
+      "rang_popularite": 18202,
+      "strate": "queue",
+      "titre_servi": "Gochūmon wa usagi desu ka?",
+      "revid": 230448783,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 12,
+      "personnages_decrits": 7,
+      "personnages_avec_japonais": 12,
+      "longueurs_description": [
+        105,
+        132,
+        146,
+        196,
+        244,
+        339,
+        366
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Cocoa Hoto",
+        "Chino Kafū",
+        "Rize Tedeza",
+        "Chiya Ujimatsu",
+        "Sharo Kirima"
+      ]
+    },
+    {
+      "series_id": 10739,
+      "rang_popularite": 21235,
+      "strate": "queue",
+      "titre_servi": "RideBack",
+      "revid": 226307555,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": true,
+      "prose": false,
+      "motif_rejet": null,
+      "personnages_isoles": 6,
+      "personnages_decrits": 5,
+      "personnages_avec_japonais": 6,
+      "longueurs_description": [
+        107,
+        163,
+        194,
+        214,
+        419
+      ],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Rin Ogata",
+        "Haruki Hishida",
+        "Tamayo Kataoka",
+        "Tenshiro Okakura",
+        "Romanof Callenbach"
+      ]
+    },
+    {
+      "series_id": 9308,
+      "rang_popularite": 21615,
+      "strate": "queue",
+      "titre_servi": "Sengoku Youko",
+      "revid": 237712280,
+      "sections_c1": [
+        "Personnages"
+      ],
+      "article_dedie": null,
+      "exploitable": false,
+      "prose": false,
+      "motif_rejet": "0 personnage(s) decrit(s) sur 14 isole(s) — seuil C3 non atteint",
+      "personnages_isoles": 14,
+      "personnages_decrits": 0,
+      "personnages_avec_japonais": 14,
+      "longueurs_description": [],
+      "marqueurs_denouement": [],
+      "noms": [
+        "Jinka",
+        "Tama",
+        "Shinsuke",
+        "Shakugan",
+        "Senya"
+      ]
+    }
+  ]
+}

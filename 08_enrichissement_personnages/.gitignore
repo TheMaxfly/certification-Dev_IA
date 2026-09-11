@@ -1,0 +1,47 @@
+# Environnements et artefacts Python
+.venv/
+.uv-cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Donnees collectees — volumineuses et regenerables. Jamais versionnees.
+#
+# EXCEPTION : `data/raw/<source>/<AAAA-MM>/MANIFEST.md`. Le manifeste n'est pas
+# de la donnee collectee, c'est ce qui permet de la verifier — taille, SHA-256
+# et nombre de lignes de fichiers qui, eux, restent hors depot. Le raw n'ira pas
+# au depot (126 Mo pour la seule source Kitsu) : le manifeste est donc le seul
+# livrable qui prouve la collecte. Meme choix qu'aux modules 01, 04 et 05.
+#
+# Git n'entre jamais dans un repertoire exclu : une negation a l'interieur de
+# `data/` serait sans effet. D'ou le depliage — rendre chaque niveau
+# descendable, puis en re-ignorer le contenu. Patron repris du module 05, qui
+# heberge deja deux sources sous `data/raw/`.
+data/*
+!data/raw/
+data/raw/*
+!data/raw/wikipedia_fr/
+!data/raw/anilist/
+data/raw/wikipedia_fr/*
+!data/raw/wikipedia_fr/*/
+data/raw/wikipedia_fr/*/*
+!data/raw/wikipedia_fr/*/MANIFEST.md
+data/raw/anilist/*
+!data/raw/anilist/*/
+data/raw/anilist/*/*
+!data/raw/anilist/*/MANIFEST.md
+
+# Etat de fusion du manifeste : source de verite interne, hors depot.
+# Le MANIFEST.md versionne en est le rendu deterministe (cf. commun/manifeste.py).
+.manifeste_etat.json
+
+# Etats de run intermediaires et journaux
+.enveloppe_*.json
+logs/
+*.log
+
+# OS
+.DS_Store
