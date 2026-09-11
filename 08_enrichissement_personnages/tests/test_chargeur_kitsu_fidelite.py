@@ -12,6 +12,7 @@ import psycopg
 import pytest
 
 import chargeur_kitsu as ck
+from commun.chargement import PROMOTIONS, promouvoir
 
 DSN = os.environ.get("APIMANGA_DSN")
 RAW = ck.RAW_DEFAUT
@@ -103,7 +104,7 @@ def test_3_empreinte_du_raw_inchangee() -> None:
 def test_4_rejeu_idempotent(connexion) -> None:
     """Rejouer la promotion n'insère rien : ni compte ni contenu ne bougent."""
     avant = _instantane(connexion)
-    inseres = ck.promouvoir(connexion)
+    inseres = promouvoir(connexion)
     connexion.rollback()
     assert sum(inseres.values()) == 0, f"le rejeu a inséré : {inseres}"
     assert _instantane(connexion) == avant
@@ -112,7 +113,7 @@ def test_4_rejeu_idempotent(connexion) -> None:
 def _instantane(connexion) -> dict[str, int]:
     return {
         table: connexion.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-        for table, _ in ck.PROMOTIONS
+        for table, _ in PROMOTIONS
     }
 
 
