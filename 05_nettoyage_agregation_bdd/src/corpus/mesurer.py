@@ -2,8 +2,10 @@
 
     uv run python -m corpus.mesurer
 
-LECTURE SEULE, imposée à la session : `SET SESSION CHARACTERISTICS AS
-TRANSACTION READ ONLY`. Mesurer n'écrit rien, pas même par accident.
+LECTURE SEULE, imposée à la connexion : `default_transaction_read_only=on`
+couvre toutes les transactions, la première comprise. Mesurer n'écrit rien, pas
+même par accident. (Corrigé le 2026-09-29 : un `SET SESSION CHARACTERISTICS`
+exécuté après connexion laissait la transaction courante en écriture.)
 
 A3 — MESURÉ, JAMAIS FILTRÉ (§5.3). Les marqueurs M1–M6 ont été validés avec la
 règle le 2026-09-28. Leur taux sert l'arbitrage RGPD ; aucune critique n'est
@@ -126,8 +128,9 @@ def nombre(n: int | float) -> str:
 def mesurer(url: str) -> tuple[dict, dict]:
     m: dict = {"horodatage": datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")}
     exemples: dict = {}
-    with psycopg.connect(url) as cx:
-        cx.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
+    # Lecture seule dès la PREMIÈRE requête : `SET SESSION CHARACTERISTICS` ne
+    # vaudrait que pour les transactions suivantes, pas pour celle qu'il ouvre.
+    with psycopg.connect(url, options="-c default_transaction_read_only=on") as cx:
         m["serveur"] = cx.execute("SELECT version()").fetchone()[0].split(" on ")[0]
         m["dsn"] = dsn_affichable(url)
         m["longueurs"] = cx.execute(SQL_LONGUEURS).fetchone()
