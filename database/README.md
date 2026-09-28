@@ -57,6 +57,8 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `012_roles_lecture.sql` | **accès en consultation** : rôle de groupe `manga_ro`, `SELECT` sur `manga` et rien d'autre (cf. « Accès en consultation ») |
 | `013_referentiel_genres.sql` | **référentiel de genres** : `genre_ref` (codes + libellés fr/en/ja) et `genre_mapping` (libellé brut → code) — schéma seul, contenu dans `donnees/` (cf. « Données de référence ») |
 | `014_hierarchie_genres.sql` | `genre_ref.type` (genre \| format) et `genre_ref.parent` — FK **DEFERRABLE**, auto-référencée : c'est l'état à la validation qui doit être correct, pas l'ordre d'écriture |
+| `015_personnages_multisources.sql` | **personnages** multi-sources : tables à noms neutres et colonne `source` obligatoire (Kitsu, puis Wikipédia français), formes typées et indexées, graphie japonaise sur index dédié |
+| `016_jeu_evaluation.sql` | **jeu d'évaluation** du bloc 2, au grain entité : `bench.eval_jeux` / `eval_questions` / `eval_attendus` / `eval_mesures`, sans aucun lien vers `corpus_docs` ; règles tenues par `CHECK`, FK vers le catalogue, déclencheur différé (nombre de séries attendues) et immuabilité d'une version gelée |
 
 ## `000` — la frontière héritage / versionné
 
@@ -88,9 +90,14 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
-le 2026-07-30, `013` et `014` le 2026-08-21 ; `000` y a été **marquée
-appliquée** le 2026-07-15, sans exécution. Le contrôle affiche **15 migrations
-appliquées et 0 en attente**.
+le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12 ; `000` y a
+été **marquée appliquée** le 2026-07-15, sans exécution. Le contrôle affiche
+**16 migrations appliquées**.
+
+`016` est **écrite et éprouvée sur base jetable** (rejeu 000→016, 33 tests
+dédiés), **non appliquée** à `apimanga` : l'appliquer la rend immuable, et ses
+tables ne servent qu'au gel du jeu d'évaluation. Tant qu'elle n'y est pas jouée,
+`outils/fidelite.sh` montre ses quatre tables en écart — attendu.
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.

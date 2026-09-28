@@ -98,6 +98,22 @@ dans `data/corpus_exemples/`, hors dépôt. L'état du banc de décembre, avant
 reconstruction, est archivé dans `data/archives/bench_2025-12/` (voir son
 `MANIFEST.md`).
 
+### Jeu d'évaluation (bloc 2)
+
+Le jeu s'écrit à la main dans `database/donnees/jeu_evaluation/v1/` (mode
+d'emploi : `database/donnees/jeu_evaluation/README.md`). Ces commandes ne
+rédigent rien et n'exécutent aucune récupération : elles **confirment** les
+réponses écrites contre le catalogue, par titre exact, auteur ou identifiant, en
+session lecture seule. Décisions et définitions :
+`rapports/jeu_evaluation_point_a_20260929.md`.
+
+```bash
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m evaluation.confirmer            # vérifie, rapporte, n'écrit rien
+uv run python -m evaluation.confirmer --ecrire   # remplit series_id / titre_catalogue / confirmation
+uv run python -m evaluation.atteignabilite       # part du catalogue que le corpus peut atteindre
+```
+
 ## Makefile
 
 ```bash

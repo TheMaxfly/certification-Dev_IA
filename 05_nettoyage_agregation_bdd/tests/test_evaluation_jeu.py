@@ -1,0 +1,166 @@
+"""Les CSV du jeu : ce que l'outil refuse AVANT la base, avec la ligne fautive.
+
+Le modèle versionné du dépôt est lu tel quel : il doit être valide et vide.
+"""
+
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from evaluation.jeu import (  # noqa: E402
+    COLONNES_ATTENDUS,
+    COLONNES_QUESTIONS,
+    Attendu,
+    JeuInvalide,
+    Question,
+    controler_question,
+    ecrire_attendus,
+    lire_attendus,
+    lire_questions,
+    lire_reponse,
+)
+
+MODELE = Path(__file__).resolve().parents[2] / "database/donnees/jeu_evaluation/v1"
+
+
+def q(**champs) -> Question:
+    base = {
+        "question_id": "Q001",
+        "texte": "Berserk",
+        "mode": "reconnaissance",
+        "famille": "F1",
+        "issue_attendue": "au_catalogue",
+        "origine": "nouvelle",
+        "origine_query_id": "",
+        "note": "titre exact",
+    }
+    return Question(**{**base, **champs})
+
+
+def test_le_modele_du_depot_est_valide_et_vide():
+    assert lire_questions(MODELE / "questions.csv") == []
+    assert lire_attendus(MODELE / "attendus.csv", []) == []
+
+
+def test_le_modele_porte_les_colonnes_du_paragraphe_6():
+    with (MODELE / "questions.csv").open(encoding="utf-8") as f:
+        assert next(csv.reader(f)) == COLONNES_QUESTIONS
+    with (MODELE / "attendus.csv").open(encoding="utf-8") as f:
+        assert next(csv.reader(f)) == COLONNES_ATTENDUS
+    assert "issue_attendue" in COLONNES_QUESTIONS
+
+
+def test_une_question_coherente_passe():
+    assert controler_question(q()) == []
+    assert (
+        controler_question(q(mode="refus", famille="F7", issue_attendue="inconnue"))
+        == []
+    )
+    assert (
+        controler_question(q(famille="F2", issue_attendue="reconnue_hors_catalogue"))
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("champs", "motif"),
+    [
+        (
+            {"mode": "reconnaissance", "famille": "F7", "issue_attendue": "inconnue"},
+            "F7",
+        ),
+        ({"mode": "refus", "famille": "F3", "issue_attendue": "inconnue"}, "F7"),
+        ({"famille": "F3", "issue_attendue": "reconnue_hors_catalogue"}, "F1 ou F2"),
+        ({"origine": "decembre"}, "origine_query_id"),
+        ({"origine_query_id": "12"}, "origine_query_id"),
+        ({"question_id": "F3-01"}, "Q001"),
+        ({"famille": "F11"}, "famille"),
+        ({"mode": "tout"}, "mode"),
+        ({"note": ""}, "note"),
+    ],
+)
+def test_question_incoherente(champs, motif):
+    assert any(motif in e for e in controler_question(q(**champs)))
+
+
+@pytest.mark.parametrize(
+    ("texte", "attendu"),
+    [
+        ("titre: Berserk", ("titre", "Berserk")),
+        ("Auteur :  Naoki Urasawa ", ("auteur", "Naoki Urasawa")),
+        ("id:1234", ("id", "1234")),
+        ("Berserk", None),
+        ("titre:", None),
+        ("genre: seinen", None),
+    ],
+)
+def test_lire_reponse(texte, attendu):
+    assert lire_reponse(texte) == attendu
+
+
+def ecrire(chemin: Path, colonnes: list[str], lignes: list[list[str]]) -> Path:
+    with chemin.open("w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(colonnes)
+        w.writerows(lignes)
+    return chemin
+
+
+def test_toutes_les_erreurs_sont_rassemblees(tmp_path):
+    chemin = ecrire(
+        tmp_path / "questions.csv",
+        COLONNES_QUESTIONS,
+        [
+            ["Q001", "a", "refus", "F3", "inconnue", "nouvelle", "", "n"],
+            ["Q001", "b", "reconnaissance", "F1", "au_catalogue", "decembre", "", "n"],
+        ],
+    )
+    with pytest.raises(JeuInvalide) as e:
+        lire_questions(chemin)
+    assert len(e.value.erreurs) == 3  # F7, origine, doublon
+    assert all("questions.csv:" in m for m in e.value.erreurs)
+
+
+@pytest.mark.parametrize(
+    ("question", "ligne", "motif"),
+    [
+        (q(), ["Q999", "titre: X", "2", "", "", ""], "question inconnue"),
+        (q(), ["Q001", "Berserk", "2", "", "", ""], "reponse_ecrite"),
+        (q(), ["Q001", "titre: Berserk", "", "", "", ""], "grade 1 ou 2"),
+        (
+            q(mode="refus", famille="F7", issue_attendue="inconnue"),
+            ["Q001", "titre: Zzz", "2", "", "", ""],
+            "pas de grade",
+        ),
+        (
+            q(mode="refus", famille="F7", issue_attendue="inconnue"),
+            ["Q001", "id: 12", "", "", "", ""],
+            "ne se désigne pas par id",
+        ),
+    ],
+)
+def test_attendu_refuse(tmp_path, question, ligne, motif):
+    chemin = ecrire(tmp_path / "attendus.csv", COLONNES_ATTENDUS, [ligne])
+    with pytest.raises(JeuInvalide, match=motif):
+        lire_attendus(chemin, [question])
+
+
+def test_aller_retour(tmp_path):
+    lignes = [
+        Attendu(
+            "Q001", "auteur: Naoki Urasawa", "2", "12", "Monster", "auteur:dessinateur"
+        ),
+        Attendu("Q002", "titre: Zzz", ""),
+    ]
+    ecrire_attendus(tmp_path / "attendus.csv", lignes)
+    questions = [
+        q(),
+        q(question_id="Q002", mode="refus", famille="F7", issue_attendue="inconnue"),
+    ]
+    assert lire_attendus(tmp_path / "attendus.csv", questions) == lignes
