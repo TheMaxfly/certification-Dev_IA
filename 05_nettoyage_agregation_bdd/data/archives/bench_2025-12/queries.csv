@@ -1,0 +1,25 @@
+query_id,split,query_text,lang,intent,created_at
+1,test,"Je veux un manga court et drôle, pas trop violent",fr,humour_court,2025-12-27 22:44:09.819579+01
+2,test,Un shonen proche de Naruto / My Hero Academia,fr,shonen_reference,2025-12-27 22:44:09.819579+01
+3,test,Romance lycée feel-good,fr,romance_school,2025-12-27 22:44:09.819579+01
+4,test,Un seinen psychologique sombre,fr,seinen_psy,2025-12-27 22:44:09.819579+01
+5,test,Manga de sport motivant (pas football),fr,sport,2025-12-27 22:44:09.819579+01
+6,test,Fantasy aventure mais sans trop de combats,fr,fantasy_soft,2025-12-27 22:44:09.819579+01
+7,test,"Pour 11 ans : pas de gore, pas d’horreur",fr,jeunesse_safe,2025-12-27 22:44:09.819579+01
+8,test,Un classique incontournable pour débuter,fr,classique_debutant,2025-12-27 22:44:09.819579+01
+9,test,"Quelque chose de poétique et contemplatif (nature, voyage)",fr,poetique,2025-12-27 22:44:09.819579+01
+10,test,"Thriller / enquête, tension psychologique",fr,thriller,2025-12-27 22:44:09.819579+01
+11,test,"Tranche de vie apaisante, quotidien, humour léger",fr,slice_of_life,2025-12-27 22:44:09.819579+01
+12,test,"Dystopie / science-fiction, ambiance sombre",fr,sf_dystopie,2025-12-27 22:44:09.819579+01
+13,eval,"Je cherche un manga dans le même esprit que ""Quand Takagi me taquine"" : collège, taquineries, humour léger, pas de violence.",fr,ref_takagi_humour_school,2025-12-28 04:02:37.081669+01
+14,eval,"Je veux une romance comique avec jeu psychologique entre deux lycéens, comme ""Kaguya-sama: Love Is War"".",fr,ref_kaguya_romcom,2025-12-28 04:02:37.081669+01
+15,eval,"Une romance lycée feel-good, douce et drôle, dans le style de ""Shikimori n’est pas juste mignonne"".",fr,ref_shikimori_romance_school,2025-12-28 04:02:37.081669+01
+16,eval,"Un shonen d’action et de super-héros dans la veine de ""My Hero Academia"" (académie, progression, combats).",fr,ref_mha_shonen,2025-12-28 04:02:37.081669+01
+17,eval,"Un manga avec des gangs/affrontements, tension et drame, proche de ""Tokyo Revengers"".",fr,ref_tokyo_revengers_gangs,2025-12-28 04:02:37.081669+01
+18,eval,"Je cherche un manga de sport centré sur le football, compétition, mental et dépassement de soi, comme ""Blue Lock"".",fr,ref_blue_lock_football,2025-12-28 04:02:37.081669+01
+19,eval,"Un manga réaliste et motivant sur une ambition de vie, carrière/projet au long cours, comme ""Space Brothers"".",fr,ref_space_brothers_realiste,2025-12-28 04:02:37.081669+01
+20,eval,"Ambiance nocturne, surnaturel léger et romance, dans le style de ""Call of the Night"".",fr,ref_call_of_the_night_nocturne,2025-12-28 04:02:37.081669+01
+21,eval,"Un récit profond et contemplatif, avec une dimension historique/philosophique, comme ""Du mouvement de la Terre"".",fr,ref_du_mouvement_de_la_terre_philo,2025-12-28 04:02:37.081669+01
+22,eval,"Un univers onirique et mélancolique, fantasy/aventure avec poésie, proche de ""Les Enfants de la Baleine"".",fr,ref_enfants_de_la_baleine_onirique,2025-12-28 04:02:37.081669+01
+23,eval,"Une série centrée sur la compétition et le dépassement de soi, avec un groupe de personnages, comme ""Chihayafuru"".",fr,ref_chihayafuru_competition,2025-12-28 04:02:37.081669+01
+24,eval,"Je veux un shonen proche de Naruto et My Hero Academia : progression, amitiés, rivalités, combats et valeurs positives.",fr,ref_shonen_naruto_mha_bridge,2025-12-28 04:02:37.081669+01

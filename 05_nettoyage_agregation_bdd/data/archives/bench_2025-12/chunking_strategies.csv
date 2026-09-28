@@ -1,0 +1,2 @@
+chunking_id,name,chunk_size,chunk_overlap,tokenizer_name,notes
+1,char_1200_overlap_200,1200,200,,benchmark default

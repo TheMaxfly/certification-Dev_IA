@@ -69,3 +69,14 @@ data/raw/wikidata/*
 !data/raw/wikidata/MANIFEST_FICHIERS.txt
 
 *.parquet
+
+# EXCEPTION : l'archive du banc de décembre (reconstruction du corpus, D6). Le
+# dump reste hors dépôt ; son manifeste, la requête d'empreintes et les tables
+# d'évaluation (quelques Ko) sont versionnés. Même dépliage que pour le raw.
+!data/archives/
+data/archives/*
+!data/archives/bench_2025-12/
+data/archives/bench_2025-12/*
+!data/archives/bench_2025-12/MANIFEST.md
+!data/archives/bench_2025-12/empreintes.sql
+!data/archives/bench_2025-12/*.csv
