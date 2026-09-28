@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from evaluation import atteignabilite, catalogue, confirmer  # noqa: E402
+from evaluation import atteignabilite, catalogue, confirmer, regles  # noqa: E402
 from evaluation.jeu import COLONNES_ATTENDUS, COLONNES_QUESTIONS  # noqa: E402
 from identity.wikidata_dump import normaliser  # noqa: E402
 
@@ -253,7 +253,7 @@ def test_recouvrement_signale(base_catalogue, tmp_path):
 
 def test_l_outil_ne_lit_jamais_le_corpus():
     """Le jeu mesurera `bench` : l'outil qui le vérifie ne doit pas le lire."""
-    for module in (catalogue, confirmer):
+    for module in (catalogue, confirmer, regles):
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert not re.search(r"\bbench\.\w", source), module.__name__
 
@@ -343,3 +343,88 @@ def test_lecture_seule_des_la_premiere_transaction(
     else:
         cible.mesurer(base_catalogue)
     assert vu == ["on"]
+
+
+# --------------------------------------------------------------------------- #
+#  regle: — exécution sur base jetable (contrôles statiques : test_evaluation_regles)
+# --------------------------------------------------------------------------- #
+
+
+def poser_regle(dossier: Path, question_id: str, sql: str) -> None:
+    (dossier / "regles").mkdir(exist_ok=True)
+    (dossier / "regles" / f"{question_id}.sql").write_text(sql, encoding="utf-8")
+
+
+REGLE_NOTES = """
+SELECT series_id FROM manga.ms_series_enriched
+WHERE series_members_rating >= 8
+ORDER BY series_members_rating DESC, series_id
+LIMIT 2
+"""
+
+
+def noter(dsn: str) -> None:
+    with psycopg.connect(dsn) as cx:
+        for series_id, note in ((1, 9.5), (2, 9.0), (3, 8.5), (4, 7.0)):
+            cx.execute(
+                "UPDATE manga.ms_series_enriched SET series_members_rating = %s"
+                " WHERE series_id = %s",
+                (note, series_id),
+            )
+
+
+def test_regle_executee_plafonnee_dans_son_ordre(base_catalogue, tmp_path):
+    noter(base_catalogue)
+    d = jeu(
+        tmp_path,
+        [question("Q001", famille="F10", mode="proposition")],
+        [attendu("Q001", "regle: Q001", "1")],
+    )
+    poser_regle(d, "Q001", REGLE_NOTES)
+    sortie, bilans = confirmer.executer(base_catalogue, d)
+    assert bilans[0].statut == "confirmee"
+    assert [(a.series_id, a.grade, a.confirmation) for a in sortie] == [
+        ("1", "1", "regle"),
+        ("2", "1", "regle"),
+    ]
+
+
+def test_regle_en_erreur_n_empeche_pas_la_suite(base_catalogue, tmp_path):
+    noter(base_catalogue)
+    d = jeu(
+        tmp_path,
+        [
+            question("Q001", famille="F10", mode="proposition"),
+            question("Q002", famille="F9", mode="proposition"),
+            question("Q003"),
+        ],
+        [
+            attendu("Q001", "regle: Q001", "1"),
+            attendu("Q002", "regle: Q002", "1"),
+            attendu("Q003", "titre: Berserk"),
+        ],
+    )
+    poser_regle(
+        d,
+        "Q001",
+        REGLE_NOTES.replace("series_members_rating >= 8", "colonne_inconnue > 1"),
+    )
+    poser_regle(
+        d, "Q002", REGLE_NOTES.replace("SELECT series_id", "SELECT series_title")
+    )
+    _, bilans = confirmer.executer(base_catalogue, d)
+    statuts = {b.question.question_id: (b.statut, " ".join(b.motifs)) for b in bilans}
+    assert statuts["Q001"][0] == "a_revoir" and "SQL invalide" in statuts["Q001"][1]
+    assert statuts["Q002"][0] == "a_revoir" and "series_id" in statuts["Q002"][1]
+    assert statuts["Q003"][0] == "confirmee"
+
+
+def test_regle_absente(base_catalogue, tmp_path):
+    d = jeu(
+        tmp_path,
+        [question("Q001", famille="F10", mode="proposition")],
+        [attendu("Q001", "regle: Q001", "1")],
+    )
+    _, bilans = confirmer.executer(base_catalogue, d)
+    assert bilans[0].statut == "a_revoir"
+    assert "introuvable" in " ".join(bilans[0].motifs)

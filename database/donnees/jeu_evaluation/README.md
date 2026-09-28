@@ -50,7 +50,7 @@ Tu remplis trois colonnes ; l'outil remplit les trois autres.
 | Colonne | Qui | Contenu |
 |---|---|---|
 | `question_id` | toi | la question |
-| `reponse_ecrite` | toi | `titre: …`, `auteur: …` ou `id: …` — la réponse **telle que tu la connais** |
+| `reponse_ecrite` | toi | `titre: …`, `auteur: …`, `id: …` ou `regle: Qnnn` — la réponse **telle que tu la connais** |
 | `grade` | toi | `2` très pertinent, `1` pertinent — vide pour les issues sans clé |
 | `series_id` | l'outil | la clé du catalogue |
 | `titre_catalogue` | l'outil | le titre **tel que le catalogue l'écrit** — une vérification visuelle, jamais une clé |
@@ -64,6 +64,30 @@ Tu remplis trois colonnes ; l'outil remplit les trois autres.
   série** de l'auteur ; en `reconnaissance`, un auteur à plusieurs séries est
   ambigu.
 - **`id:`** — le `series_id`, quand un titre est ambigu ou pour lever un doute.
+
+- **`regle:`** — F9 et F10 seulement, en `proposition` : l'ensemble attendu est
+  **dérivé** par une règle SQL versionnée, `v1/regles/Qnnn.sql` (une par
+  question, du nom de la question), exécutée en lecture seule. Son texte entre
+  dans l'empreinte du jeu au gel. Deux contraintes, vérifiées par l'outil :
+  - **des colonnes, jamais les mots de la question** — toute recherche
+    textuelle est refusée (`LIKE`, `ILIKE`, `~`, `SIMILAR TO`, plein texte,
+    similarité). Filtrer `series_category_clean = 'Shonen'` est une colonne ;
+    la liste des colonnes admises (genre, année, note, tomes, statut) relève de
+    la relecture ;
+  - **un plafond** — la règle finit par `LIMIT n`, sous un `ORDER BY` qui
+    départage par `series_id`, pour que le nDCG garde un sens et que la même
+    règle rende toujours le même ensemble.
+
+  ```sql
+  -- Q041 — « un bon shonen » : les vingt shonen les mieux notés par les membres
+  SELECT series_id
+  FROM manga.ms_series_enriched
+  WHERE series_category_clean = 'Shonen' AND series_review_count >= 3
+  ORDER BY series_members_rating DESC NULLS LAST, series_id
+  LIMIT 20;
+  ```
+
+  La règle s'écrit aussi en clair dans la `note` de la question.
 
 **Issues sans clé.** Pour une question `reconnue_hors_catalogue`, écris l'œuvre
 (`titre: …`) : l'outil vérifie qu'elle est **absente du catalogue** et **connue

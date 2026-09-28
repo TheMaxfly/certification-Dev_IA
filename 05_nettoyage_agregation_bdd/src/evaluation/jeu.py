@@ -38,9 +38,12 @@ MODES = ("proposition", "reconnaissance", "refus")
 ISSUES = ("au_catalogue", "reconnue_hors_catalogue", "inconnue")
 ORIGINES = ("nouvelle", "decembre")
 FAMILLES = tuple(f"F{i}" for i in range(1, 11))
-VOIES = ("titre", "auteur", "id")
+VOIES = ("titre", "auteur", "id", "regle")
+#: Seules familles dont l'attendu se dérive par une règle SQL (décision du
+#: 2026-09-29) — toujours en proposition.
+FAMILLES_A_REGLE = ("F9", "F10")
 
-REPONSE = re.compile(r"^\s*(titre|auteur|id)\s*:\s*(\S.*?)\s*$", re.IGNORECASE)
+REPONSE = re.compile(r"^\s*(titre|auteur|id|regle)\s*:\s*(\S.*?)\s*$", re.IGNORECASE)
 
 
 class JeuInvalide(Exception):
@@ -160,8 +163,8 @@ def lire_attendus(chemin: Path, questions: list[Question]) -> list[Attendu]:
         voie = lire_reponse(a.reponse_ecrite)
         if voie is None:
             erreurs.append(
-                f"{ou} — reponse_ecrite attendue : « titre: … », « auteur: … »"
-                " ou « id: … »"
+                f"{ou} — reponse_ecrite attendue : « titre: … », « auteur: … »,"
+                " « id: … » ou « regle: Qnnn »"
             )
         if q.issue_attendue == "au_catalogue" and a.grade not in ("1", "2"):
             erreurs.append(f"{ou} — grade 1 ou 2 exigé pour une issue au_catalogue")
@@ -171,6 +174,14 @@ def lire_attendus(chemin: Path, questions: list[Question]) -> list[Attendu]:
             erreurs.append(
                 f"{ou} — une issue {q.issue_attendue} ne se désigne pas par id"
             )
+        if voie and voie[0] == "regle":
+            if not (q.famille in FAMILLES_A_REGLE and q.mode == "proposition"):
+                erreurs.append(f"{ou} — regle: réservée à F9 et F10, en proposition")
+            if voie[1] != q.question_id:
+                erreurs.append(
+                    f"{ou} — regle: {voie[1]} ; une question a SA règle, "
+                    f"regles/{q.question_id}.sql"
+                )
         attendus.append(a)
     if erreurs:
         raise JeuInvalide(erreurs)

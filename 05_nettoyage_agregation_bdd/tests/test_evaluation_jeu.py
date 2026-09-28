@@ -164,3 +164,38 @@ def test_aller_retour(tmp_path):
         q(question_id="Q002", mode="refus", famille="F7", issue_attendue="inconnue"),
     ]
     assert lire_attendus(tmp_path / "attendus.csv", questions) == lignes
+
+
+@pytest.mark.parametrize(
+    ("question", "ligne", "motif"),
+    [
+        (
+            q(famille="F3", mode="proposition"),
+            ["Q001", "regle: Q001", "1", "", "", ""],
+            "F9 et F10",
+        ),
+        (
+            q(famille="F10", mode="reconnaissance"),
+            ["Q001", "regle: Q001", "1", "", "", ""],
+            "F9 et F10",
+        ),
+        (
+            q(famille="F9", mode="proposition"),
+            ["Q001", "regle: Q002", "1", "", "", ""],
+            "SA règle",
+        ),
+    ],
+)
+def test_regle_refusee_a_la_lecture(tmp_path, question, ligne, motif):
+    chemin = ecrire(tmp_path / "attendus.csv", COLONNES_ATTENDUS, [ligne])
+    with pytest.raises(JeuInvalide, match=motif):
+        lire_attendus(chemin, [question])
+
+
+def test_regle_admise_a_la_lecture(tmp_path):
+    chemin = ecrire(
+        tmp_path / "attendus.csv",
+        COLONNES_ATTENDUS,
+        [["Q001", "regle: Q001", "1", "", "", ""]],
+    )
+    assert len(lire_attendus(chemin, [q(famille="F9", mode="proposition")])) == 1

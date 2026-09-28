@@ -38,6 +38,7 @@ import psycopg
 import typer
 
 from evaluation import catalogue as cat
+from evaluation import regles
 from evaluation.jeu import (
     Attendu,
     JeuInvalide,
@@ -87,9 +88,31 @@ def _ligne_seule(a: Attendu, statut: str, detail: str) -> Attendu:
 
 
 def resoudre(
-    q: Question, a: Attendu, catalogue: cat.Catalogue, cx: psycopg.Connection
+    q: Question,
+    a: Attendu,
+    catalogue: cat.Catalogue,
+    cx: psycopg.Connection,
+    jeu: Path | None = None,
 ) -> Resolution:
     voie, valeur = lire_reponse(a.reponse_ecrite)
+
+    if voie == "regle":
+        try:
+            ids = regles.executer(cx, regles.lire(jeu or JEU_DEFAUT, valeur))
+        except regles.RegleInvalide as erreur:
+            return Resolution(
+                "a_revoir", [_ligne_seule(a, "a_revoir", str(erreur))], str(erreur)
+            )
+        if not ids:
+            return Resolution("introuvable", [_ligne_seule(a, "introuvable", "regle")])
+        hors = [i for i in ids if i not in catalogue.series]
+        if hors:
+            detail = f"séries hors catalogue : {hors}"
+            return Resolution("a_revoir", [_ligne_seule(a, "a_revoir", detail)], detail)
+        return Resolution(
+            "confirmee",
+            [a.completer(i, catalogue.series[i].titre, "regle") for i in ids],
+        )
 
     if q.issue_attendue == "au_catalogue":
         if voie == "id":
@@ -175,6 +198,7 @@ def confirmer(
     attendus: list[Attendu],
     catalogue: cat.Catalogue,
     cx: psycopg.Connection,
+    jeu: Path | None = None,
 ) -> tuple[list[Attendu], list[Bilan]]:
     """Attendus complétés, dans l'ordre d'écriture ; un bilan par question."""
     sortie: list[Attendu] = []
@@ -191,7 +215,7 @@ def confirmer(
                 b.motifs.append(
                     f"« {reponse} » : grades contradictoires {sorted(grades)}"
                 )
-            r = resoudre(q, lignes[0], catalogue, cx)
+            r = resoudre(q, lignes[0], catalogue, cx, jeu)
             sortie += r.lignes
             if r.statut == "introuvable":
                 b.motifs.append(
@@ -257,6 +281,10 @@ def ecrire_rapport(
         "",
         f"- `questions.csv` sha256 `{empreinte(jeu / 'questions.csv')}`",
         f"- `attendus.csv` sha256 `{empreinte(jeu / 'attendus.csv')}` (avant écriture)",
+        *[
+            f"- `regles/{r.name}` sha256 `{empreinte(r)}`"
+            for r in sorted((jeu / "regles").glob("*.sql"))
+        ],
         f"- Lu, en lecture seule : {', '.join(f'`{t}`' for t in cat.TABLES_LUES)}. "
         "Ni corpus, ni fragment, ni index.",
         "",
@@ -333,7 +361,7 @@ def executer(url: str, jeu: Path) -> tuple[list[Attendu], list[Bilan]]:
     # Lecture seule dès la PREMIÈRE requête : `SET SESSION CHARACTERISTICS` ne
     # vaudrait que pour les transactions suivantes, pas pour celle qu'il ouvre.
     with psycopg.connect(url, options="-c default_transaction_read_only=on") as cx:
-        return confirmer(questions, attendus, cat.Catalogue.charger(cx), cx)
+        return confirmer(questions, attendus, cat.Catalogue.charger(cx), cx, jeu)
 
 
 @app.command()
