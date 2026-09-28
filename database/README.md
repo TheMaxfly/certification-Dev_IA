@@ -90,14 +90,11 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
-le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12 ; `000` y a
-été **marquée appliquée** le 2026-07-15, sans exécution. Le contrôle affiche
-**16 migrations appliquées**.
-
-`016` est **écrite et éprouvée sur base jetable** (rejeu 000→016, 33 tests
-dédiés), **non appliquée** à `apimanga` : l'appliquer la rend immuable, et ses
-tables ne servent qu'au gel du jeu d'évaluation. Tant qu'elle n'y est pas jouée,
-`outils/fidelite.sh` montre ses quatre tables en écart — attendu.
+le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` le
+2026-09-29 ; `000` y a été **marquée appliquée** le 2026-07-15, sans exécution.
+Le contrôle affiche **17 migrations appliquées et 0 en attente**, et
+`outils/fidelite.sh` rend un **diff vide** (1 704 lignes de part et d'autre,
+2026-09-29).
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
