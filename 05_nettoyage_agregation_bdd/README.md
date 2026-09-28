@@ -78,6 +78,26 @@ remplacent les chiffres indicatifs antérieurs (99,6 % et 4 séries), qui
 venaient d'une requête de diagnostic non conservée — cf. ETAT,
 section « Dette 22.3 — le 99,6 % certifié : il vaut 100,00 % ».
 
+### Corpus RAG (`bench`)
+
+Reconstruit `bench.corpus_docs` / `bench.corpus_chunks` depuis
+`manga.ms_reviews_all` et le snapshot Manga Sanctuary 2026-07, sans donnée
+d'auteur. Règle, décisions et résultats : `rapports/corpus_decisions_20260928.md`.
+
+```bash
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m corpus.construire --dry-run   # gardes, diff, contrôles §7, ROLLBACK
+uv run python -m corpus.construire             # applique (un rejeu n'écrit rien)
+uv run python -m corpus.construire --a-blanc   # vide + reconstruit, compare, ROLLBACK
+uv run python -m corpus.mesurer                # mesures, session en lecture seule
+```
+
+Chaque commande écrit un rapport horodaté dans `rapports/`. Les exemples
+d'auto-référence que produit `mesurer` contiennent du texte à juger : ils vont
+dans `data/corpus_exemples/`, hors dépôt. L'état du banc de décembre, avant
+reconstruction, est archivé dans `data/archives/bench_2025-12/` (voir son
+`MANIFEST.md`).
+
 ## Makefile
 
 ```bash

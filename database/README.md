@@ -529,6 +529,23 @@ exclues et les séries sans `kitsu_id`, via `ms_formes` / `wd_formes` /
   préalable** (résolution des labels d'auteurs depuis Wikidata) est à trancher
   avant de pouvoir désambiguïser par auteur.
 
+## Données de référence — les listes du corpus RAG
+
+Deux listes versionnées disent au chargeur du corpus
+(`05_.../src/corpus/construire.py`) ce que le test mécanique de non-fuite ne
+sait pas distinguer : un chroniqueur cité, ou un personnage qui porte le même
+nom que lui.
+
+| Fichier | Contenu |
+|---|---|
+| `donnees/corpus_references_masquees.csv` | **20** vraies références à un membre dans 19 critiques (remerciement, signature d'un tiers, collègue cité…) — le pseudonyme y est remplacé par `[membre]` |
+| `donnees/corpus_homonymes_admis.csv` | **119** homonymes tolérés par le test de non-fuite : 27 dans des critiques (personnages, mangakas), 92 dans des synopsis Kitsu |
+
+Aucune ne porte de pseudonyme en clair, seulement une empreinte (SHA-256 tronqué
+à 16 caractères). Une entrée qui ne correspond plus à rien arrête le chargement :
+une liste qui dériverait en silence finirait par tolérer ce qu'elle ne décrit
+plus.
+
 ## Données de référence — le référentiel de genres (`013`)
 
 `donnees/` porte le CONTENU des tables de référence, en CSV versionnés. La
