@@ -4,7 +4,7 @@
 Bloc 1. Traitement à finalité pédagogique et de démonstration technique.
 **Base concernée** : PostgreSQL `apimanga`, schémas `manga` et `staging`, et
 les instantanés bruts qui l'alimentent.
-**Version** : 1.1 — 2026-09-07.
+**Version** : 1.2 — 2026-09-29.
 **Périmètre** : ce document couvre le **RGPD**. Il ne traite ni du droit
 d'auteur ni du droit du producteur de base de données, qui relèvent d'un autre
 régime et font l'objet de la section 7.
@@ -19,7 +19,7 @@ régime et font l'objet de la section 7.
 | Noms et rôles de créateurs | **30 678 crédits promus**, 53 183 en brut, **15 397 identifiants distincts** | `manga.kitsu_staff`, `staging.kitsu_staff`, raw Kitsu | auteurs, dessinateurs, scénaristes |
 | Identifiants et formes de noms d'auteurs | **2 780 QID**, 9 090 labels et alias, 5 453 relations œuvre-auteur | `manga.wd_auteurs`, `manga.wd_auteurs_formes` | auteurs référencés sur Wikidata |
 | **Noms de créateurs des sources francophones** | **7 285** formes distinctes (MS), **1 098** (MI), dont **3 092 n'existent dans aucune autre source** | `ms_series_enriched`, `ms_volumes_enriched`, `mi_sorties` | auteurs et dessinateurs du catalogue |
-| Noms d'auteurs intégrés au texte RAG | inclus dans les documents `series_profile` | `manga.rag_kitsu_docs`, corpus dérivé | idem |
+| Noms d'auteurs intégrés au texte RAG | ligne `Auteurs:` de **20 831** documents Kitsu sur 37 049 (staff Kitsu de juillet, rôles Scénario / Dessin) — v1.2 | `bench.corpus_docs`, `bench.corpus_chunks` | idem |
 | Libellés de consommateurs de l'API | 1 (`app_backend`) | journaux applicatifs | aucune personne physique |
 
 **Ne sont pas des données personnelles** : les personnes décédées (hors champ
@@ -380,6 +380,7 @@ est consigné ici pour ne pas être présenté comme traité.
 | Manga-News | `robots.txt` respecté et **inchangé**. **CGU nettement plus restrictives** : usage limité à la navigation et à la copie privée. Interrompue le 2026-08-25 par une protection anti-robot générale, **sans contournement** ; **reprise le 2026-09-07**. Contrainte contractuelle connue et non levée ; exploitation bornée au cadre académique — cf. T4 |
 | Kitsu | API publique. La mention de licence Apache 2.0 porte vraisemblablement sur l'API ou sa documentation, non sur le contenu du catalogue. Copie datée des CGU à constituer |
 | Wikidata | **CC0** — mais CC0 règle les droits d'auteur et de base, **pas** les droits relatifs aux données personnelles |
+| Sources citées par les textes Kitsu *(v1.2)* | Les synopsis Kitsu du corpus citent leur provenance, retirée du texte et conservée en `metadata_json.source_citee` : **« MU » désigne MangaUpdates** (6 408 mentions sous MU, M-U, MangaUpdates), puis ANN 732, MangaHelpers 667, Tapas 429, MangaDex 407, Tokyopop 301. **Le régime de licence de MangaUpdates sur ses synopsis n'a pas été instruit.** Même dossier que les descriptions de personnages Kitsu citant un wiki (Wikipédia, Wikia, Fandom), présumées CC BY-SA avec attribution requise, les autres provenances restant « à instruire » |
 
 S'ajoutent, indépendamment des CGU, les articles **L342-1 et L342-2 du CPI**
 (extraction d'une partie substantielle, extractions répétées excédant
