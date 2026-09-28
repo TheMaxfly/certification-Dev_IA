@@ -59,8 +59,11 @@ def test_listes_du_depot_valides():
     masquage, homonymes = p.lire_listes(DONNEES)
     assert len(masquage) == 20
     assert len({e.doc_key for e in masquage}) == 19
-    assert len(homonymes) == 119
-    assert Counter(e.valeur for e in homonymes)["provenance_kitsu"] == 92
+    # 27 homonymes de critiques, qualifiés à la lecture ; les homonymes Kitsu sont
+    # régénérés par provenance (`corpus.homonymes`) depuis le raw de juillet.
+    assert len(homonymes) == 155
+    assert Counter(e.valeur for e in homonymes)["provenance_kitsu"] == 128
+    assert sum(1 for e in homonymes if e.doc_key.startswith("ms_review:")) == 27
 
 
 def test_listes_du_depot_sans_pseudonyme_en_clair():

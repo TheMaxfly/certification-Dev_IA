@@ -310,7 +310,8 @@ def test_atteignabilite(base_catalogue):
     assert decomposition["au_niveau_document"] == 3  # la série 2, via kitsu:902
     assert defaut["liees_par_la_cascade"] == 3
     assert defaut["document_sans_fragment"] == 1  # 902
-    assert defaut["absentes_de_kitsu_series_core"] == 2  # 902 et 905
+    assert defaut["sans_document_au_corpus"] == 1  # 905
+    assert defaut["sans_synopsis_atteignable"] == 2  # 902 et 905
 
 
 @pytest.mark.parametrize(

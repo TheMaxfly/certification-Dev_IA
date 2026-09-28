@@ -14,7 +14,8 @@ LA RÈGLE — validée le 2026-09-28 (rapports/corpus_decisions_20260928.md)
   S6  un document par (série, corps identique), clé = plus petit `site_id`.
 
   C1  une critique = un document `ms_review:<site_id>` ;
-  C2  `kitsu_synopsis` régénérés depuis `manga`, à l'identique ;
+  C2  `kitsu_synopsis` construits depuis le raw Kitsu de JUILLET (même
+      snapshot pour toutes les sources, règle du 2026-09-29) : cf. `kitsu.py` ;
   C3  `ms_hybrid` non reconstruit (D1) — les 5 608 sont retirés.
 
   A1–A4  aucun auteur dans `bench` ; références à un membre masquées ;
@@ -52,7 +53,7 @@ from pathlib import Path
 import psycopg
 import typer
 
-from corpus import decoupage, pseudonymes
+from corpus import decoupage, kitsu, pseudonymes
 
 RACINE = Path(__file__).resolve().parents[3]
 RAW_DEFAUT = (
@@ -205,15 +206,11 @@ JOIN manga.ms_series_enriched se USING (series_id)
 ORDER BY r.site_id
 """
 
-SQL_KITSU = """
-SELECT e.doc_key, e.source, e.series_id, e.kitsu_id, e.boost_score::text,
-       e.doc_text,
-       (e.metadata_json || jsonb_build_object('title', k.title_canonical))::text,
-       k.title_canonical
-FROM manga.rag_export_docs e
-JOIN manga.kitsu_series_core k USING (kitsu_id)
-WHERE e.source = 'kitsu_synopsis'
-ORDER BY e.doc_key
+#: Les œuvres Kitsu que la cascade rattache au catalogue — seul motif
+#: d'admission d'un roman (K1).
+SQL_KITSU_RATTACHEES = """
+SELECT kitsu_id::bigint FROM manga.work_identity
+WHERE kitsu_id IS NOT NULL AND series_id IS NOT NULL
 """
 
 COLONNES_DOC = (
@@ -390,14 +387,19 @@ SELECT
 
 
 def construire_cible(
-    curseur: psycopg.Cursor, donnees: Path
+    curseur: psycopg.Cursor, donnees: Path, run_kitsu: Path
 ) -> tuple[dict[str, dict], dict]:
     """Documents cibles (masqués), et le bilan de leur construction."""
     docs: dict[str, dict] = {}
-    for requete in (SQL_MS_REVIEW, SQL_KITSU):
-        for ligne in curseur.execute(requete):
-            doc = dict(zip(COLONNES_DOC, ligne, strict=True))
-            docs[doc["doc_key"]] = doc
+    for ligne in curseur.execute(SQL_MS_REVIEW):
+        doc = dict(zip(COLONNES_DOC, ligne, strict=True))
+        docs[doc["doc_key"]] = doc
+    rattachees = {k for (k,) in curseur.execute(SQL_KITSU_RATTACHEES)}
+    try:
+        docs_kitsu, bilan_kitsu = kitsu.documents(run_kitsu, rattachees)
+    except kitsu.ErreurKitsu as erreur:
+        raise ErreurChargement(f"Kitsu — {erreur}") from erreur
+    docs.update((d["doc_key"], d) for d in docs_kitsu)
 
     pseudos = {
         pseudonymes.empreinte(p): p
@@ -424,6 +426,7 @@ def construire_cible(
         "masquage_remplacements": remplacements,
         "homonymes_admis": len(homonymes),
         "pseudonymes": len(pseudos),
+        "kitsu": bilan_kitsu,
     }
     return docs, bilan
 
@@ -535,6 +538,52 @@ def dsn_affichable(url: str) -> str:
     return " ".join(f"{k}={v}" for k, v in sorted(infos.items()))
 
 
+def section_kitsu(b: kitsu.Bilan) -> list[str]:
+    """La part Kitsu : d'où elle vient, et ce que chaque clause de K1 écarte."""
+
+    def n(x: int) -> str:
+        return f"{x:_}".replace("_", " ")
+
+    exclues = sum(b.exclues_sous_type.values())
+    return [
+        "## Part Kitsu — raw de juillet (règle du 2026-09-29)",
+        "",
+        *[
+            f"- `{nom}` sha256 `{sha}` (conforme au manifeste)"
+            for nom, sha in b.fichiers.items()
+        ],
+        "",
+        "| Clause | Œuvres |",
+        "|---|---:|",
+        f"| œuvres du raw | {n(b.oeuvres)} |",
+        f"| écartées par le type (hors manga/manhwa/manhua) | {n(exclues)} |",
+        *[f"| — dont {st} | {n(c)} |" for st, c in b.exclues_sous_type.most_common()],
+        f"| romans réadmis (rattachés au catalogue par la cascade) | "
+        f"{n(sum(b.sur_rattachement_admises.values()))} |",
+        f"| écartées faute de synopsis | {n(b.exclues_sans_synopsis)} |",
+        f"| — dont rattachées au catalogue par la cascade | "
+        f"{n(b.rattachees_sans_synopsis)} |",
+        f"| **retenues** | **{n(b.retenues)}** |",
+        "",
+        "Œuvres rattachées au catalogue par la cascade, par type : "
+        + ", ".join(
+            f"{st} {n(c)}" for st, c in b.rattachees_par_sous_type.most_common()
+        )
+        + ". Le référentiel Kitsu de la cascade ne charge que manga, manhwa et "
+        "manhua : un roman rattaché est impossible par construction, et le catalogue "
+        "ne connaît aucun type roman.",
+        "",
+        f"- Ligne `Auteurs:` (K2) : {n(b.avec_auteurs)} documents sur {n(b.retenues)}. "
+        "Conséquence : une question du type « les mangas de Naoki Urasawa » devient "
+        "trouvable par le texte Kitsu — F1 mesure aussi du lexical sur métadonnée.",
+        "- Positions de tendance et `boost_score` : retirés (K3).",
+        f"- `source_citee` (K4) : {n(sum(b.sources_citees.values()))} mentions ; "
+        "les plus fréquentes : "
+        + ", ".join(f"{s} {n(c)}" for s, c in b.sources_citees.most_common(8)),
+        "",
+    ]
+
+
 def ecrire_rapport(chemin: Path, r: dict) -> None:
     def tableau(compteur: dict, entete=("", "")) -> list[str]:
         lignes = [f"| {entete[0]} | {entete[1]} |", "|---|---:|"]
@@ -576,6 +625,7 @@ def ecrire_rapport(chemin: Path, r: dict) -> None:
         f"{dict(r['decoupe']['sans_fragment'])} — longueurs "
         f"{r['decoupe']['sans_fragment_longueurs']}. Introuvables au retrieval.",
         "",
+        *section_kitsu(r["cible"]["kitsu"]),
         "## Écritures",
         "",
         "| Opération | Par source |",
@@ -634,6 +684,7 @@ def executer(
     donnees: Path = DONNEES_DEFAUT,
     dry_run: bool = False,
     a_blanc: bool = False,
+    run_kitsu: Path = kitsu.RUN_DEFAUT,
 ) -> dict:
     """Le chargement complet ; rend le rapport. Lève si une garde ou un
     contrôle échoue — la transaction est alors annulée."""
@@ -675,7 +726,7 @@ def executer(
             raise ErreurChargement(f"garde en échec : {gardes}")
 
         r["clauses"] = dict(cur.execute(SQL_COMPTAGE).fetchall())
-        docs, r["cible"] = construire_cible(cur, donnees)
+        docs, r["cible"] = construire_cible(cur, donnees, run_kitsu)
         fragments, r["decoupe"] = decouper_cible(docs)
         r["fragments"] = len(fragments)
         verser_cible(cur, docs, fragments)
@@ -722,9 +773,19 @@ def construire(
     rapports: Path = typer.Option(  # noqa: B008
         RAPPORTS_DEFAUT, help="Dossier des rapports."
     ),
+    run_kitsu: Path = typer.Option(  # noqa: B008
+        kitsu.RUN_DEFAUT, "--kitsu", help="Run Kitsu (manga.ndjson, staff, manifeste)."
+    ),
 ) -> None:
     """Reconstruit le corpus RAG de `bench` selon la règle validée."""
-    r = executer(dsn(), raw=raw, donnees=donnees, dry_run=dry_run, a_blanc=a_blanc)
+    r = executer(
+        dsn(),
+        raw=raw,
+        donnees=donnees,
+        dry_run=dry_run,
+        a_blanc=a_blanc,
+        run_kitsu=run_kitsu,
+    )
     suffixe = {"dry-run": "dryrun", "chargement": "execution"}.get(r["mode"], "a_blanc")
     chemin = rapports / f"corpus_{suffixe}_{r['horodatage']}.md"
     ecrire_rapport(chemin, r)

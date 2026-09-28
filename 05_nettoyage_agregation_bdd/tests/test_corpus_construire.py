@@ -11,8 +11,14 @@ chose à écarter, et chaque contrôle du §7 quelque chose à voir :
        pseudonyme                           → retenue, COUPURE rapportée
   107  auteur « Tori », hors snapshot        → fournit un pseudonyme homonyme
 
-  kitsu:7  synopsis où « Tori » est un oiseau → homonyme ADMIS
-  kitsu:8  synopsis de 6 caractères          → sans fragment (plancher 50)
+  La part Kitsu vient d'un run miniature, manifeste compris (règle K1) :
+  kitsu:7   manga, « Tori » est un oiseau, auteur, « (Source: MU) »
+                                             → retenu, homonyme ADMIS
+  kitsu:8   manga, synopsis de 6 caractères  → retenu, sans fragment (plancher 50)
+  kitsu:9   roman non rattaché               → écarté (type)
+  kitsu:10  manga sans synopsis              → écarté (K1)
+  kitsu:11  roman rattaché par la cascade    → RÉADMIS
+  kitsu:12  doujin                           → écarté, toujours
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from conftest import lire
+from conftest import ecrire_run_kitsu, lire
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -48,9 +54,38 @@ CRITIQUES = [
 ]
 SNAPSHOT = [101, 102, 103, 104, 106]
 KITSU = [
-    (7, "Birds", "The bird Tori flies over the sea every morning, a long synopsis."),
-    (8, "Mini", "Court."),
+    (
+        7,
+        "manga",
+        "Birds",
+        {"en": "Birds"},
+        "The bird Tori flies over the sea every morning, a long synopsis. (Source: MU)",
+        ["Fantasy"],
+        [],
+    ),
+    (8, "manga", "Mini", {}, "Court.", [], []),
+    (9, "novel", "Roman", {}, "Un roman au synopsis assez long pour compter.", [], []),
+    (10, "manga", "Muet", {}, "", [], []),
+    (
+        11,
+        "novel",
+        "Rattache",
+        {},
+        "Un roman que la cascade rattache au catalogue.",
+        [],
+        [],
+    ),
+    (
+        12,
+        "doujin",
+        "Doujin",
+        {},
+        "Un doujin au synopsis assez long pour compter.",
+        [],
+        [],
+    ),
 ]
+STAFF = {7: [("Naoki Urasawa", "Story & Art")]}
 MASQUAGE = [("ms_review:101", empreinte("Zorglub"), "remerciement")]
 HOMONYMES = [("kitsu:7", empreinte("Tori"), "provenance_kitsu")]
 
@@ -68,16 +103,9 @@ def peupler(dsn: str, critiques=CRITIQUES) -> None:
                 " VALUES (%s, %s, %s, %s, %s)",
                 (serie, tome, f"{URL}{site_id}", auteur, corps),
             )
-        for kitsu_id, titre, texte in KITSU:
-            cx.execute(
-                "INSERT INTO manga.kitsu_series_core (kitsu_id, title_canonical)"
-                " VALUES (%s, %s)",
-                (kitsu_id, titre),
-            )
-            cx.execute(
-                "INSERT INTO manga.rag_kitsu_docs (kitsu_id, doc_text) VALUES (%s, %s)",
-                (kitsu_id, texte),
-            )
+        cx.execute(
+            "INSERT INTO manga.work_identity (series_id, kitsu_id) VALUES (1, '11')"
+        )
 
 
 def ecrire_raw(dossier: Path, site_ids=SNAPSHOT) -> Path:
@@ -107,6 +135,10 @@ def ecrire_listes(dossier: Path, masquage=MASQUAGE, homonymes=HOMONYMES) -> Path
     return dossier
 
 
+def run_kitsu(tmp_path: Path) -> Path:
+    return ecrire_run_kitsu(tmp_path / "kitsu", KITSU, STAFF)
+
+
 @pytest.fixture
 def jeu(base, tmp_path):
     peupler(base)
@@ -114,12 +146,17 @@ def jeu(base, tmp_path):
         "url": base,
         "raw": ecrire_raw(tmp_path),
         "donnees": ecrire_listes(tmp_path),
+        "kitsu": run_kitsu(tmp_path),
     }
 
 
 def charger(jeu, **options):
     return construire.executer(
-        jeu["url"], raw=jeu["raw"], donnees=jeu["donnees"], **options
+        jeu["url"],
+        raw=jeu["raw"],
+        donnees=jeu["donnees"],
+        run_kitsu=jeu["kitsu"],
+        **options,
     )
 
 
@@ -139,6 +176,7 @@ def test_chargement_applique_la_regle(jeu):
         "S6 doublons": 3,
     }
     assert lire(jeu["url"], "SELECT doc_key FROM bench.corpus_docs ORDER BY 1") == [
+        ("kitsu:11",),
         ("kitsu:7",),
         ("kitsu:8",),
         ("ms_review:101",),
@@ -264,6 +302,7 @@ def test_fuite_annule_tout(base, tmp_path):
         "url": base,
         "raw": ecrire_raw(tmp_path, SNAPSHOT + [108]),
         "donnees": ecrire_listes(tmp_path),
+        "kitsu": run_kitsu(tmp_path),
     }
     r = charger(jeu)
     assert r["echecs"] and "ANNULÉ" in r["issue"]
@@ -292,6 +331,7 @@ def test_critique_sans_serie_arrete(base, tmp_path):
         "url": base,
         "raw": ecrire_raw(tmp_path, SNAPSHOT + [109]),
         "donnees": ecrire_listes(tmp_path),
+        "kitsu": run_kitsu(tmp_path),
     }
     with pytest.raises(construire.ErreurChargement, match="G3"):
         charger(jeu)
@@ -305,7 +345,47 @@ def test_liste_perimee_arrete(base, tmp_path):
         "donnees": ecrire_listes(
             tmp_path, masquage=[("ms_review:999", empreinte("Zorglub"), "signature")]
         ),
+        "kitsu": run_kitsu(tmp_path),
     }
     with pytest.raises(construire.ErreurChargement, match="D5"):
         charger(jeu)
     assert lire(base, "SELECT count(*) FROM bench.corpus_docs") == [(0,)]
+
+
+# --------------------------------------------------------------------------- #
+#  La part Kitsu (règle du 2026-09-29)
+# --------------------------------------------------------------------------- #
+
+
+def test_part_kitsu_selon_k1(jeu):
+    r = charger(jeu)
+    b = r["cible"]["kitsu"]
+    assert (b.oeuvres, b.retenues) == (6, 3)
+    assert dict(b.exclues_sous_type) == {"novel": 1, "doujin": 1}
+    assert dict(b.sur_rattachement_admises) == {"novel": 1}
+    assert b.exclues_sans_synopsis == 1
+
+
+def test_document_kitsu_au_gabarit_de_decembre(jeu):
+    charger(jeu)
+    [(texte, meta, boost, titre)] = lire(
+        jeu["url"],
+        "SELECT doc_text, metadata_json, boost_score, title FROM bench.corpus_docs"
+        " WHERE doc_key = 'kitsu:7'",
+    )
+    assert texte == (
+        "Titres: Birds | Birds\n"
+        "Auteurs: Naoki Urasawa (Scénario & Dessin)\n"
+        'Tags: ["Fantasy"]\n'
+        "Synopsis: The bird Tori flies over the sea every morning, a long synopsis."
+    )
+    assert meta["source_citee"] == ["MU"]
+    assert boost is None and "trending_pos" not in meta
+    assert (titre, meta["subtype"]) == ("Birds", "manga")
+
+
+def test_run_kitsu_altere_refuse(jeu):
+    with (jeu["kitsu"] / "manga.ndjson").open("a", encoding="utf-8") as f:
+        f.write("{}\n")
+    with pytest.raises(construire.ErreurChargement, match="Kitsu"):
+        charger(jeu)

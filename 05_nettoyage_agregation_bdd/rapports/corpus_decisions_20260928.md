@@ -171,3 +171,13 @@ Les qrels et résultats qui visaient un document retiré sont partis par
   sur le jeu d'évaluation.
 - **API** : `/rag/export` sert toujours les vues `manga.rag_*`, fondées sur les
   3 187 anciennes critiques. Le corpus reconstruit n'est pas encore exposé.
+
+## Addendum du 2026-09-29 — la part Kitsu suit le même snapshot
+
+La construction C2 ci-dessus (« `kitsu_synopsis` inchangés, régénérés depuis
+`manga` ») laissait les synopsis Kitsu sur la table de décembre 2025, alors que
+D2 imposait le raw 2026-07 pour toutes les sources. Corrigé le 2026-09-29 : la
+part Kitsu est construite depuis le raw Kitsu de juillet manifesté, **37 049**
+documents, synopsis exigé, manga/manhwa/manhua. Le corpus compte désormais
+**48 090 documents et 66 290 fragments** ; la part critiques est inchangée.
+Règle, mesures et atteignabilité : `corpus_kitsu_juillet_20260929.md`.

@@ -157,7 +157,8 @@ def verifier_homonymes(
         if doc is None:
             raise ListeInvalide(f"document absent du corpus cible : {e.doc_key}")
         m = motif(pseudo)
-        if not (m.search(doc["doc_text"]) or m.search(doc["title"] or "")):
+        champs = (doc["doc_text"], doc["title"] or "", doc.get("metadata_json") or "")
+        if not any(m.search(c) for c in champs):
             raise ListeInvalide(
                 f"{e.doc_key} : l'homonyme {e.empreinte} n'y figure plus"
             )

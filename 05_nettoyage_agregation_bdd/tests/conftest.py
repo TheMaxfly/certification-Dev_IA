@@ -118,3 +118,77 @@ def lire(dsn: str, sql: str, params=None):
 
     with psycopg.connect(dsn) as connexion:
         return connexion.execute(sql, params).fetchall()
+
+
+def ecrire_run_kitsu(dossier, oeuvres, staff=None):
+    """Un run Kitsu miniature : `manga.ndjson`, `relations/staff.ndjson`, et le
+    `manifest.json` qui déclare leurs sha256 — la forme exacte du run réel.
+
+    oeuvres : (kitsu_id, sous_type, canonique, titres, synopsis, genres, catégories)
+    staff   : {kitsu_id: [(nom, rôle Kitsu), …]}
+    """
+    import hashlib
+
+    (dossier / "relations").mkdir(parents=True, exist_ok=True)
+    lignes = []
+    for kid, sous_type, canonique, titres, synopsis, genres, categories in oeuvres:
+        inclus = [{"type": "genres", "attributes": {"name": g}} for g in genres] + [
+            {"type": "categories", "attributes": {"title": c}} for c in categories
+        ]
+        lignes.append(
+            json.dumps(
+                {
+                    "data": {
+                        "id": str(kid),
+                        "type": "manga",
+                        "attributes": {
+                            "subtype": sous_type,
+                            "canonicalTitle": canonique,
+                            "titles": titres,
+                            "synopsis": synopsis,
+                            "popularityRank": kid * 10,
+                            "ratingRank": kid * 20,
+                        },
+                    },
+                    "included": inclus,
+                }
+            )
+        )
+    (dossier / "manga.ndjson").write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    staff_lignes = []
+    for kid, personnes in (staff or {}).items():
+        staff_lignes.append(
+            json.dumps(
+                {
+                    "manga_id": str(kid),
+                    "data": [
+                        {
+                            "type": "mediaStaff",
+                            "attributes": {"role": role},
+                            "relationships": {
+                                "person": {"data": {"type": "people", "id": f"p{i}"}}
+                            },
+                        }
+                        for i, (_, role) in enumerate(personnes)
+                    ],
+                    "included": [
+                        {"type": "people", "id": f"p{i}", "attributes": {"name": nom}}
+                        for i, (nom, _) in enumerate(personnes)
+                    ],
+                }
+            )
+        )
+    (dossier / "relations/staff.ndjson").write_text(
+        "".join(ligne + "\n" for ligne in staff_lignes), encoding="utf-8"
+    )
+    fichiers = [
+        {
+            "path": nom,
+            "sha256": hashlib.sha256((dossier / nom).read_bytes()).hexdigest(),
+        }
+        for nom in ("manga.ndjson", "relations/staff.ndjson")
+    ]
+    (dossier / "manifest.json").write_text(
+        json.dumps({"files": fichiers}), encoding="utf-8"
+    )
+    return dossier

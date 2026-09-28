@@ -71,31 +71,33 @@ SELECT
   (SELECT count(*) FROM docs)                                     AS au_niveau_document
 """
 
-#: Séries que la cascade rattache à une œuvre Kitsu, mais dont le synopsis
-#: n'est pas au corpus — un défaut de CONSTRUCTION du corpus, pas de couverture.
+#: Séries que la cascade rattache à une œuvre Kitsu, mais qu'aucun synopsis
+#: Kitsu du corpus n'atteint. Depuis le 2026-09-29, la part Kitsu vient du raw
+#: de juillet (`corpus.kitsu`) : une œuvre rattachée n'y manque que si elle n'a
+#: pas de synopsis dans ce snapshot — le bilan du chargeur le compte à part
+#: (« rattachées écartées faute de synopsis »), et les deux chiffres doivent
+#: coïncider.
 SQL_DEFAUT_KITSU = """
 WITH liees AS (
   SELECT w.series_id, w.kitsu_id::bigint AS kitsu_id
   FROM manga.work_identity w WHERE w.kitsu_id IS NOT NULL),
-manquantes AS (
-  SELECT l.* FROM liees l
-  WHERE NOT EXISTS (SELECT 1 FROM bench.corpus_chunks k
-                    JOIN bench.corpus_docs d USING (doc_key)
-                    WHERE d.source = 'kitsu_synopsis' AND d.kitsu_id = l.kitsu_id))
+docs AS (
+  SELECT d.kitsu_id,
+         EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
+           AS a_fragment
+  FROM bench.corpus_docs d WHERE d.source = 'kitsu_synopsis')
 SELECT
   (SELECT count(*) FROM liees) AS liees_par_la_cascade,
-  (SELECT count(*) FROM manquantes) AS sans_synopsis_atteignable,
-  (SELECT count(*) FROM manquantes m WHERE NOT EXISTS
-     (SELECT 1 FROM manga.kitsu_series_core s WHERE s.kitsu_id = m.kitsu_id))
-    AS absentes_de_kitsu_series_core,
-  (SELECT count(*) FROM manquantes m WHERE EXISTS
-     (SELECT 1 FROM manga.kitsu_series_core s WHERE s.kitsu_id = m.kitsu_id)
-     AND NOT EXISTS (SELECT 1 FROM bench.corpus_docs d
-                     WHERE d.source = 'kitsu_synopsis' AND d.kitsu_id = m.kitsu_id))
-    AS dans_la_source_sans_document,
-  (SELECT count(*) FROM manquantes m WHERE EXISTS
-     (SELECT 1 FROM bench.corpus_docs d
-      WHERE d.source = 'kitsu_synopsis' AND d.kitsu_id = m.kitsu_id))
+  (SELECT count(*) FROM liees l
+    WHERE NOT EXISTS (SELECT 1 FROM docs d
+                      WHERE d.kitsu_id = l.kitsu_id AND d.a_fragment))
+    AS sans_synopsis_atteignable,
+  (SELECT count(*) FROM liees l
+    WHERE NOT EXISTS (SELECT 1 FROM docs d WHERE d.kitsu_id = l.kitsu_id))
+    AS sans_document_au_corpus,
+  (SELECT count(*) FROM liees l
+    WHERE EXISTS (SELECT 1 FROM docs d
+                  WHERE d.kitsu_id = l.kitsu_id AND NOT d.a_fragment))
     AS document_sans_fragment
 """
 
@@ -146,8 +148,10 @@ def section(decomposition: dict, defaut: dict) -> str:
             f"| au niveau document (sans exiger de fragment) | "
             f"{n(t['au_niveau_document'])} |",
             "",
-            "**Défaut de construction.** Séries que la cascade rattache à une œuvre "
-            "Kitsu, mais dont le synopsis n'est pas atteignable au corpus :",
+            "**Rattachées à Kitsu, sans synopsis atteignable.** Séries que la cascade "
+            "rattache à une œuvre Kitsu, mais qu'aucun synopsis du corpus n'atteint. "
+            "La part Kitsu venant du raw de juillet, une œuvre rattachée n'y manque "
+            "que faute de synopsis dans ce snapshot (règle K1) :",
             "",
             "| | Séries |",
             "|---|---:|",
@@ -155,10 +159,8 @@ def section(decomposition: dict, defaut: dict) -> str:
             f"| {n(defaut['liees_par_la_cascade'])} |",
             f"| **sans synopsis atteignable** | "
             f"**{n(defaut['sans_synopsis_atteignable'])}** |",
-            f"| — œuvre absente de `kitsu_series_core` (source du corpus) | "
-            f"{n(defaut['absentes_de_kitsu_series_core'])} |",
-            f"| — dans la source, sans document au corpus | "
-            f"{n(defaut['dans_la_source_sans_document'])} |",
+            f"| — sans document Kitsu au corpus (pas de synopsis dans le snapshot) | "
+            f"{n(defaut['sans_document_au_corpus'])} |",
             f"| — document au corpus, sans fragment | "
             f"{n(defaut['document_sans_fragment'])} |",
             "",
