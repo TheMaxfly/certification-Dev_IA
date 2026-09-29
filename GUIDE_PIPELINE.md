@@ -176,6 +176,31 @@ PYTHONPATH=src uv run python -m identity.etage_r_promotion --appliquer   # écri
   journalisée transforme cet avis en décision, et on peut la rejouer à
   l'identique. »
 
+La **propagation du kitsu_id** vient après les étages qui identifient (1 et R) :
+une série identifiée par Wikidata ou par arbitrage reçoit le `kitsu_id` que ses
+identifiants MAL / AniList désignent, via les correspondances Kitsu, **quand ils
+mènent à une seule entrée**. Aucune lecture de titre. Puis le contrôle des têtes
+du catalogue.
+
+```bash
+PYTHONPATH=src uv run python -m identity.propagation_kitsu --dry-run   # tout, puis ROLLBACK
+PYTHONPATH=src uv run python -m identity.propagation_kitsu             # écrit
+PYTHONPATH=src uv run python -m identity.controle_tetes                # lecture seule
+```
+
+- **Affiche** : le classement des candidates, les rattachements, l'atteignabilité
+  avant → après ; le rapport complet va sous `rapports/propagation_kitsu_*.md`.
+- **Arrêts** : une entrée déjà rattachée à une autre série, ou un canari (One
+  Piece, Naruto, Death Note, Monster) qui ne se rattache pas → transaction
+  annulée, code de sortie 1. Deux entrées Kitsu pour un identifiant : la série
+  est exclue et listée, on ne choisit pas.
+- **Vérifier** : au rejeu, « rien à écrire — moyeu inchangé », empreinte md5 du
+  moyeu identique avant et après. `controle_tetes` : les 50 séries les plus
+  populaires ont un `kitsu_id`, ou une raison dans
+  `database/donnees/tetes_sans_kitsu_id.csv`.
+- **À dire** : « La cascade avait prouvé sa précision, pas son rappel. Ce
+  contrôle regarde là où un oubli se voit le plus. »
+
 ### 2.3bis Enrichir — les colonnes dérivées, APRÈS la promotion
 
 La promotion écrit ce que les sources disent. L'enrichissement écrit ce qu'on

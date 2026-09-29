@@ -35,6 +35,7 @@ def bdd_reference() -> dict[str, int]:
         "kitsu_bridge_initial": 1_689,
         "llm_review": 980,
         "trgm_auto": 0,
+        "kitsu_propagation": 1_168,
         "human_review_rejected": 1,
         "human_review_rejected_series": [1_428],
         "kitsu_formes_total": 155_003,
@@ -87,6 +88,36 @@ def test_requete_complete_s_execute_sur_le_schema_migre(base):
     assert mesure["collisions_unicite"] == 0
 
 
+def test_une_propagation_reste_comptee_sous_sa_methode_d_identification(base):
+    """La décision `kitsu_propagation` (018) devient courante sans identifier :
+    la série reste comptée sous `exact_author`, et la propagation a sa ligne.
+    La somme de contrôle de la section 2 ne bouge pas (le statut reste auto)."""
+    with psycopg.connect(base, autocommit=True) as cx:
+        cx.execute("INSERT INTO manga.ms_series_enriched (series_id) VALUES (1), (2)")
+        for series_id in (1, 2):
+            cx.execute(
+                "INSERT INTO manga.match_decision "
+                "(series_id, wikidata_qid, method, status) "
+                "VALUES (%s, %s, 'exact_author', 'auto')",
+                (series_id, f"Q{series_id}"),
+            )
+        (source,) = cx.execute(
+            "SELECT decision_id FROM manga.match_decision WHERE series_id = 1"
+        ).fetchone()
+        cx.execute(
+            "INSERT INTO manga.match_decision "
+            "(series_id, wikidata_qid, method, status, details) "
+            "VALUES (1, 'Q1', 'kitsu_propagation', 'auto', %s)",
+            (f'{{"decision_source": {source}}}',),
+        )
+    with psycopg.connect(base) as connexion, connexion.cursor() as cur:
+        mesure = mesurer_bdd(cur)
+    assert mesure["exact_author"] == 2
+    assert mesure["kitsu_propagation"] == 1
+    assert mesure["kitsu_bridge_current"] == 0
+    assert mesure["identites_auto"] == 2
+
+
 def test_echantillon_versionne_confirme_100_decisions_sur_100():
     assert ECHANTILLON.is_file()
     assert mesurer_echantillon() == {
@@ -104,8 +135,7 @@ def test_assemblage_restitue_les_chiffres_et_leurs_ecarts():
     mesure = assembler_mesure(bdd_reference(), mesurer_echantillon(), FORMES_REFERENCE)
     assert mesure["section_2"]["somme_controle"] == 14_670
     assert all(
-        ligne["ecart"] == 0
-        for ligne in mesure["section_2_comparaison"].values()
+        ligne["ecart"] == 0 for ligne in mesure["section_2_comparaison"].values()
     )
     assert mesure["section_6"]["wiki_ja_pct"] == 57.9
     assert mesure["section_6"]["wiki_ja_seul"] == 1_664

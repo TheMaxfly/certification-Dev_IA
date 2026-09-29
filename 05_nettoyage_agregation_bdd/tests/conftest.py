@@ -4,7 +4,9 @@ Garde-fou central, repris du harnais de `database/` : le DSN est fabriqué ici �
 partir du conteneur lancé par le harnais ; une DATABASE_URL présente dans
 l'environnement est ignorée, et l'absence de Docker provoque un skip explicite.
 Les tests ne se rabattent JAMAIS sur une base réelle, et `apimanga` n'est jamais
-atteignable depuis la suite.
+atteignable par ce harnais. Une seule exception, explicite et hors harnais : le
+contrôle permanent des têtes du catalogue (`test_controle_tetes.py`), qui ne
+tourne que si `APIMANGA_DSN` est défini, et en lecture seule.
 
 Les migrations sont jouées par le vrai runner (`database/migrate.py`) : la base
 de test est celle du dépôt, pas une approximation écrite pour les tests.

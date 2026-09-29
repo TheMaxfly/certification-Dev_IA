@@ -118,7 +118,12 @@ def auteurs_ms_normalises(cur) -> list[tuple[int, str]]:
         "SELECT s.series_id, s.series_scenariste, s.series_dessinateur "
         "  FROM manga.ms_series_enriched s "
         "  JOIN manga.v_match_current v ON v.series_id = s.series_id "
-        " WHERE v.method = 'exact_author' AND v.status = 'auto'"
+        "  LEFT JOIN manga.match_decision p "
+        "    ON v.method = 'kitsu_propagation' AND p.decision_id = v.decision_id "
+        "  LEFT JOIN manga.match_decision src "
+        "    ON src.decision_id = (p.details->>'decision_source')::bigint "
+        " WHERE coalesce(src.method, v.method) = 'exact_author' "
+        "   AND v.status = 'auto'"
     )
     lignes: set[tuple[int, str]] = set()
     for series_id, scenariste, dessinateur in cur.fetchall():

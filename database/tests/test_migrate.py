@@ -1392,6 +1392,51 @@ def test_011_refuse_toujours_une_methode_hors_cascade(base_migree):
             )
 
 
+def test_018_ajoute_kitsu_propagation(base_migree):
+    """La propagation du kitsu_id par identifiant est un étage nommé : sa
+    décision porte sa méthode, et désigne sa décision source dans details."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.match_decision (series_id, method, status, details) "
+            "VALUES (1, 'kitsu_propagation', 'auto', %s)",
+            ('{"decision_source": 7, "kitsu_id": 38}',),
+        )
+        connexion.commit()
+
+
+def test_018_conserve_les_methodes_anterieures(base_migree):
+    """Élargir n'est pas remplacer : les dix méthodes de 011 restent valides."""
+    with psycopg.connect(base_migree) as connexion:
+        for methode in (
+            "kitsu_bridge",
+            "exact",
+            "exact_author",
+            "exact_kitsu",
+            "exact_kitsu_author",
+            "trgm",
+            "embedding",
+            "llm_review",
+            "human_review",
+            "manual",
+        ):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, %s, 'auto')",
+                (methode,),
+            )
+        connexion.commit()
+
+
+def test_018_refuse_toujours_une_methode_hors_cascade(base_migree):
+    """MUTATION : le CHECK à onze valeurs doit rester un CHECK."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.match_decision (series_id, method, status) "
+                "VALUES (1, 'kitsu_propagation_bis', 'auto')"
+            )
+
+
 def test_details_est_nul_par_defaut_et_accepte_du_jsonb(base_migree):
     """Les décisions des étages 0 et 1 restent sans details : le journal est
     append-only, on ne rétro-remplit pas."""

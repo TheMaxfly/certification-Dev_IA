@@ -29,10 +29,7 @@ from identity.mesure_formes_auteur import mesurer as mesurer_formes_auteur
 MODULE = Path(__file__).resolve().parents[2]
 REQUETE = Path(__file__).resolve().parent / "sql" / "mesure_couverture_cascade.sql"
 ECHANTILLON = (
-    MODULE
-    / "arbitrage"
-    / "grille_c3_20260721T162953Z"
-    / "echantillon_c3_grille.csv"
+    MODULE / "arbitrage" / "grille_c3_20260721T162953Z" / "echantillon_c3_grille.csv"
 )
 
 HISTORIQUE_SECTION_2 = {
@@ -285,6 +282,7 @@ def assembler_mesure(
             "exact_kitsu_author": bdd["exact_kitsu_author"],
             "llm_review": bdd["llm_review"],
             "trgm_auto": bdd["trgm_auto"],
+            "kitsu_propagation": bdd["kitsu_propagation"],
             "human_review_rejected": bdd["human_review_rejected"],
             "human_review_rejected_series": bdd["human_review_rejected_series"],
             "kitsu_formes": bdd["kitsu_formes_total"],

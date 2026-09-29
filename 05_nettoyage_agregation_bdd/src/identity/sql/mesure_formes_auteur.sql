@@ -7,7 +7,7 @@
 --
 -- CE QUE MESURE CETTE REQUÊTE
 --
---   Dénominateur : les séries dont la décision COURANTE est
+--   Dénominateur : les séries dont la décision d'identification COURANTE est
 --     `method = 'exact_author'` et `status = 'auto'` — celles dont l'identité
 --     existe PARCE QUE le signal auteur a tranché à l'étage 1. Population
 --     persistée dans `v_match_current`, donc rejouable à l'identique.
@@ -48,9 +48,16 @@ WITH ms_auteur AS (
              AS t(series_id, auteur_norm)
 ),
 decidees AS (
+    -- La méthode d'IDENTIFICATION : une décision `kitsu_propagation` (018) ne
+    -- fait que compléter le kitsu_id, on la traverse vers sa décision source.
+    -- Le QID, lui, est recopié par la propagation : v.wikidata_qid vaut.
     SELECT v.series_id, v.wikidata_qid
       FROM manga.v_match_current v
-     WHERE v.method = 'exact_author'
+      LEFT JOIN manga.match_decision p
+        ON v.method = 'kitsu_propagation' AND p.decision_id = v.decision_id
+      LEFT JOIN manga.match_decision src
+        ON src.decision_id = (p.details->>'decision_source')::bigint
+     WHERE coalesce(src.method, v.method) = 'exact_author'
        AND v.status = 'auto'
        AND v.wikidata_qid IS NOT NULL
 ),

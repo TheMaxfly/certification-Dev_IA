@@ -8,6 +8,22 @@ catalogue AS (
     SELECT count(*)::integer AS total
     FROM manga.ms_series_enriched
 ),
+-- La décision d'IDENTIFICATION courante. Une décision `kitsu_propagation`
+-- (018, 2026-09-30) n'identifie pas : elle complète le kitsu_id d'une identité
+-- déjà décidée et désigne sa décision source dans details. On la traverse,
+-- pour que chaque série reste comptée sous la méthode qui l'a identifiée.
+identification_courante AS (
+    SELECT
+        v.series_id,
+        coalesce(src.method, v.method) AS method,
+        v.status,
+        coalesce(src.decision_id, v.decision_id) AS decision_id
+    FROM manga.v_match_current v
+    LEFT JOIN manga.match_decision p
+        ON v.method = 'kitsu_propagation' AND p.decision_id = v.decision_id
+    LEFT JOIN manga.match_decision src
+        ON src.decision_id = (p.details->>'decision_source')::bigint
+),
 decisions_courantes AS (
     SELECT
         count(*) FILTER (WHERE status = 'auto')::integer AS auto,
@@ -40,7 +56,12 @@ decisions_courantes AS (
         array_agg(series_id ORDER BY series_id) FILTER (
             WHERE status = 'rejected' AND method = 'human_review'
         ) AS human_review_rejected_series
+    FROM identification_courante
+),
+propagation AS (
+    SELECT count(*)::integer AS total
     FROM manga.v_match_current
+    WHERE method = 'kitsu_propagation' AND status = 'auto'
 ),
 orphelines AS (
     SELECT count(*)::integer AS total
@@ -68,7 +89,7 @@ strates_llm AS (
         count(*) FILTER (
             WHERE d.details->>'case' = 'promo_llm_same_haute'
         )::integer AS autres
-    FROM manga.v_match_current v
+    FROM identification_courante v
     JOIN manga.match_decision d ON d.decision_id = v.decision_id
     WHERE v.method = 'llm_review' AND v.status = 'auto'
 ),
@@ -327,6 +348,7 @@ SELECT
     ph.total AS kitsu_bridge_initial,
     d.llm_review,
     d.trgm_auto,
+    pr.total AS kitsu_propagation,
     d.human_review_rejected,
     d.human_review_rejected_series,
     kf.total AS kitsu_formes_total,
@@ -358,6 +380,7 @@ FROM catalogue c
 CROSS JOIN decisions_courantes d
 CROSS JOIN orphelines o
 CROSS JOIN pont_historique ph
+CROSS JOIN propagation pr
 CROSS JOIN kitsu_formes kf
 CROSS JOIN strates_llm sl
 CROSS JOIN pivot p

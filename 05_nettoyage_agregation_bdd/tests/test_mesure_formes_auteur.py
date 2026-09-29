@@ -167,5 +167,26 @@ class TestMesure:
         ) == pytest.approx(66.67, abs=0.01)
 
 
+def test_une_propagation_du_kitsu_id_ne_retire_pas_la_serie_du_denominateur(base):
+    """Une décision `kitsu_propagation` (018) devient la décision courante sans
+    identifier : la série reste décidée PAR L'AUTEUR, via sa décision source.
+    Sans la traversée, le dénominateur perdait les séries propagées."""
+    _seed(base)
+    with psycopg.connect(base, autocommit=True) as cx:
+        (source,) = cx.execute(
+            "SELECT decision_id FROM manga.match_decision WHERE series_id = 1"
+        ).fetchone()
+        cx.execute(
+            "INSERT INTO manga.match_decision "
+            "(series_id, wikidata_qid, method, status, details) "
+            "VALUES (1, 'Q1', 'kitsu_propagation', 'auto', %s)",
+            (f'{{"decision_source": {source}}}',),
+        )
+    with psycopg.connect(base) as cx, cx.cursor() as cur:
+        mesure = mesurer(cur)
+    assert mesure["series_decidees"] == 3
+    assert mesure["series_concordantes"] == 3
+
+
 def test_pourcentage_ne_divise_pas_par_zero():
     assert pourcentage(0, 0) == 0.0

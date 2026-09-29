@@ -60,6 +60,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `015_personnages_multisources.sql` | **personnages** multi-sources : tables à noms neutres et colonne `source` obligatoire (Kitsu, puis Wikipédia français), formes typées et indexées, graphie japonaise sur index dédié |
 | `016_jeu_evaluation.sql` | **jeu d'évaluation** du bloc 2, au grain entité : `bench.eval_jeux` / `eval_questions` / `eval_attendus` / `eval_mesures`, sans aucun lien vers `corpus_docs` ; règles tenues par `CHECK`, FK vers le catalogue, déclencheur différé (nombre de séries attendues) et immuabilité d'une version gelée |
 | `017_hors_catalogue_toute_famille.sql` | l'issue `reconnue_hors_catalogue` admise dans **toute famille**, en reconnaissance — la réserve F1/F2 de 016 était trop étroite (un romaji jamais édité relève de F5). Un CHECK remplacé |
+| `018_methode_kitsu_propagation.sql` | `kitsu_propagation` au CHECK des méthodes : l'étage qui propage le `kitsu_id` d'une identité déjà décidée, par ses identifiants MAL / AniList. Une valeur ajoutée, aucune table ni donnée |
 
 ## `000` — la frontière héritage / versionné
 
@@ -92,10 +93,10 @@ son seul emploi légitime, et il est réservé à ce cas.
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
 le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
-`017` le 2026-09-29 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
-exécution. Le contrôle affiche **18 migrations appliquées et 0 en attente**, et
-`outils/fidelite.sh` rend un **diff vide** (1 704 lignes de part et d'autre,
-2026-09-29).
+`017` le 2026-09-29, `018` le 2026-09-30 ; `000` y a été **marquée appliquée**
+le 2026-07-15, sans exécution. Le contrôle affiche **19 migrations appliquées et
+0 en attente**, et `outils/fidelite.sh` rend un **diff vide** (1 704 lignes de
+part et d'autre, 2026-09-30).
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
@@ -550,6 +551,19 @@ Aucune ne porte de pseudonyme en clair, seulement une empreinte (SHA-256 tronqu�
 à 16 caractères). Une entrée qui ne correspond plus à rien arrête le chargement :
 une liste qui dériverait en silence finirait par tolérer ce qu'elle ne décrit
 plus.
+
+## Données de référence — les têtes du catalogue sans `kitsu_id`
+
+`donnees/tetes_sans_kitsu_id.csv` (`series_id,raison,documente_le`) : les
+séries parmi les **50 plus populaires** du catalogue qui n'ont pas de
+`kitsu_id`, chacune avec sa raison. Le contrôle permanent
+(`05_.../src/identity/controle_tetes.py`, et son test sur la base réelle quand
+`APIMANGA_DSN` est défini) échoue sur une tête sans `kitsu_id` ni raison, et sur
+une raison **périmée** — série rattachée depuis, ou sortie des têtes.
+
+**Vide au 2026-09-30** : après la propagation du `kitsu_id` par identifiant
+(`018`), les 50 têtes en ont un. Avant, 19 n'en avaient pas — dont Death Note,
+Naruto et One Piece, les trois premières.
 
 ## Données de référence — le référentiel de genres (`013`)
 
