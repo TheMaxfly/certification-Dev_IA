@@ -118,6 +118,39 @@ def test_une_propagation_reste_comptee_sous_sa_methode_d_identification(base):
     assert mesure["identites_auto"] == 2
 
 
+def test_un_arbitrage_valide_derive_reste_compte_sous_sa_source(base):
+    """Un arbitrage humain d'entrée Kitsu (`human_review` / `validated`) est une
+    décision dérivée : la série reste comptée sous `llm_review` / `auto`, et la
+    somme de contrôle de la section 2 — qui ignore `validated` — tient."""
+    with psycopg.connect(base, autocommit=True) as cx:
+        cx.execute("INSERT INTO manga.ms_series_enriched (series_id) VALUES (1)")
+        (source,) = cx.execute(
+            "INSERT INTO manga.match_decision "
+            "(series_id, wikidata_qid, method, status, details) "
+            "VALUES (1, 'Q1', 'llm_review', 'auto', "
+            '\'{"case": "promo_llm_same_haute"}\') RETURNING decision_id'
+        ).fetchone()
+        cx.execute(
+            "INSERT INTO manga.match_decision "
+            "(series_id, wikidata_qid, method, status, decided_by, details) "
+            "VALUES (1, 'Q1', 'human_review', 'validated', 'human', %s)",
+            (f'{{"decision_source": {source}, "kitsu_id": 10}}',),
+        )
+    with psycopg.connect(base) as connexion, connexion.cursor() as cur:
+        mesure = mesurer_bdd(cur)
+    assert mesure["identites_auto"] == 1
+    assert mesure["llm_review"] == 1
+    assert mesure["llm_autres"] == 1
+    assert mesure["human_review_rejected"] == 0
+    assert (
+        mesure["identites_auto"]
+        + mesure["needs_review"]
+        + mesure["orphelines"]
+        + mesure["rejected"]
+        == mesure["catalogue_total"]
+    )
+
+
 def test_echantillon_versionne_confirme_100_decisions_sur_100():
     assert ECHANTILLON.is_file()
     assert mesurer_echantillon() == {

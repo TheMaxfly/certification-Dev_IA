@@ -8,19 +8,20 @@ catalogue AS (
     SELECT count(*)::integer AS total
     FROM manga.ms_series_enriched
 ),
--- La décision d'IDENTIFICATION courante. Une décision `kitsu_propagation`
--- (018, 2026-09-30) n'identifie pas : elle complète le kitsu_id d'une identité
--- déjà décidée et désigne sa décision source dans details. On la traverse,
--- pour que chaque série reste comptée sous la méthode qui l'a identifiée.
+-- La décision d'IDENTIFICATION courante. Une décision DÉRIVÉE n'identifie
+-- pas : elle complète le kitsu_id d'une identité déjà décidée — propagation
+-- (`kitsu_propagation`, 018) ou arbitrage humain entre plusieurs entrées Kitsu
+-- (`human_review` validé) — et désigne sa décision source dans
+-- `details.decision_source`. On suit ce lien, méthode ET statut, pour que
+-- chaque série reste comptée sous la décision qui l'a identifiée.
 identification_courante AS (
     SELECT
         v.series_id,
         coalesce(src.method, v.method) AS method,
-        v.status,
+        coalesce(src.status, v.status) AS status,
         coalesce(src.decision_id, v.decision_id) AS decision_id
     FROM manga.v_match_current v
-    LEFT JOIN manga.match_decision p
-        ON v.method = 'kitsu_propagation' AND p.decision_id = v.decision_id
+    JOIN manga.match_decision p ON p.decision_id = v.decision_id
     LEFT JOIN manga.match_decision src
         ON src.decision_id = (p.details->>'decision_source')::bigint
 ),
