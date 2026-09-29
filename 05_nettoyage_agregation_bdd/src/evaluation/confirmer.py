@@ -79,6 +79,7 @@ class Resolution:
     statut: str  # confirmee | ambigue | introuvable | a_revoir
     lignes: list[Attendu]
     detail: str = ""
+    signalements: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -88,6 +89,7 @@ class Bilan:
     series: dict[int, str] = field(default_factory=dict)  # series_id → grade
     motifs: list[str] = field(default_factory=list)
     recouvrement: float | None = None
+    signalements: list[str] = field(default_factory=list)
 
 
 def _ligne_seule(a: Attendu, statut: str, detail: str) -> Attendu:
@@ -189,6 +191,12 @@ def resoudre(
         if rattaches:
             detail = f"rattachée au catalogue par la cascade ({rattaches})"
             return Resolution("a_revoir", [_ligne_seule(a, "a_revoir", detail)], detail)
+        bloquants, signalements = cat.verifier_absence(cx, catalogue, kitsu)
+        if bloquants:
+            detail = "au catalogue : " + " ; ".join(bloquants)
+            return Resolution(
+                "a_revoir", [_ligne_seule(a, "a_revoir", detail)], detail, signalements
+            )
         return Resolution(
             "confirmee",
             [
@@ -196,6 +204,7 @@ def resoudre(
                     a, "hors_catalogue_confirmee", f"Kitsu, {len(kitsu)} œuvre(s)"
                 )
             ],
+            signalements=signalements,
         )
     if "kitsu_staff" not in cat.presences_hors_catalogue(cx, "auteur", valeur):
         detail = "auteur inconnu de Kitsu"
@@ -239,6 +248,7 @@ def confirmer(
                     f"« {reponse} » : grades contradictoires {sorted(grades)}"
                 )
             r = resoudre(q, lignes[0], catalogue, cx, jeu)
+            b.signalements += [f"« {reponse} » : {x}" for x in r.signalements]
             sortie += r.lignes
             if r.statut == "introuvable":
                 b.motifs.append(
@@ -358,6 +368,17 @@ def ecrire_rapport(
         L += [
             f"- **{b.question.question_id}** ({b.statut}) — {'; '.join(b.motifs)}"
             for b in motifs
+        ]
+    avec_signalements = [b for b in bilans if b.signalements]
+    if avec_signalements:
+        L += [
+            "",
+            "## Signalements (hors catalogue) — à juger, non bloquants",
+            "",
+        ]
+        L += [
+            f"- **{b.question.question_id}** — {'; '.join(b.signalements)}"
+            for b in avec_signalements
         ]
     if signales:
         L += [

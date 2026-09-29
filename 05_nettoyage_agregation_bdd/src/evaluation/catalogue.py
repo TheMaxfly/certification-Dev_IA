@@ -149,3 +149,77 @@ def presences_hors_catalogue(
         for nom, sql in requetes
         if cx.execute(sql + " LIMIT 1", (norme,)).fetchone() is not None
     ]
+
+
+def verifier_absence(
+    cx: psycopg.Connection, catalogue: Catalogue, kitsu_ids: list[int]
+) -> tuple[list[str], list[str]]:
+    """Une œuvre Kitsu est-elle vraiment hors du catalogue ? (2026-09-29)
+
+    Rend (bloquants, signalements). BLOQUANT — l'œuvre est au catalogue :
+      - un de SES titres Kitsu (canonique, variantes, abrégés) égale un titre
+        ou un alias du catalogue — pas seulement le titre écrit ;
+      - un de ses identifiants MAL / AniList (correspondances Kitsu) égale
+        celui d'une série identifiée par la cascade. Motif : 1 168 séries du
+        catalogue ont un kitsu_id déductible ainsi, que la cascade n'a pas
+        propagé — One Piece, Naruto, Death Note, Monster en sont.
+    SIGNALEMENT — à juger, pas à trancher mécaniquement :
+      - le catalogue porte des séries du même auteur (un titre français
+        différent échappe à l'égalité de titres : « Rurouni Kenshin » est au
+        catalogue sous « Kenshin le vagabond ») ;
+      - Kitsu ne connaît aucun auteur : l'absence n'est pas vérifiable par là.
+    Tout par égalité stricte ; ne lit que `manga`.
+    """
+    bloquants: list[str] = []
+    for forme, forme_norm in cx.execute(
+        "SELECT DISTINCT forme, forme_norm FROM manga.kitsu_formes"
+        " WHERE kitsu_id = ANY(%s) ORDER BY forme",
+        (kitsu_ids,),
+    ):
+        ids = sorted(catalogue._formes.get(forme_norm, {}))
+        if ids:
+            bloquants.append(f"titre Kitsu « {forme} » = titre du catalogue {ids}")
+    for series_id, site in cx.execute(
+        "SELECT DISTINCT w.series_id, m.external_site"
+        " FROM manga.kitsu_mappings m JOIN manga.work_identity w"
+        "   ON (m.external_site = 'myanimelist/manga' AND w.mal_id = m.external_id)"
+        "   OR (m.external_site = 'anilist/manga' AND w.anilist_id = m.external_id)"
+        " WHERE m.kitsu_id = ANY(%s) AND w.series_id IS NOT NULL ORDER BY 1, 2",
+        (kitsu_ids,),
+    ):
+        titre = catalogue.series.get(series_id)
+        bloquants.append(
+            f"par identifiant {site} : série {series_id}"
+            f" « {titre.titre if titre else '?'} »"
+        )
+    signalements: list[str] = []
+    noms = [
+        p
+        for (p,) in cx.execute(
+            "SELECT DISTINCT personne FROM manga.kitsu_staff"
+            " WHERE kitsu_id = ANY(%s) ORDER BY 1",
+            (kitsu_ids,),
+        )
+    ]
+    if not noms:
+        signalements.append(
+            "aucun auteur au staff Kitsu : absence non vérifiable par l'auteur"
+        )
+    else:
+        meme = sorted(
+            {
+                (i, catalogue.series[i].titre)
+                for n in noms
+                for i in catalogue.par_auteur(n)
+            },
+            key=lambda x: (x[1] or "", x[0]),
+        )
+        if meme:
+            apercu = " ; ".join(t for _, t in meme[:5]) + (
+                " …" if len(meme) > 5 else ""
+            )
+            signalements.append(
+                f"même auteur au catalogue ({', '.join(noms)}) : "
+                f"{len(meme)} série(s) — {apercu}"
+            )
+    return list(dict.fromkeys(bloquants)), signalements

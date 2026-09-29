@@ -9,6 +9,7 @@ vérification qui le trouverait aurait biaisé le jeu en faveur du bras lexical.
 from __future__ import annotations
 
 import csv
+import json
 import re
 import sys
 from pathlib import Path
@@ -523,3 +524,94 @@ def test_recherche_par_auteur_stricte(base_catalogue):
     ]
     assert auteur.lister(c, "Naoki Urasaw") == []  # pas de recherche floue
     assert auteur.lister(c, "Takashi Nagasaki")[0][2] == "scenariste"
+
+
+# --------------------------------------------------------------------------- #
+#  Hors catalogue renforcé : tous les titres Kitsu, identifiants, auteurs
+# --------------------------------------------------------------------------- #
+
+
+def oeuvre_kitsu(dsn, kitsu_id, formes, staff=(), mal=None):
+    with psycopg.connect(dsn) as cx:
+        for forme in formes:
+            cx.execute(
+                "INSERT INTO manga.kitsu_formes (kitsu_id, forme, forme_norm,"
+                " forme_type, subtype) VALUES (%s, %s, %s, 'title', 'manga')",
+                (kitsu_id, forme, normaliser(forme)),
+            )
+        for personne in staff:
+            cx.execute(
+                "INSERT INTO manga.kitsu_staff (kitsu_id, personne, personne_norm)"
+                " VALUES (%s, %s, %s)",
+                (kitsu_id, personne, normaliser(personne)),
+            )
+        if mal:
+            cx.execute(
+                "INSERT INTO manga.kitsu_mappings (kitsu_id, external_site,"
+                " external_id) VALUES (%s, 'myanimelist/manga', %s)",
+                (kitsu_id, mal),
+            )
+
+
+def hors_catalogue(dsn, tmp_path, reponse):
+    d = jeu(
+        tmp_path,
+        [question("Q001", famille="F5", issue="reconnue_hors_catalogue")],
+        [attendu("Q001", reponse, "")],
+    )
+    return bilans(dsn, d)[1]["Q001"]
+
+
+def test_un_autre_titre_kitsu_au_catalogue_bloque(base_catalogue, tmp_path):
+    oeuvre_kitsu(base_catalogue, 905, ["Astro Boy", "Berserk"], ["Quelqu'un"])
+    b = hors_catalogue(base_catalogue, tmp_path, "titre: Astro Boy")
+    assert b.statut == "a_revoir"
+    assert "titre Kitsu « Berserk »" in " ".join(b.motifs)
+
+
+def test_un_identifiant_qui_mene_au_catalogue_bloque(base_catalogue, tmp_path):
+    oeuvre_kitsu(base_catalogue, 906, ["Pluton"], ["Quelqu'un"], mal="777")
+    with psycopg.connect(base_catalogue) as cx:
+        cx.execute(
+            "INSERT INTO manga.work_identity (series_id, mal_id) VALUES (4, '777')"
+        )
+    b = hors_catalogue(base_catalogue, tmp_path, "titre: Pluton")
+    assert b.statut == "a_revoir"
+    assert "par identifiant myanimelist/manga : série 4 « Pluto »" in " ".join(b.motifs)
+
+
+def test_meme_auteur_signale_sans_bloquer(base_catalogue, tmp_path):
+    oeuvre_kitsu(base_catalogue, 907, ["Oeuvre Inedite"], ["Kentaro MIURA"])
+    b = hors_catalogue(base_catalogue, tmp_path, "titre: Oeuvre Inedite")
+    assert b.statut == "confirmee"
+    assert "même auteur au catalogue" in " ".join(b.signalements)
+    assert "Berserk" in " ".join(b.signalements)
+
+
+def test_auteur_inconnu_signale(base_catalogue, tmp_path):
+    oeuvre_kitsu(base_catalogue, 908, ["Sans Auteur"])
+    b = hors_catalogue(base_catalogue, tmp_path, "titre: Sans Auteur")
+    assert b.statut == "confirmee"
+    assert "aucun auteur au staff Kitsu" in " ".join(b.signalements)
+
+
+def test_liste_des_hors_catalogue(base_catalogue):
+    from evaluation import hors_catalogue as hc
+
+    oeuvre_kitsu(base_catalogue, 905, ["Astro Boy", "Berserk"])
+    oeuvre_kitsu(base_catalogue, 908, ["Sans Auteur"])
+    with psycopg.connect(base_catalogue) as cx:
+        for kid, rang in ((905, 1), (908, 2)):
+            cx.execute(
+                "INSERT INTO bench.corpus_docs (doc_key, source, kitsu_id, doc_text,"
+                " metadata_json, title) VALUES (%s, 'kitsu_synopsis', %s, 'texte',"
+                " %s, 't')",
+                (
+                    f"kitsu:{kid}",
+                    kid,
+                    json.dumps({"popularity_rank": rang, "subtype": "manga"}),
+                ),
+            )
+        retenues, ecartees = hc.lister(cx, 5)
+    assert [r[1] for r in retenues] == [908]
+    assert ecartees["titre"] == 1
