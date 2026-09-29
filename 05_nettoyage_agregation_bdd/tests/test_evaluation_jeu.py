@@ -76,7 +76,14 @@ def test_une_question_coherente_passe():
             "F7",
         ),
         ({"mode": "refus", "famille": "F3", "issue_attendue": "inconnue"}, "F7"),
-        ({"famille": "F3", "issue_attendue": "reconnue_hors_catalogue"}, "F1 ou F2"),
+        (
+            {
+                "famille": "F3",
+                "mode": "proposition",
+                "issue_attendue": "reconnue_hors_catalogue",
+            },
+            "reconnaissance",
+        ),
         ({"origine": "decembre"}, "origine_query_id"),
         ({"origine_query_id": "12"}, "origine_query_id"),
         ({"question_id": "F3-01"}, "Q001"),
@@ -199,3 +206,112 @@ def test_regle_admise_a_la_lecture(tmp_path):
         [["Q001", "regle: Q001", "1", "", "", ""]],
     )
     assert len(lire_attendus(chemin, [q(famille="F9", mode="proposition")])) == 1
+
+
+# --------------------------------------------------------------------------- #
+#  Le format source : un seul CSV écrit à la main (v1)
+# --------------------------------------------------------------------------- #
+
+from evaluation.jeu import COLONNES_SOURCE, analyser_source  # noqa: E402
+
+
+def source(tmp_path, lignes):
+    return ecrire(tmp_path / "jeu_evaluation_recherche.csv", COLONNES_SOURCE, lignes)
+
+
+def ligne_source(qid="Q001", **champs):
+    base = {
+        "id": qid,
+        "texte": "t",
+        "mode": "reconnaissance",
+        "famille": "F1",
+        "issue_attendue": "au_catalogue",
+        "series_attendues": "Berserk",
+        "grade": "",
+        "origine": "nouvelle",
+        "note": "n",
+        "cle_confirmation": "",
+    }
+    base.update(champs)
+    return [base[c] for c in COLONNES_SOURCE]
+
+
+def test_source_titres_grades_cles_et_regles(tmp_path):
+    chemin = source(
+        tmp_path,
+        [
+            ligne_source(
+                "Q001",
+                series_attendues="Monster",
+                cle_confirmation="Monster => auteur: Naoki Urasawa",
+            ),
+            ligne_source(
+                "Q002",
+                mode="proposition",
+                series_attendues="In/Spectre | Akira",
+                grade="In/Spectre: tres_pertinent | Akira: pertinent",
+            ),
+            ligne_source(
+                "Q003",
+                mode="proposition",
+                famille="F9",
+                series_attendues="règle : shonen",
+                grade="par règle",
+            ),
+            ligne_source(
+                "Q004",
+                mode="refus",
+                famille="F7",
+                issue_attendue="inconnue",
+                series_attendues="",
+            ),
+            ligne_source(
+                "Q005",
+                famille="F2",
+                issue_attendue="reconnue_hors_catalogue",
+                series_attendues="Oishinbo",
+            ),
+        ],
+    )
+    questions, attendus, erreurs = analyser_source(chemin)
+    assert erreurs == [] and len(questions) == 5
+    assert [(a.question_id, a.reponse_ecrite, a.grade) for a in attendus] == [
+        ("Q001", "titre: Monster ; auteur: Naoki Urasawa", "2"),
+        ("Q002", "titre: In/Spectre", "2"),
+        ("Q002", "titre: Akira", "1"),
+        ("Q003", "regle: Q003", "1"),
+        ("Q005", "titre: Oishinbo", ""),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("champs", "motif"),
+    [
+        (
+            {"grade": "Berserk: pertinent (parodique)", "mode": "proposition"},
+            "grade inconnu",
+        ),
+        ({"cle_confirmation": "Akira => auteur: Otomo"}, "sans titre attendu"),
+        ({"cle_confirmation": "Berserk -> Miura"}, "illisible"),
+        (
+            {"mode": "refus", "famille": "F7", "issue_attendue": "inconnue"},
+            "n'attend aucune",
+        ),
+        (
+            {"grade": "par règle", "famille": "F9", "mode": "proposition"},
+            "sans règle écrite",
+        ),
+        (
+            {
+                "famille": "F5",
+                "mode": "proposition",
+                "issue_attendue": "reconnue_hors_catalogue",
+            },
+            "reconnaissance",
+        ),
+    ],
+)
+def test_source_erreurs_rattachees_a_leur_question(tmp_path, champs, motif):
+    _, _, erreurs = analyser_source(source(tmp_path, [ligne_source(**champs)]))
+    assert erreurs and all(qid == "Q001" for qid, _ in erreurs)
+    assert any(motif in m for _, m in erreurs)

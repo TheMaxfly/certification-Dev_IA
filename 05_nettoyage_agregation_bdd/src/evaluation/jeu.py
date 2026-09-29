@@ -123,10 +123,9 @@ def controler_question(q: Question) -> list[str]:
         (q.famille == "F7") == (q.mode == "refus") == (q.issue_attendue == "inconnue")
     ):
         e.append("F7, refus et inconnue vont ensemble, et seulement ensemble")
-    if q.issue_attendue == "reconnue_hors_catalogue" and not (
-        q.famille in ("F1", "F2") and q.mode == "reconnaissance"
-    ):
-        e.append("reconnue_hors_catalogue exige F1 ou F2, en reconnaissance")
+    # Toute famille, en reconnaissance (017, 2026-09-29 — E7 était trop étroite).
+    if q.issue_attendue == "reconnue_hors_catalogue" and q.mode != "reconnaissance":
+        e.append("reconnue_hors_catalogue exige le mode reconnaissance")
     if (q.origine == "decembre") != bool(q.origine_query_id):
         e.append("origine_query_id renseigné si et seulement si origine = decembre")
     if q.origine_query_id and not q.origine_query_id.isdigit():
@@ -194,3 +193,131 @@ def ecrire_attendus(chemin: Path, attendus: list[Attendu]) -> None:
         w.writerow(COLONNES_ATTENDUS)
         for a in attendus:
             w.writerow([getattr(a, c) for c in COLONNES_ATTENDUS])
+
+
+# --------------------------------------------------------------------------- #
+#  Le format source du jeu : un seul CSV, écrit à la main (v1, 2026-09-29)
+# --------------------------------------------------------------------------- #
+
+FICHIER_SOURCE = "jeu_evaluation_recherche.csv"
+COLONNES_SOURCE = [
+    "id",
+    "texte",
+    "mode",
+    "famille",
+    "issue_attendue",
+    "series_attendues",
+    "grade",
+    "origine",
+    "note",
+    "cle_confirmation",
+]
+#: Séparateur des listes (séries, grades, clés). « / » a été abandonné : il
+#: coupait « In/Spectre » en deux séries.
+SEPARATEUR = "|"
+GRADES = {"tres_pertinent": "2", "pertinent": "1"}
+GRADE_REGLE = "par règle"
+#: Clé de confirmation d'un titre : « Monster => auteur: Naoki Urasawa ».
+CLE = re.compile(r"^(.+?)\s*=>\s*(auteur\s*:\s*\S.*)$", re.IGNORECASE)
+
+
+def _liste(champ: str) -> list[str]:
+    return [x.strip() for x in champ.split(SEPARATEUR)] if champ.strip() else []
+
+
+def analyser_source(
+    chemin: Path,
+) -> tuple[list[Question], list[Attendu], list[tuple[str, str]]]:
+    """Le CSV source → questions, réponses écrites, et erreurs par question.
+
+    Ne lève pas : un diagnostic doit lister TOUTES les erreurs, et confirmer au
+    catalogue ce qui peut l'être. `lire_source` est la version stricte.
+
+    Chaque titre attendu devient une réponse `titre: …` — suivie de sa clé de
+    confirmation (`; auteur: …`) si `cle_confirmation` en donne une. Grade
+    `tres_pertinent` → 2, `pertinent` → 1 ; un titre sans grade vaut 2 (la
+    bonne réponse d'une reconnaissance). `par règle` → `regle: <id>`, grade 1 :
+    un grade uniforme, que le nDCG normalise.
+    """
+    erreurs: list[tuple[str, str]] = []
+    questions: list[Question] = []
+    attendus: list[Attendu] = []
+    vus: set[str] = set()
+    for n, ligne in enumerate(_lire(chemin, COLONNES_SOURCE), start=2):
+        q = Question(
+            question_id=ligne["id"],
+            texte=ligne["texte"],
+            mode=ligne["mode"],
+            famille=ligne["famille"],
+            issue_attendue=ligne["issue_attendue"],
+            origine=ligne["origine"],
+            origine_query_id="",
+            note=ligne["note"],
+        )
+        ou = f"{chemin.name}:{n} {q.question_id}"
+        erreurs += [(q.question_id, f"{ou} — {m}") for m in controler_question(q)]
+        if q.question_id in vus:
+            erreurs.append((q.question_id, f"{ou} — identifiant en double"))
+        vus.add(q.question_id)
+        questions.append(q)
+
+        series, grade = ligne["series_attendues"], ligne["grade"]
+        if grade == GRADE_REGLE:
+            if not series.lower().startswith("règle"):
+                erreurs.append(
+                    (q.question_id, f"{ou} — grade « par règle » sans règle écrite")
+                )
+            attendus.append(Attendu(q.question_id, f"regle: {q.question_id}", "1"))
+            continue
+        titres = _liste(series)
+        if q.issue_attendue == "inconnue":
+            if titres:
+                erreurs.append(
+                    (q.question_id, f"{ou} — une issue inconnue n'attend aucune série")
+                )
+            continue
+        if not titres:
+            erreurs.append((q.question_id, f"{ou} — aucune série attendue"))
+            continue
+        grades: dict[str, str] = {}
+        for morceau in _liste(grade):
+            titre, _, libelle = morceau.rpartition(":")
+            if libelle.strip() not in GRADES:
+                erreurs.append((q.question_id, f"{ou} — grade inconnu « {morceau} »"))
+            grades[titre.strip()] = GRADES.get(libelle.strip(), "")
+        cles: dict[str, str] = {}
+        for morceau in _liste(ligne["cle_confirmation"]):
+            m = CLE.match(morceau)
+            if not m:
+                erreurs.append(
+                    (
+                        q.question_id,
+                        f"{ou} — clé de confirmation illisible « {morceau} »",
+                    )
+                )
+                continue
+            cles[m[1].strip()] = m[2].strip()
+        for orphelin in (set(grades) | set(cles)) - set(titres):
+            erreurs.append(
+                (
+                    q.question_id,
+                    f"{ou} — « {orphelin} » : grade ou clé sans titre attendu",
+                )
+            )
+        for titre in titres:
+            reponse = f"titre: {titre}" + (f" ; {cles[titre]}" if titre in cles else "")
+            if q.issue_attendue != "au_catalogue":
+                attendus.append(Attendu(q.question_id, reponse, ""))
+            elif grades and titre not in grades:
+                erreurs.append((q.question_id, f"{ou} — « {titre} » sans grade"))
+            else:
+                attendus.append(Attendu(q.question_id, reponse, grades.get(titre, "2")))
+    return questions, attendus, erreurs
+
+
+def lire_source(chemin: Path) -> tuple[list[Question], list[Attendu]]:
+    """Version stricte : lève `JeuInvalide` à la première passe s'il y a erreur."""
+    questions, attendus, erreurs = analyser_source(chemin)
+    if erreurs:
+        raise JeuInvalide([m for _, m in erreurs])
+    return questions, attendus

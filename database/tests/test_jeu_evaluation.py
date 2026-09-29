@@ -102,7 +102,6 @@ def test_aucun_lien_vers_le_corpus(base_migree):
         (question(mode="reconnaissance", famille="F7", issue="inconnue"), "f7"),
         (question(mode="refus", famille="F7", issue="au_catalogue"), "f7"),
         (question(mode="refus", famille="F3", issue="inconnue"), "f7"),
-        (question(famille="F3", issue="reconnue_hors_catalogue"), "hors_catalogue"),
         (
             question(mode="proposition", issue="reconnue_hors_catalogue"),
             "hors_catalogue",
@@ -142,6 +141,12 @@ def test_nombre_d_attendus_controle_a_la_validation(base_migree, q, attendus, me
         poser(base_migree, [q], attendus)
     with psycopg.connect(base_migree) as cx:
         assert cx.execute("SELECT count(*) FROM bench.eval_jeux").fetchone() == (0,)
+
+
+@pytest.mark.parametrize("famille", ["F2", "F5", "F6"])
+def test_hors_catalogue_admis_dans_toute_famille(base_migree, famille):
+    """017 : E7 était trop étroite — un romaji jamais édité est un cas F5."""
+    poser(base_migree, [question(famille=famille, issue="reconnue_hors_catalogue")], [])
 
 
 def test_serie_hors_catalogue_refusee(base_migree):

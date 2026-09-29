@@ -428,3 +428,98 @@ def test_regle_absente(base_catalogue, tmp_path):
     _, bilans = confirmer.executer(base_catalogue, d)
     assert bilans[0].statut == "a_revoir"
     assert "introuvable" in " ".join(bilans[0].motifs)
+
+
+# --------------------------------------------------------------------------- #
+#  Clé combinée titre + auteur, et diagnostic du format source
+# --------------------------------------------------------------------------- #
+
+
+def test_titre_ambigu_leve_par_l_auteur(base_catalogue, tmp_path):
+    with psycopg.connect(base_catalogue) as cx:
+        cx.execute(
+            "INSERT INTO manga.ms_series_enriched (series_id, series_title,"
+            " series_dessinateur, series_scenariste)"
+            " VALUES (7, 'Monster', 'Autre AUTEUR', 'Autre AUTEUR')"
+        )
+    d = jeu(
+        tmp_path, [question("Q001", famille="F8")], [attendu("Q001", "titre: Monster")]
+    )
+    _, b = bilans(base_catalogue, d)
+    assert b["Q001"].statut == "a_revoir"
+    d = jeu(
+        tmp_path,
+        [question("Q001", famille="F8")],
+        [attendu("Q001", "titre: Monster ; auteur: Naoki Urasawa")],
+    )
+    sortie, b = bilans(base_catalogue, d)
+    assert b["Q001"].statut == "confirmee" and b["Q001"].series == {2: "2"}
+    assert sortie[0].confirmation == "titre+auteur:title+auteur"
+
+
+def test_diagnostic_source_liste_tout(base_catalogue, tmp_path):
+    from evaluation.jeu import COLONNES_SOURCE
+
+    lignes = [
+        [
+            "Q001",
+            "t",
+            "reconnaissance",
+            "F1",
+            "au_catalogue",
+            "Berserk",
+            "",
+            "nouvelle",
+            "n",
+            "",
+        ],
+        [
+            "Q002",
+            "t",
+            "proposition",
+            "F5",
+            "reconnue_hors_catalogue",
+            "Berserk",
+            "",
+            "nouvelle",
+            "n",
+            "",
+        ],
+        [
+            "Q003",
+            "t",
+            "reconnaissance",
+            "F1",
+            "au_catalogue",
+            "Bersek",
+            "",
+            "nouvelle",
+            "n",
+            "",
+        ],
+    ]
+    with (tmp_path / "jeu_evaluation_recherche.csv").open(
+        "w", encoding="utf-8", newline=""
+    ) as f:
+        w = csv.writer(f)
+        w.writerow(COLONNES_SOURCE)
+        w.writerows(lignes)
+    _, b = confirmer.executer(base_catalogue, tmp_path)
+    statuts = {x.question.question_id: x.statut for x in b}
+    assert statuts == {"Q001": "confirmee", "Q002": "invalide", "Q003": "de_cote"}
+    motifs = " ".join(b[1].motifs)
+    assert "reconnaissance" in motifs and "présente au catalogue" in motifs
+
+
+def test_recherche_par_auteur_stricte(base_catalogue):
+    from evaluation import auteur
+
+    with psycopg.connect(base_catalogue) as cx:
+        c = catalogue.Catalogue.charger(cx)
+    assert [(i, t) for i, t, _ in auteur.lister(c, "naoki urasawa")] == [
+        (3, "20th Century Boys"),
+        (2, "Monster"),
+        (4, "Pluto"),
+    ]
+    assert auteur.lister(c, "Naoki Urasaw") == []  # pas de recherche floue
+    assert auteur.lister(c, "Takashi Nagasaki")[0][2] == "scenariste"

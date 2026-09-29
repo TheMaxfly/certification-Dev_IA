@@ -59,6 +59,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `014_hierarchie_genres.sql` | `genre_ref.type` (genre \| format) et `genre_ref.parent` — FK **DEFERRABLE**, auto-référencée : c'est l'état à la validation qui doit être correct, pas l'ordre d'écriture |
 | `015_personnages_multisources.sql` | **personnages** multi-sources : tables à noms neutres et colonne `source` obligatoire (Kitsu, puis Wikipédia français), formes typées et indexées, graphie japonaise sur index dédié |
 | `016_jeu_evaluation.sql` | **jeu d'évaluation** du bloc 2, au grain entité : `bench.eval_jeux` / `eval_questions` / `eval_attendus` / `eval_mesures`, sans aucun lien vers `corpus_docs` ; règles tenues par `CHECK`, FK vers le catalogue, déclencheur différé (nombre de séries attendues) et immuabilité d'une version gelée |
+| `017_hors_catalogue_toute_famille.sql` | l'issue `reconnue_hors_catalogue` admise dans **toute famille**, en reconnaissance — la réserve F1/F2 de 016 était trop étroite (un romaji jamais édité relève de F5). Un CHECK remplacé |
 
 ## `000` — la frontière héritage / versionné
 
@@ -90,9 +91,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
-le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` le
-2026-09-29 ; `000` y a été **marquée appliquée** le 2026-07-15, sans exécution.
-Le contrôle affiche **17 migrations appliquées et 0 en attente**, et
+le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
+`017` le 2026-09-29 ; `000` y a été **marquée appliquée** le 2026-07-15, sans
+exécution. Le contrôle affiche **18 migrations appliquées et 0 en attente**, et
 `outils/fidelite.sh` rend un **diff vide** (1 704 lignes de part et d'autre,
 2026-09-29).
 

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
@@ -40,9 +41,11 @@ import typer
 from evaluation import catalogue as cat
 from evaluation import regles
 from evaluation.jeu import (
+    FICHIER_SOURCE,
     Attendu,
     JeuInvalide,
     Question,
+    analyser_source,
     ecrire_attendus,
     lire_attendus,
     lire_questions,
@@ -61,6 +64,10 @@ MOTS_VIDES = frozenset(
     "les des une dans pour avec sur par qui que est son ses aux the and".split()
     + ["manga", "mangas"]
 )
+
+#: Clé combinée : « titre: Monster ; auteur: Naoki Urasawa » — les séries qui
+#: portent ce titre ET cet auteur. Deux égalités strictes, jamais une recherche.
+COMBINEE = re.compile(r"^(.*?)\s*;\s*auteur\s*:\s*(\S.*)$", re.IGNORECASE)
 
 app = typer.Typer(add_completion=False, help=__doc__)
 
@@ -120,17 +127,33 @@ def resoudre(
             if s is None:
                 return Resolution("introuvable", [_ligne_seule(a, "introuvable", "id")])
             return Resolution("confirmee", [a.completer(s.series_id, s.titre, "id")])
-        trouves = (
-            catalogue.par_titre(valeur)
-            if voie == "titre"
-            else catalogue.par_auteur(valeur)
-        )
+        combinee = COMBINEE.match(valeur) if voie == "titre" else None
+        if combinee:
+            titre, auteur = combinee.groups()
+            de_l_auteur = catalogue.par_auteur(auteur)
+            trouves = {
+                i: f"{forme}+auteur"
+                for i, forme in catalogue.par_titre(titre).items()
+                if i in de_l_auteur
+            }
+            voie = "titre+auteur"
+        else:
+            trouves = (
+                catalogue.par_titre(valeur)
+                if voie == "titre"
+                else catalogue.par_auteur(valeur)
+            )
         if not trouves:
             return Resolution("introuvable", [_ligne_seule(a, "introuvable", voie)])
-        if len(trouves) > 1 and (voie == "titre" or q.mode == "reconnaissance"):
+        if len(trouves) > 1 and (voie != "auteur" or q.mode == "reconnaissance"):
             ids = " | ".join(str(i) for i in sorted(trouves))
+            candidats = " ; ".join(
+                f"{i} « {catalogue.series[i].titre} » "
+                f"({catalogue.series[i].dessinateur or '?'})"
+                for i in sorted(trouves)
+            )
             return Resolution(
-                "ambigue", [_ligne_seule(a, "ambigue", ids)], f"{voie} → {ids}"
+                "ambigue", [_ligne_seule(a, "ambigue", ids)], f"{voie} → {candidats}"
             )
         return Resolution(
             "confirmee",
@@ -279,8 +302,11 @@ def ecrire_rapport(
         "",
         f"Horodatage `{horodatage}` · jeu `{lieu}`",
         "",
-        f"- `questions.csv` sha256 `{empreinte(jeu / 'questions.csv')}`",
-        f"- `attendus.csv` sha256 `{empreinte(jeu / 'attendus.csv')}` (avant écriture)",
+        *[
+            f"- `{f.name}` sha256 `{empreinte(f)}`"
+            for f in sorted(jeu.iterdir())
+            if f.is_file() and f.suffix in (".csv", ".txt")
+        ],
         *[
             f"- `regles/{r.name}` sha256 `{empreinte(r)}`"
             for r in sorted((jeu / "regles").glob("*.sql"))
@@ -294,7 +320,7 @@ def ecrire_rapport(
         "|---|---:|",
         *[
             f"| {s} | {statuts.get(s, 0)} |"
-            for s in ("confirmee", "a_revoir", "de_cote")
+            for s in ("confirmee", "a_revoir", "de_cote", "invalide")
         ],
         "",
         "## Effectifs (contrôle §8.3 : ≥ 5 par famille, ≥ 20 par mode hors refus)",
@@ -356,12 +382,26 @@ def ecrire_rapport(
 
 def executer(url: str, jeu: Path) -> tuple[list[Attendu], list[Bilan]]:
     """Lit le jeu, le confirme en session lecture seule ; n'écrit rien."""
-    questions = lire_questions(jeu / "questions.csv")
-    attendus = lire_attendus(jeu / "attendus.csv", questions)
+    erreurs: list[tuple[str, str]] = []
+    if (jeu / FICHIER_SOURCE).is_file():
+        questions, attendus, erreurs = analyser_source(jeu / FICHIER_SOURCE)
+    else:
+        questions = lire_questions(jeu / "questions.csv")
+        attendus = lire_attendus(jeu / "attendus.csv", questions)
     # Lecture seule dès la PREMIÈRE requête : `SET SESSION CHARACTERISTICS` ne
     # vaudrait que pour les transactions suivantes, pas pour celle qu'il ouvre.
     with psycopg.connect(url, options="-c default_transaction_read_only=on") as cx:
-        return confirmer(questions, attendus, cat.Catalogue.charger(cx), cx, jeu)
+        sortie, bilans = confirmer(
+            questions, attendus, cat.Catalogue.charger(cx), cx, jeu
+        )
+    # Une erreur de structure rend la question INVALIDE, mais n'arrête pas le
+    # diagnostic : le reste est confirmé au catalogue, et tout est listé.
+    for b in bilans:
+        propres = [m for qid, m in erreurs if qid == b.question.question_id]
+        if propres:
+            b.statut = "invalide"
+            b.motifs = propres + b.motifs
+    return sortie, bilans
 
 
 @app.command()
@@ -378,7 +418,16 @@ def principal(
     if not url:
         raise JeuInvalide(["DATABASE_URL n'est pas définie"])
     horodatage = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    questions = lire_questions(jeu / "questions.csv")
+    source = (jeu / FICHIER_SOURCE).is_file()
+    if source and ecrire:
+        raise JeuInvalide(
+            [f"{FICHIER_SOURCE} se corrige à la main : --ecrire ne s'y applique pas"]
+        )
+    questions = (
+        analyser_source(jeu / FICHIER_SOURCE)[0]
+        if source
+        else lire_questions(jeu / "questions.csv")
+    )
     if not questions:
         typer.echo("Aucune question écrite : rien à confirmer.")
         return
@@ -389,6 +438,10 @@ def principal(
         ecrire_attendus(jeu / "attendus.csv", sortie)
     statuts = Counter(b.statut for b in bilans)
     typer.echo(f"{len(bilans)} questions — {dict(statuts)} — rapport : {chemin}")
+    if statuts.get("invalide"):
+        raise JeuInvalide(
+            [f"{statuts['invalide']} question(s) invalide(s) : cf. rapport"]
+        )
 
 
 def main() -> int:
