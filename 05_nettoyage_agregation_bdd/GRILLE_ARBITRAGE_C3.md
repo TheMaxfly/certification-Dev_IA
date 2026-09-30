@@ -73,13 +73,14 @@ nourrissent directement le rapport E1.
    (c) liste des désaccords avec tes notes.
 3. Sauvegarde le CSV rempli SOUS LE MÊME NOM + suffixe `_arbitre`
    (ex. `echantillon_c3_arbitrage_arbitre.csv`), dans le même dossier
-   (gitignoré). Claude Code fera le dépouillement chiffré — mais les
-   verdicts sont figés avant.
+   (gitignoré). L'assistant de développement fera le dépouillement chiffré —
+   mais les verdicts sont figés avant.
 
 ## Règles d'or
 
-- **Aucune IA dans la boucle des verdicts** (ni Claude Code, ni claude.ai,
-  ni le juge lui-même) — sinon la mesure s'effondre épistémologiquement.
+- **Aucune IA dans la boucle des verdicts** (ni un assistant de développement,
+  ni une interface de conversation, ni le juge lui-même) — sinon la mesure
+  s'effondre épistémologiquement.
 - `undecidable` est permis ; le forçage est interdit.
 - Un verdict posé ne se retouche pas après lecture de l'avis LLM.
 - En cas de fatigue : pause. 100 cas en deux sessions valent mieux que 100
