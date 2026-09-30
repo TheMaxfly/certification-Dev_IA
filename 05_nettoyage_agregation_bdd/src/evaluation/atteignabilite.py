@@ -101,11 +101,36 @@ SELECT
     AS document_sans_fragment
 """
 
+#: Le marqueur « atteignable par synopsis anglais seulement » (décision du
+#: 2026-09-30) : aucune critique à fragment, mais un synopsis Kitsu à fragment
+#: rattaché par la cascade. Comme l'atteignabilité, il dépend du CORPUS mesuré :
+#: CALCULÉ à chaque mesure, JAMAIS écrit dans le jeu. Il partage F3 (et toute
+#: famille) en deux sous-groupes — le lexical français se tait par la langue,
+#: pas par la paraphrase.
+SQL_SYNOPSIS_SEUL = """
+SELECT s.series_id
+FROM unnest(%s::bigint[]) AS s(series_id)
+WHERE NOT EXISTS (
+        SELECT 1 FROM bench.corpus_docs d
+        WHERE d.source = 'ms_review' AND d.series_id = s.series_id
+          AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key))
+  AND EXISTS (
+        SELECT 1 FROM bench.corpus_docs d
+        JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
+        WHERE d.source = 'kitsu_synopsis' AND w.series_id = s.series_id
+          AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key))
+"""
+
 app = typer.Typer(add_completion=False, help=__doc__)
 
 
 def atteignables(cx: psycopg.Connection) -> set[int]:
     return {s for (s,) in cx.execute(SQL_ATTEIGNABLES)}
+
+
+def synopsis_seul(cx: psycopg.Connection, series_ids: list[int]) -> set[int]:
+    """Parmi ces séries, celles que seul un synopsis Kitsu (anglais) atteint."""
+    return {s for (s,) in cx.execute(SQL_SYNOPSIS_SEUL, (list(series_ids),))}
 
 
 def mesurer(cx: psycopg.Connection) -> tuple[dict, dict]:

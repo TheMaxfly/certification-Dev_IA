@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "recouvrement_f3": {
+    "seuil_frequence_critiques": 0.05,
+    "regle": "Un mot de la question est non significatif s'il est porté par plus de 5 % des critiques du corpus, ou s'il figure dans la liste v1. Un mot significatif ne doit apparaître ni dans le titre ni dans les critiques d'une série attendue d'une question F3.",
+    "derivation": "Mesure du 2026-09-30 sur les cinq F3 : les mots en recouvrement vont de 6,8 % (« années ») à 48,3 % (« faire ») des critiques ; les mots discriminants de 0 % à 0,7 % (« automates », « polar », « surnaturel »). L'intervalle 0,7 – 6,8 % est vide ; 5 % est choisi dedans, pas deviné, et vaut pour toute question future.",
+    "liste_mots_non_significatifs": "mots_non_significatifs_v1.txt",
+    "decide_par": "Max, 2026-09-30 (décision (b) du §8.2)"
+  },
+  "effectifs": {
+    "minimum_par_famille": 5,
+    "minimum_par_mode_hors_refus": 20,
+    "minimum_refus": 5
+  }
+}

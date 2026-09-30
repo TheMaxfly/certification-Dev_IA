@@ -1,0 +1,66 @@
+# mots_non_significatifs — v1 — 2026-09-29
+#
+# Rôle : liste d'exclusion du contrôle de recouvrement (§8.2 de la spec du
+# jeu d'évaluation). Avant de mesurer le recouvrement entre les mots d'une
+# question F3 et le titre + les critiques des séries attendues, ces mots sont
+# retirés des deux côtés.
+#
+# Motif : mots présents dans presque toute critique ou toute phrase de client,
+# qui ne discriminent aucune série. Les compter ferait échouer toute question.
+#
+# Cette liste fait partie de la définition du contrôle : elle est versionnée
+# avec le jeu et incluse dans l'empreinte au gel. Toute modification produit
+# une v2, avec son motif.
+#
+# En plus de cette liste, appliquer la liste standard des mots-outils du
+# français (articles, prépositions, pronoms, auxiliaires, conjonctions).
+#
+# Une ligne par mot, en minuscules, sans accent normalisé — la comparaison se
+# fait après passage en minuscules et suppression des accents.
+
+# --- désignation de l'objet ---
+manga
+serie
+titre
+tome
+volume
+recit
+histoire
+oeuvre
+truc
+chose
+
+# --- désignation des personnages, sans nom ---
+heros
+heroine
+personnage
+protagoniste
+type
+gars
+mec
+jeune
+jeunes
+
+# --- métadiscours du client ---
+cherche
+voudrais
+auriez
+avez
+parait
+genre
+style
+ambiance
+plutot
+vraiment
+peu
+quelque
+quelqu'un
+
+# --- exclus volontairement de cette liste, car significatifs ---
+# fille, garcon, monde, ville, amour, mort, guerre, sombre, drole
+# — ils figurent dans des titres ou discriminent un registre.
+# Ne pas les ajouter sans passer en v2.
+
+# --- réserve ouverte ---
+# « jeune » et « jeunes » peuvent discriminer (jeunesse, lycee, shonen).
+# Si le contrôle fait échouer une F3 légitime à cause d'eux, les retirer en v2.

@@ -1,0 +1,418 @@
+question_id,reponse_ecrite,grade,series_id,titre_catalogue,confirmation
+Q001,titre: Cat's Eye,2,1132,Cat's Eye,titre:title
+Q001,titre: Angel Heart,2,1113,Angel Heart,titre:title
+Q001,titre: Family Compo,1,78,F.Compo,titre:alias
+Q001,titre: Rash!!,1,1112,Rash !!,titre:title
+Q001,titre: Sous un rayon de soleil,1,1431,Sous un Rayon de Soleil,titre:title
+Q002,titre: Solanin,2,5332,Solanin,titre:title
+Q002,titre: Dead Dead Demon's Dededede Destruction,2,39957,Dead Dead Demon's Dededede destruction,titre:title
+Q002,titre: Un monde formidable,1,2607,Un Monde Formidable,titre:title
+Q002,titre: La Fin du monde avant le lever du jour,1,9816,"La Fin du Monde, Avant le Lever du Jour",titre:title
+Q002,titre: Errances,1,76236,Errances,titre:title
+Q002,titre: Nijigahara Holograph,1,6222,Nijigahara Holograph,titre:title
+Q003,titre: Spirale,2,1432,Spirale,titre:title
+Q003,titre: Tomie,2,779,Tomié,titre:title
+Q003,titre: Gyo,1,2196,Gyo,titre:title
+Q003,"titre: Rémina, la Planète de l'Enfer [Junji Ito Collection n°1]",1,5498,"Rémina, la Planète de l'Enfer [Junji Ito Collection n°1]",titre:title
+Q003,titre: Sensor,1,65131,Sensor,titre:title
+Q003,titre: Le Journal des chats de Junji Ito,1,42009,Le journal des chats de Junji Itô,titre:title
+Q004,titre: Emma,2,4746,Emma,titre:title
+Q004,titre: Shirley,1,5046,Shirley,titre:title
+Q005,titre: To Your Eternity,2,48655,To your eternity,titre:title
+Q006,titre: Les Fleurs du mal ; auteur: Shûzô Oshimi,2,7485,Les Fleurs du mal,titre+auteur:title+auteur
+Q006,titre: Happiness,2,50952,Happiness,titre:title
+Q006,titre: Dans l'intimité de Marie,1,13880,Dans l'intimité de Marie,titre:title
+Q006,titre: Les Liens du Sang,1,56119,Les Liens du Sang,titre:title
+Q007,titre: Shadow Lady,2,1421,Shadow Lady,titre:title
+Q008,titre: Agharta,2,402,Agharta,titre:title
+Q009,titre: Ai Non-Stop !,2,927,Ai Non-Stop !,titre:title
+Q010,titre: Kotoura-san,,,,"hors_catalogue_confirmee: Kitsu, 1 œuvre(s)"
+Q011,titre: Baby Steps,2,8124,Baby Steps,titre:title
+Q012,titre: Je veux manger ton pancréas,2,58568,Je veux manger ton pancreas,titre:title
+Q012,titre: Your Lie in April,2,13035,Your Lie in April,titre:title
+Q012,titre: One Week Friends,1,37886,One week friends,titre:title
+Q013,titre: Pluto,2,6610,Pluto,titre:title
+Q014,titre: Vinland Saga,2,5112,Vinland Saga,titre:title
+Q014,titre: Fire Punch,2,47437,Fire Punch,titre:title
+Q014,titre: L'Habitant de l'infini,1,1095,L'Habitant de l'Infini,titre:title
+Q014,titre: Berserk,1,1208,Berserk,titre:title
+Q015,titre: Blame!,2,1194,Blame !,titre:title
+Q015,titre: Amer Béton,1,405,Amer Béton,titre:title
+Q015,titre: Dorohedoro,1,1239,Dorohedoro,titre:title
+Q015,titre: Akira,1,403,Akira,titre:title
+Q016,titre: Danshi Kôkôsei no Nichijô,2,11482,Danshi Kôkôsei no Nichijô,titre:title
+Q016,titre: Komi cherche ses mots,1,49306,Komi cherche ses mots,titre:title
+Q016,titre: Kaguya-sama : Love Is War,1,47560,Kaguya-sama : Love Is War,titre:title
+Q016,titre: Sket Dance,1,7096,Sket Dance,titre:title
+Q016,titre: Nichijou,1,11265,Nichijô,titre:alias
+Q017,titre: Naruto,2,745,Naruto,titre:title
+Q018,titre: Fruits Basket,2,548,Fruits Basket,titre:title
+Q019,titre: Yotsuba&!,2,2229,Yotsuba & !,titre:title
+Q020,titre: Solanin,2,5332,Solanin,titre:title
+Q021,titre: Bonne nuit Punpun,2,9949,Bonne Nuit Punpun,titre:title
+Q022,titre: Scum's Wish,2,45305,Scum's wish,titre:title
+Q023,titre: L'Attaque des Titans,2,9640,L'Attaque des Titans,titre:title
+Q024,titre: Berserk,2,1208,Berserk,titre:title
+Q025,titre: Glass no Kamen,2,9298,Glass no Kamen,titre:title
+Q026,titre: Oishinbo,2,10921,Oishinbo,titre:title
+Q027,titre: Berserk,2,1208,Berserk,titre:title
+Q028,titre: Vinland Saga,2,5112,Vinland Saga,titre:title
+Q029,titre: Stranger Case,2,45616,Stranger Case,titre:title
+Q030,titre: Dandadan,2,65361,Dandadan,titre:title
+Q031,titre: Divine Nanami,2,9900,Divine Nanami,titre:title
+Q032,titre: March comes in like a lion,2,6071,March comes in like a lion,titre:title
+Q033,titre: Kochikame,2,2470,Kochikame,titre:title
+Q039,titre: Hikaru no Go,2,716,Hikaru No Go,titre:title
+Q040,titre: March comes in like a lion,2,6071,March comes in like a lion,titre:title
+Q040,titre: Kings of Shôgi,1,9554,Kings of Shôgi,titre:title
+Q041,titre: Le Sommet des dieux,2,1430,Le Sommet des Dieux,titre:title
+Q041,titre: Ascension,2,6967,Ascension,titre:title
+Q041,"titre: K, l'Ivresse des Sommets",1,2007,"K, l'Ivresse des Sommets",titre:title
+Q042,titre: Kenshin le vagabond,2,558,Kenshin le Vagabond,titre:title
+Q042,titre: Chiruran,1,13580,Chiruran,titre:title
+Q042,titre: Sidooh,1,5020,Sidooh,titre:title
+Q042,titre: Gintama,1,3919,Gintama,titre:title
+Q043,titre: Monster ; auteur: Naoki Urasawa,2,746,Monster,titre+auteur:title+auteur
+Q044,titre: Saikano,2,680,Larme Ultime,titre:alias
+Q045,regle: Q045,1,736,One Piece,regle
+Q045,regle: Q045,1,588,Slam Dunk,regle
+Q045,regle: Q045,1,75161,Sanda,regle
+Q045,regle: Q045,1,44712,"Moi, quand je me réincarne en slime",regle
+Q045,regle: Q045,1,1277,Jojo's Bizarre Adventure,regle
+Q045,regle: Q045,1,1488,Eye Shield 21,regle
+Q045,regle: Q045,1,2388,Ippo,regle
+Q045,regle: Q045,1,38583,My Hero Academia,regle
+Q045,regle: Q045,1,2027,Death Note,regle
+Q045,regle: Q045,1,13681,Jojo's Bizarre Adventure - Stone Ocean,regle
+Q045,regle: Q045,1,10183,Alice in Borderland,regle
+Q045,regle: Q045,1,58220,SPY×FAMILY,regle
+Q045,regle: Q045,1,48224,The promised Neverland,regle
+Q045,regle: Q045,1,9640,L'Attaque des Titans,regle
+Q045,regle: Q045,1,53528,Beastars,regle
+Q045,regle: Q045,1,6628,Capeta,regle
+Q045,regle: Q045,1,12368,Haikyû !! Les as du volley,regle
+Q045,regle: Q045,1,46588,Sou Bou Tei,regle
+Q045,regle: Q045,1,13768,Horimiya,regle
+Q045,regle: Q045,1,62518,Frieren,regle
+Q046,regle: Q046,1,49243,BLUE GIANT SUPREME,regle
+Q046,regle: Q046,1,7442,The One,regle
+Q046,regle: Q046,1,54539,Les Carnets de L'Apothicaire,regle
+Q046,regle: Q046,1,736,One Piece,regle
+Q046,regle: Q046,1,8806,Space Brothers,regle
+Q046,regle: Q046,1,1395,Real,regle
+Q046,regle: Q046,1,7784,Dengeki Daisy,regle
+Q046,regle: Q046,1,2229,Yotsuba & !,regle
+Q046,regle: Q046,1,75161,Sanda,regle
+Q046,regle: Q046,1,44712,"Moi, quand je me réincarne en slime",regle
+Q046,regle: Q046,1,1488,Eye Shield 21,regle
+Q046,regle: Q046,1,7416,Bride Stories,regle
+Q046,regle: Q046,1,38583,My Hero Academia,regle
+Q046,regle: Q046,1,58220,SPY×FAMILY,regle
+Q046,regle: Q046,1,5061,Escale à Yokohama,regle
+Q046,regle: Q046,1,53528,Beastars,regle
+Q046,regle: Q046,1,64179,Insomniaques,regle
+Q046,regle: Q046,1,12368,Haikyû !! Les as du volley,regle
+Q046,regle: Q046,1,13768,Horimiya,regle
+Q046,regle: Q046,1,62518,Frieren,regle
+Q047,regle: Q047,1,69256,7th Time Loop: The Villainess Enjoys a Carefree Life,regle
+Q047,regle: Q047,1,1498,God Child,regle
+Q047,regle: Q047,1,55821,Blue flag,regle
+Q047,regle: Q047,1,62109,Le Renard et le Petit Tanuki,regle
+Q047,regle: Q047,1,59650,La Petite Faiseuse de Livres,regle
+Q047,regle: Q047,1,9337,Le Voyage de Ryu,regle
+Q047,regle: Q047,1,65956,Stray cat and wolf,regle
+Q047,regle: Q047,1,7018,GTO Shonan 14 Days,regle
+Q047,regle: Q047,1,63873,The Elf and the Hunter,regle
+Q047,regle: Q047,1,69046,Sorcière d'un autre monde,regle
+Q047,regle: Q047,1,71211,2.5 Dimensional Seduction,regle
+Q047,regle: Q047,1,65767,La sorcière aux champignons,regle
+Q047,regle: Q047,1,62619,I Fell in Love After School,regle
+Q047,regle: Q047,1,52923,Don't Fake Your Smile,regle
+Q047,regle: Q047,1,72124,Hell Mode - Le premier invocateur,regle
+Q047,regle: Q047,1,8646,Gosick,regle
+Q047,regle: Q047,1,6872,Otaku Girls,regle
+Q048,regle: Q048,1,62683,My Happy Marriage,regle
+Q048,regle: Q048,1,70914,Le château solitaire dans le miroir,regle
+Q048,regle: Q048,1,72201,Mother parasite,regle
+Q048,regle: Q048,1,73664,"Jaadugar, la légende de Fatima",regle
+Q048,regle: Q048,1,1381,Planetes,regle
+Q048,regle: Q048,1,72961,Mission in the Apocalypse,regle
+Q048,regle: Q048,1,9337,Le Voyage de Ryu,regle
+Q048,regle: Q048,1,71776,Heart program,regle
+Q048,regle: Q048,1,7926,My Girl,regle
+Q048,regle: Q048,1,5263,Ludwig Révolution,regle
+Q048,regle: Q048,1,12036,Electric Delusion,regle
+Q048,regle: Q048,1,63873,The Elf and the Hunter,regle
+Q048,regle: Q048,1,74597,The Second Chance of the Villainess,regle
+Q048,regle: Q048,1,56445,BL Métamorphose,regle
+Q048,regle: Q048,1,41833,10 dance,regle
+Q048,regle: Q048,1,68539,Meurtres dans le décagone,regle
+Q048,regle: Q048,1,71211,2.5 Dimensional Seduction,regle
+Q048,regle: Q048,1,48422,L'étranger du zéphyr,regle
+Q048,regle: Q048,1,14998,Yume Musubi Koi Musubi,regle
+Q048,regle: Q048,1,2057,Seton,regle
+Q049,regle: Q049,1,49243,BLUE GIANT SUPREME,regle
+Q049,regle: Q049,1,54539,Les Carnets de L'Apothicaire,regle
+Q049,regle: Q049,1,11455,Jojo's Bizarre Adventure - Jojolion,regle
+Q049,regle: Q049,1,6610,Pluto,regle
+Q049,regle: Q049,1,8806,Space Brothers,regle
+Q049,regle: Q049,1,2229,Yotsuba & !,regle
+Q049,regle: Q049,1,7416,Bride Stories,regle
+Q049,regle: Q049,1,5061,Escale à Yokohama,regle
+Q049,regle: Q049,1,64179,Insomniaques,regle
+Q049,regle: Q049,1,6780,Spice & Wolf,regle
+Q049,regle: Q049,1,5523,Liar Game,regle
+Q049,regle: Q049,1,9219,Chihayafuru,regle
+Q049,regle: Q049,1,56119,Les Liens du Sang,regle
+Q049,regle: Q049,1,49829,Re:Zero - Re:Life in a different world from zero - Troisième arc : Truth of Zero,regle
+Q049,regle: Q049,1,45301,Otaku Otaku,regle
+Q049,regle: Q049,1,1393,Rainbow,regle
+Q049,regle: Q049,1,5969,Un drôle de père,regle
+Q049,regle: Q049,1,7005,Billy Bat,regle
+Q049,regle: Q049,1,5001,Nodame Cantabile,regle
+Q049,regle: Q049,1,48915,Ao ashi,regle
+Q050,regle: Q050,1,44688,Hatarakanai Futari,regle
+Q050,regle: Q050,1,46903,Gochûmon wa Usagi Desu ka,regle
+Q050,regle: Q050,1,47394,Kiniro Mosaic,regle
+Q050,regle: Q050,1,49491,City,regle
+Q050,regle: Q050,1,50374,Isekai Shokudou,regle
+Q050,regle: Q050,1,50375,Knights & Magic,regle
+Q050,regle: Q050,1,52221,Hibiki - Shousetsuka ni Naru Houhou,regle
+Q050,regle: Q050,1,52308,MF Ghost,regle
+Q050,regle: Q050,1,52845,Harlock & Tochiro Tankobom Mishuroku Work ( Red Champion Comics ),regle
+Q050,regle: Q050,1,59369,Intraitable,regle
+Q050,regle: Q050,1,66142,Kubo-san wa Boku wo Yurusanai,regle
+Q050,regle: Q050,1,72350,Kirei ni shite moraemasu ka,regle
+Q050,regle: Q050,1,72486,Fends le vent !,regle
+Q050,regle: Q050,1,71288,Medalist,regle
+Q050,regle: Q050,1,49243,BLUE GIANT SUPREME,regle
+Q050,regle: Q050,1,54539,Les Carnets de L'Apothicaire,regle
+Q050,regle: Q050,1,52600,BLACK TIGER,regle
+Q050,regle: Q050,1,53402,Kujonin,regle
+Q050,regle: Q050,1,53455,Finder: Kyoto Jogakuin Monogatari,regle
+Q050,regle: Q050,1,54230,Koko wa Ima kara Rinri desu.,regle
+Q051,regle: Q051,1,445,Mizuiro Jidai,regle
+Q051,regle: Q051,1,5828,Hinagiku,regle
+Q051,regle: Q051,1,6063,Banana fish - another story,regle
+Q051,regle: Q051,1,6251,Mizu no yakata,regle
+Q051,regle: Q051,1,6919,Yamamoto Zenjrou to Moushimasu,regle
+Q051,regle: Q051,1,7388,Punch !,regle
+Q051,regle: Q051,1,7391,Syd & Lid,regle
+Q051,regle: Q051,1,7393,Maria Sama Ga Miteru,regle
+Q051,regle: Q051,1,7402,Cherry Juice,regle
+Q051,regle: Q051,1,7519,Kare wa Tsumetai Furi o Shite,regle
+Q051,regle: Q051,1,7843,Baby Love,regle
+Q051,regle: Q051,1,8019,Chitose etc.,regle
+Q051,regle: Q051,1,8146,Atsumare! Gakuen Tengoku,regle
+Q051,regle: Q051,1,8194,Love Cruise,regle
+Q051,regle: Q051,1,8435,Chihiro ni Saku Hana,regle
+Q051,regle: Q051,1,8554,Shichigatsu no Mahoutsukai,regle
+Q051,regle: Q051,1,8555,Shinigami no Ballad,regle
+Q051,regle: Q051,1,8608,Kirara no Hoshi,regle
+Q051,regle: Q051,1,9132,China Blue Jasmine,regle
+Q051,regle: Q051,1,9191,Otogi Moyou Ayanishiki,regle
+Q052,regle: Q052,1,7200,Saiyuki Reload Blast,regle
+Q052,regle: Q052,1,10619,Kazuya Minekura - Tanpenshû,regle
+Q052,regle: Q052,1,11831,Hakuouki,regle
+Q052,regle: Q052,1,37666,Shuuen no shiori,regle
+Q052,regle: Q052,1,43709,Tales of Zestiria - Michibiki no Koku,regle
+Q052,regle: Q052,1,10911,N°6,regle
+Q052,regle: Q052,1,13767,Kagerô Days,regle
+Q052,regle: Q052,1,67633,La Grossesse de M. Hiyama,regle
+Q052,regle: Q052,1,13223,"Le rakugo à la vie, à la mort",regle
+Q052,regle: Q052,1,46313,Perfect World,regle
+Q052,regle: Q052,1,45961,Tokyo tarareba girls,regle
+Q052,regle: Q052,1,45301,Otaku Otaku,regle
+Q052,regle: Q052,1,15414,Moto Hagio - Anthologie,regle
+Q052,regle: Q052,1,12402,Plus question de fuir!,regle
+Q052,regle: Q052,1,15049,Whispering - Les voix du silence,regle
+Q052,regle: Q052,1,39574,Les deux Van Gogh,regle
+Q052,regle: Q052,1,8119,2 expressos,regle
+Q052,regle: Q052,1,8928,Fragments d'Amour,regle
+Q052,regle: Q052,1,47397,Spotted Flower,regle
+Q052,regle: Q052,1,49235,Les 7 princes et le labyrinthe millénaire,regle
+Q053,regle: Q053,1,71521,36000 Seconds in a Day,regle
+Q053,regle: Q053,1,1488,Eye Shield 21,regle
+Q053,regle: Q053,1,37670,10 count,regle
+Q053,regle: Q053,1,7018,GTO Shonan 14 Days,regle
+Q053,regle: Q053,1,12992,Area 51,regle
+Q053,regle: Q053,1,41833,10 dance,regle
+Q053,regle: Q053,1,71211,2.5 Dimensional Seduction,regle
+Q053,regle: Q053,1,66745,"Le Roi-Démon et moi, et nos 10 enfants",regle
+Q053,regle: Q053,1,63433,Kaiju No. 8,regle
+Q053,regle: Q053,1,7007,07 Ghost,regle
+Q053,regle: Q053,1,61752,Sword Art Online : Progressive - Arc 2 : Transient Barcarole,regle
+Q053,regle: Q053,1,7492,Syndrome 1866,regle
+Q054,regle: Q054,1,8699,Last Inning,regle
+Q054,regle: Q054,1,6871,Giant Killing,regle
+Q054,regle: Q054,1,10267,Akagi,regle
+Q054,regle: Q054,1,541,Initial D,regle
+Q054,regle: Q054,1,40961,Riku-do - La rage aux poings,regle
+Q054,regle: Q054,1,724,Tough - L'aube d'une légende,regle
+Q054,regle: Q054,1,48915,Ao ashi,regle
+Q054,regle: Q054,1,46647,En scène !,regle
+Q054,regle: Q054,1,7732,Happy !,regle
+Q054,regle: Q054,1,8856,Karate Shokoshi - Kohinata Minoru,regle
+Q054,regle: Q054,1,9691,Garouden,regle
+Q054,regle: Q054,1,10788,Wangan Midnight,regle
+Q054,regle: Q054,1,7841,Yawara !,regle
+Q054,regle: Q054,1,14023,F,regle
+Q054,regle: Q054,1,6896,Restore Garage 251,regle
+Q054,regle: Q054,1,8644,Countach,regle
+Q054,regle: Q054,1,10658,Derby Jockey,regle
+Q054,regle: Q054,1,10906,Mahjong Hiryû Densetsu Tenpai,regle
+Q054,regle: Q054,1,11362,Mahjong Hiryû Densetsu Tenpai - Gaiden,regle
+Q054,regle: Q054,1,12130,Abu-san,regle
+Q055,titre: Something About Us,,,,"hors_catalogue_confirmee: Kitsu, 1 œuvre(s)"
+Q056,titre: Noblesse,,,,"hors_catalogue_confirmee: Kitsu, 1 œuvre(s)"
+Q057,titre: Tomo-chan wa Onnanoko!,,,,"hors_catalogue_confirmee: Kitsu, 1 œuvre(s)"
+Q058,titre: Solo Leveling,,,,"hors_catalogue_confirmee: Kitsu, 1 œuvre(s)"
+Q059,regle: Q059,1,6919,Yamamoto Zenjrou to Moushimasu,regle
+Q059,regle: Q059,1,6960,Yoshihara Yuki - The Best Selection,regle
+Q059,regle: Q059,1,7402,Cherry Juice,regle
+Q059,regle: Q059,1,7519,Kare wa Tsumetai Furi o Shite,regle
+Q059,regle: Q059,1,8139,Onikiri-sama no Hakoiri Musume,regle
+Q059,regle: Q059,1,8146,Atsumare! Gakuen Tengoku,regle
+Q059,regle: Q059,1,8155,Koi wa Aserazu,regle
+Q059,regle: Q059,1,8497,Super Dog Rilienthal,regle
+Q059,regle: Q059,1,8554,Shichigatsu no Mahoutsukai,regle
+Q059,regle: Q059,1,8886,Cafe Detective Club,regle
+Q059,regle: Q059,1,9524,Jiujiu,regle
+Q059,regle: Q059,1,10058,Cardfight!! Vanguard,regle
+Q059,regle: Q059,1,10461,Zettai Joousei,regle
+Q059,regle: Q059,1,10706,Maji de Watashi ni Koi Shinasai!,regle
+Q059,regle: Q059,1,10799,SPAS-PA,regle
+Q059,regle: Q059,1,11186,Houkago Play,regle
+Q059,regle: Q059,1,11576,Arina no Tane,regle
+Q059,regle: Q059,1,11779,34 Sai Mushoku-san,regle
+Q059,regle: Q059,1,12107,Barcode Geass - Hanbai no Lelouch,regle
+Q059,regle: Q059,1,12328,Touhou Shinigami: Meteor Methuselah Gaiden,regle
+Q060,regle: Q060,1,5929,Seiryou Saikyou Monogatari,regle
+Q060,regle: Q060,1,7402,Cherry Juice,regle
+Q060,regle: Q060,1,7521,Fortune Arterial,regle
+Q060,regle: Q060,1,8388,Kawaii Hito - Eiiri MISONO,regle
+Q060,regle: Q060,1,9953,Kinkyori Renai,regle
+Q060,regle: Q060,1,10461,Zettai Joousei,regle
+Q060,regle: Q060,1,10770,Jigoku sensei Nube,regle
+Q060,regle: Q060,1,10799,SPAS-PA,regle
+Q060,regle: Q060,1,15750,"Inochi mijikashi, koi seyo furyô shônen!",regle
+Q060,regle: Q060,1,8410,My Precious,regle
+Q060,regle: Q060,1,6996,Say say say,regle
+Q060,regle: Q060,1,8387,Renai Shoukougun {Love Syndrome},regle
+Q060,regle: Q060,1,12641,Ichiban ushiro no Daimaô,regle
+Q060,regle: Q060,1,14683,High School Musical,regle
+Q060,regle: Q060,1,55470,Naughty girl Anjô,regle
+Q060,regle: Q060,1,74737,"Anyway, I'm falling in love with you",regle
+Q060,regle: Q060,1,78498,Spring Storm and Monster,regle
+Q060,regle: Q060,1,3336,Je ne suis pas un Ange,regle
+Q060,regle: Q060,1,3339,Lovely Complex,regle
+Q060,regle: Q060,1,9396,Zippy Ziggy,regle
+Q062,regle: Q062,1,49823,Isekai Tensei Soudouki,regle
+Q062,regle: Q062,1,6989,Final Fantasy XII,regle
+Q062,regle: Q062,1,8264,Yasashii Ryuu no Koroshikata,regle
+Q062,regle: Q062,1,5807,Crimson Spell,regle
+Q062,regle: Q062,1,56101,Je suis un assassin (et je surpasse le héros),regle
+Q062,regle: Q062,1,73240,Les Cartographes,regle
+Q062,regle: Q062,1,71497,Isekai Munchkin,regle
+Q062,regle: Q062,1,66642,Le Souffle des Légendes,regle
+Q062,regle: Q062,1,38207,The Heroic Legend of Arslân,regle
+Q062,regle: Q062,1,72565,Un comptable à la cour !,regle
+Q062,regle: Q062,1,57347,The Unwanted Undead Adventurer,regle
+Q062,regle: Q062,1,52806,Dungeon ni Deai wo Motomeru no wa Machigatte Iru Darou ka 4-koma - Kami-sama no Nichijou,regle
+Q062,regle: Q062,1,67090,Dress of Illusional Monster,regle
+Q062,regle: Q062,1,72286,Unnamed Memory,regle
+Q062,regle: Q062,1,73335,Le guérisseur de l'ombre,regle
+Q062,regle: Q062,1,73872,Welcome to Japan! Elfe de mes rêves...,regle
+Q062,regle: Q062,1,58517,Goodbye Dragon Life,regle
+Q062,regle: Q062,1,6894,Superior,regle
+Q062,regle: Q062,1,76579,Beryl : de paysan à maître d'armes,regle
+Q062,regle: Q062,1,6736,"Hang-A, Miroir de l'avenir",regle
+Q063,regle: Q063,1,736,One Piece,regle
+Q063,regle: Q063,1,588,Slam Dunk,regle
+Q063,regle: Q063,1,75161,Sanda,regle
+Q063,regle: Q063,1,44712,"Moi, quand je me réincarne en slime",regle
+Q063,regle: Q063,1,1277,Jojo's Bizarre Adventure,regle
+Q063,regle: Q063,1,1488,Eye Shield 21,regle
+Q063,regle: Q063,1,2388,Ippo,regle
+Q063,regle: Q063,1,38583,My Hero Academia,regle
+Q063,regle: Q063,1,2027,Death Note,regle
+Q063,regle: Q063,1,13681,Jojo's Bizarre Adventure - Stone Ocean,regle
+Q063,regle: Q063,1,58220,SPY×FAMILY,regle
+Q063,regle: Q063,1,9640,L'Attaque des Titans,regle
+Q063,regle: Q063,1,53528,Beastars,regle
+Q063,regle: Q063,1,6628,Capeta,regle
+Q063,regle: Q063,1,12368,Haikyû !! Les as du volley,regle
+Q063,regle: Q063,1,46588,Sou Bou Tei,regle
+Q063,regle: Q063,1,13768,Horimiya,regle
+Q063,regle: Q063,1,62518,Frieren,regle
+Q063,regle: Q063,1,65777,Blue Box,regle
+Q063,regle: Q063,1,7078,Magi - The Labyrinth of Magic,regle
+Q064,regle: Q064,1,1208,Berserk,regle
+Q064,regle: Q064,1,759,20th Century Boys,regle
+Q064,regle: Q064,1,736,One Piece,regle
+Q064,regle: Q064,1,518,GTO,regle
+Q064,regle: Q064,1,465,City Hunter,regle
+Q064,regle: Q064,1,746,Monster,regle
+Q064,regle: Q064,1,1629,Fullmetal Alchemist,regle
+Q064,regle: Q064,1,726,Dragon Ball,regle
+Q064,regle: Q064,1,6610,Pluto,regle
+Q064,regle: Q064,1,1041,Gunnm,regle
+Q064,regle: Q064,1,1488,Eye Shield 21,regle
+Q064,regle: Q064,1,899,Nana,regle
+Q064,regle: Q064,1,954,xxxHoLic,regle
+Q064,regle: Q064,1,38583,My Hero Academia,regle
+Q064,regle: Q064,1,2027,Death Note,regle
+Q064,regle: Q064,1,548,Fruits Basket,regle
+Q064,regle: Q064,1,11927,Tokyo Ghoul,regle
+Q064,regle: Q064,1,9640,L'Attaque des Titans,regle
+Q064,regle: Q064,1,1083,Tsubasa Reservoir Chronicle,regle
+Q064,regle: Q064,1,13832,One-Punch Man,regle
+Q066,regle: Q066,1,8122,Nononono,regle
+Q066,regle: Q066,1,8608,Kirara no Hoshi,regle
+Q066,regle: Q066,1,10566,Baka to Test to Shoukanjuu Spinout! - Sore ga Bokura no Nichijou,regle
+Q066,regle: Q066,1,11043,Suzumiya Haruhi-chan no Yuuutsu,regle
+Q066,regle: Q066,1,11186,Houkago Play,regle
+Q066,regle: Q066,1,11576,Arina no Tane,regle
+Q066,regle: Q066,1,11779,34 Sai Mushoku-san,regle
+Q066,regle: Q066,1,11936,Liar x Liar,regle
+Q066,regle: Q066,1,12107,Barcode Geass - Hanbai no Lelouch,regle
+Q066,regle: Q066,1,12504,Asa Made Jugyô Chu!,regle
+Q066,regle: Q066,1,13740,Eiki Eiki no Bucchaketai!!,regle
+Q066,regle: Q066,1,13910,Ore ga Dôtei wo Sutetara Shinu Ken ni Tsuite,regle
+Q066,regle: Q066,1,14315,Koi ja Nai no da!,regle
+Q066,regle: Q066,1,14520,Papa no iu Koto wo Kikinasai! - Sorairo no Hibiki,regle
+Q066,regle: Q066,1,15535,Handa-kun,regle
+Q066,regle: Q066,1,44688,Hatarakanai Futari,regle
+Q066,regle: Q066,1,45646,Tanaka-kun wa Itsumo Kedaruge,regle
+Q066,regle: Q066,1,63501,Love is money,regle
+Q066,regle: Q066,1,72351,Mikakunin de Shinkoukei,regle
+Q066,regle: Q066,1,9178,Seitokai Yakuindomo,regle
+Q067,titre: Shikimori n'est pas juste mignonne,2,57530,Shikimori n'est pas juste mignonne,titre:title
+Q067,"titre: Arrête de me chauffer, Nagatoro",1,54589,"Arrête de me chauffer, Nagatoro",titre:title
+Q067,"titre: À quoi tu joues, Ayumu ?!",1,58221,"À quoi tu joues, Ayumu ?!",titre:title
+Q067,titre: Tellement flou d'elle !,1,73049,Tellement flou d'elle !,titre:title
+Q067,titre: Kubo-san wa Boku wo Yurusanai,1,66142,Kubo-san wa Boku wo Yurusanai,titre:title
+Q068,titre: Cesare,2,11594,Cesare,titre:title
+Q068,titre: Innocent ; auteur: Shinichi Sakamoto,1,15336,Innocent,titre+auteur:title+auteur
+Q068,titre: Vinland Saga,2,5112,Vinland Saga,titre:title
+Q068,titre: L'Histoire des 3 Adolf,1,1264,L'Histoire des 3 Adolf,titre:title
+Q068,titre: Le pavillon des hommes,2,6994,Le pavillon des hommes,titre:title
+Q068,titre: Historie,1,5524,Historie,titre:title
+Q068,titre: Bride Stories,1,7416,Bride Stories,titre:title
+Q069,titre: Somali et l'esprit de la forêt,2,47484,Somali et l'esprit de la forêt,titre:title
+Q069,titre: Mushishi,2,4932,Mushishi,titre:title
+Q069,titre: L'Atelier des sorciers,1,48895,L'Atelier des Sorciers,titre:title
+Q069,titre: Made in Abyss,1,51444,Made in Abyss,titre:title
+Q069,titre: Girls' Last Tour,1,52339,Girls' Last Tour,titre:title
+Q070,titre: Haikyû !! Les as du volley,2,12368,Haikyû !! Les as du volley,titre:title
+Q070,titre: Hikaru no Go,2,716,Hikaru No Go,titre:title
+Q070,titre: Kuroko's Basket,1,7099,Kuroko's Basket,titre:title
+Q070,titre: Ping Pong,1,774,Ping Pong,titre:title
+Q070,titre: March comes in like a lion,1,6071,March comes in like a lion,titre:title
+Q070,titre: Kono Oto Tomare!,1,13433,Sounds of Life,titre:alias
+Q071,titre: Black Clover,2,42393,Black Clover,titre:title
+Q071,titre: Demon Slayer,2,46417,Demon slayer,titre:title
+Q071,titre: Jujutsu Kaisen,1,54837,Jujutsu kaisen,titre:title
+Q071,titre: Fairy Tail,2,3056,Fairy Tail,titre:title
+Q071,titre: Hunter X Hunter,1,534,Hunter X Hunter,titre:title
+Q071,titre: World Trigger,1,15273,World Trigger,titre:title

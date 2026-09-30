@@ -55,7 +55,9 @@ from evaluation.jeu import (
 from identity.wikidata_dump import normaliser
 
 RACINE = Path(__file__).resolve().parents[3]
-JEU_DEFAUT = RACINE / "database/donnees/jeu_evaluation/v1"
+#: La version qui fait foi : v2 (v1, gelée puis retirée le 2026-09-30 pour un mot
+#: dans un titre de déclaration, est archivée hors dépôt).
+JEU_DEFAUT = RACINE / "database/donnees/jeu_evaluation/v2"
 RAPPORTS_DEFAUT = RACINE / "05_nettoyage_agregation_bdd/rapports"
 
 #: Familles dont la question ne devrait pas porter le titre attendu (§4).

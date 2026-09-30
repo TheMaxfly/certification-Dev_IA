@@ -1,5 +1,13 @@
 # Jeu d'évaluation — comment l'écrire
 
+> **La version qui fait foi est `v2/`**, gelée le 2026-09-30 — empreinte
+> `31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30`.
+> **v2 = v1 au titre près** : v1, gelée le même jour, a été retirée pour un mot
+> dans un titre de déclaration, aucune question modifiée ; elle reste en base
+> locale et sa version complète est archivée hors dépôt. Le dossier `v1/` ne
+> garde que les gabarits vides de `questions.csv` et `attendus.csv`, décrits
+> ci-dessous.
+
 Le jeu de référence du bloc 2, au **grain entité** : une réponse attendue est
 une série du catalogue, désignée par son `series_id`, jamais par un titre
 recopié. Les CSV de `v1/` **font foi** ; les tables `bench.eval_*` (migration
@@ -26,7 +34,7 @@ recopié. Les CSV de `v1/` **font foi** ; les tables `bench.eval_*` (migration
 | `question_id` | `Q001`, `Q002`… — indépendant de la famille, pour survivre à un reclassement |
 | `texte` | tel qu'un utilisateur l'écrirait, fautes comprises pour F4 |
 | `mode` | `proposition` · `reconnaissance` · `refus` |
-| `famille` | `F1` à `F10` |
+| `famille` | `F1` à `F11` — F11 « par référence » depuis `019` (2026-09-30) |
 | `issue_attendue` | `au_catalogue` · `reconnue_hors_catalogue` · `inconnue` |
 | `origine` | `nouvelle` · `decembre` |
 | `origine_query_id` | l'identifiant de décembre si `origine = decembre`, vide sinon |
@@ -35,7 +43,7 @@ recopié. Les CSV de `v1/` **font foi** ; les tables `bench.eval_*` (migration
 Règles tenues par la base, et vérifiées par l'outil avant elle :
 
 - `F7` ⇔ `refus` ⇔ `inconnue` ;
-- `reconnue_hors_catalogue` ⇒ `F1` ou `F2`, en `reconnaissance` ;
+- `reconnue_hors_catalogue` ⇒ `reconnaissance`, toute famille (`017`) ;
 - `au_catalogue` ⇒ au moins une série attendue ; en `reconnaissance`, **exactement
   une** ;
 - `reconnue_hors_catalogue` et `inconnue` ⇒ **aucune** série attendue.
@@ -78,14 +86,10 @@ Tu remplis trois colonnes ; l'outil remplit les trois autres.
     départage par `series_id`, pour que le nDCG garde un sens et que la même
     règle rende toujours le même ensemble.
 
-  ```sql
-  -- Q041 — « un bon shonen » : les vingt shonen les mieux notés par les membres
-  SELECT series_id
-  FROM manga.ms_series_enriched
-  WHERE series_category_clean = 'Shonen' AND series_review_count >= 3
-  ORDER BY series_members_rating DESC NULLS LAST, series_id
-  LIMIT 20;
-  ```
+  Exemple réel : `v1/regles/Q045.sql` (« un bon shonen »). Les définitions
+  communes — public, note des membres, critiques comptées dans les tables du
+  snapshot (jamais `series_review_count`, figée à décembre 2025), genres par
+  codes du référentiel, année FR, tomes — sont écrites en tête de chaque règle.
 
   La règle s'écrit aussi en clair dans la `note` de la question.
 
@@ -108,3 +112,41 @@ uv run python -m evaluation.confirmer --ecrire   # remplit series_id / titre_cat
 L'outil lit le catalogue en session **lecture seule** et n'interroge jamais le
 corpus ni aucun index. Relancé sur un fichier déjà confirmé, il le rend
 identique.
+
+## Le format source v1 — un seul CSV écrit à la main
+
+Depuis le 2026-09-29, le jeu s'écrit dans `jeu_evaluation_recherche.csv` (v2 : `v2/`)
+(une ligne par question : séries attendues séparées par « | », grades par
+titre, `règle : …` / `par règle` pour F9 et F10, `cle_confirmation` pour une
+clé combinée `Titre => auteur: Nom`). `questions.csv` et `attendus.csv` n'en
+sont que la **projection**, écrite au gel.
+
+- **Reprise de décembre** : `origine` = `decembre:7` — l'identifiant de la
+  requête de décembre, rangé dans `origine_query_id` (2026-09-30).
+- **F11 « par référence »** : la question cite une œuvre connue ; la référence
+  n'est **jamais** une réponse attendue.
+
+## Contrôler, puis geler
+
+```bash
+cd 05_nettoyage_agregation_bdd
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m evaluation.controles                       # §8 : existence, recouvrement F3, effectifs
+uv run python -m evaluation.geler --version v2              # gel à blanc : dossier et base intacts
+uv run python -m evaluation.geler --version v3 --executer   # gel réel d'une version nouvelle — IRRÉVERSIBLE
+```
+
+- **`controles_v1.json`** (dans le dossier de la version) porte la définition du §8.2 — un mot est non
+  significatif s'il est porté par plus de **5 %** des critiques du corpus, ou
+  s'il figure dans `mots_non_significatifs_v1.txt` — avec la **dérivation** du
+  seuil, et les effectifs minimaux. Il entre dans l'empreinte.
+- **Le gel** refuse une question non confirmée, un contrôle en échec, une
+  version déjà gelée ou l'absence de `DECLARATIONS.md`. Il écrit la
+  projection, calcule l'empreinte (sha256 d'un **manifeste** de tous les
+  fichiers de la version) et charge `bench.eval_*` en une transaction ; à blanc,
+  tout est joué dans un dossier temporaire et une transaction annulée, les
+  contraintes différées de `016` forcées pour que l'essai prouve ce que le gel
+  prouvera.
+- **Le marqueur « atteignable par synopsis anglais seulement »** n'est **jamais
+  écrit** dans le jeu : il se calcule à chaque mesure depuis le corpus
+  (`evaluation.atteignabilite.synopsis_seul`), comme l'atteignabilité.

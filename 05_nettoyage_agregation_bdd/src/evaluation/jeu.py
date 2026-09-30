@@ -44,6 +44,11 @@ VOIES = ("titre", "auteur", "id", "regle")
 #: 2026-09-29) — toujours en proposition.
 FAMILLES_A_REGLE = ("F9", "F10")
 
+#: Une reprise de décembre s'écrit `decembre:7` dans le CSV source, sur le
+#: modèle de l'ancien `jet1:Qxx` (décision du 2026-09-30) : l'origine et
+#: l'identifiant de décembre, que la structure range dans `origine_query_id`.
+ORIGINE_SOURCE = re.compile(r"^\s*(decembre)\s*:\s*(\S*)\s*$")
+
 REPONSE = re.compile(r"^\s*(titre|auteur|id|regle)\s*:\s*(\S.*?)\s*$", re.IGNORECASE)
 
 
@@ -245,14 +250,18 @@ def analyser_source(
     attendus: list[Attendu] = []
     vus: set[str] = set()
     for n, ligne in enumerate(_lire(chemin, COLONNES_SOURCE), start=2):
+        m = ORIGINE_SOURCE.match(ligne["origine"])
+        origine, origine_query_id = (
+            (m.group(1), m.group(2)) if m else (ligne["origine"].strip(), "")
+        )
         q = Question(
             question_id=ligne["id"],
             texte=ligne["texte"],
             mode=ligne["mode"],
             famille=ligne["famille"],
             issue_attendue=ligne["issue_attendue"],
-            origine=ligne["origine"],
-            origine_query_id="",
+            origine=origine,
+            origine_query_id=origine_query_id,
             note=ligne["note"],
         )
         ou = f"{chemin.name}:{n} {q.question_id}"

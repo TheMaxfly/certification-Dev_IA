@@ -271,16 +271,28 @@ def test_source_titres_grades_cles_et_regles(tmp_path):
                 issue_attendue="reconnue_hors_catalogue",
                 series_attendues="Oishinbo",
             ),
+            ligne_source(
+                "Q006",
+                mode="proposition",
+                famille="F11",
+                series_attendues="Solanin",
+                grade="Solanin: tres_pertinent",
+                origine="decembre:13",
+            ),
         ],
     )
     questions, attendus, erreurs = analyser_source(chemin)
-    assert erreurs == [] and len(questions) == 5
+    assert erreurs == [] and len(questions) == 6
+    reprise = questions[-1]
+    assert (reprise.origine, reprise.origine_query_id) == ("decembre", "13")
+    assert all(q.origine_query_id == "" for q in questions[:-1])
     assert [(a.question_id, a.reponse_ecrite, a.grade) for a in attendus] == [
         ("Q001", "titre: Monster ; auteur: Naoki Urasawa", "2"),
         ("Q002", "titre: In/Spectre", "2"),
         ("Q002", "titre: Akira", "1"),
         ("Q003", "regle: Q003", "1"),
         ("Q005", "titre: Oishinbo", ""),
+        ("Q006", "titre: Solanin", "2"),
     ]
 
 
@@ -301,6 +313,8 @@ def test_source_titres_grades_cles_et_regles(tmp_path):
             {"grade": "par règle", "famille": "F9", "mode": "proposition"},
             "sans règle écrite",
         ),
+        ({"origine": "decembre"}, "origine_query_id"),
+        ({"origine": "decembre:D7"}, "entier"),
         (
             {
                 "famille": "F5",
