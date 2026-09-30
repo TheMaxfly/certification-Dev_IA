@@ -1,0 +1,6 @@
+# Fichiers de docs/ versionnés exprès. docs/ est exclu du dépôt public, sauf
+# docs/modeles/ (réinclus par l'exclusion locale) et les fichiers listés ici.
+# Ajouter une ligne est une décision : le hook pre-push refuse tout autre fichier
+# couvert par l'exclusion locale.
+docs/RAPPORT_COUVERTURE_CASCADE.md
+docs/REGISTRE_TRAITEMENTS_C4.md

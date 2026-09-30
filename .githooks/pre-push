@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# pre-push — les trois contrôles du dépôt public, rejoués avant chaque push.
+#
+#   1. AUTEUR : chaque commit poussé a pour auteur ET committer TheMaxfly.
+#   2. AUCUNE MENTION D'ASSISTANT :
+#      - message de commit : ni le nom de l'assistant, ni celui de son éditeur,
+#        ni un co-auteur ;
+#      - lignes ajoutées : pas davantage, sauf dans les fichiers de
+#        `.githooks/mentions-techniques` (usage technique : dépendance d'API,
+#        crawler visé par un robots.txt) — et même là, jamais un marqueur
+#        d'auteur (co-auteur, « généré avec », nom de l'outil de développement).
+#   3. AUCUN FICHIER INTERDIT : aucun fichier suivi du commit poussé ne tombe sous
+#      l'exclusion LOCALE (`.git/info/exclude`, jamais versionnée pour ne pas
+#      nommer ces chemins), sauf `.githooks/docs-versionnes` (docs/ versionnés
+#      exprès).
+#
+# Refuse le push si un contrôle échoue, et dit lequel. Sans exclusion locale, le
+# contrôle 3 est impossible : refus aussi — le hook ne passe pas à l'aveugle.
+#
+# Activation (une fois par clone) :
+#   ln -sf ../../.githooks/pre-push .git/hooks/pre-push
+# Essai : bash .githooks/tester.sh
+#
+# Les motifs s'écrivent avec des classes de caractères : le hook ne contient pas
+# les mots qu'il cherche, sinon il se refuserait lui-même.
+set -uo pipefail
+
+AUTEUR="TheMaxfly"
+MOTS='cl[a]ude|anthr[o]pic|co-author[e]d-by'
+SIGNATURES='co-author[e]d-by|generat[e]d (with|by) cl[a]ude|g[eé]n[eé]r[eé] (avec|par) cl[a]ude|cl[a]ude[ -]code|cl[a]ude\.ai'
+ZERO=0000000000000000000000000000000000000000
+
+distant="${1:-origin}"
+exclusion="$(git rev-parse --git-path info/exclude)"
+echecs=()
+
+liste_du_commit() {  # liste versionnée, lue dans le commit poussé
+    git show "$1:.githooks/$2" 2>/dev/null | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true
+}
+
+lignes_ajoutees() {  # « chemin<TAB>ligne » pour chaque ligne ajoutée du commit
+    git show --format= --unified=0 --no-color --no-ext-diff \
+        --diff-merges=first-parent "$1" |
+        awk '/^\+\+\+ / { f = substr($0, 7); next }
+             /^\+/      { print f "\t" substr($0, 2) }'
+}
+
+while read -r _ local_sha _ distant_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue  # suppression de branche
+    if [ "$distant_sha" = "$ZERO" ] || ! git cat-file -e "$distant_sha" 2>/dev/null; then
+        commits=$(git rev-list "$local_sha" --not --remotes="$distant")
+    else
+        commits=$(git rev-list "$distant_sha..$local_sha")
+    fi
+    techniques=$(liste_du_commit "$local_sha" mentions-techniques)
+
+    for c in $commits; do
+        court=$(git rev-parse --short "$c")
+        # 1. auteur et committer
+        IFS='|' read -r auteur committer < <(git log -1 --format='%an|%cn' "$c")
+        [ "$auteur" = "$AUTEUR" ] || echecs+=("$court : auteur « $auteur », attendu « $AUTEUR »")
+        [ "$committer" = "$AUTEUR" ] || echecs+=("$court : committer « $committer », attendu « $AUTEUR »")
+        # 2a. message
+        if git log -1 --format=%B "$c" | grep -qiE "$MOTS"; then
+            echecs+=("$court : le message de commit mentionne un assistant ou un co-auteur")
+        fi
+        # 2b. lignes ajoutées
+        while IFS=$'\t' read -r chemin ligne; do
+            if printf '%s\n' "$ligne" | grep -qiE "$SIGNATURES"; then
+                echecs+=("$court : marqueur d'auteur ajouté dans $chemin")
+            elif printf '%s\n' "$ligne" | grep -qiE "$MOTS" &&
+                ! grep -qxF "$chemin" <<<"$techniques"; then
+                echecs+=("$court : mention d'assistant ajoutée dans $chemin (fichier hors de .githooks/mentions-techniques)")
+            fi
+        done < <(lignes_ajoutees "$c" | grep -iE "$MOTS|$SIGNATURES" || true)
+    done
+
+    # 3. fichiers interdits, dans l'arbre poussé
+    if [ ! -s "$exclusion" ]; then
+        echecs+=("exclusion locale absente ($exclusion) : contrôle des fichiers interdits impossible")
+    else
+        permis=$(liste_du_commit "$local_sha" docs-versionnes)
+        index=$(mktemp)
+        GIT_INDEX_FILE="$index" git read-tree "$local_sha"
+        while read -r fichier; do
+            [ -n "$fichier" ] || continue
+            grep -qxF "$fichier" <<<"$permis" && continue
+            echecs+=("fichier interdit dans $(git rev-parse --short "$local_sha") : $fichier")
+        done < <(GIT_INDEX_FILE="$index" git ls-files -i -c --exclude-from="$exclusion")
+        rm -f "$index"
+    fi
+done
+
+if [ ${#echecs[@]} -gt 0 ]; then
+    echo "pre-push : PUSH REFUSÉ — ${#echecs[@]} contrôle(s) en échec :" >&2
+    printf '  - %s\n' "${echecs[@]}" >&2
+    exit 1
+fi
+echo "pre-push : auteur, mentions, fichiers — contrôles passés." >&2
+exit 0

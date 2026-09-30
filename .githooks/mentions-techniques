@@ -1,0 +1,14 @@
+# Fichiers où le nom du fournisseur d'IA est une donnée TECHNIQUE, pas une
+# signature : l'étage R a utilisé son API comme juge (dépendance, identifiants
+# de modèle), et le robots.txt du canari vise son crawler. Le hook pre-push y
+# tolère ce nom dans les lignes ajoutées — jamais un marqueur d'auteur
+# (co-auteur, « généré avec », nom de l'outil de développement).
+04_scraping_manga_sanctuary/canari/rapport.md
+05_nettoyage_agregation_bdd/pyproject.toml
+05_nettoyage_agregation_bdd/uv.lock
+05_nettoyage_agregation_bdd/src/identity/etage_r_contrat.py
+05_nettoyage_agregation_bdd/src/identity/etage_r_dossiers.py
+05_nettoyage_agregation_bdd/src/identity/etage_r_juge.py
+05_nettoyage_agregation_bdd/src/identity/etage_r_juge_openai.py
+05_nettoyage_agregation_bdd/tests/test_etage_r.py
+05_nettoyage_agregation_bdd/tests/test_etage_r_openai.py
