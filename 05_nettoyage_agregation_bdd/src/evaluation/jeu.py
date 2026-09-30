@@ -37,7 +37,8 @@ COLONNES_ATTENDUS = [
 MODES = ("proposition", "reconnaissance", "refus")
 ISSUES = ("au_catalogue", "reconnue_hors_catalogue", "inconnue")
 ORIGINES = ("nouvelle", "decembre")
-FAMILLES = tuple(f"F{i}" for i in range(1, 11))
+#: F11 « par référence » ajoutée le 2026-09-30 (migration 019).
+FAMILLES = tuple(f"F{i}" for i in range(1, 12))
 VOIES = ("titre", "auteur", "id", "regle")
 #: Seules familles dont l'attendu se dérive par une règle SQL (décision du
 #: 2026-09-29) — toujours en proposition.

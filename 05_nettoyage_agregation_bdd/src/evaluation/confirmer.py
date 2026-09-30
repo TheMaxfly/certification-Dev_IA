@@ -41,6 +41,7 @@ import typer
 from evaluation import catalogue as cat
 from evaluation import regles
 from evaluation.jeu import (
+    FAMILLES,
     FICHIER_SOURCE,
     Attendu,
     JeuInvalide,
@@ -338,7 +339,7 @@ def ecrire_rapport(
         "| Famille | Questions | | Mode | Questions |",
         "|---|---:|---|---|---:|",
     ]
-    lignes_f = [f"F{i}" for i in range(1, 11)]
+    lignes_f = list(FAMILLES)
     lignes_m = ["proposition", "reconnaissance", "refus"]
     for i in range(max(len(lignes_f), len(lignes_m))):
         f = lignes_f[i] if i < len(lignes_f) else ""

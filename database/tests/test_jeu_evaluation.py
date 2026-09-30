@@ -85,6 +85,25 @@ def test_un_jeu_coherent_est_accepte(base_migree):
         )
 
 
+def test_019_f11_par_reference_est_admise(base_migree):
+    """019 : la onzième famille, « par référence », en proposition et reprise de
+    décembre — et une mesure peut se ranger sous elle."""
+    poser(
+        base_migree,
+        [
+            question(
+                "Q001",
+                mode="proposition",
+                famille="F11",
+                origine="decembre",
+                origine_query_id=13,
+            )
+        ],
+        [("Q001", 2, 2)],
+    )
+    mesurer(base_migree, "hit_rate", 10, portee="famille:F11")
+
+
 def test_aucun_lien_vers_le_corpus(base_migree):
     """Le jeu doit survivre à toute reconstruction du corpus."""
     with psycopg.connect(base_migree) as cx:
@@ -109,7 +128,7 @@ def test_aucun_lien_vers_le_corpus(base_migree):
         (question(origine="decembre"), "origine"),
         (question(origine_query_id=3), "origine"),
         (question(qid="F3-01"), "question_id"),
-        (question(famille="F11"), "famille"),
+        (question(famille="F12"), "famille"),
         (question(note="  "), "note"),
     ],
 )
@@ -217,7 +236,7 @@ def test_une_mesure_en_double_echoue_au_lieu_d_ecraser(base_migree):
         ("mrr", None, "global"),
         ("taux_refus_correct", 10, "global"),
         ("recall_at_10", 10, "global"),
-        ("hit_rate", 10, "famille:F11"),
+        ("hit_rate", 10, "famille:F12"),
         ("hit_rate", 10, "mode:tout"),
     ],
 )

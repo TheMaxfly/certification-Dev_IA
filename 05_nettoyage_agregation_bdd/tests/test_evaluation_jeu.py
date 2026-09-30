@@ -87,7 +87,7 @@ def test_une_question_coherente_passe():
         ({"origine": "decembre"}, "origine_query_id"),
         ({"origine_query_id": "12"}, "origine_query_id"),
         ({"question_id": "F3-01"}, "Q001"),
-        ({"famille": "F11"}, "famille"),
+        ({"famille": "F12"}, "famille"),
         ({"mode": "tout"}, "mode"),
         ({"note": ""}, "note"),
     ],
