@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# pre-commit — les contrôles du dépôt public, AVANT que le commit n'existe.
+#
+#   1. AUCUNE MENTION D'ASSISTANT dans les lignes ajoutées : mêmes motifs que
+#      le pre-push (lus dans .githooks/pre-push, ils ne peuvent pas diverger),
+#      mêmes exceptions techniques (.githooks/mentions-techniques) — et jamais
+#      un marqueur d'auteur, même là.
+#   2. AUCUN FICHIER INTERDIT indexé : rien sous l'exclusion LOCALE
+#      (.git/info/exclude), sauf .githooks/docs-versionnes.
+#   3. AUCUN JETON : ni le jeton Hugging Face du poste en clair (compté, jamais
+#      affiché), ni une chaîne qui en a l'aspect (hf_ + 34 caractères).
+#
+# Ce qui est jugé : tout ce que le prochain push enverra, et non le seul écart à
+# HEAD. La base est le point de divergence avec la branche amont (sinon HEAD,
+# sinon l'arbre vide) : un `--amend` ne cache plus une ligne fautive déjà
+# commitée mais pas encore poussée. CONTROLE_BASE=<révision> force une base.
+#
+# Le message et l'auteur restent au pre-push : ce hook ne les voit pas encore.
+#
+# Activation (une fois par clone) :
+#   ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+# Essai : bash .githooks/tester.sh
+#
+# Les motifs s'écrivent avec des classes de caractères : le hook ne contient pas
+# les mots qu'il cherche, sinon il se refuserait lui-même.
+set -uo pipefail
+
+racine="$(git rev-parse --show-toplevel)" || exit 1
+cd "$racine" || exit 1
+
+if [ ! -r .githooks/pre-push ]; then
+    echo "pre-commit : .githooks/pre-push introuvable — motifs inconnus, refus." >&2
+    exit 1
+fi
+eval "$(grep -E "^(MOTS|SIGNATURES)=" .githooks/pre-push)"
+if [ -z "${MOTS:-}" ] || [ -z "${SIGNATURES:-}" ]; then
+    echo "pre-commit : motifs absents de .githooks/pre-push — refus." >&2
+    exit 1
+fi
+ASPECT_JETON='hf_[A-Za-z0-9]{34}'
+
+if [ -n "${CONTROLE_BASE:-}" ]; then
+    base="$CONTROLE_BASE"
+elif amont=$(git rev-parse -q --verify '@{upstream}' 2>/dev/null) &&
+    base=$(git merge-base HEAD "$amont" 2>/dev/null); then
+    :
+elif git rev-parse -q --verify HEAD >/dev/null; then
+    base=HEAD
+else
+    base=$(git hash-object -t tree /dev/null) # premier commit : arbre vide
+fi
+
+liste_indexee() { # liste versionnée, lue dans l'index
+    git show ":.githooks/$1" 2>/dev/null |
+        grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true
+}
+techniques=$(liste_indexee mentions-techniques)
+permis=$(liste_indexee docs-versionnes)
+echecs=()
+
+# 1. mentions et marqueurs d'auteur
+while IFS=$'\t' read -r chemin ligne; do
+    [ -n "$chemin" ] || continue
+    if printf '%s\n' "$ligne" | grep -qiE "$SIGNATURES"; then
+        echecs+=("marqueur d'auteur dans $chemin")
+    elif printf '%s\n' "$ligne" | grep -qiE "$MOTS" &&
+        ! grep -qxF "$chemin" <<<"$techniques"; then
+        echecs+=("mention d'assistant dans $chemin (fichier hors de .githooks/mentions-techniques)")
+    fi
+done < <(git diff --cached "$base" --unified=0 --no-color --no-ext-diff |
+    awk '/^\+\+\+ / { f = substr($0, 7); next }
+         /^\+/      { print f "\t" substr($0, 2) }' |
+    grep -iE "$MOTS|$SIGNATURES" || true)
+
+# 2. fichiers indexés sous l'exclusion locale
+exclusion="$(git rev-parse --git-path info/exclude)"
+if [ ! -s "$exclusion" ]; then
+    echecs+=("exclusion locale absente ($exclusion) : contrôle des fichiers interdits impossible")
+else
+    while read -r fichier; do
+        [ -n "$fichier" ] || continue
+        grep -qxF "$fichier" <<<"$permis" && continue
+        echecs+=("fichier interdit indexé : $fichier")
+    done < <(git ls-files -i -c --exclude-from="$exclusion")
+fi
+
+# 3. jetons
+ajoutees=$(git diff --cached "$base" --unified=0 --no-color --no-ext-diff | grep '^+' || true)
+fichier_jeton="${HF_HOME:-$HOME/.cache/huggingface}/token"
+for jeton in "${HF_TOKEN:-}" "$(cat "$fichier_jeton" 2>/dev/null)"; do
+    [ -n "$jeton" ] || continue
+    if grep -qF -- "$jeton" <<<"$ajoutees"; then
+        echecs+=("jeton Hugging Face du poste en clair dans l'index")
+        break
+    fi
+done
+if grep -qE "$ASPECT_JETON" <<<"$ajoutees"; then
+    echecs+=("chaîne d'aspect jeton Hugging Face dans l'index")
+fi
+
+if [ ${#echecs[@]} -gt 0 ]; then
+    echo "pre-commit : COMMIT REFUSÉ — ${#echecs[@]} contrôle(s) en échec :" >&2
+    printf '  - %s\n' "${echecs[@]}" >&2
+    exit 1
+fi
+echo "pre-commit : mentions, fichiers, jetons — contrôles passés." >&2
+exit 0
