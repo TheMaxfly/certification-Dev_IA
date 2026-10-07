@@ -20,8 +20,14 @@ from pathlib import Path
 
 import pytest
 
-# Image déjà présente en local : `postgres:16` déclencherait un pull réseau.
-IMAGE_POSTGRES = "postgres:16-alpine"
+# PostgreSQL 16 avec pgvector 0.6.0 — la version d'`apimanga` —, épinglée par
+# digest : la migration 020 crée l'extension `vector`, que `postgres:16-alpine`
+# n'embarque pas. Même image pour `outils/fidelite.sh`, le harnais du module 05
+# et l'intégration du module 02.
+IMAGE_POSTGRES = (
+    "pgvector/pgvector:0.6.0-pg16"
+    "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
+)
 MOT_DE_PASSE = "postgres"
 DELAI_DEMARRAGE = 60
 

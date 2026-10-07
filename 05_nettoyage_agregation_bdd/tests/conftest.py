@@ -26,7 +26,12 @@ import pytest
 
 RACINE = Path(__file__).resolve().parents[1]
 MIGRATIONS = RACINE.parents[0] / "database"
-IMAGE_POSTGRES = "postgres:16-alpine"
+# Celle du harnais de `database/` : PostgreSQL 16 + pgvector 0.6.0, par digest
+# (la migration 020 crée l'extension `vector`).
+IMAGE_POSTGRES = (
+    "pgvector/pgvector:0.6.0-pg16"
+    "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
+)
 DELAI_DEMARRAGE = 60
 
 sys.path.insert(0, str(RACINE / "src"))

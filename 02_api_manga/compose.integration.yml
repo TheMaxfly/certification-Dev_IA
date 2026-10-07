@@ -13,8 +13,11 @@
 # tuerait le harnais dès la fin des migrations.
 
 services:
+  # PostgreSQL 16 + pgvector 0.6.0, épinglée par digest : la migration 020 crée
+  # l'extension `vector`. Les services `role` et `fixture` ne sont que des
+  # clients (psql, sh busybox) et gardent `postgres:16-alpine`.
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.6.0-pg16@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3
     environment:
       POSTGRES_DB: apimanga
       POSTGRES_USER: postgres

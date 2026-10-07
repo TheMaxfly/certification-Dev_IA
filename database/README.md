@@ -62,6 +62,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `017_hors_catalogue_toute_famille.sql` | l'issue `reconnue_hors_catalogue` admise dans **toute famille**, en reconnaissance — la réserve F1/F2 de 016 était trop étroite (un romaji jamais édité relève de F5). Un CHECK remplacé |
 | `018_methode_kitsu_propagation.sql` | `kitsu_propagation` au CHECK des méthodes : l'étage qui propage le `kitsu_id` d'une identité déjà décidée, par ses identifiants MAL / AniList. Une valeur ajoutée, aucune table ni donnée |
 | `019_famille_par_reference.sql` | **F11 « par référence »** au jeu d'évaluation : les CHECK de la famille (`eval_questions`) et de la portée d'une mesure (`eval_mesures`) s'ouvrent à F11 — la similarité à un titre connu, dont la référence n'est pas une réponse |
+| `020_vecteurs_pgvector.sql` | **pgvector dans la chaîne** (`CREATE EXTENSION vector`, **superutilisateur**) et l'encodage E2 : `bench.encodages` (ce qui a produit les vecteurs) et une table de vecteurs **par modèle**, `vecteurs_bge_m3` en `vector(1024)` et `vecteurs_embeddinggemma` en `vector(768)` — unitaires (CHECK), clé `chunk_id` vers `corpus_chunks` **sans cascade**, aucun index approximatif (cf. « Notes sur `020` ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -94,10 +95,10 @@ son seul emploi légitime, et il est réservé à ce cas.
 `001`, `002` et `003` ont été **appliquées à `apimanga` le 2026-07-15**, `004`
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
 le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
-`017` le 2026-09-29, `018` et `019` le 2026-09-30 ; `000` y a été **marquée
+`017` le 2026-09-29, `018` et `019` le 2026-09-30, `020` le 2026-10-07 ; `000` y a été **marquée
 appliquée** le 2026-07-15, sans exécution. Le contrôle affiche **20 migrations
 appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
-(1 704 lignes de part et d'autre, 2026-09-30).
+(1 777 lignes de part et d'autre, extensions et versions identiques, 2026-10-07).
 
 `applied_at` de `000` est plus **récent** que celui de `001`/`002` alors que sa
 version est plus ancienne : la baseline date le constat, pas la construction.
@@ -120,6 +121,11 @@ dépôt est identique à la base réelle.
 ```bash
 bash outils/fidelite.sh   # rejeu 000→NNN sur base jetable, diff contre apimanga
 ```
+
+Depuis `020`, le contrôle compare aussi la **liste des extensions et leurs
+versions** (`pg_extension`) : elles vivent dans `public` ou `pg_catalog`, hors des
+schémas que lit `pg_dump -n`. Jusque-là, une base reconstruite **sans** `vector`
+passait le diff, alors qu'`apimanga` la portait.
 
 ## Règles
 
@@ -311,8 +317,12 @@ son `.env` n'est pas versionné.
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 126 tests. Le harnais lance un PostgreSQL
-**jetable** en conteneur et crée une base neuve par test. Si Docker est absent,
+`uv run --extra dev pytest tests/` — 181 tests (2026-10-07). Le harnais lance un
+PostgreSQL **jetable** en conteneur — `pgvector/pgvector:0.6.0-pg16`, épinglée par
+digest (PostgreSQL 16 et pgvector 0.6.0, la version d'`apimanga`) : depuis `020`,
+la chaîne crée l'extension `vector`, que `postgres:16-alpine` n'embarque pas. La
+même image sert `outils/fidelite.sh`, le harnais du module 05 et l'intégration du
+module 02 et crée une base neuve par test. Si Docker est absent,
 les tests **skippent avec un message** : ils ne se rabattent jamais sur une base
 réelle, et `apimanga` n'est jamais atteignable depuis la suite.
 
@@ -336,6 +346,48 @@ les privilèges par défaut, le rejeu du fichier ne change aucune ACL, et aucune
 migration ne contient le mot `PASSWORD`. L'inventaire est dérivé du catalogue,
 gardé par deux sentinelles en dur — sans elles, un catalogue vide validerait
 tout.
+
+`tests/test_vecteurs.py` (16 tests) couvre `020` : extension `vector` en 0.6.0,
+colonnes `vector(1024)` / `vector(768)`, clé vers les fragments en `NO ACTION`,
+aucun index autre que btree ; refus d'un vecteur de mauvaise dimension, non
+unitaire, rattaché à un fragment inconnu ou à l'encodage d'un autre modèle ; un
+fragment vectorisé ne se supprime ni directement ni par la cascade
+`corpus_docs → corpus_chunks` ; un encodage par le service nomme son image ; mêmes
+paramètres, même encodage. Vérifié par mutation, 4/4 : CHECK de norme retiré,
+`ON DELETE CASCADE` ajouté, clé composite réduite à `encodage_id`, contrainte
+d'image retirée — chaque fois, au moins un test vire au rouge.
+
+## Notes sur `020` — pgvector, et les vecteurs de l'encodage E2
+
+**L'élévation.** `CREATE EXTENSION vector` exige un superutilisateur : pgvector
+0.6.0 n'est pas « trusted ». C'est la première migration à le déclarer — elle se
+joue sous `postgres`, comme les autres, et le dit en tête de fichier. C'est aussi
+la première extension qui demande un **paquet à part** sur le serveur
+(`postgresql-16-pgvector` sous Debian / Ubuntu) : `pg_trgm` (003) est livré avec
+PostgreSQL. `INSTALLATION.md` le vérifie avant la création de la base.
+
+**Pourquoi la chaîne la crée.** `apimanga` portait `vector` 0.6.0 depuis
+décembre, installée à la main, sans qu'aucune colonne l'utilise : la base
+reconstruite par la chaîne ne l'avait pas, et rien ne le signalait. Sur
+`apimanga`, `IF NOT EXISTS` n'a rien fait (appliquée le 2026-10-07) ; c'est la
+chaîne qui la décrit désormais, et `fidelite.sh` compare les versions.
+
+**Une table par modèle.** La dimension est dans le type : la base refuse un
+vecteur de la mauvaise taille. Une colonne `modele`, contrainte à une seule
+valeur par table, porte la clé étrangère composite `(encodage_id, modele)` vers
+`bench.encodages` : une ligne de `vecteurs_bge_m3` vient d'un encodage de BGE-M3,
+et de rien d'autre.
+
+**Sans cascade.** `chunk_id` référence `bench.corpus_chunks` en `NO ACTION`. Le
+corpus se reconstruit par `DELETE` sur `corpus_docs`, qui cascade sur
+`corpus_chunks` (héritage de décembre) : avec des vecteurs en base, cette
+reconstruction échoue désormais. C'est voulu — 154 jugements de décembre ont
+disparu en silence par cette cascade le 2026-09-28 (cf. `016`) ; des vecteurs ne
+suivront pas le même chemin. Reconstruire le corpus demandera de décider d'abord
+du sort des encodages.
+
+**Recherche exacte.** Aucun index `ivfflat` ni `hnsw` : un index approximatif
+changerait les résultats qu'on cherche à mesurer.
 
 ## Notes sur `002`
 

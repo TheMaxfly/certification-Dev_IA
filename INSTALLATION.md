@@ -9,7 +9,7 @@ procédure de production suppose l'accès licite aux sources et aux snapshots.
 | Objet | Prouver que le schéma, les droits et l'API sont conformes | Obtenir la base réelle |
 | Données | Fixture réduite et versionnée | Snapshots issus des collectes |
 | Durée | Quelques minutes | Environ 11 h pour le seul crawl Manga Sanctuary |
-| Prérequis | Docker Engine avec le plugin Compose v2 (`docker compose`) | PostgreSQL 16, Python 3.12, `uv`, `psql`, `createdb`, OpenSSL, accès aux sources et autorisations nécessaires |
+| Prérequis | Docker Engine avec le plugin Compose v2 (`docker compose`) | PostgreSQL 16 avec l'extension pgvector 0.6.0, Python 3.12, `uv`, `psql`, `createdb`, OpenSSL, accès aux sources et autorisations nécessaires |
 
 Les commandes ci-dessous se lancent depuis la racine du dépôt, sauf mention
 contraire. Aucun mot de passe ni aucune clé ne doit être ajouté à Git.
@@ -17,7 +17,7 @@ contraire. Aucun mot de passe ni aucune clé ne doit être ajouté à Git.
 ## 1. Vérification de l'installation — procédure C4
 
 Cette procédure est autonome à partir du dépôt et de Docker. Elle crée une
-PostgreSQL 16 jetable, applique **toutes les migrations présentes dans
+PostgreSQL 16 jetable (image `pgvector/pgvector:0.6.0-pg16`, épinglée par digest), applique **toutes les migrations présentes dans
 `database/migrations/`**, crée `manga_ro` puis `manga_api`, injecte une fixture,
 prouve que le rôle applicatif ne peut pas écrire, démarre l'API et exécute les
 appels HTTP de contrôle.
@@ -62,6 +62,17 @@ docker compose version
 PostgreSQL 16 est la version de référence et Python 3.12 satisfait les
 contraintes communes du runner, des chargeurs et de l'API. Les dépendances
 Python sont résolues par les `pyproject.toml` et `uv.lock` propres aux modules.
+
+La migration `020` crée l'extension **pgvector**, qui n'est pas livrée avec
+PostgreSQL : son paquet doit être installé sur le serveur (Debian / Ubuntu :
+`postgresql-16-pgvector`). La version de référence est **0.6.0** ; la commande
+ci-dessous doit la rendre avant d'aller plus loin. `CREATE EXTENSION vector`
+exige un superutilisateur — c'est le cas du rôle `postgres` utilisé ici.
+
+```bash
+psql --dbname=postgres --tuples-only --no-align --command \
+  "SELECT default_version FROM pg_available_extensions WHERE name = 'vector'"
+```
 
 ### 2.2 Créer la base et vérifier son propriétaire
 
