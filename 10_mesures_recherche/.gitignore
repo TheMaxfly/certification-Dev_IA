@@ -1,0 +1,14 @@
+# Environnements et artefacts Python
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Résultats des exécutions et stockage MLflow : hors dépôt.
+resultats/
+mlflow/

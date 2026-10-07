@@ -1,0 +1,116 @@
+# Banc de mesure de la recherche — spec E2 jour 2.
+#
+# TOUS les réglages des six mesures, fixés AVANT toute exécution (2026-10-07).
+# Aucun n'est changé après avoir vu un résultat : un changement serait une
+# nouvelle mesure, déclarée comme telle (nouveau numéro, nouveau nom).
+# Ce fichier est enregistré en pièce de chaque run MLflow, avec son empreinte.
+
+[jeu]
+# Version gelée et son empreinte : vérifiées en PREMIÈRE action de chaque
+# exécution, dans les fichiers versionnés ET dans bench.eval_jeux ; sinon, arrêt.
+version = "v2"
+empreinte = "31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30"
+dossier = "database/donnees/jeu_evaluation/v2"  # relatif à la racine du dépôt
+
+[classement]
+# Entités rendues par une configuration pour une question.
+k = 10
+# Égalités de score départagées par l'identifiant de l'entité, croissant : le
+# series_id d'une série, le kitsu_id d'une entité Kitsu, comparés comme nombres ;
+# à nombre égal, la série d'abord. Les égalités qui chevauchent le rang 10 sont
+# comptées par question.
+departage = "identifiant_croissant"
+
+[metriques]
+hit_rate = [5, 10]
+mrr = [10]
+ndcg = [10]
+# nDCG : gain = grade du jeu (2 très pertinent, 1 pertinent, 0 sinon), remise
+# 1 / log2(rang + 1) ; idéal = les grades attendus triés, tronqués à k.
+gain_ndcg = "grade"
+# Portées écrites : global, par mode, par famille ; deux périmètres.
+portees = ["global", "mode", "famille"]
+perimetres = ["toutes", "atteignables"]
+
+[bootstrap]
+# Bootstrap apparié sur les questions de rang (périmètre « toutes »).
+tirages = 10000
+graine = 20261007
+metriques = ["hit_rate@10", "ndcg@10"]
+alpha = 0.05
+# Correction de Bonferroni : seuil alpha / nombre de comparaisons, et intervalle
+# de confiance à 1 - alpha / 4 (percentiles).
+comparaisons = [[1, 2], [4, 1], [1, 3], [6, 3]]
+
+[mlflow]
+experience = "E2-mesures-recherche-jeu-v2"
+
+# --------------------------------------------------------------------------- #
+#  Les six mesures
+# --------------------------------------------------------------------------- #
+
+[[mesures]]
+numero = 1
+nom = "bge-m3-sens"
+type = "semantique"
+# Instance du service (module 09) : la question y est encodée, rôle « requete »,
+# avec le préfixe de sa configuration (BGE-M3 : aucun). Une question par
+# requête : le même texte rend le même vecteur, au bit (contrôle E2 jour 1).
+instance = "bge-m3"
+table = "bench.vecteurs_bge_m3"
+modele = "BAAI/bge-m3"
+similarite = "cosinus"  # vecteurs unitaires : produit scalaire, calculé en float64
+
+[[mesures]]
+numero = 2
+nom = "embeddinggemma-sens"
+type = "semantique"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 3
+nom = "plein-texte-postgresql"
+type = "plein_texte"
+configuration = "french"
+# Les lexèmes de plainto_tsquery(question), reliés par OU (« | ») au lieu de ET.
+operateur = "OU"
+rang = "ts_rank_cd"
+normalisation = 0  # défaut de ts_rank_cd : aucune normalisation par la longueur
+# Calcul à la volée (tsvector des fragments recalculé à chaque exécution, aucune
+# table ni index) : retenu si l'exécution tient sous cinq minutes.
+calcul = "a_la_volee"
+
+[[mesures]]
+numero = 4
+nom = "fusion-plein-texte-bge-m3"
+type = "fusion"
+sources = [3, 1]
+methode = "rang_reciproque"
+k_rrf = 60
+profondeur = 100  # les 100 premières entités de chaque liste
+
+[[mesures]]
+numero = 5
+nom = "fusion-plein-texte-embeddinggemma"
+type = "fusion"
+sources = [3, 2]
+methode = "rang_reciproque"
+k_rrf = 60
+profondeur = 100
+
+[[mesures]]
+numero = 6
+nom = "tfidf-scikit-learn"
+type = "tfidf"
+lowercase = true
+strip_accents = "unicode"
+analyzer = "word"
+ngram_min = 1
+ngram_max = 1
+sublinear_tf = true
+min_df = 2
+norm = "l2"
+similarite = "cosinus"
