@@ -2,6 +2,7 @@
 `bench.eval_mesures`.
 
 Le run porte :
+  - étiquettes : le numéro de la mesure, son tour, la spec qui l'a déclarée ;
   - paramètres : tous les réglages de la mesure, la version et l'empreinte du jeu,
     l'empreinte de la configuration, le commit (et si l'arbre était propre),
     l'empreinte du code du module, l'identifiant d'encodage et la version du
@@ -121,7 +122,13 @@ def enregistrer(resultat: dict, dsn_ecriture: str, stockage: Path = STOCKAGE) ->
     mlflow.set_experiment(nom)
 
     with mlflow.start_run(run_name=f"{resultat['mesure']}-{resultat['nom']}") as run:
-        mlflow.set_tags({"mesure": str(resultat["mesure"]), "spec": "E2 jour 2"})
+        mlflow.set_tags(
+            {
+                "mesure": str(resultat["mesure"]),
+                "tour": str(resultat["tour"]),
+                "spec": resultat["spec"],
+            }
+        )
         mlflow.log_params(parametres(resultat))
         mlflow.log_metrics(
             {

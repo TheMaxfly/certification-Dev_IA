@@ -84,3 +84,36 @@ def test_fusion_hors_profondeur_vaut_zero(ent):
     a = classer(ent, np.array([4.0, 3.0, 2.0, 1.0]))
     s = fusion([a], k_rrf=60, profondeur=1)
     assert s[0] == pytest.approx(1 / 61) and not s[1:].any()
+
+
+# --------------------------------------------------------------------------- #
+#  Tour 2 — le périmètre des entités classées
+# --------------------------------------------------------------------------- #
+
+
+def test_perimetre_catalogue_retire_les_entites_kitsu_ordre_conserve(ent):
+    # Entités : 0 serie:5, 1 serie:9, 2 kitsu:7, 3 kitsu:5.
+    scores = np.array([0.1, 0.8, 0.9, 0.7])
+    toutes = classer(ent, scores)
+    catalogue = classer(ent, scores, "catalogue")
+    assert [c for c, _ in toutes.top(ent, 4)] == [
+        "kitsu:7",
+        "serie:9",
+        "kitsu:5",
+        "serie:5",
+    ]
+    assert [c for c, _ in catalogue.top(ent, 10)] == ["serie:9", "serie:5"]
+    assert catalogue.rang(ent.index_serie[5]) == 2 < toutes.rang(ent.index_serie[5])
+    np.testing.assert_array_equal(catalogue.scores, toutes.scores)
+
+
+def test_perimetre_inconnu_refuse(ent):
+    with pytest.raises(ValueError, match="périmètre inconnu"):
+        classer(ent, np.zeros(4), "series")
+
+
+def test_fusion_au_catalogue_sur_les_tetes_du_perimetre(ent):
+    # Au catalogue, la tête de liste de profondeur 1 est la première SÉRIE.
+    a = classer(ent, np.array([0.1, 0.8, 0.9, 0.7]), "catalogue")
+    s = fusion([a], k_rrf=60, profondeur=1)
+    assert s[ent.index_serie[9]] == pytest.approx(1 / 61) and s.sum() == s[1]

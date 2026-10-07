@@ -137,9 +137,39 @@ def titres(cx, cles: list[str]) -> dict[str, str | None]:
     return sortie
 
 
+def controle_filtre(sans: dict, avec: dict) -> dict:
+    """Une mesure filtrée sur le catalogue contre la même sans filtre (7 contre 1,
+    8 contre 2, 9 contre 6) : pour chaque question de rang, le rang de la
+    première série attendue avec filtre doit être ≤ celui sans filtre — retirer
+    des concurrents ne peut pas faire reculer une série. Toute question qui
+    recule est une erreur de harnais."""
+    rang_sans = {
+        q["question_id"]: q["rang_premiere_attendue"]
+        for q in sans["questions"]
+        if q["de_rang"]
+    }
+    rang_avec = {
+        q["question_id"]: q["rang_premiere_attendue"]
+        for q in avec["questions"]
+        if q["de_rang"]
+    }
+    if rang_sans.keys() != rang_avec.keys():
+        raise ValueError("questions de rang différentes")
+    reculs = sorted(q for q in rang_sans if rang_avec[q] > rang_sans[q])
+    return {
+        "sans": sans["mesure"],
+        "avec": avec["mesure"],
+        "n": len(rang_sans),
+        "egal": sum(rang_avec[q] == rang_sans[q] for q in rang_sans),
+        "avance": sum(rang_avec[q] < rang_sans[q] for q in rang_sans),
+        "reculs": reculs,
+    }
+
+
 def reference_mlflow(numero: int, spec: str = "E2 jour 2") -> dict:
     """La pièce `resultat.json` du run MLflow de la mesure."""
     import mlflow
+
     from mesures_recherche.enregistrement import uri_suivi
 
     mlflow.set_tracking_uri(uri_suivi())

@@ -11,6 +11,9 @@ RACINE_DEPOT = RACINE_MODULE.parent
 FICHIER = RACINE_MODULE / "config" / "mesures.toml"
 
 
+PERIMETRES = ("toutes", "catalogue")
+
+
 class ConfigurationInvalide(Exception):
     pass
 
@@ -23,6 +26,13 @@ def charger(chemin: Path = FICHIER) -> dict:
     for m in config["mesures"]:
         if m["type"] == "fusion" and not all(s < m["numero"] for s in m["sources"]):
             raise ConfigurationInvalide(f"fusion {m['numero']} : sources postérieures")
+    for m in config["mesures"]:
+        if perimetre(m) not in PERIMETRES:
+            raise ConfigurationInvalide(
+                f"mesure {m['numero']} : perimetre_entites {perimetre(m)!r}"
+            )
+        if str(tour(m)) not in config["tours"]:
+            raise ConfigurationInvalide(f"mesure {m['numero']} : tour inconnu")
     for a, b in config["bootstrap"]["comparaisons"]:
         if not {a, b} <= set(numeros):
             raise ConfigurationInvalide(f"comparaison {a}–{b} : mesure inconnue")
@@ -34,6 +44,16 @@ def mesure(config: dict, numero: int) -> dict:
         if m["numero"] == numero:
             return m
     raise ConfigurationInvalide(f"mesure {numero} absente de la configuration")
+
+
+def perimetre(m: dict) -> str:
+    """Périmètre des entités classées ; absent (tour 1) : « toutes »."""
+    return m.get("perimetre_entites", "toutes")
+
+
+def tour(m: dict) -> int:
+    """Tour de mesure ; absent : le premier."""
+    return m.get("tour", 1)
 
 
 def empreinte(chemin: Path = FICHIER) -> str:

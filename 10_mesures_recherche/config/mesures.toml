@@ -1,9 +1,13 @@
-# Banc de mesure de la recherche — spec E2 jour 2.
+# Banc de mesure de la recherche — specs E2 jour 2 (tour 1) et jour 3 (tour 2).
 #
-# TOUS les réglages des six mesures, fixés AVANT toute exécution (2026-10-07).
-# Aucun n'est changé après avoir vu un résultat : un changement serait une
-# nouvelle mesure, déclarée comme telle (nouveau numéro, nouveau nom).
-# Ce fichier est enregistré en pièce de chaque run MLflow, avec son empreinte.
+# Tour 1 — mesures 1 à 6 : TOUS leurs réglages fixés AVANT toute exécution
+# (2026-10-07, spec E2 jour 2). Ils ne changent plus.
+# Tour 2 — mesures 7 à 13 : choisies APRÈS lecture du premier tour, déclarées ici
+# AVANT toute exécution du second (2026-10-07, spec E2 jour 3) ; réglages de la
+# spec, aucun ajusté après avoir vu un résultat.
+# Un changement serait une nouvelle mesure, déclarée comme telle (nouveau
+# numéro, nouveau nom). Ce fichier est enregistré en pièce de chaque run MLflow,
+# avec son empreinte.
 
 [jeu]
 # Version gelée et son empreinte : vérifiées en PREMIÈRE action de chaque
@@ -20,6 +24,15 @@ k = 10
 # à nombre égal, la série d'abord. Les égalités qui chevauchent le rang 10 sont
 # comptées par question.
 departage = "identifiant_croissant"
+# Périmètre des entités classées, réglage `perimetre_entites` d'une mesure :
+#   « toutes »    — toutes les entités occupent un rang (tour 1) ;
+#   « catalogue » — seules les séries du catalogue sont classées : les entités
+#                   Kitsu sont retirées du classement, l'ordre des séries est
+#                   conservé ; les scores ne changent pas (TF-IDF ajusté sur les
+#                   66 290 fragments, comme au tour 1).
+# Pour une fusion, le périmètre vaut pour chaque liste source (ses
+# `profondeur` premières entités du périmètre) et pour la liste fusionnée.
+# Absent (mesures 1 à 6) : « toutes ».
 
 [metriques]
 hit_rate = [5, 10]
@@ -39,14 +52,24 @@ graine = 20261007
 metriques = ["hit_rate@10", "ndcg@10"]
 alpha = 0.05
 # Correction de Bonferroni : seuil alpha / nombre de comparaisons, et intervalle
-# de confiance à 1 - alpha / 4 (percentiles).
-comparaisons = [[1, 2], [4, 1], [1, 3], [6, 3]]
+# de confiance à 1 - alpha / m (percentiles). Tour 1 : les quatre premières
+# (m = 4 au jour 2). Tour 2 : deux de plus, déclarées d'avance — 10 contre 2,
+# 11 contre 8 —, soit six tests : seuil 0,05 / 6. Le filtre sur le catalogue
+# se mesure mais ne se teste pas (7–1, 8–2, 9–6 : retirer des concurrents ne
+# peut pas faire reculer une série).
+comparaisons = [[1, 2], [4, 1], [1, 3], [6, 3], [10, 2], [11, 8]]
 
 [mlflow]
 experience = "E2-mesures-recherche-jeu-v2"
 
+[tours]
+# Tour de mesure (étiquette `tour` du run MLflow) → spec qui l'a déclaré. Une
+# mesure sans `tour` est du tour 1.
+1 = "E2 jour 2"
+2 = "E2 jour 3"
+
 # --------------------------------------------------------------------------- #
-#  Les six mesures
+#  Tour 1 — les six mesures du jour 2
 # --------------------------------------------------------------------------- #
 
 [[mesures]]
@@ -114,3 +137,95 @@ sublinear_tf = true
 min_df = 2
 norm = "l2"
 similarite = "cosinus"
+
+# --------------------------------------------------------------------------- #
+#  Tour 2 — spec E2 jour 3, §4 : deux réglages nouveaux, le périmètre des
+#  entités et la fusion avec le TF-IDF au lieu du plein texte PostgreSQL.
+#  Mêmes métriques, mêmes portées, mêmes pièces qu'au tour 1.
+# --------------------------------------------------------------------------- #
+
+[[mesures]]
+numero = 7
+nom = "bge-m3-sens-catalogue"
+tour = 2
+type = "semantique"
+perimetre_entites = "catalogue"
+instance = "bge-m3"
+table = "bench.vecteurs_bge_m3"
+modele = "BAAI/bge-m3"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 8
+nom = "embeddinggemma-sens-catalogue"
+tour = 2
+type = "semantique"
+perimetre_entites = "catalogue"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 9
+nom = "tfidf-scikit-learn-catalogue"
+tour = 2
+type = "tfidf"
+perimetre_entites = "catalogue"
+lowercase = true
+strip_accents = "unicode"
+analyzer = "word"
+ngram_min = 1
+ngram_max = 1
+sublinear_tf = true
+min_df = 2
+norm = "l2"
+similarite = "cosinus"
+
+# Fusions TF-IDF (6) + EmbeddingGemma (2) : rang réciproque sur les 100
+# premières entités de chaque liste, comme au tour 1 ; seule la constante k_rrf
+# varie entre 12, 10 et 13.
+
+[[mesures]]
+numero = 10
+nom = "fusion-tfidf-embeddinggemma"
+tour = 2
+type = "fusion"
+perimetre_entites = "toutes"
+sources = [6, 2]
+methode = "rang_reciproque"
+k_rrf = 60
+profondeur = 100
+
+[[mesures]]
+numero = 11
+nom = "fusion-tfidf-embeddinggemma-catalogue"
+tour = 2
+type = "fusion"
+perimetre_entites = "catalogue"
+sources = [6, 2]
+methode = "rang_reciproque"
+k_rrf = 60
+profondeur = 100
+
+[[mesures]]
+numero = 12
+nom = "fusion-tfidf-embeddinggemma-k10"
+tour = 2
+type = "fusion"
+perimetre_entites = "toutes"
+sources = [6, 2]
+methode = "rang_reciproque"
+k_rrf = 10
+profondeur = 100
+
+[[mesures]]
+numero = 13
+nom = "fusion-tfidf-embeddinggemma-k100"
+tour = 2
+type = "fusion"
+perimetre_entites = "toutes"
+sources = [6, 2]
+methode = "rang_reciproque"
+k_rrf = 100
+profondeur = 100

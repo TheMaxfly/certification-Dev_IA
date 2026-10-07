@@ -6,8 +6,9 @@ Ordre, toujours le même :
   1. session en lecture seule côté serveur ; PREMIÈRE action : l'empreinte du
      jeu (fichiers et base) contre celle de la configuration — sinon, arrêt ;
   2. lecture du jeu, du rattachement fragment → entité, des séries atteignables ;
-  3. pour chaque question, le classement complet des entités, ses k premières,
-     le rang de la première série attendue, les métriques ;
+  3. pour chaque question, le classement des entités du périmètre de la mesure
+     (toutes, ou les seules séries du catalogue), ses k premières, le rang de la
+     première série attendue, les métriques ;
   4. les moyennes par portée et par périmètre.
 
 Sans `--enregistrer`, rien n'est écrit nulle part hors du fichier de sortie :
@@ -112,9 +113,12 @@ def configuration_de(ctx: Contexte, numero: int):
         fonction = t.scores
     elif m["type"] == "fusion":
         sources = [configuration_de(ctx, s) for s in m["sources"]]
+        perimetre = configuration.perimetre(m)
 
-        def fonction(question, sources=sources, m=m):
-            classements = [recherche.classer(ctx.entites, f(question)) for f in sources]
+        def fonction(question, sources=sources, m=m, perimetre=perimetre):
+            classements = [
+                recherche.classer(ctx.entites, f(question), perimetre) for f in sources
+            ]
             return recherche.fusion(classements, m["k_rrf"], m["profondeur"])
 
         for s in m["sources"]:
@@ -142,11 +146,13 @@ class LigneQuestion:
 
 def mesurer(ctx: Contexte, numero: int) -> dict:
     k = ctx.config["classement"]["k"]
+    m = configuration.mesure(ctx.config, numero)
+    perimetre = configuration.perimetre(m)
     fonction = configuration_de(ctx, numero)
     debut = time.monotonic()
     lignes: list[LigneQuestion] = []
     for q in ctx.questions:
-        c = recherche.classer(ctx.entites, fonction(q))
+        c = recherche.classer(ctx.entites, fonction(q), perimetre)
         top = c.top(ctx.entites, k)
         rangs = [
             c.rang(ctx.entites.index_serie[s])
@@ -176,10 +182,13 @@ def mesurer(ctx: Contexte, numero: int) -> dict:
         {lq.question_id: lq.metriques for lq in lignes},
         ctx.entites.atteignables,
     )
-    m = configuration.mesure(ctx.config, numero)
+    tour = configuration.tour(m)
     return {
         "mesure": numero,
         "nom": m["nom"],
+        "tour": tour,
+        "spec": ctx.config["tours"][str(tour)],
+        "perimetre_entites": perimetre,
         "reglages": m,
         "jeu_version": ctx.config["jeu"]["version"],
         "jeu_empreinte": ctx.empreinte_jeu,

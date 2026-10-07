@@ -15,7 +15,7 @@ import hashlib
 import psycopg
 import pytest
 
-from mesures_recherche import executer, jeu
+from mesures_recherche import diagnostic, executer, jeu, recherche
 
 
 def questions(resultat):
@@ -88,6 +88,7 @@ def test_rejeu_identique(banc):
 
 def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
     import mlflow
+
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
 
     dsn, config, _ = banc
@@ -102,6 +103,7 @@ def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
     assert run.data.params["reglage.configuration"] == "french"
     assert len(run.data.params["code_empreinte"]) == 64
     assert run.data.metrics["hit_rate_10/global/toutes"] == pytest.approx(1.0)
+    assert run.data.tags["tour"] == "1" and run.data.tags["spec"] == "E2 jour 2"
     pieces = {a.path for a in mlflow.MlflowClient().list_artifacts(run_id)}
     assert {"par_question.csv", "mesures.toml", "resultat.json"} <= pieces
 
@@ -123,3 +125,90 @@ def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
         for a in resultat["agregats"]
     }
     assert set(lignes) == attendu
+
+
+# --------------------------------------------------------------------------- #
+#  Tour 2 — périmètre « catalogue », fusion TF-IDF + sens
+# --------------------------------------------------------------------------- #
+
+
+def test_filtre_catalogue_sens_et_tfidf(banc, encodeur_doublure):
+    dsn, config, _ = banc
+    ctx = executer.ouvrir(dsn, config)
+    for sans, avec in ((1, 7), (6, 9)):
+        r_sans, r_avec = executer.mesurer(ctx, sans), executer.mesurer(ctx, avec)
+        assert r_avec["tour"] == 2 and r_avec["spec"] == "E2 jour 3"
+        assert r_avec["perimetre_entites"] == "catalogue"
+        assert r_sans["perimetre_entites"] == "toutes"
+        for q in r_avec["questions"]:
+            assert q["top"] and all(c.startswith("serie:") for c, _ in q["top"])
+        controle = diagnostic.controle_filtre(r_sans, r_avec)
+        assert controle["reculs"] == [] and controle["n"] == 2
+    # Q001 vise le fragment 102 (série 2) : au catalogue, kitsu:60 ne compte plus.
+    assert questions(executer.mesurer(ctx, 7))["Q001"]["top"][0] == ("serie:2", 1.0)
+
+
+def test_controle_filtre_signale_un_recul():
+    def r(n, rang):
+        return {
+            "mesure": n,
+            "questions": [
+                {"question_id": "Q001", "de_rang": True, "rang_premiere_attendue": rang}
+            ],
+        }
+
+    assert diagnostic.controle_filtre(r(1, 5), r(7, 3))["avance"] == 1
+    assert diagnostic.controle_filtre(r(1, 5), r(7, 6))["reculs"] == ["Q001"]
+
+
+def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch):
+    dsn, config, _ = banc
+    config["mesures"].append(
+        {
+            "numero": 14,
+            "nom": "essai-fusion-tfidf-sens-catalogue",
+            "tour": 2,
+            "type": "fusion",
+            "perimetre_entites": "catalogue",
+            "sources": [6, 1],
+            "methode": "rang_reciproque",
+            "k_rrf": 60,
+            "profondeur": 100,
+        }
+    )
+    ctx = executer.ouvrir(dsn, config)
+    perimetres = []
+    classer = recherche.classer
+
+    def espion(entites, scores, perimetre="toutes"):
+        perimetres.append(perimetre)
+        return classer(entites, scores, perimetre)
+
+    monkeypatch.setattr(recherche, "classer", espion)
+    r = executer.mesurer(ctx, 14)
+    # Chaque liste source ET la liste fusionnée : au catalogue.
+    assert len(perimetres) == 3 * len(ctx.questions)
+    assert set(perimetres) == {"catalogue"}
+    assert {"source_6_vocabulaire", "source_1_encodage_id"} <= set(r["parametres"])
+    for q in r["questions"]:
+        assert all(c.startswith("serie:") for c, _ in q["top"])
+    assert questions(r)["Q001"]["metriques"]["hit_rate@10"] == 1.0
+
+
+def test_enregistrement_tour_2_etiquete(banc, tmp_path):
+    import mlflow
+
+    from mesures_recherche.enregistrement import enregistrer, uri_suivi
+
+    dsn, config, _ = banc
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 9)
+    resultat["experience"] = "essai"
+    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
+    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    run = mlflow.get_run(run_id)
+    assert run.data.tags == run.data.tags | {
+        "mesure": "9",
+        "tour": "2",
+        "spec": "E2 jour 3",
+    }
+    assert run.data.params["reglage.perimetre_entites"] == "catalogue"

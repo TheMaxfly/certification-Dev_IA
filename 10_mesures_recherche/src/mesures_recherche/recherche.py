@@ -31,12 +31,22 @@ class Classement:
         return int(np.flatnonzero(self.ordre == entite)[0]) + 1
 
 
-def classer(entites: Entites, scores_entites: np.ndarray) -> Classement:
-    return Classement(scores_entites, entites.classer(scores_entites))
+def classer(
+    entites: Entites, scores_entites: np.ndarray, perimetre: str = "toutes"
+) -> Classement:
+    """Le classement des entités du périmètre : « toutes », ou « catalogue » —
+    les seules séries, dans l'ordre du classement complet (les entités Kitsu
+    retirées ; aucun score ne change)."""
+    ordre = entites.classer(scores_entites)
+    if perimetre == "catalogue":
+        ordre = ordre[entites.est_serie[ordre]]
+    elif perimetre != "toutes":
+        raise ValueError(f"périmètre inconnu : {perimetre!r}")
+    return Classement(scores_entites, ordre)
 
 
 # --------------------------------------------------------------------------- #
-#  1, 2 — par le sens
+#  1, 2, 7, 8 — par le sens
 # --------------------------------------------------------------------------- #
 
 
@@ -133,7 +143,7 @@ class PleinTexte:
 
 
 # --------------------------------------------------------------------------- #
-#  6 — TF-IDF (scikit-learn)
+#  6, 9 — TF-IDF (scikit-learn)
 # --------------------------------------------------------------------------- #
 
 
@@ -173,13 +183,14 @@ class Tfidf:
 
 
 # --------------------------------------------------------------------------- #
-#  4, 5 — fusion par rang réciproque
+#  4, 5, 10 à 13 — fusion par rang réciproque
 # --------------------------------------------------------------------------- #
 
 
 def fusion(classements: list[Classement], k_rrf: int, profondeur: int) -> np.ndarray:
     """Σ 1 / (k_rrf + rang) sur les `profondeur` premières entités de chaque
-    liste ; une entité absente de toutes les têtes de liste a le score 0."""
+    liste ; une entité absente de toutes les têtes de liste a le score 0. Les
+    listes sont celles du périmètre de la mesure (cf. `classer`)."""
     scores = np.zeros(len(classements[0].scores))
     for c in classements:
         tete = c.ordre[:profondeur]

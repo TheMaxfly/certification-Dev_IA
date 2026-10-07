@@ -1,8 +1,10 @@
 # 10 — mesures de la recherche
 
 Mesure la qualité de la recherche sur le **jeu d'évaluation v2 gelé** (69
-questions, onze familles), pour six configurations, au **grain entité**. Aucun
-LLM, aucune analyse de la question, aucun filtre structuré.
+questions, onze familles), au **grain entité**, en deux tours : six mesures au
+premier (spec E2 jour 2), sept au second (spec E2 jour 3, choisies après lecture
+du premier, déclarées avant d'être exécutées). Aucun LLM pour la recherche,
+aucune analyse de la question, aucun filtre structuré.
 
 | # | Configuration | Réglages (fixés d'avance, `config/mesures.toml`) |
 |---|---|---|
@@ -12,6 +14,20 @@ LLM, aucune analyse de la question, aucun filtre structuré.
 | 4 | Fusion 3 + 1 | rang réciproque, k = 60, sur les 100 premières entités de chaque liste |
 | 5 | Fusion 3 + 2 | idem |
 | 6 | TF-IDF (scikit-learn) | minuscules, accents retirés, mots simples, `sublinear_tf`, `min_df = 2`, cosinus |
+
+Second tour (`tour = 2`), deux réglages nouveaux : `perimetre_entites`
+(`toutes`, ou `catalogue` : seules les séries du catalogue sont classées) et la
+fusion avec le TF-IDF au lieu du plein texte PostgreSQL.
+
+| # | Configuration | Entités | Constante de fusion |
+|---|---|---|---:|
+| 7 | BGE-M3, par le sens | catalogue | — |
+| 8 | EmbeddingGemma, par le sens | catalogue | — |
+| 9 | TF-IDF | catalogue | — |
+| 10 | Fusion TF-IDF + EmbeddingGemma | toutes | 60 |
+| 11 | Fusion TF-IDF + EmbeddingGemma | catalogue | 60 |
+| 12 | Fusion TF-IDF + EmbeddingGemma | toutes | 10 |
+| 13 | Fusion TF-IDF + EmbeddingGemma | toutes | 100 |
 
 Tout réglage est lu dans `config/mesures.toml`. Aucun n'est changé après avoir vu
 un résultat : un changement serait une nouvelle mesure. L'empreinte du fichier
@@ -26,6 +42,11 @@ quel depuis son fichier. Score d'une entité = le meilleur de ses fragments ;
 toutes les entités occupent un rang (38 028 au 2026-10-07), sans filtre sur le
 catalogue ; classement exact sur les 66 290 fragments ; égalités départagées par
 l'identifiant croissant (la série d'abord à nombre égal).
+
+Avec `perimetre_entites = "catalogue"` (second tour), les entités Kitsu sont
+retirées du classement et l'ordre des séries conservé : aucun score ne change,
+une série ne peut que monter. Pour une fusion, le périmètre vaut pour chaque
+liste source (ses 100 premières entités du périmètre) et pour la liste fusionnée.
 
 ## Exécuter
 
@@ -55,8 +76,9 @@ uv run python -m mesures_recherche.comparaisons resultats/mesure_{1,2,3,4,5,6}.j
     --sortie resultats/comparaisons.json
 ```
 
-`--enregistrer` crée un run MLflow (expérience `E2-mesures-recherche-jeu-v2`) et
-écrit les mêmes valeurs dans `bench.eval_mesures`, `run_id` = identifiant du run.
+`--enregistrer` crée un run MLflow (expérience `E2-mesures-recherche-jeu-v2`,
+étiquettes `mesure`, `tour`, `spec`) et écrit les mêmes valeurs dans
+`bench.eval_mesures`, `run_id` = identifiant du run.
 Le run porte en paramètres tous les réglages, la version et l'empreinte du jeu,
 l'empreinte de la configuration et celle du code, le commit, l'encodage et la
 version du service ; en pièces, le tableau par question, la configuration et le
@@ -67,8 +89,11 @@ MLFLOW_DISABLE_AGENT_HINT=1 uv run mlflow ui \
   --backend-store-uri "sqlite:///$PWD/mlflow/mlflow.db" --host 127.0.0.1 --port 5000
 ```
 
-Les comparaisons déclarées d'avance (1–2, 4–1, 1–3, 6–3) : bootstrap apparié sur
-les questions de rang, 10 000 tirages, graine fixe, intervalle à 1 − 0,05 / 4.
+Les comparaisons déclarées d'avance — 1–2, 4–1, 1–3, 6–3 au premier tour, 10–2 et
+11–8 au second : bootstrap apparié sur les questions de rang, 10 000 tirages,
+graine fixe, intervalle à 1 − 0,05 / m (m = 6 depuis le second tour). Le filtre
+sur le catalogue (7–1, 8–2, 9–6) se mesure, ne se teste pas :
+`diagnostic.controle_filtre` vérifie seulement qu'aucune série n'a reculé.
 
 ## Diagnostiquer un classement
 
@@ -106,4 +131,7 @@ Métriques sur des cas écrits à la main (rang 1, rang 11, aucune série trouv�
 deux grades, question sans attendu), grain entité et départage, fusion ; puis le
 harnais de bout en bout sur une base PostgreSQL + pgvector **jetable** : arrêt sur
 une empreinte fausse (fichiers ou base), plein texte, TF-IDF, sens et fusion (la
-question encodée par une doublure), lecture seule, rejeu identique.
+question encodée par une doublure), lecture seule, rejeu identique. Second tour :
+réglages déclarés (`tests/test_configuration.py`), périmètre « catalogue » (ordre
+conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiquettes
+`tour` et `spec` du run ; diagnostic sur cas écrits à la main.

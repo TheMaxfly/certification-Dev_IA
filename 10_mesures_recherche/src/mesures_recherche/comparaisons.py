@@ -6,8 +6,9 @@ Pour chaque comparaison (A contre B) et chaque métrique par question
 (`hit_rate@10`, `ndcg@10`) : on tire, avec remise, 59 questions parmi les 59
 questions de rang — les MÊMES pour A et B (apparié) —, 10 000 fois, graine fixe,
 et on prend l'écart des moyennes A − B. Intervalle : percentiles à
-1 − alpha / m (m = 4 comparaisons, Bonferroni). Verdict : « différence » si
-l'intervalle exclut 0, sinon « non établie ».
+1 − alpha / m (m = nombre de comparaisons déclarées : 4 au tour 1, 6 avec le
+tour 2 ; Bonferroni). Verdict : « différence » si l'intervalle exclut 0, sinon
+« non établie ».
 """
 
 from __future__ import annotations
