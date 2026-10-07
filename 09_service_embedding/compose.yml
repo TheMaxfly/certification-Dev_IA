@@ -1,0 +1,62 @@
+# Service d'embedding — Text Embeddings Inference (Hugging Face), image officielle.
+#
+# Deux modèles, deux instances, deux ports. Chaque instance a son profil : on en
+# lance UNE à la fois pendant l'encodage (la carte n'a que 6 Go).
+#
+#   docker compose --profile bge-m3 up -d            # une instance
+#   docker compose --profile bge-m3 down
+#
+# La configuration de chaque instance (modèle, révision, précision, lots, ports)
+# vit dans `config/<instance>.env`, commentée ligne à ligne : ce fichier-ci ne
+# porte que l'image, le GPU, le cache des poids et l'exposition du port. Le port
+# publié DOIT rester celui de `PORT` dans le fichier de l'instance — un test le
+# vérifie (tests/test_configuration.py). Les métriques Prometheus sont servies
+# sur ce même port, à `/metrics` (cf. `CLIENT_PORT_METRIQUES`).
+#
+# Image épinglée PAR DIGEST : l'étiquette `86-1.9.4` est lisible, le digest est
+# ce qui garantit que la même image tourne demain. `86` = Ampere 8.6, la
+# RTX 3060 (cf. la table « Supported hardware » de la documentation TEI).
+
+name: service-embedding
+
+x-tei: &tei
+  image: ghcr.io/huggingface/text-embeddings-inference:86-1.9.4@sha256:bee0bdb887096229add91b6fdfcf95258c12eb9180e90dc86f3b4b25b86fc613
+  # Le cache Hugging Face de l'hôte, monté là où le service le cherche
+  # (HUGGINGFACE_HUB_CACHE=/data) : les poids déjà téléchargés aux révisions
+  # épinglées sont réutilisés. Le conteneur tourne sous l'utilisateur de l'hôte,
+  # pour ne pas laisser de fichiers appartenant à root dans ce cache.
+  user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+  volumes:
+    - ${HF_HUB_CACHE_HOTE:-~/.cache/huggingface/hub}:/data
+  # Recommandé par la documentation pour les images CUDA (`--shm-size 1g`).
+  shm_size: 1g
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  restart: "no"
+
+services:
+  bge-m3:
+    <<: *tei
+    profiles: [bge-m3]
+    container_name: tei-bge-m3
+    env_file: [config/bge-m3.env]
+    # Écoute locale uniquement : le service n'a pas d'authentification.
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  embeddinggemma:
+    <<: *tei
+    profiles: [embeddinggemma]
+    container_name: tei-embeddinggemma
+    env_file: [config/embeddinggemma.env]
+    # Modèle à accès contrôlé : le jeton vient de `.env` (exclu du dépôt, cf.
+    # `.env.example`), et de lui seul. Il n'est transmis qu'à cette instance.
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?HF_TOKEN absent - copier .env.example en .env}
+    ports:
+      - "127.0.0.1:8082:8082"

@@ -47,6 +47,7 @@ Le depot est organise par etapes numerotees.
 | `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source et preparation PostgreSQL. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2) ; 247 tests. |
 | `06_benchmark_embeddings_llm/` | Benchmark embeddings, FAISS, recall@K, MRR et evaluation LLM. | Scripts experimentaux relies au schema `bench`. |
 | `07_databricks_manga_export/` | Lakehouse Spark + Delta conteneurise : medaillon bronze / silver / gold sur le raw multi-snapshots, controles qualite historises. | v2 livree : 4 sources en bronze, silver Manga Sanctuary, 5 tables gold ; 18 tests, 12 / 12 verifications en conteneur. Couche consultative, hors chemin critique. |
+| `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee et client qui applique les prefixes. | Bloc A livre : les deux instances controlees (revision, float32, dimension, norme, determinisme, metriques, aucune troncature). |
 | `database/` | Migrations PostgreSQL partagees et versionnees. | Toutes les migrations de `database/migrations/` sont appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
 

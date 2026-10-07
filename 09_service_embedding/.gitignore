@@ -1,0 +1,16 @@
+# Secrets : le jeton Hugging Face. Seul `.env.example` est versionné.
+.env
+
+# Environnements et artefacts Python
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Relevés de mesure (mémoire, swap) : matière des rapports, hors dépôt.
+mesures/
