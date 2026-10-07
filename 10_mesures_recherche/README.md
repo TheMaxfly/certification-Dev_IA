@@ -155,6 +155,19 @@ combinaison. Le résumé donne, par réglage et par valeur, la moyenne de
 l'étendue ; F4 et les coûts (temps, vocabulaire, mémoire) par unité. Aucun
 classement des combinaisons.
 
+### Les voisins : profondeur et mesure de distance
+
+```bash
+# l'instance EmbeddingGemma du service lancée seule (module 09)
+uv run python -m mesures_recherche.etudes voisins --sortie resultats/etudes/voisins.json --enregistrer
+```
+
+Sur le classement de la mesure 8 (EmbeddingGemma, meilleur fragment, catalogue) :
+`hit_rate` à 1, 3, 5, 10, 20 et 50 résultats, global et par mode ; puis les dix
+premières entités de chaque question selon le produit scalaire (ce que calcule la
+mesure), le cosinus et la distance euclidienne, comparées. Un seul run MLflow,
+étiquette `etude`.
+
 ## Réglages de la génération (démonstration)
 
 ```bash
@@ -209,7 +222,9 @@ réglages déclarés (`tests/test_configuration.py`), périmètre « catalogue �
 conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiquettes
 `tour` et `spec` du run ; diagnostic sur cas écrits à la main. Études : grille
 déclarée, résumé sans classement, garde de mémoire (lecteurs simulés), témoin égal à
-la mesure 9, MLflow parent et enfants. Troisième tour :
+la mesure 9, MLflow parent et enfants ; profondeurs sur cas écrits à la main,
+distances (même ordre pour des vecteurs de longueur 1, pas au-delà), voisins de
+bout en bout. Troisième tour :
 vecteur moyen ramené à la longueur 1, moyenne des trois meilleurs (ou de ceux qu'on
 a), même score pour une entité à un seul fragment, de bout en bout sur la base
 jetable. Génération :

@@ -180,3 +180,59 @@ def test_mlflow_un_parent_un_enfant_par_combinaison(tmp_path):
     }
     fini = next(r for r in enfants if r.info.status == "FINISHED")
     assert fini.data.metrics["hit_rate_10/global"] == pytest.approx(0.2)
+
+
+# --------------------------------------------------------------------------- #
+#  Bloc D — les voisins
+# --------------------------------------------------------------------------- #
+
+
+def test_hit_rate_par_profondeur():
+    rangs = {"Q1": 1, "Q2": 4, "Q3": 30}
+    r = etudes.hit_rate_profondeurs(rangs, [1, 3, 5, 50])
+    assert r == {1: pytest.approx(1 / 3), 3: pytest.approx(1 / 3), 5: 2 / 3, 50: 1.0}
+
+
+def test_distances_meme_ordre_pour_des_vecteurs_unitaires():
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    m = rng.normal(size=(50, 8))
+    m /= np.linalg.norm(m, axis=1, keepdims=True)
+    q = rng.normal(size=8)
+    q /= np.linalg.norm(q)
+    ordres = {
+        d: list(np.argsort(-etudes.scores_distance(m, q, d)))
+        for d in ("produit_scalaire", "cosinus", "euclidienne")
+    }
+    assert ordres["cosinus"] == ordres["produit_scalaire"] == ordres["euclidienne"]
+    # Des vecteurs de longueurs différentes : le produit scalaire s'en écarte.
+    m2 = m * rng.uniform(0.2, 3.0, size=(50, 1))
+    assert list(np.argsort(-etudes.scores_distance(m2, q, "produit_scalaire"))) != (
+        list(np.argsort(-etudes.scores_distance(m2, q, "cosinus")))
+    )
+    with pytest.raises(ValueError, match="distance inconnue"):
+        etudes.scores_distance(m, q, "manhattan")
+
+
+def test_voisins_de_bout_en_bout_et_mlflow(banc, encodeur_doublure, tmp_path):
+    import copy
+
+    import mlflow
+
+    from mesures_recherche.enregistrement import uri_suivi
+
+    dsn, config, _ = banc
+    e = copy.deepcopy(ETUDES)
+    e["voisins"]["mesure"] = 7  # BGE-M3, catalogue : la table du banc
+    ctx = executer.ouvrir(dsn, config)
+    r = etudes.etudier_voisins(ctx, e)
+    assert r["distances"] == {"identiques": 3, "questions": 3, "differentes": []}
+    assert set(r["hit_rate"]) == {"global", "mode:proposition", "mode:reconnaissance"}
+    assert r["hit_rate"]["global"][1] == 1.0, "Q001 et Q002 trouvées au rang 1"
+    run = etudes.journaliser_voisins(e, r, {"essai": "oui"}, stockage=tmp_path / "m")
+    mlflow.set_tracking_uri(uri_suivi(tmp_path / "m"))
+    lu = mlflow.get_run(run)
+    assert lu.info.status == "FINISHED" and lu.data.tags["etude"] == "voisins"
+    assert lu.data.metrics["hit_rate_50/global"] == 1.0
+    assert lu.data.metrics["distances_listes_identiques"] == 3

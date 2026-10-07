@@ -17,6 +17,10 @@ l'étude continue. Le résumé donne, pour chaque réglage, la moyenne de `hit_r
 et de `ndcg@10` par valeur, toutes les autres confondues, avec l'étendue ; le
 détail de F4 selon l'unité ; le temps de construction et la taille du vocabulaire
 par unité. Aucun classement des combinaisons.
+
+Bloc D. Sur le classement de la mesure 8 : `hit_rate` à 1, 3, 5, 10, 20 et 50
+résultats, global et par mode ; puis les 10 premières entités de chaque question
+selon le produit scalaire, le cosinus et la distance euclidienne, comparées.
 """
 
 from __future__ import annotations
@@ -33,6 +37,8 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
+
+import numpy as np
 
 from mesures_recherche import configuration, executer
 from mesures_recherche.configuration import RACINE_MODULE
@@ -174,6 +180,86 @@ def resumer_grille(resultats: list[dict]) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+#  Bloc D — les voisins : profondeur et mesure de distance
+# --------------------------------------------------------------------------- #
+
+
+def hit_rate_profondeurs(rangs: dict[str, int], profondeurs: list[int]) -> dict:
+    """hit_rate@k pour chaque profondeur, à partir du rang de la première série
+    attendue de chaque question de rang."""
+    return {k: sum(r <= k for r in rangs.values()) / len(rangs) for k in profondeurs}
+
+
+def scores_distance(matrice: np.ndarray, q: np.ndarray, distance: str) -> np.ndarray:
+    """Score de chaque fragment (plus grand = plus proche) selon la distance."""
+    if distance == "produit_scalaire":
+        return matrice @ q
+    if distance == "cosinus":
+        return (matrice @ q) / (np.linalg.norm(matrice, axis=1) * np.linalg.norm(q))
+    if distance == "euclidienne":
+        return -np.linalg.norm(matrice - q, axis=1)
+    raise ValueError(f"distance inconnue : {distance!r}")
+
+
+def etudier_voisins(ctx: executer.Contexte, etudes: dict) -> dict:
+    from mesures_recherche import recherche
+
+    v = etudes["voisins"]
+    m = configuration.mesure(ctx.config, v["mesure"])
+    perimetre = configuration.perimetre(m)
+    encoder, params = executer.encodeur_du_service(m["instance"])
+    sens = recherche.Semantique.charger(ctx.cx, ctx.entites, m["table"], encoder)
+    rangs, listes = {}, []
+    for q in ctx.questions:
+        vec = np.asarray(encoder(q.texte), dtype=np.float64)
+        tops = {}
+        for d in v["distances"]:
+            fragments = scores_distance(sens.matrice, vec, d)
+            c = recherche.classer(
+                ctx.entites, ctx.entites.agreger(fragments), perimetre
+            )
+            tops[d] = [cle for cle, _ in c.top(ctx.entites, 10)]
+            if d == v["reference"] and q.de_rang:
+                rangs[q.question_id] = min(
+                    c.rang(ctx.entites.index_serie[s])
+                    for s in q.attendus
+                    if s in ctx.entites.index_serie
+                )
+        identiques = all(tops[d] == tops[v["reference"]] for d in v["distances"])
+        listes.append(
+            {
+                "question_id": q.question_id,
+                "mode": q.mode,
+                "identiques": identiques,
+                **{f"top_{d}": tops[d] for d in v["distances"]},
+            }
+        )
+    modes = {}
+    for q in ctx.questions:
+        if q.question_id in rangs:
+            modes.setdefault(q.mode, {})[q.question_id] = rangs[q.question_id]
+    return {
+        "mesure": v["mesure"],
+        "perimetre_entites": perimetre,
+        "service": params,
+        "hit_rate": {
+            "global": hit_rate_profondeurs(rangs, v["profondeurs"]),
+            **{
+                f"mode:{mo}": hit_rate_profondeurs(r, v["profondeurs"])
+                for mo, r in sorted(modes.items())
+            },
+        },
+        "rangs": rangs,
+        "distances": {
+            "identiques": sum(x["identiques"] for x in listes),
+            "questions": len(listes),
+            "differentes": [x["question_id"] for x in listes if not x["identiques"]],
+        },
+        "listes": listes,
+    }
+
+
+# --------------------------------------------------------------------------- #
 #  La garde de mémoire
 # --------------------------------------------------------------------------- #
 
@@ -309,6 +395,40 @@ def journaliser_grille(
         return parent.info.run_id
 
 
+def journaliser_voisins(etudes, resultat, parametres, stockage: Path | None = None):
+    mlflow = _experience(etudes, stockage)
+    v = etudes["voisins"]
+    with mlflow.start_run(run_name="voisins-profondeur-distance") as run:
+        mlflow.set_tags({"etude": v["nom"], "spec": "E2 jour 4", "bloc": "D"})
+        mlflow.log_params(
+            {
+                "mesure": v["mesure"],
+                "perimetre_entites": resultat["perimetre_entites"],
+                "profondeurs": json.dumps(v["profondeurs"]),
+                "distances": json.dumps(v["distances"]),
+                "reference": v["reference"],
+            }
+            | {k: str(x) for k, x in resultat["service"].items()}
+            | parametres
+        )
+        mlflow.log_metrics(
+            {
+                f"hit_rate_{k}/{portee}": x
+                for portee, par_k in resultat["hit_rate"].items()
+                for k, x in par_k.items()
+            }
+            | {
+                "distances_listes_identiques": resultat["distances"]["identiques"],
+                "distances_questions": resultat["distances"]["questions"],
+            }
+        )
+        mlflow.log_text(
+            json.dumps(resultat, ensure_ascii=False, indent=1), "voisins.json"
+        )
+        mlflow.log_artifact(str(FICHIER))
+        return run.info.run_id
+
+
 # --------------------------------------------------------------------------- #
 #  Ligne de commande
 # --------------------------------------------------------------------------- #
@@ -327,6 +447,9 @@ def main(argv: list[str] | None = None) -> int:
     t = sous.add_parser("tfidf", help="bloc C : la grille, sous garde de mémoire")
     t.add_argument("--sortie", type=Path, required=True)
     t.add_argument("--enregistrer", action="store_true")
+    vo = sous.add_parser("voisins", help="bloc D : profondeur et distances")
+    vo.add_argument("--sortie", type=Path, required=True)
+    vo.add_argument("--enregistrer", action="store_true")
     u = sous.add_parser("tfidf-une", help="une combinaison (processus enfant)")
     u.add_argument("--combinaison", required=True)
     u.add_argument("--sortie", type=Path, required=True)
@@ -343,6 +466,42 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     from mesures_recherche.enregistrement import empreinte_code, etat_git
+
+    if args.commande == "voisins":
+        ctx = executer.ouvrir(_dsn(), configuration.charger())
+        try:
+            resultat = etudier_voisins(ctx, etudes)
+        finally:
+            ctx.cx.close()
+        resultat |= {
+            "etudes_empreinte": configuration.empreinte(FICHIER),
+            "code_empreinte": empreinte_code(),
+        }
+        if args.enregistrer:
+            resultat["run"] = journaliser_voisins(
+                etudes,
+                resultat,
+                {
+                    "etudes_empreinte": resultat["etudes_empreinte"],
+                    "code_empreinte": resultat["code_empreinte"],
+                    **etat_git(),
+                },
+            )
+        args.sortie.parent.mkdir(parents=True, exist_ok=True)
+        args.sortie.write_text(
+            json.dumps(resultat, ensure_ascii=False, indent=1), "utf-8"
+        )
+        print(
+            json.dumps(
+                {
+                    "hit_rate": resultat["hit_rate"],
+                    "distances": resultat["distances"],
+                    "run": resultat.get("run"),
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
 
     _dsn()
     mem = etudes["memoire"]

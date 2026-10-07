@@ -57,3 +57,21 @@ nom = "caracteres_3_5"
 analyzer = "char_wb"
 ngram_min = 3
 ngram_max = 5
+
+# --------------------------------------------------------------------------- #
+#  Bloc D — les voisins : profondeur et mesure de distance (un seul run)
+# --------------------------------------------------------------------------- #
+
+[voisins]
+nom = "voisins"
+# Le classement étudié : celui de la mesure 8 (EmbeddingGemma, meilleur fragment,
+# seules les séries du catalogue classées).
+mesure = 8
+# hit_rate pour ces nombres de résultats, global et par mode.
+profondeurs = [1, 3, 5, 10, 20, 50]
+# Les trois façons de rapprocher la question d'un fragment. La référence est celle
+# que calcule la mesure 8 : le produit scalaire (vecteurs de longueur 1). Le
+# cosinus divise en plus par les deux normes ; l'euclidienne classe par distance
+# croissante. Attendu : les mêmes 10 premières entités pour les 69 questions.
+distances = ["produit_scalaire", "cosinus", "euclidienne"]
+reference = "produit_scalaire"
