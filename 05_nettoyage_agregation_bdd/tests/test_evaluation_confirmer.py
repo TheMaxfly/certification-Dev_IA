@@ -315,6 +315,46 @@ def test_atteignabilite(base_catalogue):
     assert defaut["sans_synopsis_atteignable"] == 2  # 902 et 905
 
 
+def test_rattachement_un_fragment_une_entite(base_catalogue):
+    """Le rattachement au grain fragment : une ligne par fragment, et chaque
+    fragment désigne une entité — sa série si elle existe, sinon son kitsu_id."""
+    with psycopg.connect(base_catalogue) as cx:
+        cx.execute(
+            "INSERT INTO manga.work_identity (series_id, kitsu_id) VALUES (1, '900')"
+        )
+        for doc_key, source, series_id, kitsu_id in (
+            ("ms_review:1", "ms_review", 3, None),
+            ("kitsu:900", "kitsu_synopsis", None, 900),  # rattaché à la série 1
+            ("kitsu:999", "kitsu_synopsis", None, 999),  # non rattaché
+        ):
+            cx.execute(
+                "INSERT INTO bench.corpus_docs (doc_key, source, series_id, kitsu_id,"
+                " doc_text) VALUES (%s, %s, %s, %s, 'texte')",
+                (doc_key, source, series_id, kitsu_id),
+            )
+        for chunk_id, doc_key, index in (
+            (11, "ms_review:1", 0),
+            (12, "ms_review:1", 1),
+            (21, "kitsu:900", 0),
+            (31, "kitsu:999", 0),
+        ):
+            cx.execute(
+                "INSERT INTO bench.corpus_chunks (chunk_id, doc_key, chunk_index,"
+                " chunk_text) VALUES (%s, %s, %s, 'texte')",
+                (chunk_id, doc_key, index),
+            )
+        lignes = atteignabilite.rattachement(cx)
+        assert lignes == [
+            (11, "ms_review", 3, None),
+            (12, "ms_review", 3, None),
+            (21, "kitsu_synopsis", 1, 900),
+            (31, "kitsu_synopsis", None, 999),
+        ]
+        # L'atteignabilité en est dérivée : séries des fragments, sans le non rattaché.
+        assert atteignabilite.atteignables(cx) == {1, 3}
+        assert atteignabilite.synopsis_seul(cx, [1, 3]) == {1}
+
+
 @pytest.mark.parametrize(
     "module", ["evaluation.confirmer", "evaluation.atteignabilite", "corpus.mesurer"]
 )

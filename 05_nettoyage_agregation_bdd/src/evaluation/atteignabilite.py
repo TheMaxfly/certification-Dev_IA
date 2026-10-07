@@ -17,6 +17,11 @@ décembre) n'est pas atteignable, et l'écart est rapporté.
 L'atteignabilité dépend du CORPUS mesuré, pas du jeu : elle n'est jamais écrite
 dans le jeu, elle se recalcule à chaque mesure. Chaque mesure rend ses chiffres
 sur toutes les questions et sur les questions atteignables.
+
+LE RATTACHEMENT, AU GRAIN FRAGMENT (2026-10-07). La règle ci-dessus est écrite
+une seule fois, fragment par fragment : `SQL_RATTACHEMENT`. L'atteignabilité, sa
+décomposition et le marqueur « synopsis seul » en sont dérivés ; le banc de
+mesure (module 10) l'importe tel quel pour classer les fragments par entité.
 """
 
 from __future__ import annotations
@@ -27,39 +32,57 @@ import sys
 import psycopg
 import typer
 
-#: LA définition. La mesure et ce rapport exécutent ce texte-ci, et lui seul.
-SQL_ATTEIGNABLES = """
-WITH par_critique AS (
-  SELECT DISTINCT d.series_id
-  FROM bench.corpus_docs d
-  WHERE d.source = 'ms_review'
-    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
-),
-par_kitsu AS (
+#: LA définition, au grain fragment : une ligne par fragment de
+#: `bench.corpus_chunks`, avec la source de son document et ce à quoi il est
+#: rattaché —
+#:   - `series_id` : pour une critique, la série de son `series_id` ; pour un
+#:     synopsis Kitsu, la série que le moyeu rattache à son `kitsu_id`, s'il y en
+#:     a une (sinon NULL) ;
+#:   - `kitsu_id` : celui du synopsis, rattaché ou non (NULL pour une critique).
+#: Le moyeu porte `kitsu_id` et `series_id` UNIQUES : un synopsis est rattaché à
+#: une série au plus, et un fragment n'a qu'une ligne. L'ENTITÉ d'un fragment est
+#: sa série si elle existe, sinon son `kitsu_id`.
+#: Tout ce qui suit en est dérivé ; la mesure et ce rapport exécutent ce
+#: texte-ci, et lui seul.
+SQL_RATTACHEMENT = """
+SELECT k.chunk_id,
+       d.source,
+       CASE d.source
+         WHEN 'ms_review'      THEN d.series_id
+         WHEN 'kitsu_synopsis' THEN w.series_id::bigint
+       END AS series_id,
+       CASE d.source WHEN 'kitsu_synopsis' THEN d.kitsu_id END AS kitsu_id
+FROM bench.corpus_chunks k
+JOIN bench.corpus_docs d ON d.doc_key = k.doc_key
+LEFT JOIN manga.work_identity w
+       ON d.source = 'kitsu_synopsis'
+      AND w.kitsu_id = d.kitsu_id::text
+      AND w.series_id IS NOT NULL
+"""
+
+#: Les séries atteignables : celles qu'au moins un fragment rattache.
+SQL_ATTEIGNABLES = f"""
+SELECT DISTINCT r.series_id
+FROM ({SQL_RATTACHEMENT}) AS r
+WHERE r.series_id IS NOT NULL
+"""
+
+#: Décomposition de l'atteignabilité par source : `c` et `k` viennent du
+#: rattachement ; seul `au_niveau_document` (sans exiger de fragment) lit les
+#: documents, puisque c'est précisément ce que le rattachement ne voit pas.
+SQL_DECOMPOSITION = f"""
+WITH r AS ({SQL_RATTACHEMENT}),
+critique_doc AS (
+  SELECT DISTINCT series_id FROM bench.corpus_docs WHERE source = 'ms_review'),
+kitsu_doc AS (
   SELECT DISTINCT w.series_id::bigint AS series_id
   FROM bench.corpus_docs d
   JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
-  WHERE d.source = 'kitsu_synopsis' AND w.series_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
-)
-SELECT series_id FROM par_critique
-UNION
-SELECT series_id FROM par_kitsu
-"""
-
-SQL_DECOMPOSITION = """
-WITH frag AS (SELECT DISTINCT doc_key FROM bench.corpus_chunks),
-critique_doc AS (
-  SELECT DISTINCT series_id, doc_key IN (SELECT doc_key FROM frag) AS a_fragment
-  FROM bench.corpus_docs WHERE source = 'ms_review'),
-kitsu_doc AS (
-  SELECT DISTINCT w.series_id::bigint AS series_id,
-         d.doc_key IN (SELECT doc_key FROM frag) AS a_fragment
-  FROM bench.corpus_docs d
-  JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
   WHERE d.source = 'kitsu_synopsis' AND w.series_id IS NOT NULL),
-c AS (SELECT DISTINCT series_id FROM critique_doc WHERE a_fragment),
-k AS (SELECT DISTINCT series_id FROM kitsu_doc WHERE a_fragment),
+c AS (SELECT DISTINCT series_id FROM r
+      WHERE source = 'ms_review' AND series_id IS NOT NULL),
+k AS (SELECT DISTINCT series_id FROM r
+      WHERE source = 'kitsu_synopsis' AND series_id IS NOT NULL),
 docs AS (SELECT series_id FROM critique_doc UNION SELECT series_id FROM kitsu_doc)
 SELECT
   (SELECT count(*) FROM manga.ms_series_enriched)                 AS catalogue,
@@ -107,21 +130,22 @@ SELECT
 #: CALCULÉ à chaque mesure, JAMAIS écrit dans le jeu. Il partage F3 (et toute
 #: famille) en deux sous-groupes — le lexical français se tait par la langue,
 #: pas par la paraphrase.
-SQL_SYNOPSIS_SEUL = """
+SQL_SYNOPSIS_SEUL = f"""
+WITH r AS ({SQL_RATTACHEMENT})
 SELECT s.series_id
 FROM unnest(%s::bigint[]) AS s(series_id)
-WHERE NOT EXISTS (
-        SELECT 1 FROM bench.corpus_docs d
-        WHERE d.source = 'ms_review' AND d.series_id = s.series_id
-          AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key))
-  AND EXISTS (
-        SELECT 1 FROM bench.corpus_docs d
-        JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
-        WHERE d.source = 'kitsu_synopsis' AND w.series_id = s.series_id
-          AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key))
+WHERE NOT EXISTS (SELECT 1 FROM r
+                  WHERE r.series_id = s.series_id AND r.source = 'ms_review')
+  AND EXISTS (SELECT 1 FROM r
+              WHERE r.series_id = s.series_id AND r.source = 'kitsu_synopsis')
 """
 
 app = typer.Typer(add_completion=False, help=__doc__)
+
+
+def rattachement(cx: psycopg.Connection) -> list[tuple]:
+    """(chunk_id, source, series_id, kitsu_id) de chaque fragment du corpus."""
+    return cx.execute(SQL_RATTACHEMENT + " ORDER BY k.chunk_id").fetchall()
 
 
 def atteignables(cx: psycopg.Connection) -> set[int]:
