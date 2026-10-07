@@ -70,6 +70,25 @@ MLFLOW_DISABLE_AGENT_HINT=1 uv run mlflow ui \
 Les comparaisons déclarées d'avance (1–2, 4–1, 1–3, 6–3) : bootstrap apparié sur
 les questions de rang, 10 000 tirages, graine fixe, intervalle à 1 − 0,05 / 4.
 
+## Diagnostiquer un classement
+
+```bash
+uv run python -m mesures_recherche.diagnostic 1 3 4 6 --sortie resultats/diagnostic.json
+uv run python -m mesures_recherche.diagnostic 2 5 --lecture F3 --sortie resultats/diagnostic_2.json
+```
+
+Analyse exploratoire, **sans nouvelle mesure** : rien dans MLflow ni dans
+`bench.eval_mesures`. Les classements sont recalculés à blanc par le harnais, puis
+confrontés au run MLflow de la mesure (pièce `resultat.json`) : mêmes dix
+premières entités et même rang de la première série attendue pour chaque
+question, sinon arrêt. Pour chaque question de rang : le rang de la première série
+attendue dans le classement complet, son rang parmi les seules séries du
+catalogue, le nombre d'entités hors catalogue dans les dix premières, et si son
+score est nul (son rang ne tient alors qu'au départage). Par portée : les
+médianes, et la part des questions dont la première série attendue est dans les
+50, puis les 100 premières. `--lecture F3` liste, pour une famille, les dix
+premières entités avec leur titre, leur appartenance au catalogue et leur score.
+
 ## Métriques
 
 `hit_rate@5`, `hit_rate@10`, `mrr@10`, `ndcg@10` (gain = grade du jeu, 2 ou 1),
