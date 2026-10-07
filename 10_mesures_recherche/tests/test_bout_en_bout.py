@@ -202,3 +202,43 @@ def test_rejeu_identique(banc):
     a = executer.mesurer(executer.ouvrir(dsn, config), 3)
     b = executer.mesurer(executer.ouvrir(dsn, config), 3)
     assert a["agregats"] == b["agregats"] and a["questions"] == b["questions"]
+
+
+def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
+    import mlflow
+
+    from mesures_recherche.enregistrement import enregistrer, uri_suivi
+
+    dsn, config, _ = banc
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
+    resultat["experience"] = "essai"
+    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
+
+    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    run = mlflow.get_run(run_id)
+    assert run.info.status == "FINISHED"
+    assert run.data.params["jeu_version"] == "v9"
+    assert run.data.params["reglage.configuration"] == "french"
+    assert len(run.data.params["code_empreinte"]) == 64
+    assert run.data.metrics["hit_rate_10/global/toutes"] == pytest.approx(1.0)
+    pieces = {a.path for a in mlflow.MlflowClient().list_artifacts(run_id)}
+    assert {"par_question.csv", "mesures.toml", "resultat.json"} <= pieces
+
+    with psycopg.connect(dsn) as cx:
+        lignes = cx.execute(
+            "SELECT portee, perimetre, metrique, k, valeur, n_questions"
+            " FROM bench.eval_mesures WHERE run_id = %s",
+            (run_id,),
+        ).fetchall()
+    attendu = {
+        (
+            a["portee"],
+            a["perimetre"],
+            a["metrique"],
+            a["k"],
+            a["valeur"],
+            a["n_questions"],
+        )
+        for a in resultat["agregats"]
+    }
+    assert set(lignes) == attendu

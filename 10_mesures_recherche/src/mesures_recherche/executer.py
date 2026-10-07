@@ -11,7 +11,10 @@ Ordre, toujours le même :
   4. les moyennes par portée et par périmètre.
 
 Sans `--enregistrer`, rien n'est écrit nulle part hors du fichier de sortie :
-c'est l'exécution « à blanc », qui sert aussi au rejeu.
+c'est l'exécution « à blanc ». Avec `--enregistrer` : un run MLflow et les lignes
+de `bench.eval_mesures` (module `enregistrement`). Avec `--rejeu-de FICHIER` :
+exécution à blanc, puis comparaison stricte des métriques avec celles d'une
+exécution enregistrée — code 1 si elles diffèrent.
 """
 
 from __future__ import annotations
@@ -198,6 +201,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("mesure", type=int)
     parser.add_argument("--sortie", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--enregistrer", action="store_true")
+    mode.add_argument("--rejeu-de", type=Path, default=None)
     args = parser.parse_args(argv)
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
@@ -210,6 +216,21 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         ctx.cx.close()
     resultat["duree_totale_s"] = round(time.monotonic() - debut, 1)
+    resultat["experience"] = config["mlflow"]["experience"]
+    code = 0
+    if args.enregistrer:
+        from mesures_recherche.enregistrement import enregistrer
+
+        resultat["run_id"] = enregistrer(resultat, dsn)
+    elif args.rejeu_de is not None:
+        reference = json.loads(args.rejeu_de.read_text(encoding="utf-8"))
+        cle = ("agregats", "questions")
+        identiques = all(
+            json.loads(json.dumps(resultat[c], default=_json)) == reference[c]
+            for c in cle
+        )
+        resultat["rejeu"] = {"reference": str(args.rejeu_de), "identiques": identiques}
+        code = 0 if identiques else 1
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     args.sortie.write_text(
         json.dumps(resultat, ensure_ascii=False, indent=1, default=_json), "utf-8"
@@ -226,11 +247,13 @@ def main(argv: list[str] | None = None) -> int:
                 "global": globales,
                 "duree_totale_s": resultat["duree_totale_s"],
                 "parametres": resultat["parametres"],
+                "run_id": resultat.get("run_id"),
+                "rejeu": resultat.get("rejeu"),
             },
             ensure_ascii=False,
         )
     )
-    return 0
+    return code
 
 
 if __name__ == "__main__":

@@ -45,6 +45,31 @@ Le plein texte est calculé **à la volée** : le `tsvector` de chaque fragment 
 recalculé à chaque exécution, dans une seule requête pour toutes les questions
 (84 s le 2026-10-07), sans table ni index.
 
+## Enregistrer, rejouer, comparer
+
+```bash
+uv run python -m mesures_recherche.executer 1 --enregistrer --sortie resultats/mesure_1.json
+uv run python -m mesures_recherche.executer 1 --rejeu-de resultats/mesure_1.json \
+    --sortie resultats/rejeu_1.json            # à blanc ; code 1 si les métriques diffèrent
+uv run python -m mesures_recherche.comparaisons resultats/mesure_{1,2,3,4,5,6}.json \
+    --sortie resultats/comparaisons.json
+```
+
+`--enregistrer` crée un run MLflow (expérience `E2-mesures-recherche-jeu-v2`) et
+écrit les mêmes valeurs dans `bench.eval_mesures`, `run_id` = identifiant du run.
+Le run porte en paramètres tous les réglages, la version et l'empreinte du jeu,
+l'empreinte de la configuration et celle du code, le commit, l'encodage et la
+version du service ; en pièces, le tableau par question, la configuration et le
+résultat complet. MLflow est stocké sous `mlflow/` (SQLite et pièces), hors dépôt :
+
+```bash
+MLFLOW_DISABLE_AGENT_HINT=1 uv run mlflow ui \
+  --backend-store-uri "sqlite:///$PWD/mlflow/mlflow.db" --host 127.0.0.1 --port 5000
+```
+
+Les comparaisons déclarées d'avance (1–2, 4–1, 1–3, 6–3) : bootstrap apparié sur
+les questions de rang, 10 000 tirages, graine fixe, intervalle à 1 − 0,05 / 4.
+
 ## Métriques
 
 `hit_rate@5`, `hit_rate@10`, `mrr@10`, `ndcg@10` (gain = grade du jeu, 2 ou 1),
