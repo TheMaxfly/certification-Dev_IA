@@ -114,6 +114,38 @@ médianes, et la part des questions dont la première série attendue est dans l
 50, puis les 100 premières. `--lecture F3` liste, pour une famille, les dix
 premières entités avec leur titre, leur appartenance au catalogue et leur score.
 
+## Réglages de la génération (démonstration)
+
+```bash
+# 1. l'instance EmbeddingGemma du service lancée seule (module 09) :
+uv run python -m mesures_recherche.generation passages --sortie resultats/generation/passages.json
+# 2. l'instance arrêtée ; Ollama, le modèle sur la carte graphique :
+uv run python -m mesures_recherche.generation generer \
+    --passages resultats/generation/passages.json \
+    --sortie resultats/generation/generations.json --enregistrer
+```
+
+Effet de quelques réglages de la génération — **pas une mesure de qualité** : aucun
+juge, aucune note, rien dans `bench.eval_mesures`. Onze questions (la première, par
+identifiant, de chaque famille) ; leurs passages sont ceux de la mesure 2 (les
+entités de tête et le meilleur fragment de chacune), confrontés au run MLflow de la
+mesure, puis enregistrés. Quatre configurations (`config/generation.toml`) :
+température 0 ou 0,7, 3, 5 ou 10 passages, 1 ou 3 répétitions ; 400 jetons au plus ;
+graine = 20261007 + (répétition − 1). L'invite est versionnée à part
+(`config/invite_generation.toml`).
+
+Le modèle (`ministral-3:3b-instruct-2512-q4_K_M`, par Ollama) doit tenir **entier sur
+la carte graphique** — sinon arrêt avant la série ; il demande Flash Attention dans
+le service (sans elle, son encodeur d'images réserve 9 Gio de graphe). Chaque
+requête garde le modèle chargé (`keep_alive`), une dernière le décharge ; une entrée
+qui ne laisserait pas la place des 400 jetons de réponse arrête la série.
+
+Avec `--enregistrer` : expérience MLflow `E2-reglages-generation`, un run par
+configuration — paramètres, métriques (latence médiane et p95, jetons en entrée et
+en sortie, part des répétitions identiques, part des séquences de 5 mots de la
+réponse présentes dans les passages, réponses tronquées, mémoire vidéo), pièces
+(réponses, passages, invite, réglages) ; chaque appel est une trace MLflow.
+
 ## Métriques
 
 `hit_rate@5`, `hit_rate@10`, `mrr@10`, `ndcg@10` (gain = grade du jeu, 2 ou 1),
@@ -134,4 +166,7 @@ une empreinte fausse (fichiers ou base), plein texte, TF-IDF, sens et fusion (la
 question encodée par une doublure), lecture seule, rejeu identique. Second tour :
 réglages déclarés (`tests/test_configuration.py`), périmètre « catalogue » (ordre
 conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiquettes
-`tour` et `spec` du run ; diagnostic sur cas écrits à la main.
+`tour` et `spec` du run ; diagnostic sur cas écrits à la main. Génération :
+questions retenues, meilleur fragment, part copiée, répétitions, invite, plan de 88
+appels, client Ollama contre une doublure HTTP (`keep_alive`, options,
+déchargement), runs et traces MLflow, passages sur la base jetable.

@@ -1,0 +1,71 @@
+# Réglages de la génération — spec E2 jour 3, bloc D.
+#
+# DÉMONSTRATION de l'effet de quelques réglages sur onze questions, pas une
+# mesure de qualité : aucun juge, aucune note, rien dans bench.eval_mesures.
+# Tout réglage est lu ici ; l'empreinte de ce fichier et celle de l'invite
+# (`invite_generation.toml`) accompagnent chaque run MLflow.
+
+[moteur]
+# Ollama local, sur la carte graphique (Flash Attention activée dans le service).
+url = "http://127.0.0.1:11434"
+modele = "ministral-3:3b-instruct-2512-q4_K_M"
+# Le service décharge le modèle après chaque requête (OLLAMA_KEEP_ALIVE=0) : chaque
+# requête demande qu'il reste chargé pendant la série ; une dernière requête le
+# décharge (keep_alive 0).
+keep_alive = "30m"
+# Contexte : 8 192 jetons — dix passages (≈ 300 jetons chacun au plus long), la
+# consigne, la question et les 400 jetons de réponse. Une entrée qui ne laisserait
+# pas la place de la réponse arrête la série (aucune troncature silencieuse).
+num_ctx = 8192
+# Longueur maximale de la réponse (spec).
+num_predict = 400
+# Graine exposée par le moteur (option `seed`) : graine + (répétition − 1). Une
+# même graine pour les trois répétitions rendrait la température 0,7 aussi
+# déterministe que la température 0 : on mesurerait la graine, pas la variation.
+graine = 20261007
+
+[passages]
+# Ceux de la mesure 2 (EmbeddingGemma, par le sens) : les entités de tête, et pour
+# chacune son meilleur fragment ; récupérés une fois, enregistrés, puis l'instance
+# du service est arrêtée avant de charger le modèle de langue.
+mesure = 2
+nombre = 10
+
+[questions]
+# La première question, par identifiant, de chacune des onze familles.
+regle = "premiere_par_famille"
+
+[metriques]
+# Part des séquences de n mots de la réponse présentes dans les passages fournis
+# (mots : suites de lettres ou chiffres, minuscules).
+ngramme = 5
+
+[mlflow]
+experience = "E2-reglages-generation"
+
+# Ordre d'exécution : configuration par configuration ; dans chacune, répétition
+# par répétition, les onze questions dans l'ordre.
+
+[[configurations]]
+nom = "base"
+temperature = 0.0
+passages = 5
+repetitions = 3
+
+[[configurations]]
+nom = "temperature-haute"
+temperature = 0.7
+passages = 5
+repetitions = 3
+
+[[configurations]]
+nom = "peu-de-passages"
+temperature = 0.0
+passages = 3
+repetitions = 1
+
+[[configurations]]
+nom = "beaucoup-de-passages"
+temperature = 0.0
+passages = 10
+repetitions = 1
