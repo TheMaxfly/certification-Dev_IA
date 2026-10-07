@@ -64,6 +64,35 @@ refusée ; le compteur `te_request_count` avant et après ; la longueur de chacu
 des 66 290 fragments selon le tokenizer **du service**, préfixe compris ; la
 mémoire de l'instance au repos. Le corpus est lu en lecture seule.
 
+## Encoder le corpus
+
+```bash
+export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
+uv run python -m service_embedding.controles etat          # seuils avant lancement
+docker compose --profile bge-m3 up -d
+uv run python -m service_embedding.encodage bge-m3 --sortie mesures/encodage_bge-m3.json
+docker compose --profile bge-m3 down                       # puis l'autre instance
+```
+
+Les fragments (`bench.corpus_chunks`) sont lus sur une connexion **en lecture
+seule** ; les vecteurs vont dans la table du modèle (`bench.vecteurs_bge_m3`,
+`bench.vecteurs_embeddinggemma`, migration `020`), et l'encodage est inscrit
+dans `bench.encodages` : modèle, révision, précision, préfixes, image et digest
+**tels que l'instance les sert** (`/info`, `docker inspect`), pas tels que la
+configuration les annonce. L'encodeur refuse de démarrer si les deux diffèrent.
+
+- **Reprise** : seuls les fragments sans vecteur sont envoyés ; l'écriture est
+  validée tous les 32 lots. Un encodage interrompu reprend sous la même ligne de
+  `bench.encodages`.
+- **Rejeu** : sur un encodage complet, rien à envoyer, **rien d'écrit** — ni
+  vecteur, ni mise à jour de `bench.encodages`.
+- **Refus** avant toute écriture : image non épinglée par digest, table déjà
+  remplie par un autre encodage, corpus modifié après un encodage terminé.
+- **Surveillance** : mémoire vive (`anon` du cgroup) et vidéo de l'instance, swap
+  écrit (`pswpout`, la colonne `so` de `vmstat`). Dix secondes de swap écrit
+  d'affilée arrêtent l'encodage proprement (code 3) : on réduit `--lot`, on
+  relance, la reprise fait le reste.
+
 ## Ce que la documentation ne dit pas, constaté sur 1.9.4
 
 - **Le port Prometheus n'est jamais ouvert.** `--prometheus-port` (défaut 9000)
@@ -93,5 +122,8 @@ uv run --extra dev pytest
 
 Configuration (format, règles, accord avec `compose.yml`, aucun jeton dans les
 fichiers versionnables) et client (préfixes, `normalize`, `truncate: false`,
-refus d'une dimension inattendue), contre une doublure HTTP. Le service réel est
-exercé par les contrôles ci-dessus.
+refus d'une dimension inattendue), contre une doublure HTTP. L'encodeur, sur une
+base PostgreSQL + pgvector **jetable** migrée par le runner du dépôt : écriture,
+reprise après panne, rejeu qui n'écrit rien (vérifié par le `xmin` des lignes),
+préfixes, refus. Un dernier test passe par l'instance BGE-M3 **réelle** quand
+elle tourne (il saute sinon). Garde-fous de l'encodeur vérifiés par mutation.
