@@ -200,6 +200,8 @@ class Tfidf:
             ngram_range=(reglages["ngram_min"], reglages["ngram_max"]),
             sublinear_tf=reglages["sublinear_tf"],
             min_df=reglages["min_df"],
+            # Absent (mesures 6 et 9) : 1,0, la valeur par défaut de scikit-learn.
+            max_df=reglages.get("max_df", 1.0),
             norm=reglages["norm"],
         )
         matrice = vectoriseur.fit_transform([t for _, t in textes])

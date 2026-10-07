@@ -128,6 +128,33 @@ médianes, et la part des questions dont la première série attendue est dans l
 50, puis les 100 premières. `--lecture F3` liste, pour une famille, les dix
 premières entités avec leur titre, leur appartenance au catalogue et leur score.
 
+## Études : quels réglages comptent
+
+Des **études**, pas des mesures : elles montrent quels réglages comptent, sans
+désigner de « meilleur réglage » (une grille essayée sur 59 questions trouve
+toujours un gagnant, qui doit beaucoup au hasard). Étiquette `etude` dans MLflow,
+rien dans `bench.eval_mesures`, aucun test de significativité. Réglages déclarés
+dans `config/etudes.toml`.
+
+### Sensibilité du TF-IDF
+
+```bash
+uv run python -m mesures_recherche.etudes tfidf --sortie resultats/etudes/tfidf.json --enregistrer
+```
+
+36 combinaisons — unité (mots simples ; mots simples et paires ; suites de 3 à 5
+caractères dans les mots), `sublinear_tf`, `min_df` (1, 2, 5), `max_df` (1,0 ; 0,5) —,
+classement au catalogue. Chaque combinaison est évaluée par le harnais des mesures,
+dans un processus à part, **sous garde de mémoire** : sous 5 Go de mémoire vive
+disponible, ou avec du swap écrit dix secondes d'affilée, elle est arrêtée, sautée
+et nommée, et l'étude continue. La combinaison des mesures 6 et 9 sert de témoin :
+elle doit redonner les métriques de la mesure 9. MLflow (expérience
+`E2-etudes-recherche`) : un run parent pour la grille, un run enfant par
+combinaison. Le résumé donne, par réglage et par valeur, la moyenne de
+`hit_rate@10` et de `ndcg@10`, toutes les autres valeurs confondues, avec
+l'étendue ; F4 et les coûts (temps, vocabulaire, mémoire) par unité. Aucun
+classement des combinaisons.
+
 ## Réglages de la génération (démonstration)
 
 ```bash
@@ -180,7 +207,9 @@ une empreinte fausse (fichiers ou base), plein texte, TF-IDF, sens et fusion (la
 question encodée par une doublure), lecture seule, rejeu identique. Second tour :
 réglages déclarés (`tests/test_configuration.py`), périmètre « catalogue » (ordre
 conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiquettes
-`tour` et `spec` du run ; diagnostic sur cas écrits à la main. Troisième tour :
+`tour` et `spec` du run ; diagnostic sur cas écrits à la main. Études : grille
+déclarée, résumé sans classement, garde de mémoire (lecteurs simulés), témoin égal à
+la mesure 9, MLflow parent et enfants. Troisième tour :
 vecteur moyen ramené à la longueur 1, moyenne des trois meilleurs (ou de ceux qu'on
 a), même score pour une entité à un seul fragment, de bout en bout sur la base
 jetable. Génération :

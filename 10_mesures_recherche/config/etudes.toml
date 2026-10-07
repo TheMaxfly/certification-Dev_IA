@@ -1,0 +1,59 @@
+# Études — spec E2 jour 4, blocs C, D, E.
+#
+# Ce sont des ÉTUDES, pas des mesures : elles montrent quels réglages comptent, sans
+# désigner de « meilleur réglage » — une grille essayée sur 59 questions trouve
+# toujours un gagnant, qui doit beaucoup au hasard. Étiquette `etude` dans MLflow ;
+# rien dans bench.eval_mesures ; aucun test de significativité. Tous les réglages
+# sont déclarés ici avant toute exécution.
+
+[mlflow]
+# Expérience des études de la recherche (blocs C et D), à part des mesures.
+experience = "E2-etudes-recherche"
+
+[memoire]
+# Règles de mémoire du projet : en dessous de 5 Go de mémoire vive disponible, ou
+# avec du swap écrit dix secondes d'affilée, la combinaison en cours est arrêtée,
+# sautée, nommée ; l'étude continue.
+ram_disponible_min = 5_000_000_000
+swap_continu_s = 10
+
+# --------------------------------------------------------------------------- #
+#  Bloc C — sensibilité du TF-IDF (36 combinaisons)
+# --------------------------------------------------------------------------- #
+
+[tfidf]
+nom = "tfidf-sensibilite"
+# Classement limité au catalogue, comme la mesure 9.
+perimetre_entites = "catalogue"
+# Réglages communs à toute la grille, ceux des mesures 6 et 9.
+lowercase = true
+strip_accents = "unicode"
+norm = "l2"
+similarite = "cosinus"
+# La grille : 3 × 2 × 3 × 2 = 36 combinaisons.
+sublinear_tf = [true, false]
+min_df = [1, 2, 5]
+max_df = [1.0, 0.5]
+# Contrôle : la combinaison des mesures 6 et 9 (mots simples, sublinear_tf,
+# min_df 2, max_df 1,0) doit redonner les métriques de la mesure 9.
+temoin = { unite = "mots", sublinear_tf = true, min_df = 2, max_df = 1.0 }
+
+[[tfidf.unites]]
+nom = "mots"
+analyzer = "word"
+ngram_min = 1
+ngram_max = 1
+
+[[tfidf.unites]]
+nom = "mots_et_paires"
+analyzer = "word"
+ngram_min = 1
+ngram_max = 2
+
+[[tfidf.unites]]
+# Suites de 3 à 5 caractères prises à l'intérieur des mots (`char_wb`) : une faute
+# d'orthographe ne touche que les suites qui la contiennent.
+nom = "caracteres_3_5"
+analyzer = "char_wb"
+ngram_min = 3
+ngram_max = 5
