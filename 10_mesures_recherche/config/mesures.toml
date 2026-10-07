@@ -5,6 +5,8 @@
 # Tour 2 — mesures 7 à 13 : choisies APRÈS lecture du premier tour, déclarées ici
 # AVANT toute exécution du second (2026-10-07, spec E2 jour 3) ; réglages de la
 # spec, aucun ajusté après avoir vu un résultat.
+# Tour 3 — mesures 14 à 17 : choisies après lecture des deux premiers tours,
+# déclarées ici avant toute exécution du troisième (2026-10-07, spec E2 jour 4).
 # Un changement serait une nouvelle mesure, déclarée comme telle (nouveau
 # numéro, nouveau nom). Ce fichier est enregistré en pièce de chaque run MLflow,
 # avec son empreinte.
@@ -33,6 +35,15 @@ departage = "identifiant_croissant"
 # Pour une fusion, le périmètre vaut pour chaque liste source (ses
 # `profondeur` premières entités du périmètre) et pour la liste fusionnée.
 # Absent (mesures 1 à 6) : « toutes ».
+# Représentation d'une entité, réglage `representation` d'une mesure par le sens :
+#   « meilleur_fragment » — score = le meilleur de ses fragments (tours 1 et 2) ;
+#   « vecteur_serie »     — la moyenne des vecteurs de tous ses fragments, ramenée
+#                           à la longueur 1 ; score = produit scalaire avec la
+#                           question ;
+#   « trois_meilleurs »   — la moyenne des scores de ses trois meilleurs
+#                           fragments ; moins de trois : la moyenne de ceux qu'elle a.
+# Absent : « meilleur_fragment ». Calculées sur les vecteurs de la base, rien n'y
+# est écrit.
 
 [metriques]
 hit_rate = [5, 10]
@@ -57,7 +68,16 @@ alpha = 0.05
 # 11 contre 8 —, soit six tests : seuil 0,05 / 6. Le filtre sur le catalogue
 # se mesure mais ne se teste pas (7–1, 8–2, 9–6 : retirer des concurrents ne
 # peut pas faire reculer une série).
-comparaisons = [[1, 2], [4, 1], [1, 3], [6, 3], [10, 2], [11, 8]]
+# Tour 3 : deux de plus — 15 contre 8, 17 contre 8 —, soit huit tests : seuil
+# 0,05 / 8.
+comparaisons = [[1, 2], [4, 1], [1, 3], [6, 3], [10, 2], [11, 8], [15, 8], [17, 8]]
+
+[controles]
+# Tour 3 : une entité à un seul fragment doit avoir le même score aux mesures 8,
+# 15 et 17 (sa moyenne, ou son vecteur ramené à la longueur 1, est son fragment).
+# Écart toléré : 1e-6 — les vecteurs de la base sont unitaires à 5e-8 près, et le
+# vecteur de série est renormalisé. Au-delà : erreur de harnais, arrêt.
+ecart_max_un_fragment = 1e-6
 
 [mlflow]
 experience = "E2-mesures-recherche-jeu-v2"
@@ -67,6 +87,7 @@ experience = "E2-mesures-recherche-jeu-v2"
 # mesure sans `tour` est du tour 1.
 1 = "E2 jour 2"
 2 = "E2 jour 3"
+3 = "E2 jour 4"
 
 # --------------------------------------------------------------------------- #
 #  Tour 1 — les six mesures du jour 2
@@ -229,3 +250,56 @@ sources = [6, 2]
 methode = "rang_reciproque"
 k_rrf = 100
 profondeur = 100
+
+# --------------------------------------------------------------------------- #
+#  Tour 3 — spec E2 jour 4, §3 : représenter l'œuvre entière, avec les vecteurs
+#  EmbeddingGemma existants. Mêmes métriques, portées et pièces.
+# --------------------------------------------------------------------------- #
+
+[[mesures]]
+numero = 14
+nom = "embeddinggemma-vecteur-serie"
+tour = 3
+type = "semantique"
+representation = "vecteur_serie"
+perimetre_entites = "toutes"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 15
+nom = "embeddinggemma-vecteur-serie-catalogue"
+tour = 3
+type = "semantique"
+representation = "vecteur_serie"
+perimetre_entites = "catalogue"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 16
+nom = "embeddinggemma-trois-meilleurs"
+tour = 3
+type = "semantique"
+representation = "trois_meilleurs"
+perimetre_entites = "toutes"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"
+
+[[mesures]]
+numero = 17
+nom = "embeddinggemma-trois-meilleurs-catalogue"
+tour = 3
+type = "semantique"
+representation = "trois_meilleurs"
+perimetre_entites = "catalogue"
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+modele = "google/embeddinggemma-300m"
+similarite = "cosinus"

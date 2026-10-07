@@ -97,7 +97,13 @@ def configuration_de(ctx: Contexte, numero: int):
     if m["type"] == "semantique":
         encoder, params = encodeur_du_service(m["instance"])
         params["encodage_id"] = encodage_du_modele(ctx.cx, m["modele"])
-        s = recherche.Semantique.charger(ctx.cx, ctx.entites, m["table"], encoder)
+        s = recherche.Semantique.charger(
+            ctx.cx,
+            ctx.entites,
+            m["table"],
+            encoder,
+            representation=configuration.representation(m),
+        )
         fonction = s.scores
     elif m["type"] == "plein_texte":
         p = recherche.PleinTexte.calculer(

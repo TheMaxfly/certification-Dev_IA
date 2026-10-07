@@ -6,7 +6,9 @@ est celui de `evaluation/atteignabilite.py` (module 05, `SQL_RATTACHEMENT`),
 chargé tel quel depuis son fichier — sans installer le module 05 et ses
 dépendances. Les séries atteignables viennent de la même source.
 
-Score d'une entité = le meilleur score de ses fragments. Toutes les entités
+Score d'une entité = le meilleur score de ses fragments (tours 1 et 2) ; au
+tour 3, deux autres représentations de l'œuvre entière : le vecteur moyen de ses
+fragments, ou la moyenne de ses trois meilleurs scores. Toutes les entités
 occupent un rang ; égalités départagées par l'identifiant croissant (series_id
 ou kitsu_id, comme nombres), la série d'abord à nombre égal.
 """
@@ -90,6 +92,32 @@ class Entites:
             raise ValueError("un score par fragment, dans l'ordre des chunk_id")
         ordre, debuts = self._groupes
         return np.maximum.reduceat(scores_fragments[ordre], debuts)
+
+    @cached_property
+    def fragments_par_entite(self) -> np.ndarray:
+        """Nombre de fragments de chaque entité."""
+        return np.bincount(self.entite, minlength=len(self.identifiant))
+
+    def vecteurs_moyens(self, matrice: np.ndarray) -> np.ndarray:
+        """Par entité : la moyenne des vecteurs de ses fragments, ramenée à la
+        longueur 1 (une ligne par entité)."""
+        if matrice.shape[0] != self.chunk_ids.shape[0]:
+            raise ValueError("une ligne par fragment, dans l'ordre des chunk_id")
+        ordre, debuts = self._groupes
+        sommes = np.add.reduceat(matrice[ordre], debuts, axis=0)
+        return sommes / np.linalg.norm(sommes, axis=1, keepdims=True)
+
+    def moyenne_meilleurs(self, scores_fragments: np.ndarray, n: int) -> np.ndarray:
+        """Par entité : la moyenne des scores de ses n meilleurs fragments ; moins
+        de n fragments : la moyenne de ceux qu'elle a."""
+        if scores_fragments.shape != self.chunk_ids.shape:
+            raise ValueError("un score par fragment, dans l'ordre des chunk_id")
+        _, debuts = self._groupes
+        ordre = np.lexsort((-scores_fragments, self.entite))
+        comptes = self.fragments_par_entite
+        rang = np.arange(len(ordre)) - np.repeat(debuts, comptes)
+        tries = np.where(rang < n, scores_fragments[ordre], 0.0)
+        return np.add.reduceat(tries, debuts) / np.minimum(comptes, n)
 
     def classer(self, scores_entites: np.ndarray) -> np.ndarray:
         """Indices d'entités, du rang 1 au dernier : score décroissant, puis

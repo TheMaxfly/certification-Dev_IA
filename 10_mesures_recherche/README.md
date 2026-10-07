@@ -1,9 +1,10 @@
 # 10 — mesures de la recherche
 
 Mesure la qualité de la recherche sur le **jeu d'évaluation v2 gelé** (69
-questions, onze familles), au **grain entité**, en deux tours : six mesures au
-premier (spec E2 jour 2), sept au second (spec E2 jour 3, choisies après lecture
-du premier, déclarées avant d'être exécutées). Aucun LLM pour la recherche,
+questions, onze familles), au **grain entité**, en trois tours : six mesures au
+premier (spec E2 jour 2), sept au second (spec E2 jour 3), quatre au troisième
+(spec E2 jour 4) — chaque tour choisi après lecture des précédents, déclaré avant
+d'être exécuté. Aucun LLM pour la recherche,
 aucune analyse de la question, aucun filtre structuré.
 
 | # | Configuration | Réglages (fixés d'avance, `config/mesures.toml`) |
@@ -28,6 +29,16 @@ fusion avec le TF-IDF au lieu du plein texte PostgreSQL.
 | 11 | Fusion TF-IDF + EmbeddingGemma | catalogue | 60 |
 | 12 | Fusion TF-IDF + EmbeddingGemma | toutes | 10 |
 | 13 | Fusion TF-IDF + EmbeddingGemma | toutes | 100 |
+
+Troisième tour (`tour = 3`), EmbeddingGemma par le sens : représenter l'œuvre
+entière (`representation`) plutôt que son meilleur fragment.
+
+| # | Représentation | Entités |
+|---|---|---|
+| 14 | vecteur de série : moyenne des vecteurs de ses fragments, ramenée à la longueur 1 | toutes |
+| 15 | vecteur de série | catalogue |
+| 16 | trois meilleurs fragments : moyenne de leurs scores (moins de trois : ceux qu'elle a) | toutes |
+| 17 | trois meilleurs fragments | catalogue |
 
 Tout réglage est lu dans `config/mesures.toml`. Aucun n'est changé après avoir vu
 un résultat : un changement serait une nouvelle mesure. L'empreinte du fichier
@@ -90,8 +101,11 @@ MLFLOW_DISABLE_AGENT_HINT=1 uv run mlflow ui \
 ```
 
 Les comparaisons déclarées d'avance — 1–2, 4–1, 1–3, 6–3 au premier tour, 10–2 et
-11–8 au second : bootstrap apparié sur les questions de rang, 10 000 tirages,
-graine fixe, intervalle à 1 − 0,05 / m (m = 6 depuis le second tour). Le filtre
+11–8 au second, 15–8 et 17–8 au troisième : bootstrap apparié sur les questions de
+rang, 10 000 tirages, graine fixe, intervalle à 1 − 0,05 / m (m = 8 depuis le
+troisième tour). Une entité à un seul fragment a le même score dans les trois
+représentations (`diagnostic.ecart_un_fragment`, écart toléré déclaré dans
+`[controles]`). Le filtre
 sur le catalogue (7–1, 8–2, 9–6) se mesure, ne se teste pas :
 `diagnostic.controle_filtre` vérifie seulement qu'aucune série n'a reculé.
 
@@ -166,7 +180,10 @@ une empreinte fausse (fichiers ou base), plein texte, TF-IDF, sens et fusion (la
 question encodée par une doublure), lecture seule, rejeu identique. Second tour :
 réglages déclarés (`tests/test_configuration.py`), périmètre « catalogue » (ordre
 conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiquettes
-`tour` et `spec` du run ; diagnostic sur cas écrits à la main. Génération :
+`tour` et `spec` du run ; diagnostic sur cas écrits à la main. Troisième tour :
+vecteur moyen ramené à la longueur 1, moyenne des trois meilleurs (ou de ceux qu'on
+a), même score pour une entité à un seul fragment, de bout en bout sur la base
+jetable. Génération :
 questions retenues, meilleur fragment, part copiée, répétitions, invite, plan de 88
 appels, client Ollama contre une doublure HTTP (`keep_alive`, options,
 déchargement), runs et traces MLflow, passages sur la base jetable.

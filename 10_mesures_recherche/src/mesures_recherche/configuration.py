@@ -12,6 +12,7 @@ FICHIER = RACINE_MODULE / "config" / "mesures.toml"
 
 
 PERIMETRES = ("toutes", "catalogue")
+REPRESENTATIONS = ("meilleur_fragment", "vecteur_serie", "trois_meilleurs")
 
 
 class ConfigurationInvalide(Exception):
@@ -31,6 +32,10 @@ def charger(chemin: Path = FICHIER) -> dict:
             raise ConfigurationInvalide(
                 f"mesure {m['numero']} : perimetre_entites {perimetre(m)!r}"
             )
+        if representation(m) not in REPRESENTATIONS:
+            raise ConfigurationInvalide(
+                f"mesure {m['numero']} : representation {representation(m)!r}"
+            )
         if str(tour(m)) not in config["tours"]:
             raise ConfigurationInvalide(f"mesure {m['numero']} : tour inconnu")
     for a, b in config["bootstrap"]["comparaisons"]:
@@ -49,6 +54,12 @@ def mesure(config: dict, numero: int) -> dict:
 def perimetre(m: dict) -> str:
     """Périmètre des entités classées ; absent (tour 1) : « toutes »."""
     return m.get("perimetre_entites", "toutes")
+
+
+def representation(m: dict) -> str:
+    """Représentation d'une entité ; absente (tours 1 et 2) : son meilleur
+    fragment."""
+    return m.get("representation", "meilleur_fragment")
 
 
 def tour(m: dict) -> int:

@@ -165,7 +165,7 @@ def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch)
     dsn, config, _ = banc
     config["mesures"].append(
         {
-            "numero": 14,
+            "numero": 101,
             "nom": "essai-fusion-tfidf-sens-catalogue",
             "tour": 2,
             "type": "fusion",
@@ -185,7 +185,7 @@ def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch)
         return classer(entites, scores, perimetre)
 
     monkeypatch.setattr(recherche, "classer", espion)
-    r = executer.mesurer(ctx, 14)
+    r = executer.mesurer(ctx, 101)
     # Chaque liste source ET la liste fusionnée : au catalogue.
     assert len(perimetres) == 3 * len(ctx.questions)
     assert set(perimetres) == {"catalogue"}
@@ -212,3 +212,36 @@ def test_enregistrement_tour_2_etiquete(banc, tmp_path):
         "spec": "E2 jour 3",
     }
     assert run.data.params["reglage.perimetre_entites"] == "catalogue"
+
+
+# --------------------------------------------------------------------------- #
+#  Tour 3 — vecteur de série, trois meilleurs fragments
+# --------------------------------------------------------------------------- #
+
+
+def test_representations_de_l_oeuvre(banc, encodeur_doublure):
+    dsn, config, _ = banc
+    for numero, representation in ((102, "vecteur_serie"), (103, "trois_meilleurs")):
+        config["mesures"].append(
+            {
+                "numero": numero,
+                "nom": f"essai-{representation}",
+                "tour": 3,
+                "type": "semantique",
+                "representation": representation,
+                "perimetre_entites": "toutes",
+                "instance": "bge-m3",
+                "table": "bench.vecteurs_bge_m3",
+                "modele": "BAAI/bge-m3",
+                "similarite": "cosinus",
+            }
+        )
+    ctx = executer.ouvrir(dsn, config)
+    sens, serie, trois = (questions(executer.mesurer(ctx, n)) for n in (1, 102, 103))
+    # Q002 vise le fragment 104 ; la série 3 a deux fragments (103 et 104).
+    assert dict(sens["Q002"]["top"])["serie:3"] == pytest.approx(1.0)
+    assert dict(serie["Q002"]["top"])["serie:3"] == pytest.approx(2**-0.5)
+    assert dict(trois["Q002"]["top"])["serie:3"] == pytest.approx(0.5)
+    # Q001 vise le fragment 102, seul fragment de la série 2 : rien ne change.
+    for r in (serie, trois):
+        assert dict(r["Q001"]["top"])["serie:2"] == pytest.approx(1.0)

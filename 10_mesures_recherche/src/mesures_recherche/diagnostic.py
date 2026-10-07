@@ -166,6 +166,13 @@ def controle_filtre(sans: dict, avec: dict) -> dict:
     }
 
 
+def ecart_un_fragment(entites, scores_reference, scores_autre) -> float:
+    """Écart maximal de score entre deux représentations, sur les entités à un
+    seul fragment — pour elles, toutes les représentations se confondent."""
+    seules = entites.fragments_par_entite == 1
+    return float(np.max(np.abs(scores_reference[seules] - scores_autre[seules])))
+
+
 def reference_mlflow(numero: int, spec: str = "E2 jour 2") -> dict:
     """La pièce `resultat.json` du run MLflow de la mesure."""
     import mlflow

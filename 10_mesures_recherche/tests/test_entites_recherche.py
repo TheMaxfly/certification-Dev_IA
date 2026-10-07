@@ -117,3 +117,64 @@ def test_fusion_au_catalogue_sur_les_tetes_du_perimetre(ent):
     a = classer(ent, np.array([0.1, 0.8, 0.9, 0.7]), "catalogue")
     s = fusion([a], k_rrf=60, profondeur=1)
     assert s[ent.index_serie[9]] == pytest.approx(1 / 61) and s.sum() == s[1]
+
+
+# --------------------------------------------------------------------------- #
+#  Tour 3 — représenter l'œuvre entière
+# --------------------------------------------------------------------------- #
+
+
+def test_fragments_par_entite(ent):
+    # Entités : 0 serie:5 (fragments 10, 11), 1 serie:9, 2 kitsu:7, 3 kitsu:5.
+    assert list(ent.fragments_par_entite) == [2, 1, 1, 1]
+
+
+def test_vecteur_moyen_ramene_a_la_longueur_1(ent):
+    matrice = np.array(
+        [[1.0, 0.0], [0.0, 1.0], [0.6, 0.8], [1.0, 0.0], [0.0, 1.0]]
+    )  # fragments 10, 11, 20, 30, 40
+    v = ent.vecteurs_moyens(matrice)
+    np.testing.assert_allclose(v[0], [2**-0.5, 2**-0.5])  # serie:5 : (1,0)+(0,1)
+    np.testing.assert_allclose(v[1], [0.6, 0.8])  # un seul fragment : lui-même
+    np.testing.assert_allclose(np.linalg.norm(v, axis=1), 1.0)
+
+
+def test_moyenne_des_trois_meilleurs_ou_de_ceux_qu_on_a():
+    lignes = [(c, "ms_review", 5, None) for c in (1, 2, 3, 4)] + [
+        (5, "ms_review", 9, None),
+        (6, "ms_review", 9, None),
+    ]
+    e = construire(lignes, {5, 9})
+    scores = np.array([0.1, 0.9, 0.5, 0.7, 0.4, 0.2])
+    m = e.moyenne_meilleurs(scores, 3)
+    assert m[e.index_serie[5]] == pytest.approx((0.9 + 0.7 + 0.5) / 3)
+    assert m[e.index_serie[9]] == pytest.approx((0.4 + 0.2) / 2), "deux fragments"
+
+
+def test_un_seul_fragment_meme_score_dans_les_trois_representations(ent):
+    from mesures_recherche.diagnostic import ecart_un_fragment
+    from mesures_recherche.recherche import Semantique
+
+    rng = np.random.default_rng(0)
+    matrice = rng.normal(size=(5, 4))
+    matrice /= np.linalg.norm(matrice, axis=1, keepdims=True)
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
+    scores = {
+        r: Semantique(ent, matrice, lambda _t: q, representation=r).scores(
+            type("Q", (), {"texte": "x"})
+        )
+        for r in ("meilleur_fragment", "vecteur_serie", "trois_meilleurs")
+    }
+    ref = scores["meilleur_fragment"]
+    assert ecart_un_fragment(ent, ref, scores["trois_meilleurs"]) == 0.0
+    assert ecart_un_fragment(ent, ref, scores["vecteur_serie"]) < 1e-12
+    # serie:5 (deux fragments) : les représentations diffèrent.
+    assert scores["vecteur_serie"][0] != pytest.approx(ref[0])
+
+
+def test_representation_inconnue_refusee(ent):
+    from mesures_recherche.recherche import Semantique
+
+    with pytest.raises(ValueError, match="représentation inconnue"):
+        Semantique(ent, np.eye(5), None, representation="moyenne")

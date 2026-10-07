@@ -19,7 +19,7 @@ def test_tour_1_inchange_perimetre_toutes_par_defaut():
         assert "perimetre_entites" not in m and "tour" not in m
         assert configuration.perimetre(m) == "toutes"
         assert configuration.tour(m) == 1
-    assert config["tours"] == {"1": "E2 jour 2", "2": "E2 jour 3"}
+    assert config["tours"]["1"] == "E2 jour 2" and config["tours"]["2"] == "E2 jour 3"
 
 
 def test_tour_2_tel_que_declare_par_la_spec():
@@ -47,8 +47,7 @@ def test_tour_2_tel_que_declare_par_la_spec():
     tfidf_2 = configuration.mesure(config, 9)
     for cle in ("lowercase", "strip_accents", "sublinear_tf", "min_df", "norm"):
         assert tfidf_2[cle] == tfidf_1[cle]
-    assert config["bootstrap"]["comparaisons"][-2:] == [[10, 2], [11, 8]]
-    assert len(config["bootstrap"]["comparaisons"]) == 6
+    assert config["bootstrap"]["comparaisons"][4:6] == [[10, 2], [11, 8]]
 
 
 def _ecrire(tmp_path, transformer):
@@ -86,7 +85,39 @@ def test_perimetre_inconnu_refuse(tmp_path):
 
 def test_tour_inconnu_refuse(tmp_path):
     def casser(c):
-        c["mesures"][6]["tour"] = 3
+        c["mesures"][6]["tour"] = 9
 
     with pytest.raises(ConfigurationInvalide, match="tour inconnu"):
+        charger(_ecrire(tmp_path, casser))
+
+
+def test_tour_3_tel_que_declare_par_la_spec():
+    config = charger()
+    attendu = {
+        14: ("vecteur_serie", "toutes"),
+        15: ("vecteur_serie", "catalogue"),
+        16: ("trois_meilleurs", "toutes"),
+        17: ("trois_meilleurs", "catalogue"),
+    }
+    for n, (representation, perimetre) in attendu.items():
+        m = configuration.mesure(config, n)
+        assert m["tour"] == 3 and m["type"] == "semantique"
+        assert m["instance"] == "embeddinggemma"
+        assert configuration.representation(m) == representation
+        assert configuration.perimetre(m) == perimetre
+    for n in range(1, 14):
+        assert configuration.representation(configuration.mesure(config, n)) == (
+            "meilleur_fragment"
+        )
+    assert config["tours"]["3"] == "E2 jour 4"
+    assert config["bootstrap"]["comparaisons"][-2:] == [[15, 8], [17, 8]]
+    assert len(config["bootstrap"]["comparaisons"]) == 8
+    assert config["controles"]["ecart_max_un_fragment"] == 1e-6
+
+
+def test_representation_inconnue_refusee(tmp_path):
+    def casser(c):
+        c["mesures"][14]["representation"] = "moyenne"
+
+    with pytest.raises(ConfigurationInvalide, match="representation"):
         charger(_ecrire(tmp_path, casser))

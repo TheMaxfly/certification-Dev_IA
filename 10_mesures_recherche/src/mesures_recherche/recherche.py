@@ -46,21 +46,45 @@ def classer(
 
 
 # --------------------------------------------------------------------------- #
-#  1, 2, 7, 8 — par le sens
+#  1, 2, 7, 8, 14 à 17 — par le sens
 # --------------------------------------------------------------------------- #
+
+
+REPRESENTATIONS = ("meilleur_fragment", "vecteur_serie", "trois_meilleurs")
 
 
 @dataclass
 class Semantique:
-    """Cosinus entre la question, encodée par le service, et chaque fragment."""
+    """Cosinus entre la question, encodée par le service, et chaque fragment ;
+    l'entité est représentée par son meilleur fragment, par le vecteur moyen de
+    ses fragments ramené à la longueur 1, ou par la moyenne de ses trois
+    meilleurs scores."""
 
     entites: Entites
     matrice: np.ndarray  # float64, une ligne par fragment, ordre des chunk_id
     encoder: object  # question → vecteur (le client du service, rôle « requete »)
     parametres: dict = field(default_factory=dict)
+    representation: str = "meilleur_fragment"
+
+    def __post_init__(self):
+        if self.representation not in REPRESENTATIONS:
+            raise ValueError(f"représentation inconnue : {self.representation!r}")
+        self._series = (
+            self.entites.vecteurs_moyens(self.matrice)
+            if self.representation == "vecteur_serie"
+            else None
+        )
 
     @classmethod
-    def charger(cls, cx, entites: Entites, table: str, encoder, parametres=None):
+    def charger(
+        cls,
+        cx,
+        entites: Entites,
+        table: str,
+        encoder,
+        parametres=None,
+        representation: str = "meilleur_fragment",
+    ):
         from pgvector.psycopg import register_vector
 
         register_vector(cx)
@@ -71,11 +95,16 @@ class Semantique:
         if not np.array_equal(chunk_ids, entites.chunk_ids):
             raise ValueError(f"{table} : les fragments vectorisés ≠ ceux du corpus")
         matrice = np.vstack([v.to_numpy() for _, v in lignes]).astype(np.float64)
-        return cls(entites, matrice, encoder, dict(parametres or {}))
+        return cls(entites, matrice, encoder, dict(parametres or {}), representation)
 
     def scores(self, question: Question) -> np.ndarray:
         q = np.asarray(self.encoder(question.texte), dtype=np.float64)
-        return self.entites.agreger(self.matrice @ q)
+        if self.representation == "vecteur_serie":
+            return self._series @ q
+        fragments = self.matrice @ q
+        if self.representation == "trois_meilleurs":
+            return self.entites.moyenne_meilleurs(fragments, 3)
+        return self.entites.agreger(fragments)
 
 
 # --------------------------------------------------------------------------- #
