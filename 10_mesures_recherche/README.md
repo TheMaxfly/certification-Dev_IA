@@ -168,6 +168,25 @@ premières entités de chaque question selon le produit scalaire (ce que calcule
 mesure), le cosinus et la distance euclidienne, comparées. Un seul run MLflow,
 étiquette `etude`.
 
+### Classification d'intention
+
+```bash
+# méthode 1 : l'instance EmbeddingGemma du service lancée seule (module 09)
+uv run python -m mesures_recherche.etudes intention-voisins --sortie resultats/etudes/intention_voisins.json --enregistrer
+# méthode 2 : l'instance arrêtée ; Ollama, le modèle sur la carte graphique
+uv run python -m mesures_recherche.etudes intention-llm --sortie resultats/etudes/intention_llm.json --enregistrer
+```
+
+Le mode de chacune des 69 questions (proposition, reconnaissance, refus) prédit de
+deux façons : par le vote de ses k plus proches voisines parmi les 68 autres
+(vecteurs EmbeddingGemma, k = 1, 3, 5, 7), et par le LLM local
+(`ministral-3:3b`, température 0, réponse contrainte aux trois valeurs par un
+schéma JSON, invite `config/invite_intention.toml` qui définit les modes sans
+aucun exemple tiré du jeu — un test le vérifie). Expérience MLflow
+`E2-etude-intention`, un run par méthode et par k : exactitude, rappel par
+classe, matrice de confusion en pièce, latence pour le LLM, appels tracés.
+69 exemples dont 5 refus ne donnent qu'un ordre de grandeur.
+
 ## Réglages de la génération (démonstration)
 
 ```bash
@@ -224,7 +243,8 @@ conservé, aucun recul, chaque liste source d'une fusion au périmètre), étiqu
 déclarée, résumé sans classement, garde de mémoire (lecteurs simulés), témoin égal à
 la mesure 9, MLflow parent et enfants ; profondeurs sur cas écrits à la main,
 distances (même ordre pour des vecteurs de longueur 1, pas au-delà), voisins de
-bout en bout. Troisième tour :
+bout en bout ; intention : vote, rappel et matrice, sorties hors valeurs, invite
+sans extrait du jeu, LLM contre une doublure. Troisième tour :
 vecteur moyen ramené à la longueur 1, moyenne des trois meilleurs (ou de ceux qu'on
 a), même score pour une entité à un seul fragment, de bout en bout sur la base
 jetable. Génération :

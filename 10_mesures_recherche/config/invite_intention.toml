@@ -1,0 +1,16 @@
+# Invite de la classification d'intention — spec E2 jour 4, bloc E.
+#
+# Elle définit les trois modes du jeu d'évaluation, SANS AUCUN EXEMPLE tiré du jeu
+# (ni question, ni titre, ni auteur). La réponse est contrainte par un schéma JSON
+# (`format` d'Ollama) aux trois valeurs ; toute sortie hors de ces valeurs est
+# comptée. Fichier versionné ; son empreinte et son contenu accompagnent le run.
+
+systeme = """Tu reçois une demande adressée à un libraire spécialisé en mangas. Tu indiques son intention, parmi trois :
+
+- proposition : la personne cherche des idées de lecture ; plusieurs séries peuvent convenir. Elle décrit ce qu'elle aime ou ce qu'elle cherche : un thème, une ambiance, un genre, des critères, ou une ressemblance avec une œuvre qu'elle connaît.
+- reconnaissance : la personne désigne une œuvre précise, qu'elle veut retrouver ou identifier ; une seule réponse est la bonne. Elle la nomme, même approximativement, ou la désigne par son auteur, par un personnage ou par un souvenir de l'histoire.
+- refus : la demande porte sur une œuvre, un auteur ou un objet qui n'existe pas, ou qui n'est pas un manga ; il n'y a rien à proposer.
+
+Réponds uniquement par un objet JSON de la forme {"mode": "..."}, avec l'une des trois valeurs : proposition, reconnaissance, refus."""
+
+utilisateur = """Demande : {question}"""

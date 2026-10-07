@@ -182,18 +182,21 @@ class Ollama:
     modele: str
     keep_alive: str
 
-    def discuter(self, msgs: list[dict], opts: dict) -> dict:
+    def discuter(
+        self, msgs: list[dict], opts: dict, format: dict | None = None
+    ) -> dict:
+        """Un appel ; `format` (schéma JSON) contraint la réponse, s'il est donné."""
         debut = time.monotonic()
-        r = _requete(
-            f"{self.url}/api/chat",
-            {
-                "model": self.modele,
-                "messages": msgs,
-                "stream": False,
-                "keep_alive": self.keep_alive,
-                "options": opts,
-            },
-        )
+        corps = {
+            "model": self.modele,
+            "messages": msgs,
+            "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": opts,
+        }
+        if format is not None:
+            corps["format"] = format
+        r = _requete(f"{self.url}/api/chat", corps)
         return {
             "reponse": r["message"]["content"],
             "done_reason": r.get("done_reason"),

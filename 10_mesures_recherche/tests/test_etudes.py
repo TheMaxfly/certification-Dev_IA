@@ -236,3 +236,134 @@ def test_voisins_de_bout_en_bout_et_mlflow(banc, encodeur_doublure, tmp_path):
     assert lu.info.status == "FINISHED" and lu.data.tags["etude"] == "voisins"
     assert lu.data.metrics["hit_rate_50/global"] == 1.0
     assert lu.data.metrics["distances_listes_identiques"] == 3
+
+
+# --------------------------------------------------------------------------- #
+#  Bloc E — classification d'intention
+# --------------------------------------------------------------------------- #
+
+
+def test_vote_majoritaire_et_egalite_par_la_plus_proche():
+    assert etudes.voter([("a", 0.9), ("b", 0.8), ("b", 0.7)]) == "b"
+    assert etudes.voter([("a", 0.9), ("b", 0.8)]) == "a", "égalité : la plus proche"
+    assert etudes.voter([("b", 0.9), ("a", 0.8), ("a", 0.7), ("b", 0.6)]) == "b"
+
+
+def test_plus_proches_voisins_parmi_les_autres():
+    import numpy as np
+
+    vecteurs = np.array([[1.0, 0.0], [0.9, 0.1], [0.0, 1.0], [0.1, 0.9], [0.2, 0.8]])
+    etiquettes = ["a", "a", "b", "b", "b"]
+    assert etudes.plus_proches_voisins(vecteurs, etiquettes, 1) == etiquettes
+    # k = 3 : la première voit ses trois voisines (0.9/0.1, puis deux « b »).
+    assert etudes.plus_proches_voisins(vecteurs, etiquettes, 3)[0] == "b"
+
+
+def test_evaluation_exactitude_rappel_matrice_hors_valeurs():
+    r = etudes.evaluer_classement(
+        ["proposition", "proposition", "reconnaissance", "refus"],
+        ["proposition", "reconnaissance", "reconnaissance", None],
+    )
+    assert r["exactitude"] == 0.5 and r["questions"] == 4
+    assert r["rappel"] == {"proposition": 0.5, "reconnaissance": 1.0, "refus": 0.0}
+    assert r["hors_valeurs"] == 1
+    assert r["matrice"]["refus"]["hors_valeurs"] == 1
+    assert r["matrice"]["proposition"]["reconnaissance"] == 1
+
+
+def test_lire_le_mode_ou_rien():
+    assert etudes.lire_mode('{"mode": "refus"}') == "refus"
+    assert etudes.lire_mode('{"mode": "autre"}') is None
+    assert etudes.lire_mode("proposition") is None
+    assert etudes.lire_mode("[1]") is None
+
+
+def test_invite_sans_aucun_exemple_tire_du_jeu():
+    import csv
+    import re
+
+    from mesures_recherche.configuration import RACINE_DEPOT
+    from mesures_recherche.generation import charger_toml
+
+    invite = charger_toml(etudes.RACINE_MODULE / ETUDES["intention"]["llm"]["invite"])
+    texte = " ".join(
+        re.findall(r"\w+", (invite["systeme"] + invite["utilisateur"]).lower())
+    )
+    fichier = RACINE_DEPOT / "database/donnees/jeu_evaluation/v2/questions.csv"
+    with fichier.open(encoding="utf-8") as f:
+        questions = [ligne["texte"] for ligne in csv.DictReader(f)]
+    assert len(questions) == 69
+    for q in questions:
+        mots = re.findall(r"\w+", q.lower())
+        for i in range(len(mots) - 3):
+            assert " ".join(mots[i : i + 4]) not in texte, q
+    for mode in etudes.MODES:
+        assert mode in invite["systeme"]
+
+
+class ModeleDoublure:
+    def __init__(self, reponses):
+        self.reponses = iter(reponses)
+        self.formats = []
+
+    def discuter(self, msgs, opts, format=None):
+        self.formats.append((format, opts["temperature"]))
+        return {
+            "reponse": next(self.reponses),
+            "done_reason": "stop",
+            "jetons_entree": 300,
+            "jetons_sortie": 6,
+            "latence_s": 0.2,
+            "duree_totale_s": 0.2,
+            "duree_chargement_s": 0.0,
+        }
+
+
+def test_llm_contraint_aux_trois_valeurs_et_hors_valeurs_comptees():
+    from mesures_recherche.jeu import Question
+
+    questions = [
+        Question("Q1", "un manga de pirates", "proposition", "F1", "au_catalogue", {}),
+        Question("Q2", "Berserk", "reconnaissance", "F1", "au_catalogue", {}),
+        Question("Q3", "le grimoire inventé", "refus", "F7", "inconnue", {}),
+    ]
+    modele = ModeleDoublure(
+        ['{"mode": "proposition"}', '{"mode": "reconnaissance"}', "je ne sais pas"]
+    )
+    invite = {"systeme": "S", "utilisateur": "Demande : {question}"}
+    r = etudes.classer_par_llm(questions, ETUDES, modele, invite)
+    assert r["exactitude"] == pytest.approx(2 / 3) and r["hors_valeurs"] == 1
+    assert r["rappel"]["refus"] == 0.0
+    assert all(f == etudes.SCHEMA_MODE and t == 0.0 for f, t in modele.formats)
+    assert r["latence_mediane_s"] == pytest.approx(0.2)
+
+
+def test_intention_par_voisins_de_bout_en_bout_et_mlflow(
+    banc, encodeur_doublure, tmp_path
+):
+    import copy
+
+    import mlflow
+
+    from mesures_recherche.enregistrement import uri_suivi
+
+    dsn, config, _ = banc
+    e = copy.deepcopy(ETUDES)
+    e["intention"]["voisins"]["instance"] = "bge-m3"
+    ctx = executer.ouvrir(dsn, config)
+    r = etudes.classer_par_voisins(ctx, e)
+    assert [x["k"] for x in r["runs"]] == [1, 3, 5, 7]
+    assert all(x["questions"] == 3 for x in r["runs"])
+    m = etudes._experience(e, tmp_path / "m", e["intention"]["experience"])
+    with m.start_run(run_name="voisins-k=1") as run:
+        etudes.journaliser_classement(
+            m, e, r["runs"][0], list(r["etiquettes"].values()), {"essai": "oui"}
+        )
+    mlflow.set_tracking_uri(uri_suivi(tmp_path / "m"))
+    lu = mlflow.get_run(run.info.run_id)
+    assert lu.data.tags["etude"] == "intention" and lu.data.params["k"] == "1"
+    assert lu.data.metrics["reference_naive_exactitude"] == pytest.approx(1 / 3)
+    pieces = {a.path for a in mlflow.MlflowClient().list_artifacts(run.info.run_id)}
+    assert {"matrice_confusion.json", "matrice_confusion.md", "predictions.json"} <= (
+        pieces
+    )
