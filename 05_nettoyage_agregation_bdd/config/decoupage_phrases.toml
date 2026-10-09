@@ -1,0 +1,34 @@
+# Découpage par phrases du corpus v2 (E3, étape 1).
+#
+# Règle validée par Max le 2026-10-09 sur simulation (rapport de l'étape, bloc A,
+# A4) : taille et recouvrement du v1 conservés, pour que seule la FAÇON de couper
+# change ; repérage des phrases par une règle écrite, sans modèle.
+#
+# Lu par `corpus.phrases` (module 05). Son empreinte (sha256 du fichier) est
+# inscrite avec la stratégie dans `bench.chunking_strategies` : une règle changée
+# porte un autre nom, jamais le même.
+
+[strategie]
+# Nom inscrit dans `bench.chunking_strategies`.
+nom = "phrases_1200_recouvrement_200"
+
+# Taille maximale d'un fragment, en caractères (espaces de fin retirées) : celle
+# du corpus v1 (`char_1200_overlap_200`).
+taille = 1200
+
+# Recouvrement : la dernière phrase du fragment précédent, si elle tient dans ces
+# 200 caractères — le recouvrement du v1 ; sinon aucun.
+recouvrement = 200
+
+# Abréviations qui ne finissent pas une phrase : minuscules, sans le point final.
+# Une lettre seule (initiale : « J. K. ») ne finit jamais une phrase, par règle.
+# « etc. » non plus, comme le demande la spec (validé par Max le 2026-10-09).
+abreviations = [
+  # civilités et titres
+  "m", "mm", "mme", "mmes", "mlle", "mlles", "dr", "pr", "st", "ste", "sts", "stes",
+  "mr", "mrs", "ms", "jr", "sr", "prof",
+  # renvois et éditions
+  "etc", "cf", "ex", "env", "chap", "ch", "vol", "vols", "t", "tt", "p", "pp",
+  "no", "n", "nos", "éd", "ed", "eds", "coll", "trad", "ill", "fig", "op", "cit",
+  "ibid", "av", "apr", "vs", "e.g", "i.e",
+]
