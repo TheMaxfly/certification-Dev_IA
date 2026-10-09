@@ -7,3 +7,6 @@ __pycache__/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Sorties de make verify (JUnit, couverture, résumé)
+/.verify/
