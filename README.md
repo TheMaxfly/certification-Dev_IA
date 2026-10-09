@@ -372,6 +372,8 @@ Elle distingue la verification C4, autonome sur une fixture jetable, de
 l'installation de production, qui suppose les snapshots et les autorisations de
 collecte.
 
+La methode de travail est dans **[`CONTRIBUTING.md`](CONTRIBUTING.md)** : branches, commits, fusions, etiquettes.
+
 ## Demonstration
 
 Le deroule complet est dans **`GUIDE_PIPELINE.md`** : le pipeline ELT commande
