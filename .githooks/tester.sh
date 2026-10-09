@@ -60,6 +60,27 @@ scenario refuse "autre fichier de docs/"            eval 'ecrire docs/autre.md "
 scenario refuse "exclusion locale absente"          eval 'ecrire f.txt "x" && git commit -q -m f && mv .git/info/exclude .git/info/exclude.bak'
 mv .git/info/exclude.bak .git/info/exclude 2>/dev/null || true
 
+# Fusions créées par GitHub : le committer prend l'identité technique de GitHub.
+cote() {  # cote <n> : une branche latérale propre, d'un commit, à fusionner dans main
+    git checkout -q -b "cote$1" && ecrire "cote$1.txt" "côté $1" && git commit -q -m "côté $1" &&
+        git checkout -q main
+}
+par_github() {  # par_github <adresse> <commande git…> : committer GitHub, à cette adresse
+    local adresse="$1"
+    shift
+    GIT_COMMITTER_NAME=GitHub GIT_COMMITTER_EMAIL="$adresse" git "$@"
+}
+scenario passe  "fusion de GitHub"                  eval 'cote 1 && par_github noreply@github.com merge -q --no-ff cote1 -m "Merge pull request #1"'
+scenario refuse "commit ordinaire validé par GitHub" eval 'ecrire g.txt "x" && par_github noreply@github.com commit -q -m g'
+scenario refuse "fusion de GitHub, auteur étranger" eval 'cote 2 && GIT_AUTHOR_NAME=Autre par_github noreply@github.com merge -q --no-ff cote2 -m "Merge pull request #2"'
+scenario refuse "fusion de GitHub, ligne fautive"   eval 'cote 3 && git merge -q --no-ff --no-commit cote3 >/dev/null 2>&1 && ecrire h.md "rédigé avec $NOM Code" && par_github noreply@github.com commit -q -m "Merge pull request #3"'
+scenario refuse "fusion validée par GitHub, autre adresse" eval 'cote 4 && par_github github@example.invalid merge -q --no-ff cote4 -m "Merge pull request #4"'
+scenario refuse "fusion à trois parents validée par GitHub" eval 'cote 5 && cote 6 && par_github noreply@github.com merge -q --no-ff cote5 cote6 -m "Merge pull requests #5 et #6" >/dev/null'
+# Le nom de profil GitHub de TheMaxfly n'est admis qu'en auteur d'une fusion créée par GitHub.
+scenario passe  "fusion de GitHub d'auteur MaxFlavigny" eval 'cote 7 && GIT_AUTHOR_NAME=MaxFlavigny par_github noreply@github.com merge -q --no-ff cote7 -m "Merge pull request #7"'
+scenario refuse "commit ordinaire d'auteur MaxFlavigny" eval 'ecrire m.txt "x" && git commit -q -m m --author="MaxFlavigny <max@example.invalid>"'
+scenario refuse "fusion locale d'auteur MaxFlavigny"  eval 'cote 8 && GIT_AUTHOR_NAME=MaxFlavigny git merge -q --no-ff cote8 -m "fusion locale"'
+
 # --------------------------------------------------------------------------- #
 # Hook pre-commit — sur un SECOND clone : le premier a besoin de commits fautifs
 # pour éprouver le pre-push, que le pre-commit refuserait. Chaque scénario
