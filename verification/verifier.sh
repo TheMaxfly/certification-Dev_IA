@@ -6,6 +6,10 @@
 #   verifier.sh indicatif [MODULE]  Bandit et pip-audit — jamais exigés
 #   verifier.sh poste               verify, puis les harnais qui ne tournent que sur
 #                                   le poste
+#   verifier.sh preparer MODULE     uv sync --locked de ce module (et de database/
+#                                   s'il en dépend) : l'étape d'avant verify sur GitHub
+#   verifier.sh image               tire, par empreinte, l'image PostgreSQL que les
+#                                   fixtures des bases jetables désignent
 #
 # Lancé par le Makefile de la racine (`make verify`, `make verify MODULE=05`,
 # `make verify-indicatif`, `make verify-poste`).
@@ -271,6 +275,7 @@ verify() {
 indicatif() {
   local l lignes constats=0
   lignes="$(choisir_modules "${1:-}")" || exit 2
+  local tableau=("| module | Bandit H / M / L | pip-audit : vulnérabilités |" "|---|---|---:|")
   printf '%-10s %-22s %-28s\n' module "Bandit H/M/L" "pip-audit vulnérabilités"
   while IFS= read -r l; do
     local nom lint projet lanceur
@@ -289,11 +294,66 @@ indicatif() {
         --progress-spinner off -f json -o "$sortie/audit.json") >"$sortie/audit.log" 2>&1
     audit=$(jq '[.dependencies[].vulns[]] | length' "$sortie/audit.json" 2>/dev/null || echo "erreur")
     printf '%-10s %-22s %-28s\n' "$nom" "$bandit" "$audit"
+    tableau+=("| $nom | $bandit | $audit |")
     [ "$bandit" = 0/0/0 ] && [ "$audit" = 0 ] || constats=$((constats + 1))
   done <<<"$lignes"
   printf '\n%s module(s) avec constats — indicatif, jamais exigé. Détail : %s/<module>/\n' \
     "$constats" "$SORTIES"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    { echo "### Indicatif — jamais exigé"; echo; printf '%s\n' "${tableau[@]}"; } >>"$GITHUB_STEP_SUMMARY"
+  fi
   [ "$constats" -eq 0 ]
+}
+
+# --------------------------------------------------------------------------- #
+#  Image : la PostgreSQL des bases jetables, lue dans les fixtures, tirée par empreinte
+# --------------------------------------------------------------------------- #
+FIXTURES_BASE=(
+  database/tests/conftest.py
+  05_nettoyage_agregation_bdd/tests/conftest.py
+  09_service_embedding/tests/conftest.py
+  10_mesures_recherche/tests/conftest.py
+)
+
+image() {
+  local images
+  images="$(cd "$RACINE" && "${PROPRE[@]}" uv run --no-project python -I - "${FIXTURES_BASE[@]}" <<'PY' | sort -u
+import ast
+import sys
+
+for chemin in sys.argv[1:]:
+    with open(chemin, encoding="utf-8") as fichier:
+        arbre = ast.parse(fichier.read())
+    for noeud in arbre.body:
+        if isinstance(noeud, ast.Assign) and any(
+            getattr(cible, "id", None) == "IMAGE_POSTGRES" for cible in noeud.targets
+        ):
+            print(ast.literal_eval(noeud.value))
+PY
+)"
+  if [ "$(grep -c . <<<"$images")" -ne 1 ] || [[ $images != *@sha256:* ]]; then
+    echo "Les fixtures ne désignent pas une seule image par empreinte : ${images:-aucune}" >&2
+    exit 1
+  fi
+  dire "image des bases jetables : docker pull $images"
+  docker pull "$images"
+}
+
+# --------------------------------------------------------------------------- #
+#  Préparer : l'environnement d'un module depuis son verrou (sur GitHub, avant verify)
+# --------------------------------------------------------------------------- #
+preparer() {
+  local l nom lint projet lanceur options args couv prerequis
+  l="$(choisir_modules "$1")" || exit 2
+  IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$l"
+  if [ "$prerequis" = database ]; then
+    dire "$nom — prérequis database/ : uv sync --locked --inexact"
+    (cd "$RACINE/database" && "${PROPRE[@]}" uv sync --locked --inexact) || exit 1
+  fi
+  if [ -z "$projet" ]; then echo "$nom : aucun environnement à préparer"; return 0; fi
+  dire "$nom — (${projet}/) uv sync --locked --inexact $options"
+  # shellcheck disable=SC2086  # options : mots simples, sans espace
+  (cd "$RACINE/$projet" && "${PROPRE[@]}" uv sync --locked --inexact $options)
 }
 
 # --------------------------------------------------------------------------- #
@@ -327,5 +387,7 @@ case $action in
     trap terminer EXIT
     if [ "$action" = verify ]; then verify "${1:-}"; else poste; fi ;;
   indicatif) indicatif "${1:-}" ;;
-  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste" >&2; exit 2 ;;
+  preparer) preparer "${1:?Usage : $0 preparer MODULE}" ;;
+  image) image ;;
+  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste | preparer MODULE | image" >&2; exit 2 ;;
 esac
