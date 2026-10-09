@@ -1,0 +1,14 @@
+# Tests sautés attendus, par module : un plafond, avec sa raison.
+#
+# `make verify` échoue si un module saute PLUS de tests que ce nombre : un saut
+# imprévu ne reste jamais vert. Un module absent de cette liste ne doit rien sauter.
+# Sauter moins est admis (par exemple une instance lancée sur le poste).
+#
+# Les suites ne reçoivent jamais APIMANGA_DSN ni DATABASE_URL : les tests qui
+# lisent la base réelle sautent donc toujours, sur le poste comme sur GitHub.
+#
+# module	plafond	raison
+05	4	base réelle (APIMANGA_DSN jamais fourni) : test_controle_tetes 1, test_rattachement_apimanga 3
+08	25	base réelle (APIMANGA_DSN jamais fourni) : test_chargeur_kitsu_fidelite 11, test_chargeur_wikipedia_fr 9, test_perimetre_integration 4 ; raw Kitsu absent d'un clone : test_3_empreinte_du_raw_inchangee 1 (passe sur le poste, où le raw existe)
+09	1	instance bge-m3 non lancée (carte graphique) : test_encodage 1
+demo	4	base réelle (DATABASE_URL jamais fournie) : test_etat 4

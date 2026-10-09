@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # pre-push — les trois contrôles du dépôt public, rejoués avant chaque push.
 #
-#   1. AUTEUR : chaque commit poussé a pour auteur ET committer TheMaxfly.
+#   1. AUTEUR : chaque commit poussé a pour auteur ET committer TheMaxfly. Seule
+#      exception, le commit de fusion créé par l'interface de GitHub : exactement
+#      deux parents, pour committer l'identité technique de GitHub (nom et adresse
+#      exacts), pour auteur TheMaxfly ou son nom de profil GitHub, MaxFlavigny.
+#      Les contrôles 2 et 3 s'appliquent aussi à ce commit.
 #   2. AUCUNE MENTION D'ASSISTANT :
 #      - message de commit : ni le nom de l'assistant, ni celui de son éditeur,
 #        ni un co-auteur ;
@@ -26,6 +30,12 @@
 set -uo pipefail
 
 AUTEUR="TheMaxfly"
+# Committer des commits de fusion créés par l'interface de GitHub : relevé sur de
+# vrais commits de fusion (2026-10-09), nom et adresse exacts.
+VALIDATEUR_GITHUB="GitHub <noreply@github.com>"
+# Auteur des fusions faites par TheMaxfly dans l'interface de GitHub : son nom de
+# profil (relevé), admis pour ces seules fusions.
+AUTEUR_PROFIL_GITHUB="MaxFlavigny"
 MOTS='cl[a]ude|anthr[o]pic|co-author[e]d-by'
 SIGNATURES='co-author[e]d-by|generat[e]d (with|by) cl[a]ude|g[eé]n[eé]r[eé] (avec|par) cl[a]ude|cl[a]ude[ -]code|cl[a]ude\.ai'
 ZERO=0000000000000000000000000000000000000000
@@ -56,10 +66,16 @@ while read -r _ local_sha _ distant_sha; do
 
     for c in $commits; do
         court=$(git rev-parse --short "$c")
-        # 1. auteur et committer
-        IFS='|' read -r auteur committer < <(git log -1 --format='%an|%cn' "$c")
-        [ "$auteur" = "$AUTEUR" ] || echecs+=("$court : auteur « $auteur », attendu « $AUTEUR »")
-        [ "$committer" = "$AUTEUR" ] || echecs+=("$court : committer « $committer », attendu « $AUTEUR »")
+        # 1. auteur et committer — exception : la fusion créée par GitHub
+        IFS='|' read -r auteur committer adresse parents < <(git log -1 --format='%an|%cn|%ce|%P' "$c")
+        if [ "$(wc -w <<<"$parents")" -eq 2 ] && [ "$committer <$adresse>" = "$VALIDATEUR_GITHUB" ]; then
+            [ "$auteur" = "$AUTEUR" ] || [ "$auteur" = "$AUTEUR_PROFIL_GITHUB" ] ||
+                echecs+=("$court : auteur « $auteur » d'une fusion créée par GitHub, attendu « $AUTEUR » ou « $AUTEUR_PROFIL_GITHUB »")
+        else
+            [ "$auteur" = "$AUTEUR" ] || echecs+=("$court : auteur « $auteur », attendu « $AUTEUR »")
+            [ "$committer" = "$AUTEUR" ] ||
+                echecs+=("$court : committer « $committer <$adresse> », attendu « $AUTEUR » (ou « $VALIDATEUR_GITHUB » pour une fusion à deux parents)")
+        fi
         # 2a. message
         if git log -1 --format=%B "$c" | grep -qiE "$MOTS"; then
             echecs+=("$court : le message de commit mentionne un assistant ou un co-auteur")

@@ -42,6 +42,10 @@ where = ["src"]
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+# Exclu nommément, inscrit comme dette : notebook Databricks du bonus (non exécuté).
+# `spark` et `dbutils` y sont des globales fournies par la plateforme (F821) ; les
+# cellules `# COMMAND ----------` imposent des imports en cours de fichier (E402).
+extend-exclude = ["bonus_databricks/bronze_ms_databricks.py"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP"]
