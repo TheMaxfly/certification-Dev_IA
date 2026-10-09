@@ -1,31 +1,94 @@
 # Contribuer — méthode de travail
 
-Ce dépôt est public. Le travail y entre par trois niveaux de branches, toujours par
-des fusions locales, sous le contrôle de deux hooks versionnés dans `.githooks/`.
+Ce dépôt est public. Le travail y entre par trois niveaux de branches et par des
+demandes de fusion sur GitHub, sous le contrôle de deux hooks versionnés dans
+`.githooks/`, d'une vérification unique (`make verify`) et d'une chaîne d'intégration
+continue qui la lance.
 
 ## Les branches
 
 | Branche | Rôle | Comment on y écrit |
 |---|---|---|
-| `main` | l'état stable, celui qu'on démontre ; branche par défaut | par fusion locale de `develop`, sur demande explicite du mainteneur, suivie d'une étiquette annotée |
-| `develop` | l'intégration : ce qui est vérifié | par fusion locale d'une branche de travail, après accord du mainteneur |
-| branches de travail | une étape, une spec | commit par commit |
+| `main` | l'état stable, celui qu'on démontre ; branche par défaut, protégée | par demande de fusion de `develop`, sur demande explicite du mainteneur, suivie d'une étiquette annotée |
+| `develop` | l'intégration : ce qui est vérifié ; protégée | par demande de fusion d'une branche de travail, après accord du mainteneur |
+| branches de travail | une étape, une spec | commit par commit, push par push |
 
-Après la fusion de `develop` dans `main`, `develop` est avancée sur `main` par avance
-rapide (`git merge --ff-only main`) : les deux branches pointent le même commit.
+**Alignées** : après une livraison (`develop` fusionnée dans `main`),
+`git diff origin/main origin/develop` est vide. Une demande de fusion `main → develop`
+reste possible, jamais obligatoire.
+
+## « Tests verts » : `make verify`
+
+**Tests verts = `make verify` sans échec, les tests sautés affichés.** C'est la même
+commande sur le poste et sur GitHub.
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `make verify` | pour chaque module : Ruff, format, tests ; puis actionlint sur les workflows |
+| `make verify MODULE=<nom>` | la même chose pour un seul module : `01` … `10`, `database`, `demo`, `workflows` |
+| `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé |
+| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, intégration Compose du 02 |
+
+- Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
+  vidé : aucune suite ne reçoit la base réelle.
+- Arrêt au premier échec, avec le module et la commande ; une ligne par module :
+  passés, sautés, en échec, durée.
+- **Un test sauté n'est pas un test passé** : il est compté. Au-delà du plafond écrit,
+  avec sa raison, dans `verification/sauts_attendus.tsv`, c'est un échec.
+- Les volumes Docker créés par la vérification, et eux seuls, sont supprimés.
+
+Avant une demande de fusion vers `develop` : `make verify`. Vers `main` :
+`make verify-poste`, et une sauvegarde de ce qui vit hors du dépôt.
+
+## La chaîne d'intégration continue — `.github/workflows/verify.yml`
+
+- **Déclencheurs** : push sur `main` et `develop`, toute demande de fusion, lancement
+  manuel.
+- **Une tâche par module** (`verify <module>`), qui lance `make verify MODULE=<nom>`
+  après `uv sync --locked` ; l'image PostgreSQL des bases jetables est tirée par son
+  empreinte, Java 8 est installé pour le 07.
+- **Une tâche `indicatif`** (Bandit, pip-audit), seule à ne jamais bloquer.
+- JUnit, couverture et journaux sont publiés comme pièces de chaque exécution, même en
+  échec ; le résumé reprend la ligne de chaque module.
+- Actions épinglées par l'empreinte de leur commit, exécuteur à version fixe,
+  permissions en lecture seule.
+
+**Tout module neuf entre dans la matrice ET dans les contrôles obligatoires, dans la
+même étape** : sa ligne dans `verification/verifier.sh`, son entrée dans la matrice de
+`verify.yml`, et son contrôle `verify <module>` dans l'ensemble de règles.
+
+## Les protections de `main` et `develop`
+
+Un ensemble de règles GitHub s'applique aux deux branches, **sans exemption, pas même
+pour l'administrateur** :
+
+- pas de push direct : une demande de fusion est obligatoire ;
+- les tâches `verify <module>` de la matrice doivent être vertes — jamais `indicatif` ;
+- commit de fusion seul (ni écrasement, ni rebase) ; aucune approbation d'un tiers : le
+  mainteneur valide en fusionnant ;
+- ni push forcé, ni suppression.
+
+La branche de travail est supprimée automatiquement après sa fusion.
+
+**Sortie de secours** : si la chaîne est cassée pour une raison extérieure au dépôt
+(service tiers, exécuteur, registre), le propriétaire désactive l'ensemble de règles,
+répare, le réactive, et le note au journal.
 
 ## Les hooks — à activer une fois par clone
 
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 26 scénarios sur 26
+bash .githooks/tester.sh   # 35 scénarios sur 35
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
   l'exclusion locale, jetons.
 - `pre-push`, avant que le distant change : auteur et validateur `TheMaxfly` pour
-  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé.
+  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé. Seule
+  exception, le commit de fusion créé par GitHub : exactement deux parents, validateur
+  `GitHub <noreply@github.com>`, auteur `TheMaxfly` ou le nom de profil GitHub du
+  mainteneur. Les autres contrôles s'appliquent aussi à ce commit.
 
 Ils s'appliquent à l'identique sur toutes les branches et ne lancent aucun test.
 **Jamais de `--no-verify`.**
@@ -65,9 +128,10 @@ elle tenait en un seul commit.
 Exemples : `feature/e3-etape1-corpus-v2`, `docs/methode-branches`. Forme contrôlable
 par `^(feature|fix|perf|refactor|test|docs|ci|chore|style)/[a-z0-9]+(-[a-z0-9]+)*$`.
 
-### Commits de fusion
+### Demandes de fusion et commits de fusion
 
-Créés par `git merge --no-ff -F <fichier>`, jamais avec le message par défaut.
+GitHub reprend **le titre et le corps de la demande** comme titre et corps du commit
+de fusion. La demande s'écrit donc dans la forme de la nomenclature :
 
 ```text
 chore(git): fusionner feature/e3-etape1-corpus-v2 dans develop
@@ -83,26 +147,26 @@ chore(git): fusionner develop dans main — e3-etape1
 ```
 
 Le type `chore` ne compte pas une seconde fois les `feat` et les `fix` que la
-branche apporte : chacun porte déjà son propre commit.
+branche apporte : chacun porte déjà son propre commit. Titre et corps se relisent
+avant de fusionner : aucune mention d'assistant, aucune signature d'outil, aucun
+secret — le message du commit de fusion passe ensuite par le `pre-push`.
 
 ### Étiquettes
 
-Annotées, posées sur `main`, une par fusion de `develop` dans `main` : `e3-etape1`,
-`e3-etape2`… ; pour une étape sans numéro, le nom de sa spec (`methode-branches`).
-Si plusieurs étapes passent ensemble, l'étiquette prend le nom de la dernière.
-Message : `<étiquette> — <titre>`, puis la liste des étapes apportées.
+Annotées, posées sur `main`, une par livraison de `develop` dans `main` :
+`e3-etape1`, `e3-etape2`… ; pour une étape sans numéro, le nom de sa spec
+(`methode-branches`). Si plusieurs étapes passent ensemble, l'étiquette prend le nom
+de la dernière. Message : `<étiquette> — <titre>`, puis la liste des étapes apportées.
 
 Le `pre-push` ne juge que des commits : **le message d'une étiquette n'est relu par
 aucun hook**. Il se relit avant le push.
 
 ## Trois règles imposées par les hooks
 
-1. **Toutes les fusions se font en local**, par `git merge --no-ff`, puis push.
-   **Aucune fusion par l'interface de GitHub** : ni bouton de fusion, ni écrasement,
-   ni rebase. *Motif : le `pre-push` exige `TheMaxfly` comme auteur **et**
-   validateur de chaque commit ; un commit de fusion créé par GitHub a pour
-   validateur « GitHub », et ferait refuser le push suivant de toute branche qui le
-   ramène.*
+1. **Les fusions se font par demande de fusion sur GitHub, par commit de fusion.**
+   *Motif : le `pre-push` admet le commit de fusion créé par GitHub (deux parents,
+   validateur GitHub exact) ; tout autre commit doit avoir `TheMaxfly` pour auteur et
+   validateur.*
 2. **Une branche de travail se crée depuis `origin/develop`, avec son amont** :
    `git fetch origin`, puis `git switch -c <branche> origin/develop`. Le premier
    push se fait par `git push -u origin <branche>`. *Motif : sans amont, le
@@ -120,12 +184,13 @@ aucun hook**. Il se relit avant le push.
 3. **On commite d'abord, on mesure ensuite** : une mesure enregistrée (MLflow,
    base) se lance sur un arbre propre et commité ; le rapport cite la branche et le
    commit.
-4. Fin d'étape : sauvegarde, rapport, puis **accord du mainteneur**, puis fusion
-   locale dans `develop` et push.
-5. `develop` vers `main` : **seulement sur demande explicite du mainteneur**, par
-   fusion locale et push, suivie d'une étiquette annotée sur `main`, poussée.
-6. La branche de travail est supprimée après fusion, en local et sur le distant ;
-   ses commits restent atteignables.
+4. Fin d'étape : `make verify`, rapport, demande de fusion vers `develop`, chaîne
+   verte, puis **le mainteneur fusionne** dans l'interface.
+5. `develop` vers `main` : **seulement sur demande explicite du mainteneur** :
+   `make verify-poste` et une sauvegarde, demande de fusion, chaîne verte, fusion par
+   le mainteneur, puis une étiquette annotée sur `main`, poussée.
+6. La branche de travail fusionnée est supprimée sur le distant par GitHub, en local
+   à la main ; ses commits restent atteignables.
 
 L'historique n'est jamais réécrit : pas de push forcé, pas de rebase d'une branche
 poussée, pas de fusion par écrasement.
@@ -137,7 +202,7 @@ commune : elle est précédée d'une sauvegarde.
 
 ## Un cycle complet
 
-Les fichiers de message (`-F`) s'écrivent hors du dépôt.
+Les fichiers de corps (`--body-file`, `-F`) s'écrivent hors du dépôt.
 
 ```bash
 # ouvrir l'étape
@@ -146,18 +211,22 @@ git switch -c feature/e3-etape1-corpus-v2 origin/develop
 # … un bloc = un commit vérifié ; premier push :
 git push -u origin feature/e3-etape1-corpus-v2
 
-# fin d'étape, après accord : fusionner dans develop, supprimer la branche
+# fin d'étape : vérifier, demander la fusion vers develop
+make verify
+gh pr create --base develop \
+  --title "chore(git): fusionner feature/e3-etape1-corpus-v2 dans develop" \
+  --body-file ../demande.md
+# chaîne verte → le mainteneur fusionne dans l'interface (commit de fusion)
 git switch develop && git pull --ff-only
-git merge --no-ff -F ../fusion.txt feature/e3-etape1-corpus-v2
-git push
-git branch -d feature/e3-etape1-corpus-v2
-git push origin --delete feature/e3-etape1-corpus-v2
+git branch -d feature/e3-etape1-corpus-v2 && git fetch --prune
 
-# sur demande : livrer develop dans main, étiqueter, réaligner develop
-git switch main && git pull --ff-only
-git merge --no-ff -F ../livraison.txt develop
-git push
-git tag -a e3-etape1 -F ../etiquette.txt
+# sur demande : livrer develop dans main, étiqueter
+make verify-poste      # et une sauvegarde
+gh pr create --base main --head develop \
+  --title "chore(git): fusionner develop dans main — e3-etape1" --body-file ../livraison.md
+# chaîne verte → le mainteneur fusionne
+git fetch origin
+git tag -a e3-etape1 -F ../etiquette.txt origin/main
 git push origin e3-etape1
-git switch develop && git merge --ff-only main && git push
+git diff --quiet origin/main origin/develop && echo "main et develop alignées"
 ```
