@@ -41,7 +41,7 @@ from pathlib import Path
 import psycopg
 import typer
 
-from evaluation.atteignabilite import atteignables
+from evaluation.atteignabilite import atteignables, corpus_lu
 from evaluation.catalogue import Catalogue
 
 SQL = Path(__file__).resolve().parent / "sql"
@@ -300,8 +300,10 @@ def mesurer_titres(cx: psycopg.Connection, cur) -> Titres:
         k
         for (k,) in cx.execute(
             "SELECT DISTINCT d.kitsu_id::bigint FROM bench.corpus_docs d "
-            "WHERE d.source = 'kitsu_synopsis' AND NOT EXISTS (SELECT 1 FROM "
-            "manga.work_identity w WHERE w.kitsu_id = d.kitsu_id::text)"
+            "WHERE d.corpus_id = %(corpus)s AND d.source = 'kitsu_synopsis' "
+            "AND NOT EXISTS (SELECT 1 FROM manga.work_identity w "
+            "WHERE w.kitsu_id = d.kitsu_id::text)",
+            {"corpus": corpus_lu(cx)},
         )
     ]
     egal = {k: series_a_titre_egal(k) for k in non_rattachees}

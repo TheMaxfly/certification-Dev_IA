@@ -86,8 +86,7 @@ def recuperer_passages(ctx, questions, mesure: int, nombre: int) -> list[dict]:
     m = configuration.mesure(ctx.config, mesure)
     if m["type"] != "semantique":
         raise ValueError(f"mesure {mesure} : passages par le sens seulement")
-    encoder, _ = executer.encodeur_du_service(m["instance"])
-    sens = recherche.Semantique.charger(ctx.cx, ctx.entites, m["table"], encoder)
+    sens, encoder, _ = executer.semantique(ctx, m)
     sortie = []
     for q in questions:
         vecteur = np.asarray(encoder(q.texte), dtype=np.float64)
@@ -99,12 +98,12 @@ def recuperer_passages(ctx, questions, mesure: int, nombre: int) -> list[dict]:
         textes = dict(
             ctx.cx.execute(
                 "SELECT chunk_id, chunk_text FROM bench.corpus_chunks"
-                " WHERE chunk_id = ANY(%s)",
-                (chunk_ids,),
+                " WHERE corpus_id = %s AND chunk_id = ANY(%s)",
+                (ctx.entites.corpus_id, chunk_ids),
             ).fetchall()
         )
         cles = [ctx.entites.cle(int(e)) for e in tete]
-        titres = diagnostic.titres(ctx.cx, cles)
+        titres = diagnostic.titres(ctx.cx, cles, ctx.entites.corpus_id)
         sortie.append(
             {
                 "question_id": q.question_id,

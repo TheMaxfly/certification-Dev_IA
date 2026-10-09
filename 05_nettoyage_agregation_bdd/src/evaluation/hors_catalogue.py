@@ -24,12 +24,13 @@ import psycopg
 import typer
 
 from evaluation import catalogue as cat
+from evaluation.atteignabilite import corpus_lu
 
 SQL_CANDIDATES = """
 SELECT d.kitsu_id, d.title, d.metadata_json ->> 'subtype',
        (d.metadata_json ->> 'popularity_rank')::int
 FROM bench.corpus_docs d
-WHERE d.source = 'kitsu_synopsis'
+WHERE d.corpus_id = %(corpus)s AND d.source = 'kitsu_synopsis'
   AND NOT EXISTS (SELECT 1 FROM manga.work_identity w
                   WHERE w.kitsu_id = d.kitsu_id::text AND w.series_id IS NOT NULL)
 ORDER BY (d.metadata_json ->> 'popularity_rank')::int NULLS LAST, d.kitsu_id
@@ -43,7 +44,9 @@ def lister(cx: psycopg.Connection, n: int) -> tuple[list[tuple], Counter]:
     catalogue = cat.Catalogue.charger(cx)
     retenues: list[tuple] = []
     ecartees: Counter = Counter()
-    for kitsu_id, titre, sous_type, rang in cx.execute(SQL_CANDIDATES).fetchall():
+    for kitsu_id, titre, sous_type, rang in cx.execute(
+        SQL_CANDIDATES, {"corpus": corpus_lu(cx)}
+    ).fetchall():
         bloquants, signalements = cat.verifier_absence(cx, catalogue, [kitsu_id])
         if bloquants:
             ecartees[

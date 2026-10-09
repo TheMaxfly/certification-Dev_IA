@@ -29,9 +29,10 @@ class ErreurService(Exception):
 
 
 class ClientService:
-    def __init__(self, instance: Instance, hote: str = "127.0.0.1", delai=300.0):
+    def __init__(self, instance: Instance, hote: str | None = None, delai=300.0):
         self.instance = instance
-        self.hote = hote
+        # L'hôte de la configuration (CLIENT_HOTE), sauf désignation explicite.
+        self.hote = hote or instance.hote
         self.delai = delai
 
     @property

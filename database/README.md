@@ -63,6 +63,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `018_methode_kitsu_propagation.sql` | `kitsu_propagation` au CHECK des méthodes : l'étage qui propage le `kitsu_id` d'une identité déjà décidée, par ses identifiants MAL / AniList. Une valeur ajoutée, aucune table ni donnée |
 | `019_famille_par_reference.sql` | **F11 « par référence »** au jeu d'évaluation : les CHECK de la famille (`eval_questions`) et de la portée d'une mesure (`eval_mesures`) s'ouvrent à F11 — la similarité à un titre connu, dont la référence n'est pas une réponse |
 | `020_vecteurs_pgvector.sql` | **pgvector dans la chaîne** (`CREATE EXTENSION vector`, **superutilisateur**) et l'encodage E2 : `bench.encodages` (ce qui a produit les vecteurs) et une table de vecteurs **par modèle**, `vecteurs_bge_m3` en `vector(1024)` et `vecteurs_embeddinggemma` en `vector(768)` — unitaires (CHECK), clé `chunk_id` vers `corpus_chunks` **sans cascade**, aucun index approximatif (cf. « Notes sur `020` ») |
+| `021_corpus_cohabitation.sql` | **Plusieurs corpus et plusieurs encodages côte à côte** (E3, étape 1) : `bench.corpus` (une ligne par version : règle, découpage, clôture) ; `corpus_id` sur les documents, les fragments, les encodages et les vecteurs, clé des documents `(corpus_id, doc_key)`, vecteurs identifiés par `(encodage_id, chunk_id)` et reliés à leur corpus par clés composites ; **journal des promotions** en ajout seul et vue `v_encodage_en_service` ; `eval_runs` (corpus et encodage d'un run) ; **un corpus clos refuse toute écriture**, sauf `bench.autoriser_extension` (insertion seule). Aucune élévation de privilège (cf. « Notes sur `021` ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -356,6 +357,35 @@ fragment vectorisé ne se supprime ni directement ni par la cascade
 paramètres, même encodage. Vérifié par mutation, 4/4 : CHECK de norme retiré,
 `ON DELETE CASCADE` ajouté, clé composite réduite à `encodage_id`, contrainte
 d'image retirée — chaque fois, au moins un test vire au rouge.
+
+## Notes sur `021` — plusieurs corpus, plusieurs encodages, un encodage en service
+
+- **Le corpus existant devient `v1` sans qu'une ligne change** : `corpus_id` est
+  ajouté avec une valeur par défaut constante, donc sans réécriture (vérifié :
+  même fichier de données avant et après, `tests/test_corpus_cohabitation.py`).
+- **Le défaut `'v1'` est une dette** : il laisse écrire comme avant le chargeur du
+  v1 et les tests antérieurs. Le code n'écrit jamais sans nommer son corpus (règle
+  de `CONTRIBUTING.md`, « Écrire dans le corpus ou les vecteurs »).
+- **Une base qui porte déjà un corpus** (`apimanga`) : la migration clôt le v1 à ses
+  comptes, et inscrit au journal l'encodage EmbeddingGemma du v1 comme encodage en
+  service (reprise de la décision du 7 octobre 2026). Une base neuve laisse le v1
+  ouvert et le journal vide.
+- **Le journal** (`bench.promotions`) refuse UPDATE, DELETE et TRUNCATE, et
+  contrôle chaque ligne : encodage terminé, « encodage précédent » égal à celui en
+  service, retour arrière vers un encodage déjà en service. La lecture de référence
+  est `bench.v_encodage_en_service`.
+- **Un corpus clos** refuse toute écriture de document ou de fragment. L'ajout à un
+  corpus en service passe par `SELECT bench.autoriser_extension('<corpus>')`, dans
+  la transaction qui ajoute ; modifier ou retirer demandera une opération explicite
+  de retrait, à concevoir. Conséquence : `corpus.construire --a-blanc` ne tourne plus
+  sur une base dont le v1 est clos.
+- **Empreintes de contrôle** : `outils/empreintes_corpus.sql` (`psql -X -q -A -t -v
+  corpus=v1 -f …`) calcule les empreintes d'un corpus, de ses vecteurs et des
+  mesures, avant comme après `021`.
+
+`tests/test_corpus_cohabitation.py` (32 tests) couvre `021`. Vérifié par mutation,
+3/3 : déclencheur de clôture retiré, ajout seul du journal retiré, clé composite
+fragment–corpus retirée — chaque fois, au moins un test vire au rouge.
 
 ## Notes sur `020` — pgvector, et les vecteurs de l'encodage E2
 

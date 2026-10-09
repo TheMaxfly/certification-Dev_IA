@@ -117,9 +117,12 @@ def resumer(lignes: list[Rangs]) -> dict[str, dict]:
     return sortie
 
 
-def titres(cx, cles: list[str]) -> dict[str, str | None]:
+def titres(cx, cles: list[str], corpus_id: str | None = None) -> dict[str, str | None]:
     """Titre d'une entité : celui du catalogue pour une série, celui du document
-    Kitsu sinon."""
+    Kitsu du corpus lu sinon."""
+    from mesures_recherche.entites import charger_atteignabilite
+
+    corpus_id = charger_atteignabilite().corpus_lu(cx, corpus_id)
     series = [int(c.split(":")[1]) for c in cles if c.startswith("serie:")]
     kitsu = [c for c in cles if c.startswith("kitsu:")]
     sortie: dict[str, str | None] = dict.fromkeys(cles)
@@ -130,8 +133,9 @@ def titres(cx, cles: list[str]) -> dict[str, str | None]:
     ):
         sortie[f"serie:{sid}"] = titre
     for doc_key, titre in cx.execute(
-        "SELECT doc_key, title FROM bench.corpus_docs WHERE doc_key = ANY(%s)",
-        (kitsu,),
+        "SELECT doc_key, title FROM bench.corpus_docs"
+        " WHERE corpus_id = %s AND doc_key = ANY(%s)",
+        (corpus_id, kitsu),
     ):
         sortie[doc_key] = titre
     return sortie
@@ -245,6 +249,7 @@ def diagnostiquer(
                 {cle for x in a_lire for cle, _ in x["top"]}
                 | {f"serie:{s}" for x in a_lire for s in x["attendus"]}
             ),
+            ctx.entites.corpus_id,
         )
         for x in a_lire:
             x["top"] = [

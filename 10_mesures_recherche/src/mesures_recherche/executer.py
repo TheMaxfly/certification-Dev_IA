@@ -11,6 +11,14 @@ Ordre, toujours le même :
      première série attendue, les métriques ;
   4. les moyennes par portée et par périmètre.
 
+LE CORPUS ET L'ENCODAGE (migration 021). Plusieurs corpus et plusieurs encodages
+d'un même modèle coexistent : une mesure lit UN corpus et, par le sens, les
+vecteurs d'UN encodage, désigné — `--encodage N` ; sinon celui en service s'il est
+du modèle de la mesure ; sinon le seul encodage terminé de ce modèle. Le corpus
+suit l'encodage désigné (`--corpus` pour une mesure sans vecteurs ; sinon celui en
+service). Avant de mesurer, ce que sert l'instance (`/info`) est confronté à la
+ligne de l'encodage : un écart arrête.
+
 Sans `--enregistrer`, rien n'est écrit nulle part hors du fichier de sortie :
 c'est l'exécution « à blanc ». Avec `--enregistrer` : un run MLflow et les lignes
 de `bench.eval_mesures` (module `enregistrement`). Avec `--rejeu-de FICHIER` :
@@ -43,25 +51,131 @@ class Contexte:
     empreinte_jeu: str
     caches: dict = field(default_factory=dict)
     parametres: dict = field(default_factory=dict)
+    encodage_id: int | None = None  # désigné explicitement (--encodage)
 
 
-def ouvrir(dsn: str, config: dict) -> Contexte:
+class ServiceNonConforme(RuntimeError):
+    """L'instance ne sert pas ce que dit le registre (ou la configuration)."""
+
+
+@dataclass(frozen=True)
+class Designation:
+    """L'instance qui encode les questions, et la ligne de `bench.encodages` dont
+    on lit les vecteurs (None : aucun vecteur du corpus n'est lu)."""
+
+    instance: str
+    encodage: dict | None = None
+
+
+COLONNES_ENCODAGE = (
+    "encodage_id, corpus_id, modele, revision, precision_calcul, outil_version,"
+    " prefixe_requete, termine_le"
+)
+
+
+def ligne_encodage(cx, encodage_id: int) -> dict:
+    r = cx.execute(
+        f"SELECT {COLONNES_ENCODAGE} FROM bench.encodages WHERE encodage_id = %s",  # nosec B608
+        (encodage_id,),
+    )
+    ligne = r.fetchone()
+    if ligne is None:
+        raise RuntimeError(f"encodage {encodage_id} inconnu du registre")
+    return dict(zip([c.name for c in r.description], ligne, strict=True))
+
+
+def encodage_designe(cx, modele: str, encodage_id: int | None = None) -> dict:
+    """L'encodage dont une mesure de `modele` lit les vecteurs : celui désigné ;
+    sinon celui en service s'il est de ce modèle ; sinon le seul encodage terminé
+    de ce modèle. Jamais deviné entre plusieurs."""
+    if encodage_id is None:
+        en_service = cx.execute(
+            "SELECT encodage_id FROM bench.v_encodage_en_service WHERE modele = %s",
+            (modele,),
+        ).fetchone()
+        if en_service is not None:
+            encodage_id = en_service[0]
+        else:
+            termines = cx.execute(
+                "SELECT encodage_id FROM bench.encodages"
+                " WHERE modele = %s AND termine_le IS NOT NULL",
+                (modele,),
+            ).fetchall()
+            if len(termines) != 1:
+                raise RuntimeError(
+                    f"{modele} : {len(termines)} encodage(s) terminé(s) et aucun en"
+                    " service — désigner l'encodage (--encodage)"
+                )
+            encodage_id = termines[0][0]
+    e = ligne_encodage(cx, encodage_id)
+    if e["modele"] != modele:
+        raise RuntimeError(
+            f"encodage {encodage_id} : modèle {e['modele']}, la mesure attend {modele}"
+        )
+    if e["termine_le"] is None:
+        raise RuntimeError(f"encodage {encodage_id} : non terminé")
+    return e
+
+
+def ouvrir(
+    dsn: str,
+    config: dict,
+    encodage_id: int | None = None,
+    corpus_id: str | None = None,
+) -> Contexte:
     cx = psycopg.connect(dsn, options="-c default_transaction_read_only=on")
     j = config["jeu"]
     empreinte = jeu.verifier_empreinte(
         cx, j["version"], j["empreinte"], configuration.RACINE_DEPOT / j["dossier"]
     )
+    if encodage_id is not None:
+        designe = ligne_encodage(cx, encodage_id)["corpus_id"]
+        if corpus_id is not None and corpus_id != designe:
+            raise RuntimeError(
+                f"encodage {encodage_id} : corpus {designe}, pas {corpus_id}"
+            )
+        corpus_id = designe
     questions = jeu.lire_jeu(cx, j["version"])
-    return Contexte(cx, config, questions, entites.charger(cx), empreinte)
+    return Contexte(
+        cx,
+        config,
+        questions,
+        entites.charger(cx, corpus_id),
+        empreinte,
+        encodage_id=encodage_id,
+    )
 
 
-def encodeur_du_service(instance_nom: str):
-    """Question → vecteur, par l'instance du service (rôle « requete »)."""
+def encodeur_du_service(designation: Designation):
+    """Question → vecteur, par l'instance du service (rôle « requete »), APRÈS
+    confrontation de ce qu'elle sert (`/info`) à la ligne de l'encodage — ou, sans
+    encodage, à la configuration de l'instance. Un écart arrête."""
     from service_embedding.client import ClientService
     from service_embedding.configuration import charger
 
-    client = ClientService(charger(instance_nom))
+    client = ClientService(charger(designation.instance))
     info = client.info()
+    servi = {
+        "modele": info["model_id"],
+        "revision": info["model_sha"],
+        "precision_calcul": info["model_dtype"],
+        "prefixe_requete": client.instance.prefixe_requete,
+    }
+    e = designation.encodage
+    if e is not None:
+        servi["outil_version"] = info["version"]
+        attendu = {k: e[k] for k in servi}
+    else:
+        i = client.instance
+        attendu = {
+            "modele": i.model_id,
+            "revision": i.revision,
+            "precision_calcul": i.dtype,
+            "prefixe_requete": i.prefixe_requete,
+        }
+    if servi != attendu:
+        ecarts = {k: (servi[k], attendu[k]) for k in servi if servi[k] != attendu[k]}
+        raise ServiceNonConforme(f"{designation.instance} : servi ≠ attendu {ecarts}")
 
     def encoder(texte: str):
         return client.encoder([texte], role="requete")[0]
@@ -75,17 +189,26 @@ def encodeur_du_service(instance_nom: str):
     }
 
 
-def encodage_du_modele(cx, modele: str) -> int:
-    lignes = cx.execute(
-        "SELECT encodage_id FROM bench.encodages"
-        " WHERE modele = %s AND termine_le IS NOT NULL",
-        (modele,),
-    ).fetchall()
-    if len(lignes) != 1:
+def semantique(ctx: Contexte, m: dict, representation: str = "meilleur_fragment"):
+    """La recherche par le sens d'une mesure : encodage désigné, service confronté,
+    vecteurs lus PAR CET ENCODAGE seulement. Rend (Semantique, encoder, params)."""
+    e = encodage_designe(ctx.cx, m["modele"], ctx.encodage_id)
+    if e["corpus_id"] != ctx.entites.corpus_id:
         raise RuntimeError(
-            f"{modele} : {len(lignes)} encodage(s) terminé(s), 1 attendu"
+            f"encodage {e['encodage_id']} : corpus {e['corpus_id']}, la mesure lit"
+            f" {ctx.entites.corpus_id} (--corpus ou --encodage)"
         )
-    return lignes[0][0]
+    encoder, params = encodeur_du_service(Designation(m["instance"], e))
+    params = params | {"encodage_id": e["encodage_id"], "corpus_id": e["corpus_id"]}
+    s = recherche.Semantique.charger(
+        ctx.cx,
+        ctx.entites,
+        m["table"],
+        encoder,
+        encodage_id=e["encodage_id"],
+        representation=representation,
+    )
+    return s, encoder, params
 
 
 def configuration_de(ctx: Contexte, numero: int):
@@ -95,15 +218,7 @@ def configuration_de(ctx: Contexte, numero: int):
     m = configuration.mesure(ctx.config, numero)
     params: dict = {}
     if m["type"] == "semantique":
-        encoder, params = encodeur_du_service(m["instance"])
-        params["encodage_id"] = encodage_du_modele(ctx.cx, m["modele"])
-        s = recherche.Semantique.charger(
-            ctx.cx,
-            ctx.entites,
-            m["table"],
-            encoder,
-            representation=configuration.representation(m),
-        )
+        s, _, params = semantique(ctx, m, configuration.representation(m))
         fonction = s.scores
     elif m["type"] == "plein_texte":
         p = recherche.PleinTexte.calculer(
@@ -189,8 +304,15 @@ def mesurer(ctx: Contexte, numero: int) -> dict:
         ctx.entites.atteignables,
     )
     tour = configuration.tour(m)
+    encodages = {
+        v for c, v in ctx.parametres[numero].items() if c.endswith("encodage_id")
+    }
+    if len(encodages) > 1:
+        raise RuntimeError(f"mesure {numero} : plusieurs encodages {sorted(encodages)}")
     return {
         "mesure": numero,
+        "corpus_id": ctx.entites.corpus_id,
+        "encodage_id": next(iter(encodages), None),
         "nom": m["nom"],
         "tour": tour,
         "spec": ctx.config["tours"][str(tour)],
@@ -219,13 +341,15 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--enregistrer", action="store_true")
     mode.add_argument("--rejeu-de", type=Path, default=None)
+    parser.add_argument("--encodage", type=int, default=None, help="encodage lu")
+    parser.add_argument("--corpus", default=None, help="corpus lu (sans vecteurs)")
     args = parser.parse_args(argv)
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         raise SystemExit("DATABASE_URL absente")
     config = configuration.charger()
     debut = time.monotonic()
-    ctx = ouvrir(dsn, config)
+    ctx = ouvrir(dsn, config, args.encodage, args.corpus)
     try:
         resultat = mesurer(ctx, args.mesure)
     finally:
@@ -262,6 +386,8 @@ def main(argv: list[str] | None = None) -> int:
                 "global": globales,
                 "duree_totale_s": resultat["duree_totale_s"],
                 "parametres": resultat["parametres"],
+                "corpus_id": resultat["corpus_id"],
+                "encodage_id": resultat["encodage_id"],
                 "run_id": resultat.get("run_id"),
                 "rejeu": resultat.get("rejeu"),
             },

@@ -25,7 +25,9 @@ import psycopg
 from service_embedding.configuration import RACINE
 
 # Valeurs posées d'avance (attendus de l'encodage, spec E2 jour 1 ; corpus et jeu v2 :
-# état du 2026-09-30).
+# état du 2026-09-30). Elles décrivent le corpus v1 et ses deux encodages : depuis
+# la migration 021, chaque lecture est bornée à ce corpus et à ses encodages.
+CORPUS = "v1"
 FRAGMENTS = 66_290
 DOCUMENTS = 48_090
 ENCODAGES = 2
@@ -65,20 +67,28 @@ def verifier(dsn: str) -> list[dict]:
         def un(sql: str, *params):
             return cx.execute(sql, params or None).fetchone()[0]
 
+        # Les vecteurs ne se lisent que filtrés par encodage : ceux du corpus.
+        ses_encodages = "SELECT encodage_id FROM bench.encodages WHERE corpus_id = %s"
         for table, dimension in TABLES.items():
             resultats += [
                 controle(
                     f"{table} : lignes",
                     FRAGMENTS,
-                    un(f"SELECT count(*) FROM {table}"),  # nosec B608
+                    un(
+                        f"SELECT count(*) FROM {table}"  # nosec B608
+                        f" WHERE encodage_id IN ({ses_encodages})",
+                        CORPUS,
+                    ),
                 ),
                 controle(
                     f"{table} : vecteurs NULL, dimension fausse, norme hors 1 ± 1e-3",
                     0,
                     un(
-                        f"SELECT count(*) FROM {table} WHERE embedding IS NULL"  # nosec B608
-                        " OR public.vector_dims(embedding) <> %s"
-                        " OR abs(public.vector_norm(embedding) - 1) > %s",
+                        f"SELECT count(*) FROM {table}"  # nosec B608
+                        f" WHERE encodage_id IN ({ses_encodages}) AND ("
+                        " embedding IS NULL OR public.vector_dims(embedding) <> %s"
+                        " OR abs(public.vector_norm(embedding) - 1) > %s)",
+                        CORPUS,
                         dimension,
                         TOLERANCE_NORME,
                     ),
@@ -87,37 +97,48 @@ def verifier(dsn: str) -> list[dict]:
                     f"{table} : chunk_id sans vecteur",
                     0,
                     un(
-                        "SELECT count(*) FROM bench.corpus_chunks c WHERE NOT EXISTS"
-                        f" (SELECT 1 FROM {table} v WHERE v.chunk_id = c.chunk_id)"  # nosec B608
+                        "SELECT count(*) FROM bench.corpus_chunks c"
+                        " WHERE c.corpus_id = %s AND NOT EXISTS"
+                        f" (SELECT 1 FROM {table} v WHERE v.chunk_id = c.chunk_id"  # nosec B608
+                        f"  AND v.encodage_id IN ({ses_encodages}))",
+                        CORPUS,
+                        CORPUS,
                     ),
                 ),
                 controle(
                     f"{table} : vecteur sans chunk_id",
                     0,
                     un(
-                        f"SELECT count(*) FROM {table} v WHERE NOT EXISTS"  # nosec B608
+                        f"SELECT count(*) FROM {table} v"  # nosec B608
+                        f" WHERE v.encodage_id IN ({ses_encodages}) AND NOT EXISTS"
                         " (SELECT 1 FROM bench.corpus_chunks c"
-                        "  WHERE c.chunk_id = v.chunk_id)"
+                        "  WHERE c.chunk_id = v.chunk_id)",
+                        CORPUS,
                     ),
                 ),
                 controle(
                     f"{table} : encodages distincts",
                     1,
-                    un(f"SELECT count(DISTINCT encodage_id) FROM {table}"),  # nosec B608
+                    un(
+                        f"SELECT count(DISTINCT encodage_id) FROM {table}"  # nosec B608
+                        f" WHERE encodage_id IN ({ses_encodages})",
+                        CORPUS,
+                    ),
                 ),
             ]
         resultats += [
             controle(
                 "bench.encodages : lignes",
                 ENCODAGES,
-                un("SELECT count(*) FROM bench.encodages"),
+                un("SELECT count(*) FROM bench.encodages WHERE corpus_id = %s", CORPUS),
             ),
             controle(
                 "bench.encodages : terminés, nombre de fragments = corpus",
                 ENCODAGES,
                 un(
-                    "SELECT count(*) FROM bench.encodages"
-                    " WHERE termine_le IS NOT NULL AND nb_fragments = %s",
+                    "SELECT count(*) FROM bench.encodages WHERE corpus_id = %s"
+                    " AND termine_le IS NOT NULL AND nb_fragments = %s",
+                    CORPUS,
                     FRAGMENTS,
                 ),
             ),
@@ -125,8 +146,14 @@ def verifier(dsn: str) -> list[dict]:
                 "corpus : documents / fragments",
                 [DOCUMENTS, FRAGMENTS],
                 [
-                    un("SELECT count(*) FROM bench.corpus_docs"),
-                    un("SELECT count(*) FROM bench.corpus_chunks"),
+                    un(
+                        "SELECT count(*) FROM bench.corpus_docs WHERE corpus_id = %s",
+                        CORPUS,
+                    ),
+                    un(
+                        "SELECT count(*) FROM bench.corpus_chunks WHERE corpus_id = %s",
+                        CORPUS,
+                    ),
                 ],
             ),
             controle(
