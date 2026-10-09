@@ -2,7 +2,8 @@ name: verify
 
 # Chaîne d'intégration continue : la même commande que sur le poste,
 # `make verify MODULE=<nom>`, une tâche par module. Une tâche rouge bloque.
-# Seule la tâche `indicatif` (Bandit, pip-audit) n'est jamais exigée.
+# La tâche `indicatif` (Bandit, pip-audit) n'est jamais exigée : elle réussit dès que
+# ses rapports sont produits, quel que soit le nombre de constats, qu'elle affiche.
 # Détail des règles et des plafonds de tests sautés : Makefile,
 # verification/verifier.sh, verification/sauts_attendus.tsv.
 
@@ -75,8 +76,8 @@ jobs:
     name: indicatif (Bandit, pip-audit)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Jamais exigée pour fusionner : ses constats sont listés, pas bloquants.
-    continue-on-error: true
+    # Jamais exigée pour fusionner. Les constats ne la font pas échouer ; une panne
+    # d'outil ou un rapport manquant, si.
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

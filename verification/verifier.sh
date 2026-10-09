@@ -270,39 +270,84 @@ verify() {
 }
 
 # --------------------------------------------------------------------------- #
-#  Indicatif : Bandit et pip-audit, tous les modules, sans arrêt ; jamais exigé
+#  Indicatif : Bandit et pip-audit, tous les modules, sans arrêt ; jamais exigé.
+#  Les constats ne font pas échouer : seule une panne d'outil ou un rapport manquant le fait.
 # --------------------------------------------------------------------------- #
 indicatif() {
-  local l lignes constats=0
+  # Réussit dès que Bandit et pip-audit ont tourné et produit leurs rapports, quel
+  # que soit le nombre de constats ; échoue si un outil plante ou si un rapport manque.
+  local l lignes pannes=() th=0 tm=0 tl=0 ta=0
   lignes="$(choisir_modules "${1:-}")" || exit 2
-  local tableau=("| module | Bandit H / M / L | pip-audit : vulnérabilités |" "|---|---|---:|")
-  printf '%-10s %-22s %-28s\n' module "Bandit H/M/L" "pip-audit vulnérabilités"
+  local tableau=("| module | Bandit H / M / L | pip-audit : vulnérabilités | paquets non audités |"
+                 "|---|---|---:|---:|")
+  printf '%-10s %-18s %-26s %s\n' module "Bandit H/M/L" "pip-audit vulnérabilités" "non audités"
   while IFS= read -r l; do
     local nom lint projet lanceur
     IFS='|' read -r nom lint projet lanceur _ <<<"$l"
     [ "$lanceur" = unittest ] || [ "$lanceur" = pytest ] || continue
-    local sortie="$SORTIES/$nom" exclus bandit audit
+    local sortie="$SORTIES/$nom" exclus bandit audit non_audites erreurs
     mkdir -p "$sortie"
+    # Un rapport d'une exécution précédente ne doit jamais compter.
+    rm -f "$sortie/bandit.json" "$sortie/audit.json" "$sortie/verrou.txt"
+
     exclus="$(cd "$RACINE/$lint" && find . -type d \( -name .venv -o -name tests \) -prune -printf '%p,' | sed 's/,$//')"
     (cd "$RACINE/$lint" && "${PROPRE[@]}" uvx "bandit@$BANDIT" -q -r . ${exclus:+-x "$exclus"} \
       -f json -o "$sortie/bandit.json") >"$sortie/bandit.log" 2>&1
-    bandit=$(jq -r '.metrics._totals | "\(.["SEVERITY.HIGH"])/\(.["SEVERITY.MEDIUM"])/\(.["SEVERITY.LOW"])"' \
-      "$sortie/bandit.json" 2>/dev/null || echo "erreur")
-    (cd "$RACINE/$projet" && "${PROPRE[@]}" uv export --locked --all-extras --all-groups \
-      --no-emit-project --no-emit-local --format requirements-txt -o "$sortie/verrou.txt" \
-      && "${PROPRE[@]}" uvx "pip-audit@$PIP_AUDIT" -r "$sortie/verrou.txt" --no-deps --disable-pip \
-        --progress-spinner off -f json -o "$sortie/audit.json") >"$sortie/audit.log" 2>&1
-    audit=$(jq '[.dependencies[].vulns[]] | length' "$sortie/audit.json" 2>/dev/null || echo "erreur")
-    printf '%-10s %-22s %-28s\n' "$nom" "$bandit" "$audit"
-    tableau+=("| $nom | $bandit | $audit |")
-    [ "$bandit" = 0/0/0 ] && [ "$audit" = 0 ] || constats=$((constats + 1))
+    if bandit=$(jq -er '.metrics._totals | "\(.["SEVERITY.HIGH"])/\(.["SEVERITY.MEDIUM"])/\(.["SEVERITY.LOW"])"' \
+        "$sortie/bandit.json" 2>/dev/null); then
+      IFS=/ read -r h m b <<<"$bandit"
+      th=$((th + h)); tm=$((tm + m)); tl=$((tl + b))
+      erreurs=$(jq '.errors | length' "$sortie/bandit.json")
+      if [ "$erreurs" -gt 0 ]; then
+        pannes+=("$nom : Bandit n'a pas pu analyser $erreurs fichier(s) — $sortie/bandit.json")
+        bandit="$bandit, $erreurs erreur(s)"
+      fi
+    else
+      bandit=panne
+      pannes+=("$nom : Bandit n'a pas produit de rapport lisible — $sortie/bandit.log")
+    fi
+
+    audit=panne; non_audites=-
+    if ! (cd "$RACINE/$projet" && "${PROPRE[@]}" uv export --locked --all-extras --all-groups \
+        --no-emit-project --no-emit-local --format requirements-txt -o "$sortie/verrou.txt") \
+        >"$sortie/audit.log" 2>&1; then
+      pannes+=("$nom : export du verrou impossible — $sortie/audit.log")
+    else
+      (cd "$RACINE/$projet" && "${PROPRE[@]}" uvx "pip-audit@$PIP_AUDIT" -r "$sortie/verrou.txt" \
+        --no-deps --disable-pip --progress-spinner off -f json -o "$sortie/audit.json") \
+        >>"$sortie/audit.log" 2>&1
+      if audit=$(jq -e '[.dependencies[].vulns[]] | length' "$sortie/audit.json" 2>/dev/null); then
+        ta=$((ta + audit))
+        non_audites=$(jq '[.dependencies[] | select(.skip_reason)] | length' "$sortie/audit.json")
+      else
+        audit=panne
+        pannes+=("$nom : pip-audit n'a pas produit de rapport lisible — $sortie/audit.log")
+      fi
+    fi
+
+    printf '%-10s %-18s %-26s %s\n' "$nom" "$bandit" "$audit" "$non_audites"
+    tableau+=("| $nom | $bandit | $audit | $non_audites |")
   done <<<"$lignes"
-  printf '\n%s module(s) avec constats — indicatif, jamais exigé. Détail : %s/<module>/\n' \
-    "$constats" "$SORTIES"
-  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-    { echo "### Indicatif — jamais exigé"; echo; printf '%s\n' "${tableau[@]}"; } >>"$GITHUB_STEP_SUMMARY"
+
+  printf '%-10s %-18s %-26s\n' total "$th/$tm/$tl" "$ta"
+  tableau+=("| **total** | **$th / $tm / $tl** | **$ta** | |")
+  if [ ${#pannes[@]} -eq 0 ]; then
+    printf '\nRapports produits pour chaque module : indicatif, jamais exigé. Détail : %s/<module>/\n' "$SORTIES"
+  else
+    printf '\nPANNE — %s rapport(s) manquant(s) ou incomplet(s) :\n' "${#pannes[@]}" >&2
+    printf '  - %s\n' "${pannes[@]}" >&2
   fi
-  [ "$constats" -eq 0 ]
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+      echo "### Indicatif — constats par module et par outil (jamais exigé)"
+      echo
+      printf '%s\n' "${tableau[@]}"
+      echo
+      if [ ${#pannes[@]} -eq 0 ]; then echo "Rapports produits pour chaque module."
+      else echo "**Panne** :"; printf -- '- %s\n' "${pannes[@]}"; fi
+    } >>"$GITHUB_STEP_SUMMARY"
+  fi
+  [ ${#pannes[@]} -eq 0 ]
 }
 
 # --------------------------------------------------------------------------- #

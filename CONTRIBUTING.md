@@ -26,7 +26,7 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | pour chaque module : Ruff, format, tests ; puis actionlint sur les workflows |
 | `make verify MODULE=<nom>` | la même chose pour un seul module : `01` … `10`, `database`, `demo`, `workflows` |
-| `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé |
+| `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
 | `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, intégration Compose du 02 |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
@@ -47,7 +47,11 @@ Avant une demande de fusion vers `develop` : `make verify`. Vers `main` :
 - **Une tâche par module** (`verify <module>`), qui lance `make verify MODULE=<nom>`
   après `uv sync --locked` ; l'image PostgreSQL des bases jetables est tirée par son
   empreinte, Java 8 est installé pour le 07.
-- **Une tâche `indicatif`** (Bandit, pip-audit), seule à ne jamais bloquer.
+- **Une tâche `indicatif`** (Bandit, pip-audit), jamais exigée pour fusionner. Elle
+  réussit dès que les deux outils ont tourné et produit leurs rapports, quel que soit
+  le nombre de constats, qu'elle affiche par module et par outil dans le résumé et
+  publie comme pièces ; elle n'échoue que si un outil plante ou si un rapport manque.
+  La synthèse d'un commit dont les contrôles passent reste ainsi verte.
 - JUnit, couverture et journaux sont publiés comme pièces de chaque exécution, même en
   échec ; le résumé reprend la ligne de chaque module.
 - Actions épinglées par l'empreinte de leur commit, exécuteur à version fixe,
