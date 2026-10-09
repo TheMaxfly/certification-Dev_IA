@@ -7,6 +7,7 @@ corpus `bench` si au moins un FRAGMENT de `bench.corpus_chunks` appartient à un
 document rattaché à elle :
 
   - une critique (`ms_review`), par son `series_id` ;
+  - un résumé de série (`ms_synopsis`, depuis le corpus v2), par son `series_id` ;
   - un synopsis Kitsu (`kitsu_synopsis`), dont le `kitsu_id` est rattaché à la
     série par le moyeu d'identité (`manga.work_identity`) — la cascade.
 
@@ -54,6 +55,7 @@ SELECT k.chunk_id,
        d.source,
        CASE d.source
          WHEN 'ms_review'      THEN d.series_id
+         WHEN 'ms_synopsis'    THEN d.series_id
          WHEN 'kitsu_synopsis' THEN w.series_id::bigint
        END AS series_id,
        CASE d.source WHEN 'kitsu_synopsis' THEN d.kitsu_id END AS kitsu_id
@@ -80,7 +82,7 @@ SQL_DECOMPOSITION = f"""
 WITH r AS ({SQL_RATTACHEMENT}),
 critique_doc AS (
   SELECT DISTINCT series_id FROM bench.corpus_docs
-  WHERE corpus_id = %(corpus)s AND source = 'ms_review'),
+  WHERE corpus_id = %(corpus)s AND source IN ('ms_review', 'ms_synopsis')),
 kitsu_doc AS (
   SELECT DISTINCT w.series_id::bigint AS series_id
   FROM bench.corpus_docs d
@@ -91,14 +93,17 @@ c AS (SELECT DISTINCT series_id FROM r
       WHERE source = 'ms_review' AND series_id IS NOT NULL),
 k AS (SELECT DISTINCT series_id FROM r
       WHERE source = 'kitsu_synopsis' AND series_id IS NOT NULL),
+s AS (SELECT DISTINCT series_id FROM r
+      WHERE source = 'ms_synopsis' AND series_id IS NOT NULL),
 docs AS (SELECT series_id FROM critique_doc UNION SELECT series_id FROM kitsu_doc)
 SELECT
   (SELECT count(*) FROM manga.ms_series_enriched)                 AS catalogue,
   (SELECT count(*) FROM c)                                        AS par_critique,
   (SELECT count(*) FROM k)                                        AS par_kitsu,
   (SELECT count(*) FROM c JOIN k USING (series_id))               AS les_deux,
-  (SELECT count(*) FROM (SELECT series_id FROM c UNION SELECT series_id FROM k) u)
-                                                                  AS atteignables,
+  (SELECT count(*) FROM s)                                        AS par_resume,
+  (SELECT count(*) FROM (SELECT series_id FROM c UNION SELECT series_id FROM k
+                         UNION SELECT series_id FROM s) u)        AS atteignables,
   (SELECT count(*) FROM docs)                                     AS au_niveau_document
 """
 
@@ -135,7 +140,8 @@ SELECT
 """
 
 #: Le marqueur « atteignable par synopsis anglais seulement » (décision du
-#: 2026-09-30) : aucune critique à fragment, mais un synopsis Kitsu à fragment
+#: 2026-09-30) : aucun texte français à fragment (critique, ou résumé de série
+#: depuis le corpus v2), mais un synopsis Kitsu à fragment
 #: rattaché par la cascade. Comme l'atteignabilité, il dépend du CORPUS mesuré :
 #: CALCULÉ à chaque mesure, JAMAIS écrit dans le jeu. Il partage F3 (et toute
 #: famille) en deux sous-groupes — le lexical français se tait par la langue,
@@ -145,7 +151,8 @@ WITH r AS ({SQL_RATTACHEMENT})
 SELECT s.series_id
 FROM unnest(%(series)s::bigint[]) AS s(series_id)
 WHERE NOT EXISTS (SELECT 1 FROM r
-                  WHERE r.series_id = s.series_id AND r.source = 'ms_review')
+                  WHERE r.series_id = s.series_id
+                    AND r.source IN ('ms_review', 'ms_synopsis'))
   AND EXISTS (SELECT 1 FROM r
               WHERE r.series_id = s.series_id AND r.source = 'kitsu_synopsis')
 """
@@ -229,7 +236,8 @@ def section(decomposition: dict, defaut: dict) -> str:
             "",
             "**Définition.** Une série du catalogue est atteignable si au moins un "
             "**fragment** du corpus appartient à un document rattaché à elle : une "
-            "critique par son `series_id`, ou un synopsis Kitsu dont le `kitsu_id` "
+            "critique ou un résumé de série par son `series_id`, ou un synopsis "
+            "Kitsu dont le `kitsu_id` "
             "est rattaché à la série par `manga.work_identity`. La requête exacte :",
             "",
             "```sql" + SQL_ATTEIGNABLES.rstrip() + "\n```",
@@ -241,6 +249,7 @@ def section(decomposition: dict, defaut: dict) -> str:
             f"| atteintes par un synopsis Kitsu, via la cascade "
             f"| {n(t['par_kitsu'])} |",
             f"| dont par les deux | {n(t['les_deux'])} |",
+            f"| atteintes par un résumé de série (corpus v2) | {n(t['par_resume'])} |",
             f"| **atteignables (union)** | **{n(t['atteignables'])} — "
             f"{pct:.1f} %**".replace(".", ",")
             + " |",
