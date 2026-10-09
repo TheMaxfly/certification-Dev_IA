@@ -96,5 +96,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: indicatif
-          path: .verify/
+          # Chemins de fichiers explicites : `.verify/` seul n'a rien trouvé (dossier
+          # caché à la racine du motif), constaté sur l'exécution 37915436388.
+          path: |
+            .verify/*/bandit.json
+            .verify/*/audit.json
           if-no-files-found: ignore
