@@ -219,6 +219,59 @@ en sortie, part des répétitions identiques, part des séquences de 5 mots de l
 réponse présentes dans les passages, réponses tronquées, mémoire vidéo), pièces
 (réponses, passages, invite, réglages) ; chaque appel est une trace MLflow.
 
+## Corpus, encodage en service, promotion (E3)
+
+Depuis la migration 021, plusieurs corpus et plusieurs encodages coexistent. Une
+mesure par le sens lit **un** encodage : celui que `--encodage N` désigne, sinon
+celui en service (`bench.v_encodage_en_service`) s'il est du modèle de la mesure,
+sinon le seul encodage terminé de ce modèle. Le corpus suit l'encodage. Chaque run
+enregistré a sa ligne `bench.eval_runs` (corpus, encodage).
+
+```bash
+# mesurer un encodage qui n'est pas en service, dans l'expérience de l'étape
+uv run python -m mesures_recherche.executer 8 --encodage 3 --enregistrer \
+    --experience E3-corpus-v2 --spec "E3 étape 1 — corpus v2" --sortie resultats/m8_v2.json
+# le comparer à la mesure 8 : verdict de la règle commitée avant la mesure
+uv run python -m mesures_recherche.promotion --run <run_id> --sortie resultats/comparaison.json
+# inscrire la décision de Max (une ligne au journal) — ou `refuser` ;
+# `--derogation` si la décision est contraire au verdict de la règle
+uv run python -m mesures_recherche.journal_promotions promouvoir --encodage 3 \
+    --run <run_id> --motif "…" --par Max
+uv run python -m mesures_recherche.journal_promotions etat
+```
+
+- **La règle** (`config/promotion_corpus_v2.toml`) est écrite et commitée avant la
+  mesure : global ≥ 31 **et** reconnaissance ≥ 20, comptés en questions.
+- **La comparaison** ne rend aucun verdict si le run n'a pas sa ligne `eval_runs` sur
+  le corpus de la règle, si l'encodage mesuré est **celui en service**, ou si la
+  référence ne rend plus 31 / 21 / 10.
+- **La décision** reste celle de Max. `promouvoir` et `refuser` refont la comparaison :
+  une décision contraire au verdict exige `--derogation`, une décision conforme la
+  refuse. Le run doit être celui de l'encodage décidé.
+- **Le journal** `bench.promotions` est en ajout seul : la base contrôle chaque ligne
+  (encodage terminé, précédent = encodage en service, pas déjà en service).
+
+### Retour arrière — une commande, une ligne au journal
+
+```bash
+DATABASE_URL=… uv run python -m mesures_recherche.journal_promotions revenir \
+    --motif "…" --par Max
+```
+
+- **Effet** : une ligne `retour_arriere` qui remet en service l'encodage que la
+  décision en service a remplacé (son `encodage_precedent_id`), ou celui que
+  `--vers N` désigne. La base refuse un encodage qui n'a jamais été servi.
+- **Ce qui ne bouge pas** : aucun vecteur, aucun fragment, aucun encodage n'est
+  effacé ; les deux encodages restent en base, et revenir encore est une ligne de
+  plus.
+- **Contrôle, aussitôt après** : `journal_promotions etat` (la vue désigne l'encodage
+  remis), puis la mesure de contrôle sans `--encodage`, qui suit la vue :
+  `executer 8 --rejeu-de <resultat.json du run de cet encodage> --sortie …` rend
+  `identiques: true`.
+- **Essayé sur base jetable** (copie d'`apimanga`, E3 étape 1, bloc H) : promouvoir,
+  revenir, la vue et la mesure de contrôle suivent. Sur la base réelle, on ne joue
+  pas d'aller-retour pour la démonstration.
+
 ## Métriques
 
 `hit_rate@5`, `hit_rate@10`, `mrr@10`, `ndcg@10` (gain = grade du jeu, 2 ou 1),
@@ -250,4 +303,10 @@ a), même score pour une entité à un seul fragment, de bout en bout sur la bas
 jetable. Génération :
 questions retenues, meilleur fragment, part copiée, répétitions, invite, plan de 88
 appels, client Ollama contre une doublure HTTP (`keep_alive`, options,
-déchargement), runs et traces MLflow, passages sur la base jetable.
+déchargement), runs et traces MLflow, passages sur la base jetable. E3 : lecture
+d'un corpus et d'un encodage désignés, résolution sans deviner entre plusieurs
+candidats ; inscription des runs d'E2 dans `eval_runs` ; règle de promotion, verdict
+aux bornes, comparaison et ses garde-fous (dont l'encodage en service) ; journal
+des promotions : promouvoir, refuser, dérogation exigée ou refusée, retour arrière
+(la vue et la résolution de l'encodage suivent), retour vers un encodage jamais
+servi refusé par la base.
