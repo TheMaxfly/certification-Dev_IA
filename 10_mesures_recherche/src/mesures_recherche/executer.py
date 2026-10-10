@@ -343,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--rejeu-de", type=Path, default=None)
     parser.add_argument("--encodage", type=int, default=None, help="encodage lu")
     parser.add_argument("--corpus", default=None, help="corpus lu (sans vecteurs)")
+    parser.add_argument("--experience", default=None, help="expérience MLflow")
+    parser.add_argument("--spec", default=None, help="étiquette « spec » du run")
     args = parser.parse_args(argv)
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
@@ -355,7 +357,11 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         ctx.cx.close()
     resultat["duree_totale_s"] = round(time.monotonic() - debut, 1)
-    resultat["experience"] = config["mlflow"]["experience"]
+    # Une mesure d'une autre étape s'enregistre dans son expérience, sous son
+    # étiquette : la configuration de la mesure, elle, ne change pas.
+    resultat["experience"] = args.experience or config["mlflow"]["experience"]
+    if args.spec:
+        resultat["spec"] = args.spec
     code = 0
     if args.enregistrer:
         from mesures_recherche.enregistrement import enregistrer
