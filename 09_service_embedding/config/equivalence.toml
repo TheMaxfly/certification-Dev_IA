@@ -1,0 +1,24 @@
+# Le test d'équivalence du service (E3, étape 1, bloc F).
+#
+# Le seuil vivait dans une spec d'E2, hors dépôt (jour 3, bloc A) : il entre ici,
+# lu par `service_embedding.equivalence` et par `tests/test_equivalence.py`.
+
+[echantillon]
+# 200 fragments : dix tranches de longueur (en caractères, effectifs égaux),
+# vingt fragments tirés par tranche, toujours les mêmes (graine fixe).
+tranches = 10
+par_tranche = 20
+graine = 20261010
+
+[seuils]
+# Cosinus minimal, sur l'échantillon, entre le vecteur que rend le service et le
+# vecteur inscrit dans l'encodage.
+# ≥ equivalent : équivalent ; de echec à equivalent : le test passe et rapporte
+# les fragments concernés ; < echec : le test échoue.
+equivalent = 0.999
+echec = 0.99
+
+[export]
+# Les échantillons exportés, hors dépôt (`mesures/` est ignoré) : le test ne se
+# connecte jamais à une base réelle.
+dossier = "mesures/equivalence"
