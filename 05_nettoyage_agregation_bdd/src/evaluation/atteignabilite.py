@@ -7,6 +7,7 @@ corpus `bench` si au moins un FRAGMENT de `bench.corpus_chunks` appartient à un
 document rattaché à elle :
 
   - une critique (`ms_review`), par son `series_id` ;
+  - un résumé de série (`ms_synopsis`, depuis le corpus v2), par son `series_id` ;
   - un synopsis Kitsu (`kitsu_synopsis`), dont le `kitsu_id` est rattaché à la
     série par le moyeu d'identité (`manga.work_identity`) — la cascade.
 
@@ -18,6 +19,10 @@ L'atteignabilité dépend du CORPUS mesuré, pas du jeu : elle n'est jamais écr
 dans le jeu, elle se recalcule à chaque mesure. Chaque mesure rend ses chiffres
 sur toutes les questions et sur les questions atteignables.
 
+LE CORPUS LU (2026-10-09, migration 021). Plusieurs versions du corpus
+coexistent dans `bench` : chaque lecture porte sur UN corpus, nommé, sinon celui
+de l'encodage en service (`corpus_lu`).
+
 LE RATTACHEMENT, AU GRAIN FRAGMENT (2026-10-07). La règle ci-dessus est écrite
 une seule fois, fragment par fragment : `SQL_RATTACHEMENT`. L'atteignabilité, sa
 décomposition et le marqueur « synopsis seul » en sont dérivés ; le banc de
@@ -28,6 +33,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Annotated
 
 import psycopg
 import typer
@@ -49,15 +55,17 @@ SELECT k.chunk_id,
        d.source,
        CASE d.source
          WHEN 'ms_review'      THEN d.series_id
+         WHEN 'ms_synopsis'    THEN d.series_id
          WHEN 'kitsu_synopsis' THEN w.series_id::bigint
        END AS series_id,
        CASE d.source WHEN 'kitsu_synopsis' THEN d.kitsu_id END AS kitsu_id
 FROM bench.corpus_chunks k
-JOIN bench.corpus_docs d ON d.doc_key = k.doc_key
+JOIN bench.corpus_docs d ON d.corpus_id = k.corpus_id AND d.doc_key = k.doc_key
 LEFT JOIN manga.work_identity w
        ON d.source = 'kitsu_synopsis'
       AND w.kitsu_id = d.kitsu_id::text
       AND w.series_id IS NOT NULL
+WHERE k.corpus_id = %(corpus)s
 """
 
 #: Les séries atteignables : celles qu'au moins un fragment rattache.
@@ -73,24 +81,29 @@ WHERE r.series_id IS NOT NULL
 SQL_DECOMPOSITION = f"""
 WITH r AS ({SQL_RATTACHEMENT}),
 critique_doc AS (
-  SELECT DISTINCT series_id FROM bench.corpus_docs WHERE source = 'ms_review'),
+  SELECT DISTINCT series_id FROM bench.corpus_docs
+  WHERE corpus_id = %(corpus)s AND source IN ('ms_review', 'ms_synopsis')),
 kitsu_doc AS (
   SELECT DISTINCT w.series_id::bigint AS series_id
   FROM bench.corpus_docs d
   JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
-  WHERE d.source = 'kitsu_synopsis' AND w.series_id IS NOT NULL),
+  WHERE d.corpus_id = %(corpus)s AND d.source = 'kitsu_synopsis'
+    AND w.series_id IS NOT NULL),
 c AS (SELECT DISTINCT series_id FROM r
       WHERE source = 'ms_review' AND series_id IS NOT NULL),
 k AS (SELECT DISTINCT series_id FROM r
       WHERE source = 'kitsu_synopsis' AND series_id IS NOT NULL),
+s AS (SELECT DISTINCT series_id FROM r
+      WHERE source = 'ms_synopsis' AND series_id IS NOT NULL),
 docs AS (SELECT series_id FROM critique_doc UNION SELECT series_id FROM kitsu_doc)
 SELECT
   (SELECT count(*) FROM manga.ms_series_enriched)                 AS catalogue,
   (SELECT count(*) FROM c)                                        AS par_critique,
   (SELECT count(*) FROM k)                                        AS par_kitsu,
   (SELECT count(*) FROM c JOIN k USING (series_id))               AS les_deux,
-  (SELECT count(*) FROM (SELECT series_id FROM c UNION SELECT series_id FROM k) u)
-                                                                  AS atteignables,
+  (SELECT count(*) FROM s)                                        AS par_resume,
+  (SELECT count(*) FROM (SELECT series_id FROM c UNION SELECT series_id FROM k
+                         UNION SELECT series_id FROM s) u)        AS atteignables,
   (SELECT count(*) FROM docs)                                     AS au_niveau_document
 """
 
@@ -106,9 +119,11 @@ WITH liees AS (
   FROM manga.work_identity w WHERE w.kitsu_id IS NOT NULL),
 docs AS (
   SELECT d.kitsu_id,
-         EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
+         EXISTS (SELECT 1 FROM bench.corpus_chunks k
+                 WHERE k.corpus_id = d.corpus_id AND k.doc_key = d.doc_key)
            AS a_fragment
-  FROM bench.corpus_docs d WHERE d.source = 'kitsu_synopsis')
+  FROM bench.corpus_docs d
+  WHERE d.corpus_id = %(corpus)s AND d.source = 'kitsu_synopsis')
 SELECT
   (SELECT count(*) FROM liees) AS liees_par_la_cascade,
   (SELECT count(*) FROM liees l
@@ -125,7 +140,8 @@ SELECT
 """
 
 #: Le marqueur « atteignable par synopsis anglais seulement » (décision du
-#: 2026-09-30) : aucune critique à fragment, mais un synopsis Kitsu à fragment
+#: 2026-09-30) : aucun texte français à fragment (critique, ou résumé de série
+#: depuis le corpus v2), mais un synopsis Kitsu à fragment
 #: rattaché par la cascade. Comme l'atteignabilité, il dépend du CORPUS mesuré :
 #: CALCULÉ à chaque mesure, JAMAIS écrit dans le jeu. Il partage F3 (et toute
 #: famille) en deux sous-groupes — le lexical français se tait par la langue,
@@ -133,36 +149,77 @@ SELECT
 SQL_SYNOPSIS_SEUL = f"""
 WITH r AS ({SQL_RATTACHEMENT})
 SELECT s.series_id
-FROM unnest(%s::bigint[]) AS s(series_id)
+FROM unnest(%(series)s::bigint[]) AS s(series_id)
 WHERE NOT EXISTS (SELECT 1 FROM r
-                  WHERE r.series_id = s.series_id AND r.source = 'ms_review')
+                  WHERE r.series_id = s.series_id
+                    AND r.source IN ('ms_review', 'ms_synopsis'))
   AND EXISTS (SELECT 1 FROM r
               WHERE r.series_id = s.series_id AND r.source = 'kitsu_synopsis')
 """
 
+#: LE CORPUS LU (migration 021 : plusieurs versions coexistent dans `bench`).
+#: Nommé par l'appelant ; sinon, celui de l'encodage en service ; sinon — base
+#: sans journal — le seul corpus de la base. Plusieurs corpus et aucun encodage en
+#: service : on refuse de deviner.
+SQL_CORPUS_PAR_DEFAUT = """
+SELECT coalesce(
+  (SELECT corpus_id FROM bench.v_encodage_en_service),
+  (SELECT min(corpus_id) FROM bench.corpus HAVING count(*) = 1))
+"""
+
+
+class CorpusNonDesigne(Exception):
+    """Plusieurs corpus, aucun en service : le corpus lu doit être nommé."""
+
+
+def corpus_lu(cx: psycopg.Connection, corpus_id: str | None = None) -> str:
+    if corpus_id is not None:
+        return corpus_id
+    (corpus,) = cx.execute(SQL_CORPUS_PAR_DEFAUT).fetchone()
+    if corpus is None:
+        raise CorpusNonDesigne(
+            "plusieurs corpus dans bench et aucun encodage en service : "
+            "nommer le corpus lu"
+        )
+    return corpus
+
+
 app = typer.Typer(add_completion=False, help=__doc__)
 
 
-def rattachement(cx: psycopg.Connection) -> list[tuple]:
+def rattachement(cx: psycopg.Connection, corpus_id: str | None = None) -> list[tuple]:
     """(chunk_id, source, series_id, kitsu_id) de chaque fragment du corpus."""
-    return cx.execute(SQL_RATTACHEMENT + " ORDER BY k.chunk_id").fetchall()
+    return cx.execute(
+        SQL_RATTACHEMENT + " ORDER BY k.chunk_id", {"corpus": corpus_lu(cx, corpus_id)}
+    ).fetchall()
 
 
-def atteignables(cx: psycopg.Connection) -> set[int]:
-    return {s for (s,) in cx.execute(SQL_ATTEIGNABLES)}
+def atteignables(cx: psycopg.Connection, corpus_id: str | None = None) -> set[int]:
+    return {
+        s for (s,) in cx.execute(SQL_ATTEIGNABLES, {"corpus": corpus_lu(cx, corpus_id)})
+    }
 
 
-def synopsis_seul(cx: psycopg.Connection, series_ids: list[int]) -> set[int]:
+def synopsis_seul(
+    cx: psycopg.Connection, series_ids: list[int], corpus_id: str | None = None
+) -> set[int]:
     """Parmi ces séries, celles que seul un synopsis Kitsu (anglais) atteint."""
-    return {s for (s,) in cx.execute(SQL_SYNOPSIS_SEUL, (list(series_ids),))}
+    return {
+        s
+        for (s,) in cx.execute(
+            SQL_SYNOPSIS_SEUL,
+            {"series": list(series_ids), "corpus": corpus_lu(cx, corpus_id)},
+        )
+    }
 
 
-def mesurer(cx: psycopg.Connection) -> tuple[dict, dict]:
-    d = cx.execute(SQL_DECOMPOSITION)
+def mesurer(cx: psycopg.Connection, corpus_id: str | None = None) -> tuple[dict, dict]:
+    p = {"corpus": corpus_lu(cx, corpus_id)}
+    d = cx.execute(SQL_DECOMPOSITION, p)
     decomposition = dict(
         zip([c.name for c in d.description], d.fetchone(), strict=True)
     )
-    k = cx.execute(SQL_DEFAUT_KITSU)
+    k = cx.execute(SQL_DEFAUT_KITSU, p)
     defaut = dict(zip([c.name for c in k.description], k.fetchone(), strict=True))
     return decomposition, defaut
 
@@ -179,7 +236,8 @@ def section(decomposition: dict, defaut: dict) -> str:
             "",
             "**Définition.** Une série du catalogue est atteignable si au moins un "
             "**fragment** du corpus appartient à un document rattaché à elle : une "
-            "critique par son `series_id`, ou un synopsis Kitsu dont le `kitsu_id` "
+            "critique ou un résumé de série par son `series_id`, ou un synopsis "
+            "Kitsu dont le `kitsu_id` "
             "est rattaché à la série par `manga.work_identity`. La requête exacte :",
             "",
             "```sql" + SQL_ATTEIGNABLES.rstrip() + "\n```",
@@ -191,6 +249,7 @@ def section(decomposition: dict, defaut: dict) -> str:
             f"| atteintes par un synopsis Kitsu, via la cascade "
             f"| {n(t['par_kitsu'])} |",
             f"| dont par les deux | {n(t['les_deux'])} |",
+            f"| atteintes par un résumé de série (corpus v2) | {n(t['par_resume'])} |",
             f"| **atteignables (union)** | **{n(t['atteignables'])} — "
             f"{pct:.1f} %**".replace(".", ",")
             + " |",
@@ -218,7 +277,13 @@ def section(decomposition: dict, defaut: dict) -> str:
 
 
 @app.command()
-def principal() -> None:
+def principal(
+    # `Annotated` : appelée directement en Python (tests), le défaut reste None.
+    corpus: Annotated[
+        str | None,
+        typer.Option("--corpus", help="Corpus lu (défaut : celui en service)."),
+    ] = None,
+) -> None:
     """Imprime la section « Atteignabilité », en session lecture seule."""
     url = os.environ.get("DATABASE_URL")
     if not url:
@@ -226,7 +291,7 @@ def principal() -> None:
     # Lecture seule dès la PREMIÈRE requête : `SET SESSION CHARACTERISTICS` ne
     # vaudrait que pour les transactions suivantes, pas pour celle qu'il ouvre.
     with psycopg.connect(url, options="-c default_transaction_read_only=on") as cx:
-        typer.echo(section(*mesurer(cx)))
+        typer.echo(section(*mesurer(cx, corpus)))
 
 
 if __name__ == "__main__":

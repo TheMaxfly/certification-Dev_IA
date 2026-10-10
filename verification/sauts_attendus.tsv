@@ -10,5 +10,5 @@
 # module	plafond	raison
 05	4	base réelle (APIMANGA_DSN jamais fourni) : test_controle_tetes 1, test_rattachement_apimanga 3
 08	25	base réelle (APIMANGA_DSN jamais fourni) : test_chargeur_kitsu_fidelite 11, test_chargeur_wikipedia_fr 9, test_perimetre_integration 4 ; raw Kitsu absent d'un clone : test_3_empreinte_du_raw_inchangee 1 (passe sur le poste, où le raw existe)
-09	1	instance bge-m3 non lancée (carte graphique) : test_encodage 1
+09	2	instance bge-m3 non lancée (carte graphique) : test_encodage 1 ; échantillon d'équivalence absent ou instance non lancée : test_equivalence 1 (accord de Max, 2026-10-09)
 demo	4	base réelle (DATABASE_URL jamais fournie) : test_etat 4

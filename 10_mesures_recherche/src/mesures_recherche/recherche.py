@@ -84,12 +84,18 @@ class Semantique:
         encoder,
         parametres=None,
         representation: str = "meilleur_fragment",
+        *,
+        encodage_id: int,
     ):
+        """Les vecteurs d'UN encodage, désigné : sans `encodage_id`, aucune lecture
+        (migration 021 : plusieurs encodages d'un modèle partagent la table)."""
         from pgvector.psycopg import register_vector
 
         register_vector(cx)
         lignes = cx.execute(
-            f"SELECT chunk_id, embedding FROM {table} ORDER BY chunk_id"  # nosec B608
+            f"SELECT chunk_id, embedding FROM {table}"  # nosec B608
+            " WHERE encodage_id = %s ORDER BY chunk_id",
+            (encodage_id,),
         ).fetchall()
         chunk_ids = np.array([c for c, _ in lignes], dtype=np.int64)
         if not np.array_equal(chunk_ids, entites.chunk_ids):
@@ -121,6 +127,7 @@ WITH q AS (
 c AS MATERIALIZED (
   SELECT chunk_id, to_tsvector(%(config)s::regconfig, chunk_text) AS tsv
   FROM bench.corpus_chunks
+  WHERE corpus_id = %(corpus)s
 )
 SELECT q.n, c.chunk_id, ts_rank_cd(c.tsv, q.requete, %(norme)s)
 FROM q JOIN c ON c.tsv @@ q.requete
@@ -149,6 +156,7 @@ class PleinTexte:
                 "config": configuration,
                 "norme": norme,
                 "textes": [q.texte for q in questions],
+                "corpus": entites.corpus_id,
             },
         ).fetchall()
         fragments = np.zeros((len(questions), len(entites.chunk_ids)))
@@ -187,7 +195,9 @@ class Tfidf:
         from sklearn.feature_extraction.text import TfidfVectorizer
 
         textes = cx.execute(
-            "SELECT chunk_id, chunk_text FROM bench.corpus_chunks ORDER BY chunk_id"
+            "SELECT chunk_id, chunk_text FROM bench.corpus_chunks"
+            " WHERE corpus_id = %s ORDER BY chunk_id",
+            (entites.corpus_id,),
         ).fetchall()
         if not np.array_equal(
             np.array([c for c, _ in textes], dtype=np.int64), entites.chunk_ids

@@ -27,7 +27,7 @@ commande sur le poste et sur GitHub.
 | `make verify` | pour chaque module : Ruff, format, tests ; puis actionlint sur les workflows |
 | `make verify MODULE=<nom>` | la même chose pour un seul module : `01` … `10`, `database`, `demo`, `workflows` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, intégration Compose du 02 |
+| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés), intégration Compose du 02 |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
   vidé : aucune suite ne reçoit la base réelle.
@@ -203,6 +203,37 @@ poussée, pas de fusion par écrasement.
 magasin MLflow, les données brutes, le journal et les rapports sont communs à toutes
 les branches. Une migration appliquée depuis une branche de travail modifie la base
 commune : elle est précédée d'une sauvegarde.
+
+## Écrire dans le corpus ou les vecteurs
+
+Depuis la migration `021`, plusieurs versions du corpus (`bench.corpus`) et
+plusieurs encodages d'un même modèle coexistent. La base donne encore `'v1'` par
+défaut à `corpus_id`, pour que le chargeur du corpus v1 et les tests antérieurs
+écrivent comme avant : c'est une dette. Le code, lui, ne s'y fie jamais.
+
+1. **Une seule fonction d'écriture par module écrivain.** Toute écriture d'un
+   document (`bench.corpus_docs`), d'un fragment (`bench.corpus_chunks`) ou d'un
+   vecteur (`bench.vecteurs_*`) passe par elle : ajouts, modifications et
+   suppressions. Aujourd'hui : `corpus.ecriture.ecrire_corpus` (module 05) et
+   `service_embedding.encodage.ecrire_vecteurs` (module 09).
+2. **Le corpus y est un argument nommé, obligatoire, sans valeur par défaut** :
+   `corpus_id=…`. Toute inscription d'un encodage (`bench.encodages`) nomme aussi
+   son corpus.
+3. **Un test par module le vérifie** sur le code source :
+   - aucune autre écriture de ces tables n'existe dans le module ;
+   - aucune écriture dont la table n'est connue qu'à l'exécution ;
+   - le corpus de la fonction n'a pas de défaut.
+
+   Un module qui se met à écrire dans ces tables arrive avec sa fonction et son
+   test, dans la même étape.
+4. **Lire, c'est désigner.** Une lecture de vecteurs nomme son encodage. Une
+   lecture du corpus nomme le sien ; sinon, c'est celui de l'encodage en service
+   (`bench.v_encodage_en_service`), sinon le seul corpus de la base. Plusieurs
+   corpus et aucun en service : la lecture refuse de deviner.
+
+*Motif : un corpus omis tombe dans `v1` sans bruit. La base refuse déjà de mêler
+deux corpus (clés composites) et d'écrire dans un corpus clos ; la règle ferme la
+voie au défaut côté code.*
 
 ## Un cycle complet
 

@@ -32,6 +32,7 @@ import typer
 
 from corpus import pseudonymes
 from corpus.construire import RACINE, RAPPORTS_DEFAUT, dsn_affichable
+from evaluation.atteignabilite import corpus_lu
 
 EXEMPLES_DEFAUT = RACINE / "05_nettoyage_agregation_bdd/data/corpus_exemples"
 DIMENSIONS = (384, 768, 1024)
@@ -64,7 +65,7 @@ corps AS (
   JOIN manga.ms_reviews_all a
     ON substring(a.review_url FROM 'id=([0-9]+)$')::bigint
        = (d.metadata_json ->> 'site_id')::bigint
-  WHERE d.source = 'ms_review')"""
+  WHERE d.corpus_id = %(corpus)s AND d.source = 'ms_review')"""
 
 SQL_LONGUEURS = f"""
 WITH {CTE_CORPS}
@@ -81,7 +82,8 @@ SQL_FRAGMENTS = """
 SELECT d.source, count(DISTINCT d.doc_key), count(k.chunk_id),
        count(DISTINCT d.doc_key) FILTER (WHERE k.chunk_id IS NULL)
 FROM bench.corpus_docs d
-LEFT JOIN bench.corpus_chunks k USING (doc_key)
+LEFT JOIN bench.corpus_chunks k ON k.corpus_id = d.corpus_id AND k.doc_key = d.doc_key
+WHERE d.corpus_id = %(corpus)s
 GROUP BY d.source ORDER BY d.source
 """
 
@@ -133,15 +135,18 @@ def mesurer(url: str) -> tuple[dict, dict]:
     with psycopg.connect(url, options="-c default_transaction_read_only=on") as cx:
         m["serveur"] = cx.execute("SELECT version()").fetchone()[0].split(" on ")[0]
         m["dsn"] = dsn_affichable(url)
-        m["longueurs"] = cx.execute(SQL_LONGUEURS).fetchone()
-        m["fragments"] = cx.execute(SQL_FRAGMENTS).fetchall()
-        m["M1"] = cx.execute(SQL_M1).fetchone()[0]
+        # Le corpus mesuré : celui de l'encodage en service (migration 021).
+        c = {"corpus": corpus_lu(cx)}
+        m["corpus"] = c["corpus"]
+        m["longueurs"] = cx.execute(SQL_LONGUEURS, c).fetchone()
+        m["fragments"] = cx.execute(SQL_FRAGMENTS, c).fetchall()
+        m["M1"] = cx.execute(SQL_M1, c).fetchone()[0]
         m["marqueurs"] = {
-            nom: cx.execute(SQL_MARQUEUR, {"motif": motif}).fetchone()[0]
+            nom: cx.execute(SQL_MARQUEUR, c | {"motif": motif}).fetchone()[0]
             for nom, motif in MARQUEURS.items()
         }
         m["au_moins_un_M2_M6"] = cx.execute(
-            SQL_AU_MOINS_UN, {"motifs": list(MARQUEURS.values())}
+            SQL_AU_MOINS_UN, c | {"motifs": list(MARQUEURS.values())}
         ).fetchone()[0]
         pseudos = [
             p
@@ -152,7 +157,7 @@ def mesurer(url: str) -> tuple[dict, dict]:
         ]
         for nom, motif in MARQUEURS.items():
             lignes = cx.execute(
-                SQL_EXEMPLES, {"motif": motif, "n": PAR_MARQUEUR}
+                SQL_EXEMPLES, c | {"motif": motif, "n": PAR_MARQUEUR}
             ).fetchall()
             masques = []
             for doc_key, extrait in lignes:

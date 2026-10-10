@@ -77,6 +77,7 @@ class Instance:
     dimension: int
     prefixe_document: str
     prefixe_requete: str
+    hote: str
 
     def prefixe(self, role: Role) -> str:
         if role == "document":
@@ -104,7 +105,7 @@ def charger(nom: str, dossier: Path | None = None) -> Instance:
         "MODEL_ID REVISION DTYPE PORT CLIENT_PORT_METRIQUES AUTO_TRUNCATE "
         "MAX_BATCH_TOKENS MAX_CLIENT_BATCH_SIZE CLIENT_TAILLE_LOT "
         "CLIENT_LONGUEUR_MAXIMALE CLIENT_LONGUEUR_REQUISE CLIENT_DIMENSION "
-        "CLIENT_PREFIXE_DOCUMENT CLIENT_PREFIXE_REQUETE"
+        "CLIENT_PREFIXE_DOCUMENT CLIENT_PREFIXE_REQUETE CLIENT_HOTE"
     ).split()
     manquantes = [c for c in requises if c not in v]
     if manquantes:
@@ -126,8 +127,11 @@ def charger(nom: str, dossier: Path | None = None) -> Instance:
         dimension=_entier(v, "CLIENT_DIMENSION", chemin.name),
         prefixe_document=v["CLIENT_PREFIXE_DOCUMENT"],
         prefixe_requete=v["CLIENT_PREFIXE_REQUETE"],
+        hote=v["CLIENT_HOTE"],
     )
 
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", instance.hote):
+        raise ConfigurationInvalide(f"{chemin.name} : CLIENT_HOTE n'est pas un hôte")
     if not re.fullmatch(r"[0-9a-f]{40}", instance.revision):
         raise ConfigurationInvalide(f"{chemin.name} : REVISION doit être un commit")
     if instance.dtype not in ("float16", "float32"):

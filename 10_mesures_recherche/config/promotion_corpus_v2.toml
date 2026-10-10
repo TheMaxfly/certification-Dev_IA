@@ -1,0 +1,71 @@
+# La règle de promotion du corpus v2 et l'hypothèse de gain — E3, étape 1, bloc G.
+#
+# Commitée AVANT la mesure : son commit et son empreinte figurent au rapport. Lue
+# par `mesures_recherche.promotion`, qui rend le verdict de la règle ; la chaîne du
+# modèle (étape 6) lira ce même fichier. Les deux textes sont les sections 7 et 8
+# de la spec de l'étape, mot pour mot ; les nombres qui suivent les traduisent.
+
+[mesure]
+# La configuration de la mesure 8 (par le sens seul ; meilleur fragment ; classement
+# limité au catalogue), sur l'encodage du corpus v2, DÉSIGNÉ explicitement.
+numero = 8
+corpus = "v2"
+experience = "E3-corpus-v2"
+spec = "E3 étape 1 — corpus v2"
+# La référence : le run de la mesure 8 (E2, corpus v1, encodage 2).
+reference_run = "28aa0e60e8014b078bf48f5c7c2ce78a"
+reference = { global = 31, reconnaissance = 21, proposition = 10 }
+
+[regle]
+# Questions où une série attendue est dans les dix premiers résultats
+# (hit_rate@10), périmètre « toutes », sur les questions de rang.
+metrique = "hit_rate@10"
+# Promotion proposée si global ≥ global_min ET reconnaissance ≥ reconnaissance_min ;
+# refus proposé sinon.
+global_min = 31
+reconnaissance_min = 20
+texte = '''
+## 7. La règle de promotion — écrite avant la mesure (décidée par Max, D3)
+
+Indicateur : nombre de questions où une série attendue est dans les dix premiers
+résultats (`hit_rate_10`), sur les 59 questions mesurées (les 10 questions de refus
+attendent le modèle de langage). Référence, mesure 8 : **31 sur 59** ; reconnaissance
+**21 sur 23** ; proposition **10 sur 36**.
+
+| Condition | Verdict |
+|---|---|
+| global ≥ 31 **et** reconnaissance ≥ 20 | **promotion proposée** |
+| global ≤ 30, **ou** reconnaissance ≤ 19 | **refus proposé** : l'application reste sur les vecteurs du corpus v1 |
+
+- Compté **en questions**, pas en pourcentage : une question déplace le chiffre global
+  de 1,7 point, de 2,8 en proposition, de 4,3 en reconnaissance.
+- Une question perdue est tolérée en reconnaissance, parce qu'une question seule ne
+  prouve rien ; aucune perte nette n'est tolérée au global.
+- Préalables à tout verdict : contrôles des blocs B, D, E et F tenus.
+- **La décision reste celle de Max.**
+'''
+
+[hypothese]
+proposition_min = 12
+reconnaissance = [20, 22]
+global = [31, 36]
+texte = '''
+## 8. L'hypothèse de gain — écrite avant la mesure
+
+*Proposée par la conversation ; Max la valide en transmettant cette spec.*
+
+- **D'où viendrait un gain** : d'un texte en français au niveau de l'œuvre entière, pas
+  de l'atteignabilité. Sur les séries attendues en proposition, 252 sur 314 ont un
+  résumé, et 18 seulement deviennent atteignables grâce à lui (chiffres du point 0, à
+  recalculer après exclusions).
+- **Où il est attendu** : en mode proposition. Attendu : au moins **12 sur 36**
+  (deux questions gagnées).
+- **Où il n'est pas attendu** : en reconnaissance (déjà 21 sur 23). Le risque y est
+  inverse : près de 8 700 documents de plus peuvent passer devant la bonne série.
+  Attendu : 20 à 22.
+- **Global attendu : 31 à 36.**
+- **Ce que la mesure ne dira pas** : l'écart vaut pour le corpus v2 entier. Il ne
+  sépare pas l'effet des résumés, celui du découpage, ni celui des textes rétablis
+  (D2, négligeable en nombre). Un écart d'une ou deux questions ne prouve rien.
+- Une hypothèse démentie est un résultat : elle s'écrit telle quelle au rapport.
+'''

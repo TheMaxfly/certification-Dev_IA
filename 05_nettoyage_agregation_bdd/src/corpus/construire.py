@@ -32,6 +32,11 @@ UNE SEULE TRANSACTION. Gardes, écriture, puis contrôles du §7 : si un contrô
 échoue, rien n'est validé. Un corpus à moitié reconstruit est un état que
 personne ne sait interpréter.
 
+LE CORPUS V1, ET LUI SEUL (migration 021). Chaque lecture et chaque écriture
+nomme le corpus `v1` ; les écritures passent par `corpus.ecriture`, la seule
+porte du module. Un autre corpus de `bench` n'est ni lu ni touché. Un v1 CLOS
+refuse toute écriture : le rejeu sans écart passe, `--a-blanc` échoue (il vide).
+
 CE QUE LE CHARGEUR NE FAIT PAS : il ne touche ni `manga`, ni `queries`, ni
 aucun embedding. Il retire les documents hors règle, et les FK en `ON DELETE
 CASCADE` emportent qrels et résultats qui les visaient — état archivé AVANT
@@ -53,7 +58,7 @@ from pathlib import Path
 import psycopg
 import typer
 
-from corpus import decoupage, kitsu, pseudonymes
+from corpus import decoupage, ecriture, kitsu, pseudonymes
 
 RACINE = Path(__file__).resolve().parents[3]
 RAW_DEFAUT = (
@@ -64,6 +69,10 @@ DONNEES_DEFAUT = RACINE / "database/donnees"
 RAPPORTS_DEFAUT = RACINE / "05_nettoyage_agregation_bdd/rapports"
 
 SOURCES_REGLE = ("kitsu_synopsis", "ms_review")
+
+#: Ce chargeur construit le corpus v1, et lui seul (migration 021). Le corpus est
+#: NOMMÉ dans chaque écriture et chaque lecture : jamais le défaut de la base.
+CORPUS = "v1"
 
 app = typer.Typer(add_completion=False, help=__doc__)
 
@@ -226,79 +235,24 @@ COLONNES_DOC = (
 
 SQL_TEMPORAIRES = """
 CREATE TEMP TABLE snapshot_urls (review_url text PRIMARY KEY) ON COMMIT DROP;
-CREATE TEMP TABLE cible_docs (LIKE bench.corpus_docs) ON COMMIT DROP;
+CREATE TEMP TABLE cible_docs (
+  doc_key text, source text, series_id bigint, kitsu_id bigint, boost_score numeric,
+  doc_text text, metadata_json jsonb, title text) ON COMMIT DROP;
 CREATE TEMP TABLE cible_chunks (
   doc_key text, chunk_index integer, chunk_text text,
   char_start integer, char_end integer, chunk_hash text) ON COMMIT DROP;
 CREATE TEMP TABLE admis (doc_key text, empreinte text) ON COMMIT DROP;
 """
 
-# --- le diff --------------------------------------------------------------- #
-
-SQL_RETIRER_DOCS = """
-DELETE FROM bench.corpus_docs d
-WHERE NOT EXISTS (SELECT 1 FROM cible_docs c WHERE c.doc_key = d.doc_key)
-RETURNING d.source
-"""
-
-SQL_MODIFIER_DOCS = """
-UPDATE bench.corpus_docs d
-SET source = c.source, series_id = c.series_id, kitsu_id = c.kitsu_id,
-    boost_score = c.boost_score, doc_text = c.doc_text,
-    metadata_json = c.metadata_json, title = c.title
-FROM cible_docs c
-WHERE c.doc_key = d.doc_key
-  AND (d.source, d.series_id, d.kitsu_id, d.boost_score, d.doc_text,
-       d.metadata_json, d.title)
-      IS DISTINCT FROM
-      (c.source, c.series_id, c.kitsu_id, c.boost_score, c.doc_text,
-       c.metadata_json, c.title)
-RETURNING d.source
-"""
-
-SQL_AJOUTER_DOCS = """
-INSERT INTO bench.corpus_docs
-  (doc_key, source, series_id, kitsu_id, boost_score, doc_text, metadata_json, title)
-SELECT c.doc_key, c.source, c.series_id, c.kitsu_id, c.boost_score, c.doc_text,
-       c.metadata_json, c.title
-FROM cible_docs c
-WHERE NOT EXISTS (SELECT 1 FROM bench.corpus_docs d WHERE d.doc_key = c.doc_key)
-ORDER BY c.doc_key
-RETURNING source
-"""
-
-SQL_RETIRER_CHUNKS = """
-DELETE FROM bench.corpus_chunks k
-WHERE NOT EXISTS (
-  SELECT 1 FROM cible_chunks c
-  WHERE c.doc_key = k.doc_key AND c.chunk_index = k.chunk_index
-    AND c.chunk_text = k.chunk_text
-    AND c.char_start IS NOT DISTINCT FROM k.char_start
-    AND c.char_end IS NOT DISTINCT FROM k.char_end
-    AND c.chunk_hash IS NOT DISTINCT FROM k.chunk_hash
-    AND k.token_count IS NULL)
-RETURNING split_part(k.doc_key, ':', 1)
-"""
-
-SQL_AJOUTER_CHUNKS = """
-INSERT INTO bench.corpus_chunks
-  (doc_key, chunk_index, chunk_text, char_start, char_end, token_count, chunk_hash)
-SELECT c.doc_key, c.chunk_index, c.chunk_text, c.char_start, c.char_end, NULL,
-       c.chunk_hash
-FROM cible_chunks c
-WHERE NOT EXISTS (SELECT 1 FROM bench.corpus_chunks k
-                  WHERE k.doc_key = c.doc_key AND k.chunk_index = c.chunk_index)
-ORDER BY c.doc_key, c.chunk_index
-RETURNING split_part(doc_key, ':', 1)
-"""
-
 # --- les contrôles du §7 --------------------------------------------------- #
 
 SQL_ETAT = """
-SELECT 'docs:' || source, count(*) FROM bench.corpus_docs GROUP BY source
+SELECT 'docs:' || source, count(*) FROM bench.corpus_docs
+  WHERE corpus_id = %(corpus)s GROUP BY source
 UNION ALL
 SELECT 'fragments:' || split_part(doc_key, ':', 1), count(*)
-  FROM bench.corpus_chunks GROUP BY split_part(doc_key, ':', 1)
+  FROM bench.corpus_chunks WHERE corpus_id = %(corpus)s
+  GROUP BY split_part(doc_key, ':', 1)
 UNION ALL SELECT 'qrels', count(*) FROM bench.qrels
 UNION ALL SELECT 'retrieval_results', count(*) FROM bench.retrieval_results
 UNION ALL SELECT 'retrieval_results sans fragment', count(*)
@@ -309,7 +263,8 @@ ORDER BY 1
 SQL_7_1 = f"""
 WITH {CTE_RETENUES},
 attendus AS (SELECT 'ms_review:' || site_id AS doc_key FROM retenues),
-presents AS (SELECT doc_key FROM bench.corpus_docs WHERE source = 'ms_review')
+presents AS (SELECT doc_key FROM bench.corpus_docs
+             WHERE corpus_id = %(corpus)s AND source = 'ms_review')
 SELECT (SELECT count(*) FROM attendus a
          WHERE NOT EXISTS (SELECT 1 FROM presents p WHERE p.doc_key = a.doc_key)),
        (SELECT count(*) FROM presents p
@@ -323,7 +278,7 @@ SELECT
                    OR doc_key <> 'ms_review:' || (metadata_json ->> 'site_id'))),
   count(*) FILTER (WHERE source = 'kitsu_synopsis' AND (kitsu_id IS NULL
                    OR doc_key <> 'kitsu:' || kitsu_id))
-FROM bench.corpus_docs
+FROM bench.corpus_docs WHERE corpus_id = %(corpus)s
 """
 
 #: A4 / §7.4 — la requête du document de règle, étendue aux fragments.
@@ -345,15 +300,16 @@ WITH pseudos AS (
   FROM manga.ms_reviews_all WHERE review_author IS NOT NULL),
 docs_occ AS (
   SELECT DISTINCT d.doc_key, x.h FROM bench.corpus_docs d JOIN pseudos x
-    ON d.doc_text ~* ('\\m' || x.esc || '\\M') OR d.title ~* ('\\m' || x.esc || '\\M')
-    OR d.metadata_json::text ~* ('\\m' || x.esc || '\\M')),
+    ON (d.doc_text ~* ('\\m' || x.esc || '\\M') OR d.title ~* ('\\m' || x.esc || '\\M')
+    OR d.metadata_json::text ~* ('\\m' || x.esc || '\\M'))
+    AND d.corpus_id = %(corpus)s),
 chunks_occ AS (
   SELECT k.doc_key, x.h,
          regexp_count(k.chunk_text, '\\m' || x.esc || '\\M', 1, 'i') AS n,
          (k.chunk_text ~* ('^' || x.esc || '\\M'))::int
            + (k.chunk_text ~* ('\\m' || x.esc || '$'))::int AS n_bord
   FROM bench.corpus_chunks k JOIN pseudos x
-    ON k.chunk_text ~* ('\\m' || x.esc || '\\M'))
+    ON k.chunk_text ~* ('\\m' || x.esc || '\\M') AND k.corpus_id = %(corpus)s)
 SELECT o.doc_key, o.h, 'document' AS niveau,
        EXISTS (SELECT 1 FROM admis a WHERE a.doc_key = o.doc_key AND a.empreinte = o.h)
 FROM docs_occ o
@@ -373,11 +329,11 @@ SELECT
   (SELECT md5(string_agg(ROW(doc_key, source, series_id, kitsu_id, boost_score,
                              doc_text, metadata_json, title)::text,
                          E'\\n' ORDER BY doc_key))
-     FROM bench.corpus_docs),
+     FROM bench.corpus_docs WHERE corpus_id = %(corpus)s),
   (SELECT md5(string_agg(ROW(doc_key, chunk_index, chunk_text, char_start, char_end,
                              token_count, chunk_hash)::text,
                          E'\\n' ORDER BY doc_key, chunk_index))
-     FROM bench.corpus_chunks)
+     FROM bench.corpus_chunks WHERE corpus_id = %(corpus)s)
 """
 
 
@@ -474,28 +430,12 @@ def verser_cible(
             copie.write_row(fragment)
 
 
-def appliquer_diff(curseur: psycopg.Cursor, a_blanc: bool) -> dict:
-    """Écrit l'écart cible → bench ; `a_blanc` vide d'abord tout le corpus."""
-    ecritures: dict[str, Counter] = {}
-    if a_blanc:
-        vidage = curseur.execute("DELETE FROM bench.corpus_docs RETURNING source")
-        ecritures["vidage"] = Counter(s for (s,) in vidage)
-    for nom, requete in (
-        ("docs retirés", SQL_RETIRER_DOCS),
-        ("docs modifiés", SQL_MODIFIER_DOCS),
-        ("docs ajoutés", SQL_AJOUTER_DOCS),
-        ("fragments retirés", SQL_RETIRER_CHUNKS),
-        ("fragments ajoutés", SQL_AJOUTER_CHUNKS),
-    ):
-        ecritures[nom] = Counter(s for (s,) in curseur.execute(requete))
-    return ecritures
-
-
 def controler(curseur: psycopg.Cursor) -> dict:
     """§7.1, §7.4, §7.5 — en base, après écriture, avant validation."""
-    manquants, en_trop = curseur.execute(SQL_7_1).fetchone()
-    hors_type, ms_mal, kitsu_mal = curseur.execute(SQL_7_5).fetchone()
-    occurrences = curseur.execute(SQL_7_4).fetchall()
+    p = {"corpus": CORPUS}
+    manquants, en_trop = curseur.execute(SQL_7_1, p).fetchone()
+    hors_type, ms_mal, kitsu_mal = curseur.execute(SQL_7_5, p).fetchone()
+    occurrences = curseur.execute(SQL_7_4, p).fetchall()
     fuites = [
         (d, h, niveau)
         for (d, h, niveau, admis) in occurrences
@@ -731,11 +671,12 @@ def executer(
         r["fragments"] = len(fragments)
         verser_cible(cur, docs, fragments)
 
-        r["avant"] = dict(cur.execute(SQL_ETAT).fetchall())
-        r["empreinte_avant"] = cur.execute(SQL_EMPREINTE).fetchone()
-        r["ecritures"] = appliquer_diff(cur, a_blanc)
-        r["apres"] = dict(cur.execute(SQL_ETAT).fetchall())
-        r["empreinte_apres"] = cur.execute(SQL_EMPREINTE).fetchone()
+        p = {"corpus": CORPUS}
+        r["avant"] = dict(cur.execute(SQL_ETAT, p).fetchall())
+        r["empreinte_avant"] = cur.execute(SQL_EMPREINTE, p).fetchone()
+        r["ecritures"] = ecriture.ecrire_corpus(cur, corpus_id=CORPUS, vider=a_blanc)
+        r["apres"] = dict(cur.execute(SQL_ETAT, p).fetchall())
+        r["empreinte_apres"] = cur.execute(SQL_EMPREINTE, p).fetchone()
         r["controles"] = controler(cur)
 
         en_echec = echecs(r["controles"])

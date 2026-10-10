@@ -404,6 +404,32 @@ preparer() {
 # --------------------------------------------------------------------------- #
 #  Poste : verify, puis les harnais qui ne tournent que sur ce poste
 # --------------------------------------------------------------------------- #
+
+# Le test d'équivalence du service (E3, étape 1, bloc F) : l'instance EmbeddingGemma
+# réencode les échantillons exportés (09_…/mesures/equivalence/, hors dépôt) et les
+# compare à leurs encodages. Sans échantillon, l'étape est sautée et le dit. Une
+# seule instance à la fois : refus si une instance tourne déjà.
+equivalence_du_service() {
+  local module="$RACINE/09_service_embedding" rc
+  if ! compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null; then
+    dire "poste — équivalence du service : aucun échantillon exporté, étape sautée"
+    return 0
+  fi
+  if docker ps --format '{{.Names}}' | grep -q '^tei-'; then
+    echouer poste "équivalence du service" "une instance du service tourne déjà"
+  fi
+  (cd "$module" && "${PROPRE[@]}" uv run --locked python -m service_embedding.controles etat) ||
+    echouer poste "équivalence du service" "mémoire sous les seuils"
+  dire "poste — (09_service_embedding/) équivalence du service"
+  (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma up -d >/dev/null) ||
+    echouer poste "équivalence du service" "docker compose --profile embeddinggemma up -d"
+  for _ in $(seq 1 90); do curl -sf 127.0.0.1:8082/health >/dev/null && break; sleep 2; done
+  (cd "$module" && "${PROPRE[@]}" uv run --locked --extra dev pytest -q -p no:cacheprovider \
+    tests/test_equivalence.py -k service_reel -rs); rc=$?
+  (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma down >/dev/null 2>&1)
+  [ "$rc" -eq 0 ] || echouer poste "équivalence du service (code $rc)" "pytest tests/test_equivalence.py"
+}
+
 poste() {
   verify
   local cmd
@@ -413,13 +439,14 @@ poste() {
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
+  equivalence_du_service
   cmd=(docker compose -f compose.integration.yml run --rm --build smoke)
   dire "poste — (02_api_manga/) ${cmd[*]}"
   local rc
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}"); rc=$?
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
   [ "$rc" -eq 0 ] || echouer poste "intégration du 02 (code $rc)" "(02_api_manga/) ${cmd[*]}"
-  dire "poste — harnais : tester.sh, fidelite.sh, Compose du 02 passés"
+  dire "poste — harnais : tester.sh, fidelite.sh, équivalence du service, Compose du 02 passés"
 }
 
 # --------------------------------------------------------------------------- #
