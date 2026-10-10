@@ -82,6 +82,12 @@ def run(stockage, contenu) -> str:
     import mlflow
 
     mlflow.set_tracking_uri(uri_suivi(stockage))
+    # Les pièces sous le stockage du test, comme l'enregistrement les range : sinon
+    # MLflow les écrirait dans ./mlruns, au milieu du module.
+    if mlflow.get_experiment_by_name("essai") is None:
+        mlflow.create_experiment(
+            "essai", artifact_location=(stockage / "pieces").as_uri()
+        )
     mlflow.set_experiment("essai")
     with mlflow.start_run() as r:
         mlflow.log_text(json.dumps(contenu), "resultat.json")
