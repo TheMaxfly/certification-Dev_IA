@@ -27,7 +27,7 @@ commande sur le poste et sur GitHub.
 | `make verify` | pour chaque module : Ruff, format, tests ; puis actionlint sur les workflows |
 | `make verify MODULE=<nom>` | la même chose pour un seul module : `01` … `10`, `database`, `demo`, `workflows` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, intégration Compose du 02 |
+| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés), intégration Compose du 02 |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
   vidé : aucune suite ne reçoit la base réelle.

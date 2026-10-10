@@ -142,10 +142,11 @@ et l'épingler par digest.
 
 | Contrôle | Commande | Résultat attendu |
 |---|---|---|
-| Tests du module (47) | `uv run --extra dev pytest` | tous verts ; une base PostgreSQL + pgvector **jetable** est lancée par Docker ; le test qui passe par l'instance BGE-M3 réelle saute si elle ne tourne pas |
+| Tests du module (72) | `uv run --extra dev pytest` | tous verts ; une base PostgreSQL + pgvector **jetable** est lancée par Docker ; deux tests sautent sans instance : celui qui passe par l'instance BGE-M3 réelle, et le test d'équivalence contre le service réel (plafond de sautés : 2) |
 | Mémoire avant lancement | `uv run python -m service_embedding.controles etat` | code 0 et `"seuils_non_tenus": []` |
 | Contrôle d'une instance lancée | `uv run python -m service_embedding.controles instance bge-m3 --sortie mesures/controles_bge-m3.json` (avec `DATABASE_URL`) | voir le tableau suivant |
 | Après l'encodage du corpus | `uv run python -m service_embedding.verification --sortie mesures/verification.json` (avec `DATABASE_URL`) | code 0, chaque ligne « OK » |
+| Équivalence du service (E3) | `uv run python -m service_embedding.equivalence exporter --encodage N` (avec `DATABASE_URL`, une fois), puis l'étape « équivalence du service » de `make verify-poste` | cosinus minimal ≥ 0,999 : équivalent ; de 0,99 à 0,999 : rapporté ; sous 0,99 : échec |
 
 Le contrôle d'une instance **rend toujours le code 0** : c'est le fichier JSON qu'on
 lit.
@@ -159,10 +160,32 @@ lit.
 | `metriques` | `requetes_apres` − `requetes_avant` = 5 |
 | `troncature` | `fragments` = 66 290 ; `max` = 529 / 586 jetons ; `au_dela_maximale` = 0 |
 
-`verification` contrôle : 66 290 vecteurs par table, aucun vecteur nul, de dimension
+`verification` contrôle **le corpus v1 et ses deux encodages** (il le nomme, depuis
+la migration 021) : 66 290 vecteurs par table, aucun vecteur nul, de dimension
 fausse ou de norme hors 1 ± 1e-3 ; aucun fragment sans vecteur ni vecteur sans
-fragment ; deux encodages terminés dans `bench.encodages` ; corpus 48 090 documents /
-66 290 fragments ; empreinte du jeu d'évaluation v2 `31712b0d…`.
+fragment ; deux encodages terminés du v1 dans `bench.encodages` ; corpus 48 090
+documents / 66 290 fragments ; empreinte du jeu d'évaluation v2 `31712b0d…`.
+
+**Test d'équivalence versionné (E3, étape 1)** : `service_embedding.equivalence`,
+réglages dans `config/equivalence.toml` (10 tranches de longueur × 20 fragments,
+graine 20261010 ; seuils 0,999 et 0,99). Deux temps :
+- `exporter --encodage N` lit la base en lecture seule et écrit l'échantillon, avec
+  les vecteurs de l'encodage, hors dépôt (`mesures/equivalence/encodage_<N>.json`).
+  Tout fragment qui contient un pseudonyme en est écarté ;
+- `comparer --encodage N`, et le test `tests/test_equivalence.py -k service_reel`, ne
+  lisent que ce fichier et le service, après confrontation de `/info` à la ligne de
+  l'encodage. Le test ne se connecte jamais à une base réelle.
+
+`make verify-poste` lance l'instance EmbeddingGemma seule (seuils de mémoire, refus si
+une instance tourne déjà), joue le test sur chaque échantillon exporté, puis arrête
+l'instance ; sans échantillon, l'étape est sautée et le dit. Le test écrit
+`mesures/equivalence/resultat_encodage_<N>.json`.
+
+Constats (10 octobre) : encodage 2 (v1) équivalent ; encodage 3 (v2) **un passage à
+0,998797**, sur deux fragments, puis deux passages équivalents (0,9999997 et
+0,9999996) sur les mêmes lots. C'est un écart isolé, non reproduit, déjà vu une fois au
+point 0 d'E3 (0,99874) : cause non établie, **inscrit en dette**, à surveiller par la
+sonde de l'étape 5.
 
 **Équivalence avec l'implémentation de référence** (contrôle ponctuel du
 2026-10-07, hors dépôt) : sentence-transformers 5.7.0 en float32 sur la carte, sur
@@ -262,7 +285,8 @@ Un histogramme expose `_bucket`, `_sum` et `_count` : la moyenne d'une durée es
 le port publié. Tout le reste est dans `config/<instance>.env`, **commenté ligne à
 ligne** (valeur, motif) : les variables du service sous leurs noms documentés
 (`MODEL_ID`, `REVISION`, `DTYPE`, `MAX_BATCH_TOKENS`…), et les clés `CLIENT_*` que lit
-le client (préfixes, taille de lot, dimension, longueurs). Une seule source pour les
+le client (préfixes, taille de lot, dimension, longueurs, et `CLIENT_HOTE`, l'hôte où
+il joint l'instance : `127.0.0.1`, le seul où le port est publié). Une seule source pour les
 deux côtés : le préfixe appliqué et la révision servie ne peuvent pas diverger.
 
 Préfixes, appliqués par le client (`service_embedding.client`) :
@@ -280,7 +304,18 @@ uv run python -m service_embedding.controles etat          # seuils avant lancem
 docker compose --profile bge-m3 up -d
 uv run python -m service_embedding.encodage bge-m3 --sortie mesures/encodage_bge-m3.json
 docker compose --profile bge-m3 down                       # puis l'autre instance
+# un corpus nommé (migration 021) — ainsi fut encodé le v2, le 10 octobre :
+uv run python -m service_embedding.encodage embeddinggemma --corpus v2 \
+    --sortie mesures/encodage_embeddinggemma_v2.json
 ```
+
+**Un corpus, nommé** (migration 021). Plusieurs corpus coexistent dans `bench` :
+l'encodage porte sur celui que `--corpus` nomme ; sans nom, sur le seul corpus de la
+base, et s'il y en a plusieurs, il refuse. Deux encodages d'un même modèle coexistent
+dans la table du modèle, sur deux corpus ; sur un même corpus, un second encodage est
+refusé. Les vecteurs ne s'écrivent que par `ecrire_vecteurs` (corpus en argument
+nommé, sans défaut : `CONTRIBUTING.md`). Encoder n'est pas promouvoir : l'encodage
+lu par les mesures est celui du journal des promotions (module 10).
 
 Les fragments (`bench.corpus_chunks`) sont lus sur une connexion **en lecture
 seule** ; les vecteurs vont dans la table du modèle, et l'encodage est inscrit dans
@@ -292,8 +327,9 @@ annonce. L'encodeur refuse de démarrer si les deux diffèrent.
   validée tous les 32 lots. Un encodage interrompu reprend sous la même ligne de
   `bench.encodages`.
 - **Rejeu** : sur un encodage complet, rien à envoyer, **rien d'écrit**.
-- **Refus** avant toute écriture : image non épinglée par digest, table déjà remplie
-  par un autre encodage, corpus modifié après un encodage terminé.
+- **Refus** avant toute écriture : image non épinglée par digest, table qui porte
+  déjà, pour ce corpus, les vecteurs d'un autre encodage, corpus modifié après un
+  encodage terminé.
 
 ### 7.3 Constats sur la version 1.9.4
 

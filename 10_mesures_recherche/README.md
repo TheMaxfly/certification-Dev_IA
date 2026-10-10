@@ -225,7 +225,10 @@ Depuis la migration 021, plusieurs corpus et plusieurs encodages coexistent. Une
 mesure par le sens lit **un** encodage : celui que `--encodage N` désigne, sinon
 celui en service (`bench.v_encodage_en_service`) s'il est du modèle de la mesure,
 sinon le seul encodage terminé de ce modèle. Le corpus suit l'encodage. Chaque run
-enregistré a sa ligne `bench.eval_runs` (corpus, encodage).
+enregistré a sa ligne `bench.eval_runs` (corpus, encodage). Les 17 runs d'E2, mesurés
+avant `021`, y ont été inscrits une fois, depuis leurs paramètres MLflow :
+`uv run python -m mesures_recherche.historique --corpus v1` (un rejeu n'écrit rien ;
+un run sans trace MLflow arrête tout, avant d'écrire).
 
 ```bash
 # mesurer un encodage qui n'est pas en service, dans l'expérience de l'étape
