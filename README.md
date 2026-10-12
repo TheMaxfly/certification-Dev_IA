@@ -30,8 +30,8 @@ Sources externes
   -> nettoyage, enrichissement, validation
   -> PostgreSQL schema manga
   -> FastAPI + recherche plein texte
-  -> corpus RAG-ready
-  -> benchmark embeddings / LLM
+  -> corpus de recherche versionne (schema bench)
+  -> encodage (pgvector) et mesure de la recherche
 ```
 
 Le depot est organise par etapes numerotees.
@@ -44,12 +44,13 @@ Le depot est organise par etapes numerotees.
 | `02_api_manga/` | API FastAPI en lecture seule sur PostgreSQL : metadonnees, corpus RAG et recherche plein texte. | MVP teste, avec Compose d'integration. |
 | `03_kitsu_api_exports/` | Client Kitsu et collecteur exhaustif reprenable. | Catalogue, mappings et staff termines ; characters hors perimetre actuel. |
 | `04_scraping_manga_sanctuary/` | Scraping Manga Sanctuary : series, tomes et critiques staff. | Snapshot 2026-07 promu : 103 811 volumes et 11 052 critiques. |
-| `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source et preparation PostgreSQL. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2) ; 247 tests. |
-| `06_benchmark_embeddings_llm/` | Benchmark embeddings, FAISS, recall@K, MRR et evaluation LLM. | Scripts experimentaux relies au schema `bench`. |
+| `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source, corpus de recherche et jeu d'evaluation. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2). Package `corpus` : deux corpus clos dans `bench`, `v1` (48 090 documents, 66 290 fragments) et `v2` (56 775 documents, 77 006 fragments). Package `evaluation` : jeu d'evaluation `v2` gele (69 questions, 11 familles). 542 tests. |
+| `06_benchmark_embeddings_llm/` | Premier benchmark : embeddings, FAISS, recall@K, MRR et evaluation LLM. | Scripts experimentaux. Remplace, pour l'encodage et la mesure de la recherche, par les modules 09 et 10 ; ses tables restent dans `bench`, non utilisees par la chaine actuelle. |
 | `07_databricks_manga_export/` | Lakehouse Spark + Delta conteneurise : medaillon bronze / silver / gold sur le raw multi-snapshots, controles qualite historises. | v2 livree : 4 sources en bronze, silver Manga Sanctuary, 5 tables gold ; 18 tests, 12 / 12 verifications en conteneur. Couche consultative, hors chemin critique. |
-| `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus. | Corpus encode le 2026-10-07 : 66 290 vecteurs BGE-M3 (1 024 d) et 66 290 EmbeddingGemma (768 d), float32, dans `bench` (pgvector, migration 020) ; reprise et rejeu sans ecriture ; 46 tests. |
-| `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : six configurations (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, fusions, TF-IDF), metriques au grain entite, MLflow. | Six mesures enregistrees le 2026-10-07 (MLflow local, `bench.eval_mesures`) : hit_rate@10 global de 0,102 (plein texte) a 0,424 (EmbeddingGemma) ; comparaisons par bootstrap apparie. |
-| `database/` | Migrations PostgreSQL partagees et versionnees. | Toutes les migrations de `database/migrations/` sont appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee. |
+| `08_enrichissement_personnages/` | Personnages : collectes Wikipedia francais et AniList sur une ossature commune, chargeurs Kitsu et Wikipedia vers les tables `manga.character*`. | Charges : 34 293 personnages et 105 048 formes (Kitsu), 13 101 personnages et 21 398 formes (Wikipedia francais) ; 90 tests. |
+| `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus, test d'equivalence du service. | Trois encodages float32 dans `bench` (pgvector) : BGE-M3 (1 024 d) et EmbeddingGemma (768 d) sur le corpus `v1`, 66 290 vecteurs chacun (2026-10-07) ; EmbeddingGemma sur le corpus `v2`, 77 006 vecteurs (2026-10-10). Reprise et rejeu sans ecriture ; 72 tests. |
+| `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : 17 configurations en trois tours (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, TF-IDF, fusions, classement limite au catalogue, representation de l'oeuvre), metriques au grain entite, MLflow ; regle de promotion et journal des promotions. | 18 runs enregistres (MLflow local, `bench.eval_mesures`, 1 872 lignes) : les 17 mesures sur le corpus `v1`, puis la mesure 8 sur le corpus `v2`. Mesure 8 : 31 questions reussies sur 59, sur l'un comme sur l'autre. Encodage du `v2` en service depuis le 2026-10-10 ; 120 tests. |
+| `database/` | Migrations PostgreSQL partagees et versionnees. | 22 migrations (`000` a `021`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 213 tests sur base jetable. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
 
 ## Sources de donnees
@@ -234,17 +235,24 @@ Tables et vues utilisees par l'API :
 - `manga.rag_docs_scored`
 - `manga.rag_export_docs`
 
-Les benchmarks utilisent le schema `bench` :
+Le schema `bench` porte le corpus de recherche, ses vecteurs, les mesures et la
+promotion (etat lu dans la base le 2026-10-12) :
 
-- `bench.corpus_docs`
-- `bench.corpus_chunks`
-- `bench.embedding_models`
-- `bench.embedding_runs`
-- `bench.faiss_indexes`
-- `bench.queries`
-- `bench.qrels`
-- `bench.retrieval_results`
-- `bench.metrics`
+| Objet | Role | Contenu |
+| --- | --- | --- |
+| `bench.corpus` | Une ligne par version du corpus : regle, decoupage, cloture. | `v1` et `v2`, clos tous les deux. |
+| `bench.corpus_docs`, `bench.corpus_chunks` | Documents et fragments, chacun avec son `corpus_id`. | `v1` : 48 090 documents, 66 290 fragments ; `v2` : 56 775 et 77 006. |
+| `bench.chunking_strategies` | Strategies de decoupage. | `char_1200_overlap_200` (`v1`), `phrases_1200_recouvrement_200` (`v2`). |
+| `bench.encodages` | Registre des encodages : corpus, modele, revision, precision, prefixes, image. | 3 encodages. |
+| `bench.vecteurs_bge_m3`, `bench.vecteurs_embeddinggemma` | Vecteurs pgvector, une table par modele, cle `(encodage_id, chunk_id)`. | 66 290 ; 66 290 (`v1`) et 77 006 (`v2`). |
+| `bench.eval_jeux`, `bench.eval_questions`, `bench.eval_attendus` | Jeu d'evaluation gele. | Jeu `v2` : 69 questions, 412 attendus sur 328 series. |
+| `bench.eval_mesures`, `bench.eval_runs` | Metriques de chaque run ; corpus et encodage de chaque run. Ajout seul. | 1 872 lignes, 18 runs. |
+| `bench.promotions`, `bench.v_encodage_en_service` | Journal des promotions, en ajout seul ; vue de l'encodage en service. | 2 decisions ; encodage 3, corpus `v2`. |
+
+Un corpus clos refuse toute ecriture, sauf extension explicite. Les tables du
+premier benchmark (module 06) restent dans le schema, non utilisees par la chaine
+actuelle : `embedding_models`, `embedding_runs`, `faiss_indexes`, `queries`,
+`qrels`, `retrieval_results`, `metrics`.
 
 ## Referentiel d'identite multi-source
 
@@ -340,21 +348,65 @@ Endpoints principaux :
 
 ## Benchmarks RAG / LLM
 
-Le module `06_benchmark_embeddings_llm/` compare des modeles d'embedding et
-des modeles LLM pour la recommandation manga.
+Le premier benchmark, `06_benchmark_embeddings_llm/` (FAISS, recall@K, MRR), est
+**remplace** depuis le 2026-10-07 par deux modules :
 
-Modeles d'embedding documentes :
+- **`09_service_embedding/`** sert les modeles d'embedding par Text Embeddings
+  Inference 1.9.4 : deux instances float32, BGE-M3 (1 024 dimensions) et
+  EmbeddingGemma (768 dimensions). Son client applique les prefixes ; son encodeur
+  ecrit les vecteurs dans PostgreSQL (pgvector) et inscrit chaque encodage au
+  registre `bench.encodages`. Un test d'equivalence verifie que le service rend
+  toujours les vecteurs de la base : 200 fragments en 10 tranches de longueur,
+  cosinus minimal d'au moins 0,999 pour "equivalent", echec sous 0,99.
+- **`10_mesures_recherche/`** mesure la recherche sur le jeu d'evaluation `v2`
+  gele (69 questions, 11 familles ; 59 questions portent une metrique de rang),
+  au grain de l'oeuvre et non du fragment. Metriques : `hit_rate@5`,
+  `hit_rate@10`, `mrr@10`, `ndcg@10`. 17 configurations en trois tours, chaque
+  tour declare avant d'etre execute ; chaque run est enregistre dans MLflow
+  (local) et dans `bench.eval_mesures`.
 
-- `paraphrase-multilingual-MiniLM-L12-v2`
-- `intfloat/multilingual-e5-small`
+Aucun reglage n'est change apres lecture d'un resultat : un changement est une
+nouvelle mesure.
 
-Metriques :
+### Corpus v2, promotion et retour arriere
 
-- recall@K ;
-- MRR ;
-- entity_hit@K / entity_recall@K pour les reponses LLM ;
-- validite des citations ;
-- latence.
+Deux versions du corpus coexistent dans `bench` (migration `021`), closes toutes
+les deux :
+
+| | Corpus `v1` | Corpus `v2` |
+| --- | --- | --- |
+| Documents | 48 090 : 11 041 critiques, 37 049 synopsis Kitsu | 56 775 : les memes, plus 8 685 resumes de serie |
+| Fragments | 66 290, decoupes par caracteres | 77 006, decoupes par phrases |
+| Series du catalogue atteignables, sur 14 670 | 8 718 | 11 155 |
+| Encodage EmbeddingGemma | encodage 2 | encodage 3, **en service** |
+| Mesure 8 (EmbeddingGemma, classement limite au catalogue) : questions reussies a dix resultats, sur 59 | 31 | 31 |
+| dont reconnaissance, sur 23 | 21 | 21 |
+| dont proposition, sur 36 | 10 | 10 |
+
+- **Ce que le `v2` change** : les resumes de serie de Manga Sanctuary s'ajoutent,
+  le decoupage suit les phrases, et le texte des critiques n'est plus masque —
+  seul le nom de leur auteur reste anonymise.
+- **La regle de promotion est ecrite et commitee avant la mesure**
+  (`10_mesures_recherche/config/promotion_corpus_v2.toml`) : au moins 31
+  questions sur 59 au global, et au moins 20 sur 23 en reconnaissance. Elle
+  compte en questions, pas en pourcentages. Une seule mesure est faite, comparee
+  a la mesure 8 du `v1`.
+- **Le resultat** : 31 et 21, donc "promotion proposee". L'hypothese d'un gain
+  en proposition (au moins 12 sur 36) est dementie : 10, comme sur le `v1`. Le
+  `v2` ne gagne aucune question nette ; il est promu pour sa portee et son
+  decoupage.
+- **La decision est humaine** : elle est inscrite au journal `bench.promotions`
+  (2026-10-10), en ajout seul. La vue `bench.v_encodage_en_service` designe
+  l'encodage que lisent, par defaut, les mesures et les controles.
+- **Le retour arriere est une commande, et une ligne au journal.** Aucun vecteur
+  n'est efface : les deux encodages restent en base. La procedure a ete essayee
+  sur une copie jetable de la base.
+
+```bash
+cd 10_mesures_recherche
+uv run python -m mesures_recherche.journal_promotions etat
+uv run python -m mesures_recherche.journal_promotions revenir --motif "..." --par <decideur>
+```
 
 ## Reproductibilite
 
@@ -373,6 +425,27 @@ l'installation de production, qui suppose les snapshots et les autorisations de
 collecte.
 
 La methode de travail est dans **[`CONTRIBUTING.md`](CONTRIBUTING.md)** : branches, commits, fusions, etiquettes.
+
+### Verification : `make verify`
+
+Une seule commande verifie le depot, sur le poste comme sur GitHub :
+
+```bash
+make verify              # chaque module : Ruff, format, tests ; puis les workflows
+make verify MODULE=10    # un seul module : 01 ... 10, database, demo, workflows
+make verify-indicatif    # Bandit et pip-audit, jamais exiges
+make verify-poste        # make verify, puis les harnais du poste seul
+```
+
+- **"Tests verts" veut dire `make verify` sans echec.** Un test saute n'est pas
+  un test passe : il est compte, et plafonne par module dans
+  `verification/sauts_attendus.tsv`. Au-dela du plafond, la verification echoue.
+- Aucune suite ne recoit l'adresse de la base reelle : les tests qui ont besoin
+  de PostgreSQL lancent une base jetable par Docker.
+- Sur GitHub, la chaine `verify` joue une tache par module : 13 controles,
+  obligatoires avant toute fusion vers `develop` ou `main`.
+- `make verify-poste` ajoute les hooks, la fidelite du schema, l'equivalence du
+  service d'embedding et l'integration Compose de l'API.
 
 ## Demonstration
 
@@ -409,6 +482,8 @@ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run manga-pipeli
   l'arbitrage des cas residuels (undecidable, conflits multi-candidats, collisions
   d'identite), la decision sur les `same_work` de confiance moyenne, une eventuelle
   v2. Le doute n'est jamais une decision automatique.
+- L'API ne sert pas encore le corpus `v2` : `/rag/export` lit la vue
+  `manga.rag_export_docs` (51 880 documents), qui ne lit pas `bench`.
 - Le renommage des dossiers et du package `api_manga` est gele jusqu'a une fenetre
   atomique dediee, avant l'orchestrateur.
 - Les rapports de validation doivent etre regeneres apres chaque collecte

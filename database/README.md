@@ -326,7 +326,7 @@ son `.env` n'est pas versionné.
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 181 tests (2026-10-07). Le harnais lance un
+`uv run --extra dev pytest tests/` — 213 tests (2026-10-10). Le harnais lance un
 PostgreSQL **jetable** en conteneur — `pgvector/pgvector:0.6.0-pg16`, épinglée par
 digest (PostgreSQL 16 et pgvector 0.6.0, la version d'`apimanga`) : depuis `020`,
 la chaîne crée l'extension `vector`, que `postgres:16-alpine` n'embarque pas. La

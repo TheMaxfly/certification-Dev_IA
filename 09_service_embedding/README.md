@@ -218,9 +218,9 @@ longueurs.
 
 | Donnée | Origine | Volume | Où elle va |
 |---|---|---:|---|
-| Fragments du corpus RAG | `bench.corpus_chunks` : critiques Manga Sanctuary et synopsis Kitsu, textes publics, sans pseudonyme d'auteur | 66 290 fragments (48 090 documents) | envoyés à l'instance locale ; vecteurs écrits dans PostgreSQL, sur la même machine |
+| Fragments du corpus RAG | `bench.corpus_chunks` : critiques Manga Sanctuary et synopsis Kitsu (corpus `v1` et `v2`), résumés de série Manga Sanctuary (`v2`) ; textes publics. Le nom de l'auteur d'une critique n'y figure jamais. Dans le `v1`, une mention de pseudonyme dans le texte était masquée ; dans le `v2`, le texte des critiques est celui d'origine et peut porter une telle mention (occurrences connues, contrôlées avant écriture) | `v1` : 66 290 fragments (48 090 documents) ; `v2` : 77 006 fragments (56 775 documents) | envoyés à l'instance locale ; vecteurs écrits dans PostgreSQL, sur la même machine |
 | Questions du jeu d'évaluation v2 | module 10 | 69 | envoyées à l'instance locale, une par requête ; vecteurs gardés en mémoire, jamais écrits |
-| Vecteurs | ce module | 66 290 par modèle | `bench.vecteurs_bge_m3`, `bench.vecteurs_embeddinggemma` |
+| Vecteurs | ce module | `v1` : 66 290 par modèle ; `v2` : 77 006 (EmbeddingGemma) | `bench.vecteurs_bge_m3`, `bench.vecteurs_embeddinggemma` |
 | Relevés de mémoire et de contrôle | ce module | — | `mesures/`, exclu du dépôt |
 
 **Rien de ces données ne sort de la machine** : le client parle au service par
