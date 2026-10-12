@@ -40,6 +40,12 @@ commande sur le poste et sur GitHub.
 Avant une demande de fusion vers `develop` : `make verify`. Vers `main` :
 `make verify-poste`, et une sauvegarde de ce qui vit hors du dépôt.
 
+**Documentation seule.** Pour un changement qui ne touche que des fichiers de
+documentation (`.md`), `make verify` complet n'est pas exigé sur le poste avant le
+push : les hooks suffisent, et la chaîne de GitHub garde la fusion. Dès qu'un fichier
+de code, de configuration, de test ou de workflow est touché, `make verify` complet
+reste obligatoire.
+
 ## La chaîne d'intégration continue — `.github/workflows/verify.yml`
 
 - **Déclencheurs** : push sur `main` et `develop`, toute demande de fusion, lancement
