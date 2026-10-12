@@ -1,0 +1,51 @@
+# Le corpus v2 (E3, étape 1, bloc D) — ce que la règle du 2026-09-28 gagne.
+#
+# Lu par `corpus.construire_v2` (module 05). Trois différences avec le v1, et
+# seulement trois : les résumés de série s'ajoutent ; le découpage par phrases
+# (`config/decoupage_phrases.toml`) vaut pour tous les types ; le texte des
+# critiques n'est plus masqué. Décisions de Max des 8 et 9 octobre 2026.
+
+[corpus]
+corpus_id = "v2"
+# Inscrit dans `bench.corpus.regle`.
+regle = """Corpus v2 : la règle de reconstruction du 2026-09-28 (critiques de \
+manga.ms_reviews_all présentes dans le snapshot Manga Sanctuary 2026-07, corps non \
+vide, dédoublonnées ; part Kitsu du raw 20260714T152202Z), avec trois différences : \
+(1) les résumés de série du raw 2026-07 s'ajoutent, hors textes de moins de 50 \
+caractères, faux résumés (amorce de chronique, ou critique entière de la série) et \
+textes qui contiennent un pseudonyme ; (2) découpage par phrases \
+(phrases_1200_recouvrement_200) pour tous les types ; (3) le texte des critiques \
+n'est plus masqué : seul le nom de l'auteur reste anonymisé. Code : \
+corpus.construire_v2 (module 05)."""
+
+[resumes]
+# Le raw des volumes : chaque item porte le résumé de sa série.
+raw = "04_scraping_manga_sanctuary/data/raw/2026-07/manga_sanctuary_volumes.jsonl"
+# Formule de remplissage (« Pas de résumé… ») : pas un résumé. Casse ignorée.
+remplissage = "^pas de r.sum"
+# Règle 2 : en deçà, pas de résumé (après retrait des espaces de bord).
+plancher = 50
+# Règle 3 (option b, Max, 2026-10-09) : le texte CONTIENT l'amorce d'un lien vers
+# une chronique — ou contient une critique entière (au moins 50 caractères) de la
+# même série. Casse ignorée.
+amorce = 'LA\s+CHRONIQUE\s+COMPL[EÈ]TE\s*(\.\.\.|…)'
+critique_incluse_min = 50
+# Le texte du document (variante E, Max, 2026-10-09).
+entete = "Résumé Manga {titre}"
+
+[langue]
+# Information annexe du document (D4 : tout est gardé, la langue est notée).
+# « fr » si au moins `minimum` mots-outils français et au moins `rapport` fois plus
+# que d'anglais ; « en » symétriquement ; « indeterminee » sinon.
+minimum = 3
+rapport = 2
+mots_fr = [
+  "le", "la", "les", "un", "une", "des", "du", "de", "et", "est", "dans", "pour",
+  "qui", "que", "sur", "avec", "par", "au", "aux", "ce", "cette", "son", "sa",
+  "ses", "il", "elle", "ils", "mais", "pas",
+]
+mots_en = [
+  "the", "a", "an", "and", "is", "in", "for", "who", "that", "on", "with", "by",
+  "of", "this", "his", "her", "their", "they", "but", "not", "to", "from", "was",
+  "are",
+]

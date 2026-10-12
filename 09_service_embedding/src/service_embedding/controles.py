@@ -54,10 +54,26 @@ def connexion_lecture():
     return psycopg.connect(dsn, options="-c default_transaction_read_only=on")
 
 
-def fragments() -> list[tuple[int, str]]:
+#: Le corpus balayé (migration 021) — même règle que
+#: `evaluation.atteignabilite.corpus_lu` (module 05) : nommé, sinon celui de
+#: l'encodage en service, sinon le seul corpus de la base ; jamais deviné.
+SQL_CORPUS_LU = """
+SELECT coalesce(
+  (SELECT corpus_id FROM bench.v_encodage_en_service),
+  (SELECT min(corpus_id) FROM bench.corpus HAVING count(*) = 1))
+"""
+
+
+def fragments(corpus_id: str | None = None) -> list[tuple[int, str]]:
     with connexion_lecture() as cx:
+        if corpus_id is None:
+            (corpus_id,) = cx.execute(SQL_CORPUS_LU).fetchone()
+            if corpus_id is None:
+                raise SystemExit("plusieurs corpus et aucun en service : le nommer")
         return cx.execute(
-            "SELECT chunk_id, chunk_text FROM bench.corpus_chunks ORDER BY chunk_id"
+            "SELECT chunk_id, chunk_text FROM bench.corpus_chunks"
+            " WHERE corpus_id = %s ORDER BY chunk_id",
+            (corpus_id,),
         ).fetchall()
 
 

@@ -98,6 +98,44 @@ dans `data/corpus_exemples/`, hors dépôt. L'état du banc de décembre, avant
 reconstruction, est archivé dans `data/archives/bench_2025-12/` (voir son
 `MANIFEST.md`).
 
+**Plusieurs corpus coexistent** dans `bench` depuis la migration 021 (E3, étape 1) :
+`v1` (48 090 documents, 66 290 fragments, découpage `char_1200_overlap_200`) et `v2`
+(56 775 / 77 006, découpage par phrases). Chacun est **clos** : la base refuse toute
+écriture dans un corpus clos, sauf extension explicite. `corpus.construire` nomme
+`v1` et lui seul.
+
+```bash
+uv run python -m corpus.phrases --enregistrer   # inscrit la stratégie de découpage (une fois)
+uv run python -m corpus.construire_v2 --dry-run # tout, contrôles compris, ROLLBACK
+uv run python -m corpus.construire_v2           # construit, contrôle, clôt le v2
+```
+
+- **Le v2** : la règle du v1, avec trois différences et seulement trois
+  (`config/corpus_v2.toml`) :
+  - les résumés de série du raw de juillet, sous la forme « Résumé Manga <titre> », un
+    saut de ligne, puis le résumé ;
+  - le découpage par phrases (`corpus.phrases`, réglages et motifs dans
+    `config/decoupage_phrases.toml` : 1 200 caractères, recouvrement d'une phrase de
+    200 au plus) ;
+  - le texte des critiques n'est plus masqué : seul le nom de l'auteur reste
+    anonymisé.
+- **Résumés exclus**, dans cet ordre : moins de 50 caractères ; faux résumé (le texte
+  contient l'amorce d'un lien vers une chronique, ou une critique entière) ;
+  pseudonyme dans le texte. Les pseudonymes sont contrôlés avant d'écrire, et le
+  contrôle est bloquant.
+- **Une seule porte d'écriture** : `corpus.ecriture.ecrire_corpus(curseur,
+  corpus_id=…)`, corpus en argument nommé, sans défaut (`CONTRIBUTING.md`). Un test
+  vérifie qu'aucune autre écriture des documents ou des fragments n'existe dans le
+  module.
+- **Lire un corpus** : les mesures et contrôles (`corpus.mesurer`,
+  `evaluation.atteignabilite`, `evaluation.controles`, `evaluation.hors_catalogue`,
+  `identity.propagation_kitsu`) lisent le corpus nommé (`--corpus`, là où
+  l'option existe). Sinon, celui de l'encodage **en service**
+  (`bench.v_encodage_en_service`), sinon le seul corpus. Avec plusieurs candidats,
+  ils refusent. Depuis la promotion du 2026-10-10, le corpus en service est le
+  **v2** : un chiffre d'atteignabilité doit dire son corpus (v1 : 8 718 séries sur
+  14 670 ; v2 : 11 155).
+
 ### Jeu d'évaluation (bloc 2)
 
 Le jeu s'écrit à la main dans `database/donnees/jeu_evaluation/v1/` (mode
@@ -112,6 +150,7 @@ export DATABASE_URL='postgresql://postgres@localhost:5432/apimanga'
 uv run python -m evaluation.confirmer            # vérifie, rapporte, n'écrit rien
 uv run python -m evaluation.confirmer --ecrire   # remplit series_id / titre_catalogue / confirmation
 uv run python -m evaluation.atteignabilite       # part du catalogue que le corpus peut atteindre
+uv run python -m evaluation.atteignabilite --corpus v1   # d'un corpus nommé
 ```
 
 ## Makefile

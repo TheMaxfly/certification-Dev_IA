@@ -221,8 +221,7 @@ def etudier_voisins(ctx: executer.Contexte, etudes: dict) -> dict:
     v = etudes["voisins"]
     m = configuration.mesure(ctx.config, v["mesure"])
     perimetre = configuration.perimetre(m)
-    encoder, params = executer.encodeur_du_service(m["instance"])
-    sens = recherche.Semantique.charger(ctx.cx, ctx.entites, m["table"], encoder)
+    sens, encoder, params = executer.semantique(ctx, m)
     rangs, listes = {}, []
     for q in ctx.questions:
         vec = np.asarray(encoder(q.texte), dtype=np.float64)
@@ -348,7 +347,11 @@ def classer_par_voisins(ctx: executer.Contexte, etudes: dict) -> dict:
     """Méthode 1 : les vecteurs EmbeddingGemma des questions (service), puis le vote
     des k plus proches voisines, pour chaque k déclaré."""
     cfg = etudes["intention"]
-    encoder, params = executer.encodeur_du_service(cfg["voisins"]["instance"])
+    # Les questions seules sont encodées : aucun vecteur du corpus n'est lu, le
+    # service est confronté à la configuration de l'instance.
+    encoder, params = executer.encodeur_du_service(
+        executer.Designation(cfg["voisins"]["instance"])
+    )
     ids = [q.question_id for q in ctx.questions]
     etiquettes = [q.mode for q in ctx.questions]
     vecteurs = np.vstack(

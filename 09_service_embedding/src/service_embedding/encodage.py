@@ -1,6 +1,16 @@
 """Encodage du corpus par une instance du service — spec E2, bloc C.
 
     uv run python -m service_embedding.encodage bge-m3 --sortie bilan.json
+    uv run python -m service_embedding.encodage embeddinggemma --corpus v2 --sortie …
+
+UN CORPUS, NOMMÉ (migration 021). Plusieurs versions du corpus coexistent dans
+`bench` : l'encodage porte sur un corpus, nommé par `--corpus` ; sans nom, le seul
+corpus de la base, et s'il y en a plusieurs, refus. L'encodage est inscrit au
+registre avec son corpus ; deux encodages d'un même modèle coexistent dans la
+table, sur deux corpus. Sur un même corpus, un second encodage reste refusé.
+
+UNE SEULE ÉCRITURE DE VECTEURS (CONTRIBUTING.md, « Écrire dans le corpus ou les
+vecteurs ») : `ecrire_vecteurs`, corpus en argument nommé, sans défaut.
 
 Lit les fragments (`bench.corpus_chunks`) sur une connexion en LECTURE SEULE,
 les envoie au service par lots de `CLIENT_TAILLE_LOT` (préfixe « document »
@@ -103,14 +113,60 @@ def vecteur_texte(vecteur: list[float]) -> str:
     return "[" + ",".join(repr(x) for x in vecteur) + "]"
 
 
-def ligne_encodage(cx, instance: Instance, service: Service) -> tuple | None:
+def ecrire_vecteurs(
+    cx: psycopg.Connection, *, corpus_id: str, encodage_id: int, modele: str, lignes
+) -> int:
+    """LA seule écriture de vecteurs du module 09 ; rend le nombre écrit.
+
+    `lignes` : des (chunk_id, vecteur). Le corpus est NOMMÉ, jamais laissé au
+    défaut de la base : les clés composites de 021 refusent alors tout vecteur
+    dont le fragment ou l'encodage n'est pas de ce corpus.
+    """
+    copies = {
+        "BAAI/bge-m3": "COPY bench.vecteurs_bge_m3"
+        " (encodage_id, chunk_id, corpus_id, embedding) FROM STDIN",
+        "google/embeddinggemma-300m": "COPY bench.vecteurs_embeddinggemma"
+        " (encodage_id, chunk_id, corpus_id, embedding) FROM STDIN",
+    }
+    n = 0
+    with cx.cursor().copy(copies[modele]) as copie:
+        for chunk_id, vecteur in lignes:
+            copie.write_row((encodage_id, chunk_id, corpus_id, vecteur_texte(vecteur)))
+            n += 1
+    return n
+
+
+def corpus_a_encoder(cx: psycopg.Connection, corpus_id: str | None) -> str:
+    """Le corpus nommé ; sans nom, le seul corpus de la base — plusieurs : refus."""
+    if corpus_id is not None:
+        connu = cx.execute(
+            "SELECT 1 FROM bench.corpus WHERE corpus_id = %s", (corpus_id,)
+        ).fetchone()
+        if connu is None:
+            raise EncodageRefuse(f"corpus {corpus_id} inconnu de bench.corpus")
+        return corpus_id
+    tous = [c for (c,) in cx.execute("SELECT corpus_id FROM bench.corpus ORDER BY 1")]
+    if len(tous) != 1:
+        raise EncodageRefuse(
+            f"{len(tous)} corpus dans bench : nommer le corpus à encoder (--corpus)"
+        )
+    return tous[0]
+
+
+def ligne_encodage(
+    cx, instance: Instance, service: Service, corpus_id: str
+) -> tuple | None:
+    """La ligne du registre retrouvée PAR ce que sert l'instance, sur ce corpus :
+    le service est confronté au registre par construction."""
     return cx.execute(
         "SELECT encodage_id, termine_le, nb_fragments, taille_lot"
         " FROM bench.encodages"
-        " WHERE modele = %s AND revision = %s AND precision_calcul = %s"
+        " WHERE corpus_id = %s AND modele = %s AND revision = %s"
+        "   AND precision_calcul = %s"
         "   AND prefixe_document = %s AND prefixe_requete = %s AND outil = %s"
         "   AND outil_version = %s AND image_digest IS NOT DISTINCT FROM %s",
         (
+            corpus_id,
             service.modele,
             service.revision,
             service.precision,
@@ -129,11 +185,13 @@ def encoder_corpus(
     service: Service,
     dsn: str,
     *,
+    corpus_id: str | None = None,
     taille_lot: int | None = None,
     validation: int = 32,
     surveillance: mesures.Surveillance | None = None,
 ) -> dict:
-    """Encode les fragments sans vecteur ; rend le bilan (écritures comprises)."""
+    """Encode les fragments du corpus sans vecteur de cet encodage ; rend le bilan
+    (écritures comprises). `corpus_id` : voir `corpus_a_encoder`."""
     verifier_service(instance, service)
     table = TABLES[instance.model_id]
     lot = taille_lot or instance.taille_lot
@@ -151,14 +209,20 @@ def encoder_corpus(
         "encodage_mis_a_jour": False,
     }
     try:
-        corpus = lecture.execute("SELECT count(*) FROM bench.corpus_chunks").fetchone()
+        corpus_id = corpus_a_encoder(lecture, corpus_id)
+        bilan["corpus_id"] = corpus_id
+        corpus = lecture.execute(
+            "SELECT count(*) FROM bench.corpus_chunks WHERE corpus_id = %s",
+            (corpus_id,),
+        ).fetchone()
         bilan["fragments_corpus"] = corpus[0]
         autres = lecture.execute(
             f"SELECT count(*) FROM {table} v JOIN bench.encodages e"  # nosec B608
-            " USING (encodage_id) WHERE NOT (e.revision = %s AND"
+            " USING (encodage_id) WHERE e.corpus_id = %s AND NOT (e.revision = %s AND"
             " e.precision_calcul = %s AND e.outil_version = %s AND"
             " e.image_digest IS NOT DISTINCT FROM %s AND e.prefixe_document = %s)",
             (
+                corpus_id,
                 service.revision,
                 service.precision,
                 service.version,
@@ -168,19 +232,22 @@ def encoder_corpus(
         ).fetchone()[0]
         if autres:
             raise EncodageRefuse(
-                f"{table} porte {autres} vecteurs d'un autre encodage : "
-                "on ne mélange pas deux encodages dans une table"
+                f"{table} porte, pour le corpus {corpus_id}, {autres} vecteurs d'un"
+                " autre encodage : un seul encodage par modèle et par corpus"
             )
+        deja = ligne_encodage(lecture, instance, service, corpus_id)
         a_faire = lecture.execute(
             "SELECT c.chunk_id, c.chunk_text FROM bench.corpus_chunks c"
-            f" WHERE NOT EXISTS (SELECT 1 FROM {table} v"  # nosec B608
-            "                    WHERE v.chunk_id = c.chunk_id)"
-            " ORDER BY c.chunk_id"
+            " WHERE c.corpus_id = %s"
+            f" AND NOT EXISTS (SELECT 1 FROM {table} v"  # nosec B608
+            "                  WHERE v.encodage_id = %s AND v.chunk_id = c.chunk_id)"
+            " ORDER BY c.chunk_id",
+            (corpus_id, deja[0] if deja else None),
         ).fetchall()
         lecture.rollback()
         bilan["fragments_a_encoder"] = len(a_faire)
 
-        existante = ligne_encodage(ecriture, instance, service)
+        existante = ligne_encodage(ecriture, instance, service, corpus_id)
         if existante and existante[1] is not None and a_faire:
             raise EncodageRefuse(
                 f"encodage {existante[0]} terminé ({existante[2]} fragments), mais "
@@ -193,12 +260,13 @@ def encoder_corpus(
 
         if existante is None:
             encodage_id = ecriture.execute(
-                "INSERT INTO bench.encodages (modele, revision, dimension,"
-                " precision_calcul, prefixe_document, prefixe_requete, outil,"
-                " outil_version, image, image_digest, taille_lot)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                "INSERT INTO bench.encodages (corpus_id, modele, revision,"
+                " dimension, precision_calcul, prefixe_document, prefixe_requete,"
+                " outil, outil_version, image, image_digest, taille_lot)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 " RETURNING encodage_id",
                 (
+                    corpus_id,
                     service.modele,
                     service.revision,
                     instance.dimension,
@@ -239,12 +307,13 @@ def encoder_corpus(
             for v in vecteurs:
                 if abs(norme(v) - 1.0) > TOLERANCE_NORME:
                     raise EncodageRefuse(f"vecteur de norme {norme(v)} rendu")
-            with ecriture.cursor().copy(
-                f"COPY {table} (chunk_id, encodage_id, embedding) FROM STDIN"
-            ) as copie:
-                for (chunk_id, _), v in zip(paquet, vecteurs, strict=True):
-                    copie.write_row((chunk_id, encodage_id, vecteur_texte(v)))
-            bilan["vecteurs_ecrits"] += len(paquet)
+            bilan["vecteurs_ecrits"] += ecrire_vecteurs(
+                ecriture,
+                corpus_id=corpus_id,
+                encodage_id=encodage_id,
+                modele=instance.model_id,
+                lignes=zip((c for c, _ in paquet), vecteurs, strict=True),
+            )
             if numero % validation == 0:
                 ecriture.commit()
         ecriture.commit()
@@ -252,7 +321,7 @@ def encoder_corpus(
         bilan["debit_fragments_s"] = round(
             bilan["vecteurs_ecrits"] / max(bilan["duree_encodage_s"], 1e-9), 1
         )
-        existante = ligne_encodage(ecriture, instance, service)
+        existante = ligne_encodage(ecriture, instance, service, corpus_id)
         return bilan | _cloture(ecriture, table, existante, bilan)
     finally:
         lecture.close()
@@ -286,6 +355,7 @@ def _cloture(cx, table: str, ligne: tuple | None, bilan: dict) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("instance", choices=INSTANCES)
+    parser.add_argument("--corpus", default=None, help="corpus à encoder")
     parser.add_argument("--sortie", type=Path, required=True)
     parser.add_argument("--lot", type=int, default=None)
     parser.add_argument("--validation", type=int, default=32)
@@ -306,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
             client,
             service,
             dsn,
+            corpus_id=args.corpus,
             taille_lot=args.lot,
             validation=args.validation,
             surveillance=surveillance,

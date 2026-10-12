@@ -73,6 +73,12 @@ def parametres(resultat: dict) -> dict[str, str]:
         "code_empreinte": empreinte_code(),
     }
     p |= {k: str(v) for k, v in resultat["parametres"].items()}
+    # Le corpus et l'encodage mesurés (migration 021) : None pour une mesure sans
+    # vecteurs.
+    p |= {
+        "corpus_id": str(resultat["corpus_id"]),
+        "encodage_id": str(resultat["encodage_id"]),
+    }
     return p | etat_git()
 
 
@@ -109,8 +115,9 @@ def tableau_par_question(resultat: dict) -> str:
 
 
 def enregistrer(resultat: dict, dsn_ecriture: str, stockage: Path = STOCKAGE) -> str:
-    """Un run MLflow terminé, puis les lignes de `bench.eval_mesures` ; rend le
-    run_id. Les deux portent les mêmes valeurs."""
+    """Un run MLflow terminé, puis sa ligne de `bench.eval_runs` et ses lignes de
+    `bench.eval_mesures`, en une transaction ; rend le run_id. MLflow et la base
+    portent les mêmes valeurs, corpus et encodage compris."""
     import mlflow
     import psycopg
 
@@ -149,6 +156,18 @@ def enregistrer(resultat: dict, dsn_ecriture: str, stockage: Path = STOCKAGE) ->
 
     with psycopg.connect(dsn_ecriture) as cx:
         with cx.cursor() as cur:
+            # Le run, son corpus et son encodage (migration 021), dans LA MÊME
+            # transaction que ses mesures : l'un ne s'écrit jamais sans l'autre.
+            cur.execute(
+                "INSERT INTO bench.eval_runs (run_id, corpus_id, encodage_id, note)"
+                " VALUES (%s, %s, %s, %s)",
+                (
+                    uuid.UUID(run_id),
+                    resultat["corpus_id"],
+                    resultat["encodage_id"],
+                    f"mesure {resultat['mesure']} — {resultat['nom']}",
+                ),
+            )
             cur.executemany(
                 "INSERT INTO bench.eval_mesures (run_id, jeu_version, portee,"
                 " perimetre, metrique, k, valeur, n_questions)"

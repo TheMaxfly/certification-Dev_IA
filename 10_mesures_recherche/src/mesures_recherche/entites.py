@@ -54,6 +54,7 @@ class Entites:
     identifiant: np.ndarray  # par entité : series_id ou kitsu_id
     est_serie: np.ndarray  # par entité
     atteignables: frozenset[int]
+    corpus_id: str | None = None  # le corpus lu (migration 021)
 
     @cached_property
     def _groupes(self) -> tuple[np.ndarray, np.ndarray]:
@@ -125,7 +126,7 @@ class Entites:
         return np.lexsort((~self.est_serie, self.identifiant, -scores_entites))
 
 
-def construire(lignes, atteignables) -> Entites:
+def construire(lignes, atteignables, corpus_id: str | None = None) -> Entites:
     """À partir des lignes du rattachement (chunk_id, source, series_id, kitsu_id)."""
     lignes = sorted(lignes)
     cles: dict[tuple[bool, int], int] = {}
@@ -146,9 +147,15 @@ def construire(lignes, atteignables) -> Entites:
         identifiant=identifiant,
         est_serie=est_serie,
         atteignables=frozenset(atteignables),
+        corpus_id=corpus_id,
     )
 
 
-def charger(cx) -> Entites:
+def charger(cx, corpus_id: str | None = None) -> Entites:
+    """Le rattachement d'UN corpus : nommé, sinon celui de l'encodage en service
+    (`corpus_lu` du module 05, la même définition)."""
     module = charger_atteignabilite()
-    return construire(module.rattachement(cx), module.atteignables(cx))
+    corpus = module.corpus_lu(cx, corpus_id)
+    return construire(
+        module.rattachement(cx, corpus), module.atteignables(cx, corpus), corpus
+    )

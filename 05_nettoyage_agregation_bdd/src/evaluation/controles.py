@@ -37,7 +37,7 @@ from pathlib import Path
 import psycopg
 import typer
 
-from evaluation.atteignabilite import synopsis_seul
+from evaluation.atteignabilite import corpus_lu, synopsis_seul
 from evaluation.confirmer import JEU_DEFAUT, RAPPORTS_DEFAUT, Bilan, executer
 from evaluation.jeu import FAMILLES
 from identity.wikidata_dump import normaliser
@@ -96,11 +96,15 @@ def mots_significatifs(
     ]
 
 
-def critiques(cx: psycopg.Connection) -> dict[int, list[set[str]]]:
-    """Les critiques du corpus, par série, en ensembles de mots normalisés."""
+def critiques(
+    cx: psycopg.Connection, corpus_id: str | None = None
+) -> dict[int, list[set[str]]]:
+    """Les critiques du corpus lu, par série, en ensembles de mots normalisés."""
     par_serie: dict[int, list[set[str]]] = {}
     for series_id, texte in cx.execute(
-        "SELECT series_id, doc_text FROM bench.corpus_docs WHERE source = 'ms_review'"
+        "SELECT series_id, doc_text FROM bench.corpus_docs"
+        " WHERE corpus_id = %(corpus)s AND source = 'ms_review'",
+        {"corpus": corpus_lu(cx, corpus_id)},
     ):
         par_serie.setdefault(series_id, []).append(set(normaliser(texte).split()))
     return par_serie

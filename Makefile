@@ -5,7 +5,8 @@
 #   make verify MODULE=05    un seul module : 01 … 10, database, demo, workflows
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make verify-poste        make verify, puis les harnais du poste seul : hooks,
-#                            fidélité du schéma, intégration Compose du 02
+#                            fidélité du schéma, équivalence du service d'embedding,
+#                            intégration Compose du 02
 #
 # Le moteur est verification/verifier.sh ; les tests sautés admis, avec leur raison,
 # sont dans verification/sauts_attendus.tsv. Sorties (JUnit, couverture, résumé) :
