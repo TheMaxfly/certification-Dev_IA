@@ -28,6 +28,17 @@ IMAGE_POSTGRES = (
     "pgvector/pgvector:0.6.0-pg16"
     "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
 )
+
+# Base jetable : la durabilité n'y sert à rien et coûte cher (chaque test crée une
+# base et rejoue les migrations, soit des dizaines de commits synchronisés).
+SANS_DURABILITE = [
+    "-c",
+    "fsync=off",
+    "-c",
+    "synchronous_commit=off",
+    "-c",
+    "full_page_writes=off",
+]
 MOT_DE_PASSE = "postgres"
 DELAI_DEMARRAGE = 60
 
@@ -87,6 +98,7 @@ def conteneur_postgres() -> str:
             "-p",
             "0:5432",
             IMAGE_POSTGRES,
+            *SANS_DURABILITE,
         ],
         capture_output=True,
         check=True,
