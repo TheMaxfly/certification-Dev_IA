@@ -431,21 +431,26 @@ La methode de travail est dans **[`CONTRIBUTING.md`](CONTRIBUTING.md)** : branch
 Une seule commande verifie le depot, sur le poste comme sur GitHub :
 
 ```bash
-make verify              # chaque module : Ruff, format, tests ; puis les workflows
-make verify MODULE=10    # un seul module : 01 ... 10, database, demo, workflows
+make verify              # les modules touches depuis origin/develop et ceux qui en
+                         # dependent, plus la tache statique ; TOUT=1 pour tout
+make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 10, database, demo, statique
 make verify-indicatif    # Bandit et pip-audit, jamais exiges
-make verify-poste        # make verify, puis les harnais du poste seul
+make verify-poste        # la memoire d'abord ; make verify complet sauf arbre deja
+                         # vert ; puis les harnais du poste seul
 ```
 
 - **"Tests verts" veut dire `make verify` sans echec.** Un test saute n'est pas
   un test passe : il est compte, et plafonne par module dans
   `verification/sauts_attendus.tsv`. Au-dela du plafond, la verification echoue.
 - Aucune suite ne recoit l'adresse de la base reelle : les tests qui ont besoin
-  de PostgreSQL lancent une base jetable par Docker.
-- Sur GitHub, la chaine `verify` joue une tache par module : 13 controles,
-  obligatoires avant toute fusion vers `develop` ou `main`.
-- `make verify-poste` ajoute les hooks, la fidelite du schema, l'equivalence du
-  service d'embedding et l'integration Compose de l'API.
+  de PostgreSQL lancent une base jetable par Docker. Seule exception, l'etape
+  « etat d'apimanga » de `make verify-poste`, en lecture seule sous `verif_ro`.
+- Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
+  `statique` (actionlint, shellcheck, essais des hooks) : 12 controles,
+  obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
+  par les changements reussit sans rien faire.
+- `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture
+  seule et l'equivalence du service d'embedding.
 
 ## Demonstration
 
