@@ -54,17 +54,17 @@ SHELLCHECK=0.11.0.1   # paquet shellcheck-py : shellcheck 0.11.0
 
 # nom | dossier Ruff | dossier du projet (verrou, tests) | lanceur | options uv | arguments | couverture | prérequis
 MODULES=(
-  "01|01_scraping_manganews|01_scraping_manganews|unittest|||||"
-  "02|02_api_manga|02_api_manga|pytest|||||"
-  "03|03_kitsu_api_exports|03_kitsu_api_exports|unittest|||||"
-  "04|04_scraping_manga_sanctuary|04_scraping_manga_sanctuary|pytest|--extra dev|tests/||"
-  "05|05_nettoyage_agregation_bdd|05_nettoyage_agregation_bdd|pytest|--extra dev|||database"
-  "07|07_databricks_manga_export|07_databricks_manga_export/lakehouse|pytest|--extra dev|||"
+  "01|01_scraping_manganews|01_scraping_manganews|pytest|--extra dev|tests|.|"
+  "02|02_api_manga|02_api_manga|pytest|||.|"
+  "03|03_kitsu_api_exports|03_kitsu_api_exports|pytest|--extra dev|tests|.|"
+  "04|04_scraping_manga_sanctuary|04_scraping_manga_sanctuary|pytest|--extra dev|tests/|.|"
+  "05|05_nettoyage_agregation_bdd|05_nettoyage_agregation_bdd|pytest|--extra dev||.|database"
+  "07|07_databricks_manga_export|07_databricks_manga_export/lakehouse|pytest|--extra dev||.|"
   "08|08_enrichissement_personnages|08_enrichissement_personnages|pytest|--extra dev|tests|.|"
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
-  "database|database|database|pytest|--extra dev|tests/||"
-  "demo|demo|demo|pytest|--extra dev|||"
+  "database|database|database|pytest|--extra dev|tests/|.|"
+  "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,
   # essais des hooks et du périmètre (voir verifier_statique).
   "statique|||statique||||"
