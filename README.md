@@ -493,3 +493,5 @@ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run manga-pipeli
   atomique dediee, avant l'orchestrateur.
 - Les rapports de validation doivent etre regeneres apres chaque collecte
   importante pour garder des preuves a jour.
+
+<!-- Demande d'essai de la chaîne (palier 2) : documentation seule, fermée sans fusion. -->
