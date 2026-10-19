@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Vérification unique du dépôt : le même verdict sur le poste et sur GitHub.
 #
-#   verifier.sh verify [MODULE]     Ruff, format et tests de chaque module, puis
-#                                   actionlint ; un seul module si MODULE est donné
+#   verifier.sh verify [MODULE]     Ruff, format et tests des modules concernés par les
+#                                   changements depuis `origin/develop` et de ceux qui
+#                                   en dépendent (verification/dependances.tsv) ; tous
+#                                   les modules si TOUT=1 ; un seul si MODULE est donné
 #   verifier.sh indicatif [MODULE]  Bandit et pip-audit — jamais exigés
-#   verifier.sh poste               verify, puis les harnais qui ne tournent que sur
-#                                   le poste
+#   verifier.sh poste               mémoire d'abord ; verify complet, sauf si l'arbre,
+#                                   propre, est déjà vert (FORCER=1 pour le rejouer) ;
+#                                   puis les harnais qui ne tournent que sur le poste
+#   verifier.sh perimetre           lit des chemins changés sur l'entrée, écrit les
+#                                   modules concernés (liste JSON) : pour GitHub
+#   verifier.sh graphe              contrôle que MODULES et le graphe se correspondent
 #   verifier.sh preparer MODULE     uv sync --locked de ce module (et de database/
 #                                   s'il en dépend) : l'étape d'avant verify sur GitHub
 #   verifier.sh image               tire, par empreinte, l'image PostgreSQL que les
@@ -30,6 +36,9 @@ export LC_ALL=C
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SORTIES="${VERIFY_SORTIES:-$RACINE/.verify}"
 SAUTS="${VERIFY_SAUTS:-$RACINE/verification/sauts_attendus.tsv}"
+GRAPHE="${VERIFY_GRAPHE:-$RACINE/verification/dependances.tsv}"
+# Verdict du dernier `make verify` complet : l'arbre vérifié, s'il était propre et vert.
+VERDICT="$SORTIES/verdict_complet"
 COUVERTURE="$RACINE/verification/couverture.ini"
 
 # Outils lancés par uvx, à version fixée (absents des verrous des modules).
@@ -263,10 +272,101 @@ choisir_modules() {  # [MODULE] → lignes de MODULES
   exit 2
 }
 
+# --------------------------------------------------------------------------- #
+#  Périmètre : les modules qu'un changement concerne (verification/dependances.tsv)
+# --------------------------------------------------------------------------- #
+graphe_noms() { grep -v '^[[:space:]]*#' "$GRAPHE" | grep -v '^[[:space:]]*$' | cut -f1; }
+prefixes_de() { awk -F'\t' -v m="$1" '$1 == m { print $2 }' "$GRAPHE"; }
+
+graphe() {  # MODULES et le graphe se correspondent, un pour un
+  local noms n ecarts=0
+  noms="$(graphe_noms)"
+  for n in "${MODULES[@]%%|*}"; do
+    grep -qxF -- "$n" <<<"$noms" ||
+      { echo "graphe : le module $n est absent de ${GRAPHE#"$RACINE"/}" >&2; ecarts=$((ecarts + 1)); }
+  done
+  while IFS= read -r n; do
+    [ "$n" = '*' ] && continue
+    printf '%s\n' "${MODULES[@]%%|*}" | grep -qxF -- "$n" ||
+      { echo "graphe : $n n'est pas un module de MODULES (verifier.sh)" >&2; ecarts=$((ecarts + 1)); }
+  done <<<"$noms"
+  [ "$ecarts" -eq 0 ]
+}
+
+touche() {  # touche <préfixes…> : vrai si un chemin de $FICHIERS commence par l'un d'eux
+  local p
+  for p in "$@"; do
+    awk -v p="$p" 'substr($0, 1, length(p)) == p { trouve = 1; exit } END { exit !trouve }' \
+      <<<"$FICHIERS" && return 0
+  done
+  return 1
+}
+
+modules_concernes() {  # chemins changés sur l'entrée → lignes de MODULES concernées
+  local l prefixes tous=0
+  FICHIERS="$(sed '/^$/d')"
+  graphe || exit 2
+  # shellcheck disable=SC2046  # préfixes : mots simples, sans espace
+  [ -n "$FICHIERS" ] && touche $(prefixes_de '*') && tous=1
+  for l in "${MODULES[@]}"; do
+    prefixes="$(prefixes_de "${l%%|*}")"
+    # shellcheck disable=SC2086
+    if [ "$prefixes" = "(toujours)" ] || [ "$tous" = 1 ] ||
+        { [ -n "$FICHIERS" ] && touche $prefixes; }; then
+      echo "$l"
+    fi
+  done
+}
+
+base_perimetre() { git -C "$RACINE" merge-base HEAD origin/develop 2>/dev/null; }
+
+fichiers_touches() {  # <base> : changés depuis la base, arbre de travail compris
+  {
+    git -C "$RACINE" diff --name-only --no-renames "$1" HEAD
+    git -C "$RACINE" diff --name-only --no-renames HEAD
+    git -C "$RACINE" ls-files --others --exclude-standard
+  } | sort -u
+}
+
+perimetre() {  # chemins sur l'entrée → liste JSON des modules concernés
+  local lignes
+  lignes="$(modules_concernes)" || exit 2
+  cut -d'|' -f1 <<<"$lignes" | jq -Rsc 'split("\n") | map(select(length > 0))'
+}
+
+arbre_propre() { [ -z "$(git -C "$RACINE" status --porcelain)" ]; }
+arbre() { git -C "$RACINE" rev-parse 'HEAD^{tree}'; }
+
 verify() {
-  local l lignes
-  lignes="$(choisir_modules "${1:-}")" || exit 2
+  local l lignes base fichiers complet=0 depart=""
+  if [ -n "${1:-}" ]; then
+    lignes="$(choisir_modules "$1")" || exit 2
+  elif [ "${TOUT:-}" = 1 ]; then
+    lignes="$(choisir_modules)"; complet=1
+  elif ! base="$(base_perimetre)"; then
+    dire "périmètre : origin/develop introuvable, tous les modules"
+    lignes="$(choisir_modules)"; complet=1
+  else
+    fichiers="$(fichiers_touches "$base")"
+    lignes="$(modules_concernes <<<"$fichiers")" || exit 2
+    dire "périmètre : $(grep -c . <<<"$fichiers") fichier(s) changé(s) depuis origin/develop (${base:0:7}) ;" \
+      "modules : $(cut -d'|' -f1 <<<"$lignes" | paste -sd' ')"
+    if [ -z "$lignes" ]; then
+      echo "aucun module concerné : rien à vérifier (TOUT=1 pour tout vérifier)"
+      return 0
+    fi
+    [ "$(grep -c . <<<"$lignes")" -eq "${#MODULES[@]}" ] && complet=1
+  fi
+  # Un verdict ne vaut que pour un passage complet, sur un arbre propre du début à la fin.
+  if [ "$complet" = 1 ]; then
+    rm -f "$VERDICT"
+    arbre_propre && depart="$(arbre)"
+  fi
   while IFS= read -r l; do verifier_module "$l"; done <<<"$lignes"
+  if [ -n "$depart" ] && arbre_propre && [ "$(arbre)" = "$depart" ]; then
+    printf '%s\t%s\n' "$depart" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$VERDICT"
+    dire "verdict enregistré : arbre ${depart:0:12}, propre et vert (${VERDICT#"$RACINE"/})"
+  fi
 }
 
 # --------------------------------------------------------------------------- #
@@ -430,8 +530,32 @@ equivalence_du_service() {
   [ "$rc" -eq 0 ] || echouer poste "équivalence du service (code $rc)" "pytest tests/test_equivalence.py"
 }
 
+# Les seuils de mémoire de l'équivalence, contrôlés avant toute chose : un passage ne
+# doit pas échouer sur une condition connue dès la première seconde.
+memoire_d_abord() {
+  local module="$RACINE/09_service_embedding" etat
+  dire "poste — mémoire, avant toute chose (seuils de l'équivalence)"
+  if ! etat="$(cd "$module" && "${PROPRE[@]}" uv run --locked python -m service_embedding.controles etat)"; then
+    printf '%s\n' "$etat"
+    echouer poste "mémoire sous les seuils : rien n'a été lancé" \
+      "libérer de la mémoire (5 Go disponibles, 4 Go de mémoire vidéo libre), puis make verify-poste"
+  fi
+  printf '%s\n' "$etat"
+}
+
+# L'arbre courant, propre, a-t-il déjà un verdict vert complet ? (FORCER=1 : non.)
+arbre_deja_vert() {
+  local arbre_vert date_vert
+  [ "${FORCER:-}" = 1 ] && return 1
+  [ -f "$VERDICT" ] && arbre_propre || return 1
+  IFS=$'\t' read -r arbre_vert date_vert <"$VERDICT"
+  [ "$arbre_vert" = "$(arbre)" ] || return 1
+  dire "poste — arbre ${arbre_vert:0:12} déjà vert ($date_vert) : make verify n'est pas rejoué (FORCER=1 pour le rejouer)"
+}
+
 poste() {
-  verify
+  memoire_d_abord
+  arbre_deja_vert || TOUT=1 verify
   local cmd
   cmd=(bash .githooks/tester.sh)
   dire "poste — ${cmd[*]}"
@@ -439,6 +563,10 @@ poste() {
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
+  # La seule étape qui lit la base réelle : sous verif_ro, en lecture seule.
+  cmd=(bash verification/etat_apimanga.sh)
+  dire "poste — ${cmd[*]}"
+  (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
   equivalence_du_service
   cmd=(docker compose -f compose.integration.yml run --rm --build smoke)
   dire "poste — (02_api_manga/) ${cmd[*]}"
@@ -446,7 +574,7 @@ poste() {
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}"); rc=$?
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
   [ "$rc" -eq 0 ] || echouer poste "intégration du 02 (code $rc)" "(02_api_manga/) ${cmd[*]}"
-  dire "poste — harnais : tester.sh, fidelite.sh, équivalence du service, Compose du 02 passés"
+  dire "poste — harnais : tester.sh, fidelite.sh, état d'apimanga, équivalence du service, Compose du 02 passés"
 }
 
 # --------------------------------------------------------------------------- #
@@ -461,5 +589,7 @@ case $action in
   indicatif) indicatif "${1:-}" ;;
   preparer) preparer "${1:?Usage : $0 preparer MODULE}" ;;
   image) image ;;
-  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste | preparer MODULE | image" >&2; exit 2 ;;
+  perimetre) perimetre ;;
+  graphe) graphe && echo "graphe : ${#MODULES[@]} modules, tous dans ${GRAPHE#"$RACINE"/}, et eux seuls" ;;
+  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste | preparer MODULE | image | perimetre | graphe" >&2; exit 2 ;;
 esac
