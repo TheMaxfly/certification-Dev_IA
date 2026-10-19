@@ -1,7 +1,7 @@
 # Config Ruff du module 06 (benchmark embeddings / LLM). Cible py310 (module >=3.10).
 # Seuls les scripts maintenus sont lintés : Bench_embedding.py, Bench_only.py
-# et Bench_llm_only_v7.py (version courante). Les itérations LLM antérieures sont
-# des expérimentations non maintenues, exclues du lint.
+# et Bench_llm_only_v7.py (version courante). Les itérations LLM antérieures,
+# non maintenues, sont sous archive/ et exclues du lint.
 
 line-length = 88
 target-version = "py310"
@@ -10,13 +10,8 @@ target-version = "py310"
 force-exclude = true
 
 extend-exclude = [
-    "Bench_llm_only.py",
-    "Bench_llm_onlyv1.py",
-    "Bench_llm_only_v3.py",
-    "Bench_llm_only_v5.py",
-    "Bench_llm_only_v5a.py",
-    "Bench_llm_only_v6.py",
-    "Bench_llm_only_v6b.py",
+    # Itérations LLM antérieures, archivées (archive/README.md).
+    "archive/",
 ]
 
 [lint]

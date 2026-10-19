@@ -1,0 +1,32 @@
+# Graphe des dépendances de la vérification : quels modules un changement concerne.
+#
+# Un module est concerné quand un fichier changé commence par l'un de ses chemins
+# (préfixes, séparés par des espaces). La ligne `*` liste les chemins qui concernent
+# TOUS les modules. Lu par `verification/verifier.sh` : `make verify` sans MODULE= ne
+# vérifie que les modules concernés depuis `origin/develop`, et la chaîne de GitHub ne
+# lance que leurs tâches. Chaque module de MODULES (verifier.sh) doit y figurer, et lui
+# seul : `verifier.sh graphe` le contrôle, `verification/tester_perimetre.sh` aussi.
+# `(toujours)` : le module est vérifié à chaque fois, quels que soient les changements.
+#
+# Dépendances relevées dans le code, au-delà du dossier du module :
+#   02     ← migrations (le harnais Compose rejoue `database/migrations/`)
+#   05     ← `06/Bench_embedding.py` (lu par l'AST dans un test), `database/` (bases jetables)
+#   09     ← `database/` (bases jetables, jeu d'évaluation)
+#   10     ← `database/`, le module 09 (dépendance par chemin), `atteignabilite.py` du 05
+#            (chargé par son chemin)
+#   demo   ← 04, 05, 07 (états et actions), `database/`
+#
+# module	chemins
+01	01_scraping_manganews/
+02	02_api_manga/ database/migrations/
+03	03_kitsu_api_exports/
+04	04_scraping_manga_sanctuary/
+05	05_nettoyage_agregation_bdd/ 06_benchmark_embeddings_llm/Bench_embedding.py database/
+07	07_databricks_manga_export/
+08	08_enrichissement_personnages/
+09	09_service_embedding/ database/
+10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+database	database/
+demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
+statique	(toujours)
+*	verification/ Makefile ruff.toml .pre-commit-config.yaml .github/workflows/verify.yml pyproject.toml

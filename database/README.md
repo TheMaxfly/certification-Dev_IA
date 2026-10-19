@@ -97,9 +97,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
 le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 `017` le 2026-09-29, `018` et `019` le 2026-09-30, `020` le 2026-10-07, `021` le
-2026-10-09 (22:03 UTC, après sauvegarde) ; `000` y a été **marquée
-appliquée** le 2026-07-15, sans exécution. Le contrôle affiche **22 migrations
-appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
+2026-10-09 (22:03 UTC, après sauvegarde), `022` le 2026-10-19 (21:53 UTC, après
+sauvegarde) ; `000` y a été **marquée appliquée** le 2026-07-15, sans exécution.
+Le contrôle affiche **23 migrations appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
 (1 986 lignes de part et d'autre, extensions et versions identiques, 2026-10-09).
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
@@ -249,7 +249,7 @@ touche jamais au rôle de connexion.
 | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` | **non**, sur aucune relation |
 | droits sur les 13 séquences de `manga` | **non** — sans `USAGE`, `nextval` est fermé, ce qui coupe la dernière voie d'écriture indirecte |
 | `USAGE` sur le schéma `staging` | **non** — `staging` est jetable, rechargé à chaque ELT, et ne fait pas partie de la mise à disposition |
-| schéma `bench` (module 06) | **non** — hors périmètre |
+| schéma `bench` | **non** — hors périmètre ; la lecture de vérification passe par `verif_ro` (plus bas) |
 
 Le contrôle n'est pas laissé à cette table : `tests/test_roles_lecture.py` le
 vérifie relation par relation, et un **témoin positif**
@@ -308,6 +308,30 @@ psql 'postgresql://manga_api@localhost:5432/apimanga'
 Côté API, le module `02` lit `DB_USER` / `DB_PASSWORD` dans son environnement ;
 son `.env` n'est pas versionné.
 
+### La lecture de vérification : `verif_ro` (`022`)
+
+L'étape « état d'apimanga » de `make verify-poste` relit `manga`, `bench` et le suivi
+des migrations. `manga_ro` ne peut pas la porter : `bench` est hors de son périmètre
+par décision, et l'API en hérite. Un second couple de rôles porte donc cette lecture,
+sur le même modèle :
+
+| Rôle | Nature | Créé par | Porte un secret |
+| --- | --- | --- | --- |
+| `verif_ro` | groupe, `NOLOGIN` ; `SELECT` sur `manga`, `bench`, `public.schema_migrations` | migration `022_role_verification.sql` | non |
+| `verif_lecture` | connexion, `LOGIN`, membre de `verif_ro`, sessions en lecture seule | `outils/creer_role_verification.sh` | oui |
+
+Aucune écriture, ni droit sur les séquences, ni `staging` ; `manga_ro` reste hors de
+`bench`. `tests/test_role_verification.py` le vérifie relation par relation, crée le
+rôle de connexion par le script et prouve les deux verrous : la session refuse
+d'écrire, et, la lecture seule levée, les droits refusent encore.
+
+```bash
+VERIF_LECTURE_PASSWORD="$(openssl rand -hex 24)" \
+  sh outils/creer_role_verification.sh 'postgresql://postgres@localhost:5432/apimanga'
+# puis ~/.pgpass : localhost:5432:apimanga:verif_lecture:<mot de passe>
+# et verification/.env, depuis verification/.env.example
+```
+
 ### Ce qui n'est volontairement pas fait
 
 - **`REVOKE CONNECT ON DATABASE … FROM PUBLIC`** n'est pas exécuté. Par défaut,
@@ -326,7 +350,7 @@ son `.env` n'est pas versionné.
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 213 tests (2026-10-10). Le harnais lance un
+`uv run --extra dev pytest tests/` — 234 tests (2026-10-19). Le harnais lance un
 PostgreSQL **jetable** en conteneur — `pgvector/pgvector:0.6.0-pg16`, épinglée par
 digest (PostgreSQL 16 et pgvector 0.6.0, la version d'`apimanga`) : depuis `020`,
 la chaîne crée l'extension `vector`, que `postgres:16-alpine` n'embarque pas. La
