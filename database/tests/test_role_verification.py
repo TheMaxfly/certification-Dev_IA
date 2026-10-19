@@ -35,12 +35,6 @@ ECRITURES = ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 SCHEMAS_LUS = ("manga", "bench")
 
 
-@pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    return base
-
-
 def relations(connexion, schema: str) -> list[str]:
     """Tables, vues et vues matérialisées d'un schéma, qualifiées."""
     return [

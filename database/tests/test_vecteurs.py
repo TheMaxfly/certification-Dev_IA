@@ -11,13 +11,10 @@ cela doit ÉCHOUER ici.
 from __future__ import annotations
 
 import math
-from argparse import Namespace
 
 import psycopg
 import pytest
-from conftest import migrate
 
-UP = Namespace(commande="up", target=None)
 REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
 DIGEST = "sha256:" + "b" * 64
 
@@ -29,9 +26,8 @@ def unitaire(dimension: int, axe: int = 0) -> str:
 
 
 @pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    with psycopg.connect(base) as cx:
+def base_migree(base_migree):
+    with psycopg.connect(base_migree) as cx:
         cx.execute(
             "INSERT INTO bench.corpus_docs (doc_key, source, doc_text)"
             " VALUES ('ms:1', 'ms_review', 'Une critique.')"
@@ -40,7 +36,7 @@ def base_migree(base):
             "INSERT INTO bench.corpus_chunks (chunk_id, doc_key, chunk_index,"
             " chunk_text) VALUES (10, 'ms:1', 0, 'Une'), (11, 'ms:1', 1, 'critique')"
         )
-    return base
+    return base_migree
 
 
 def encodage(cx, modele="BAAI/bge-m3", dimension=1024, **champs) -> int:

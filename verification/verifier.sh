@@ -516,11 +516,9 @@ indicatif() {
 # --------------------------------------------------------------------------- #
 #  Image : la PostgreSQL des bases jetables, lue dans les fixtures, tirée par empreinte
 # --------------------------------------------------------------------------- #
+# L'image n'est écrite qu'une fois : dans le harnais partagé des bases jetables.
 FIXTURES_BASE=(
-  database/tests/conftest.py
-  05_nettoyage_agregation_bdd/tests/conftest.py
-  09_service_embedding/tests/conftest.py
-  10_mesures_recherche/tests/conftest.py
+  database/harnais_tests/__init__.py
 )
 
 image() {
@@ -540,7 +538,7 @@ for chemin in sys.argv[1:]:
 PY
 )"
   if [ "$(grep -c . <<<"$images")" -ne 1 ] || [[ $images != *@sha256:* ]]; then
-    echo "Les fixtures ne désignent pas une seule image par empreinte : ${images:-aucune}" >&2
+    echo "Le harnais ne désigne pas une seule image par empreinte : ${images:-aucune}" >&2
     exit 1
   fi
   dire "image des bases jetables : docker pull $images"

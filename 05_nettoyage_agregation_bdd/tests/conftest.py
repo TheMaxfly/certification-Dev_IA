@@ -8,127 +8,64 @@ atteignable par ce harnais. Une seule exception, explicite et hors harnais : le
 contrôle permanent des têtes du catalogue (`test_controle_tetes.py`), qui ne
 tourne que si `APIMANGA_DSN` est défini, et en lecture seule.
 
-Les migrations sont jouées par le vrai runner (`database/migrate.py`) : la base
-de test est celle du dépôt, pas une approximation écrite pour les tests.
+Le conteneur, la base gabarit (migrée une fois par session par le vrai runner,
+`database/migrate.py`) et la copie par test viennent du harnais partagé
+`database/harnais_tests/` : la base de test est celle du dépôt, pas une
+approximation écrite pour les tests.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
-import subprocess
 import sys
-import time
-import uuid
 from pathlib import Path
 
 import pytest
 
 RACINE = Path(__file__).resolve().parents[1]
 MIGRATIONS = RACINE.parents[0] / "database"
-# Celle du harnais de `database/` : PostgreSQL 16 + pgvector 0.6.0, par digest
-# (la migration 020 crée l'extension `vector`).
-IMAGE_POSTGRES = (
-    "pgvector/pgvector:0.6.0-pg16"
-    "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
-)
-
-# Base jetable : la durabilité n'y sert à rien et coûte cher (chaque test crée une
-# base et rejoue les migrations, soit des dizaines de commits synchronisés).
-SANS_DURABILITE = [
-    "-c",
-    "fsync=off",
-    "-c",
-    "synchronous_commit=off",
-    "-c",
-    "full_page_writes=off",
-]
-DELAI_DEMARRAGE = 60
-
 sys.path.insert(0, str(RACINE / "src"))
 
 
-def docker_utilisable() -> bool:
-    if subprocess.run(["which", "docker"], capture_output=True).returncode != 0:
-        return False
-    return subprocess.run(["docker", "info"], capture_output=True).returncode == 0
+def _charger_harnais():
+    """Le harnais partagé des bases jetables (`database/harnais_tests/`), par chemin."""
+    spec = importlib.util.spec_from_file_location(
+        "harnais_tests", MIGRATIONS / "harnais_tests" / "__init__.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["harnais_tests"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+harnais = _charger_harnais()
 
 
 @pytest.fixture(scope="session")
 def conteneur() -> str:
     """Un PostgreSQL jetable pour toute la session."""
-    if not docker_utilisable():
-        pytest.skip(
-            "Docker est indisponible : les tests de chargement ont besoin d'une "
-            "base jetable. Ils ne se rabattront jamais sur une base réelle."
-        )
-    nom = f"referentiels-test-{uuid.uuid4().hex[:8]}"
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "--name",
-            nom,
-            "-e",
-            "POSTGRES_PASSWORD=postgres",
-            "-p",
-            "0:5432",
-            IMAGE_POSTGRES,
-            *SANS_DURABILITE,
-        ],
-        capture_output=True,
-        check=True,
-    )
-    try:
-        liaison = json.loads(
-            subprocess.run(
-                ["docker", "inspect", nom], capture_output=True, text=True, check=True
-            ).stdout
-        )[0]["NetworkSettings"]["Ports"]["5432/tcp"][0]
-        dsn = f"postgresql://postgres:postgres@127.0.0.1:{liaison['HostPort']}/postgres"
-
-        import psycopg
-
-        limite = time.monotonic() + DELAI_DEMARRAGE
-        while True:
-            try:
-                with psycopg.connect(dsn, connect_timeout=2):
-                    break
-            except psycopg.OperationalError:
-                if time.monotonic() > limite:
-                    raise
-                time.sleep(0.3)
+    raison = harnais.raison_de_sauter()
+    if raison:
+        pytest.skip(raison)
+    with harnais.conteneur("referentiels-test") as dsn:
         yield dsn
-    finally:
-        subprocess.run(["docker", "rm", "-f", nom], capture_output=True, check=False)
+
+
+@pytest.fixture(scope="session")
+def gabarit(conteneur) -> str:
+    """La base gabarit, migrée une fois par session par le runner du dépôt."""
+    return harnais.creer_gabarit(conteneur)
 
 
 @pytest.fixture
-def base(conteneur, monkeypatch) -> str:
-    """Une base neuve par test, migrée par le runner du dépôt."""
-    import psycopg
-
-    nom = f"t_{uuid.uuid4().hex[:12]}"
-    with psycopg.connect(conteneur, autocommit=True) as connexion:
-        connexion.execute(f'CREATE DATABASE "{nom}"')
-    dsn = conteneur.rsplit("/", 1)[0] + f"/{nom}"
-    monkeypatch.setitem(os.environ, "DATABASE_URL", dsn)
-
-    sortie = subprocess.run(
-        ["uv", "run", "python", "migrate.py", "up"],
-        cwd=MIGRATIONS,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "DATABASE_URL": dsn},
-    )
-    assert sortie.returncode == 0, f"migrations en échec : {sortie.stderr}"
-    try:
+def base(conteneur, gabarit, monkeypatch) -> str:
+    """Une base neuve par test, copiée du gabarit migré."""
+    with harnais.base_depuis_gabarit(conteneur, gabarit) as dsn:
+        monkeypatch.setitem(os.environ, "DATABASE_URL", dsn)
         yield dsn
-    finally:
-        with psycopg.connect(conteneur, autocommit=True) as connexion:
-            connexion.execute(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)')
 
 
 def lire(dsn: str, sql: str, params=None):

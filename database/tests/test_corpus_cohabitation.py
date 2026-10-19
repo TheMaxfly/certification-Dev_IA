@@ -153,12 +153,6 @@ def en_service(cx) -> list[tuple]:
     ).fetchall()
 
 
-@pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    return base
-
-
 # --------------------------------------------------------------------------- #
 #  La migration elle-même
 # --------------------------------------------------------------------------- #

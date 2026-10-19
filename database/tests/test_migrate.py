@@ -331,12 +331,6 @@ def test_up_ne_rejoue_pas_une_migration_marquee(base, migrations_jetables, capsy
 # --------------------------------------------------------------------------- #
 
 
-@pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    return base
-
-
 # --------------------------------------------------------------------------- #
 #  L'héritage livré par 000
 # --------------------------------------------------------------------------- #
