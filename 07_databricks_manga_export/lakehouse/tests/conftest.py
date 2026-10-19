@@ -80,8 +80,31 @@ _SCHEMA_SER = (
 )
 
 
-@pytest.fixture
-def silver_fabrique(spark, lakehouse_tmp):
+@pytest.fixture(scope="session")
+def lakehouse_session(tmp_path_factory):
+    """LAKEHOUSE_ROOT isolé pour la session (tables Delta jetables) ; les tests qui
+    ont besoin du leur le surchargent (`lakehouse_tmp`), puis le rétablissent."""
+    racine = tmp_path_factory.mktemp("lakehouse_session")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("LAKEHOUSE_ROOT", str(racine / "lakehouse"))
+        mp.setenv("LAKEHOUSE_RAPPORTS", str(racine / "rapports"))
+        yield racine / "lakehouse"
+
+
+@pytest.fixture(scope="session")
+def gold_fabrique(spark, lakehouse_session):
+    """Silver fabriqué puis gold construit (`gold.build_all`), UNE fois par session.
+
+    Les tests du gold et du lecteur ne font que lire : refabriquer silver (trois
+    tables Delta partitionnées) et gold à chaque test coûtait l'essentiel du module.
+    """
+    from lakehouse import gold
+
+    ecrire_silver_fabrique(spark)
+    gold.build_all(spark)
+
+
+def ecrire_silver_fabrique(spark) -> None:
     """Deux snapshots à RÉSULTAT CONNU : le total de séries monte (4→5) mais le
     préfixe « di » perd 2 séries (0 nouvelle) — le déficit localisé qui doit
     flasher. Partagée par les tests gold ET le test du lecteur externe."""
