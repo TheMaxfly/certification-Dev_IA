@@ -242,3 +242,32 @@ def encodeur_doublure(monkeypatch):
         return encoder, {"service_version": "doublure"}
 
     monkeypatch.setattr(executer, "encodeur_du_service", fabrique)
+
+
+# --------------------------------------------------------------------------- #
+#  Le magasin MLflow : initialisé une fois par session, copié pour chaque test
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="session")
+def gabarit_mlflow(tmp_path_factory) -> Path:
+    """Un magasin MLflow initialisé, une fois par session.
+
+    Créer le schéma SQLite d'un magasin coûte près de 3 s ; l'utiliser ensuite, quelques
+    centièmes. Chaque test en reçoit une copie (`stockage_mlflow`) : isolé, mais sans
+    payer l'initialisation.
+    """
+    from mlflow.tracking import MlflowClient
+
+    from mesures_recherche.enregistrement import uri_suivi
+
+    dossier = tmp_path_factory.mktemp("gabarit_mlflow")
+    MlflowClient(tracking_uri=uri_suivi(dossier)).search_experiments()
+    return dossier / "mlflow.db"
+
+
+@pytest.fixture
+def stockage_mlflow(gabarit_mlflow, tmp_path) -> Path:
+    """Un magasin MLflow propre au test, copié du gabarit de la session."""
+    dossier = tmp_path / "mlflow"
+    dossier.mkdir()
+    shutil.copyfile(gabarit_mlflow, dossier / "mlflow.db")
+    return dossier

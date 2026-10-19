@@ -141,7 +141,7 @@ def test_temoin_redonne_la_mesure_9_de_bout_en_bout(banc):
     assert etudes.valeur(caracteres["agregats"], "global", "hit_rate@10") is not None
 
 
-def test_mlflow_un_parent_un_enfant_par_combinaison(tmp_path):
+def test_mlflow_un_parent_un_enfant_par_combinaison(tmp_path, stockage_mlflow):
     import mlflow
 
     from mesures_recherche.enregistrement import uri_suivi
@@ -163,9 +163,9 @@ def test_mlflow_un_parent_un_enfant_par_combinaison(tmp_path):
         resultats,
         etudes.resumer_grille(resultats),
         {"essai": "oui"},
-        stockage=tmp_path / "mlflow",
+        stockage=stockage_mlflow,
     )
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     runs = mlflow.search_runs(
         experiment_names=[ETUDES["mlflow"]["experience"]], output_format="list"
     )
@@ -215,7 +215,9 @@ def test_distances_meme_ordre_pour_des_vecteurs_unitaires():
         etudes.scores_distance(m, q, "manhattan")
 
 
-def test_voisins_de_bout_en_bout_et_mlflow(banc, encodeur_doublure, tmp_path):
+def test_voisins_de_bout_en_bout_et_mlflow(
+    banc, encodeur_doublure, tmp_path, stockage_mlflow
+):
     import copy
 
     import mlflow
@@ -230,8 +232,8 @@ def test_voisins_de_bout_en_bout_et_mlflow(banc, encodeur_doublure, tmp_path):
     assert r["distances"] == {"identiques": 3, "questions": 3, "differentes": []}
     assert set(r["hit_rate"]) == {"global", "mode:proposition", "mode:reconnaissance"}
     assert r["hit_rate"]["global"][1] == 1.0, "Q001 et Q002 trouvées au rang 1"
-    run = etudes.journaliser_voisins(e, r, {"essai": "oui"}, stockage=tmp_path / "m")
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "m"))
+    run = etudes.journaliser_voisins(e, r, {"essai": "oui"}, stockage=stockage_mlflow)
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     lu = mlflow.get_run(run)
     assert lu.info.status == "FINISHED" and lu.data.tags["etude"] == "voisins"
     assert lu.data.metrics["hit_rate_50/global"] == 1.0
@@ -339,7 +341,7 @@ def test_llm_contraint_aux_trois_valeurs_et_hors_valeurs_comptees():
 
 
 def test_intention_par_voisins_de_bout_en_bout_et_mlflow(
-    banc, encodeur_doublure, tmp_path
+    banc, encodeur_doublure, tmp_path, stockage_mlflow
 ):
     import copy
 
@@ -354,12 +356,12 @@ def test_intention_par_voisins_de_bout_en_bout_et_mlflow(
     r = etudes.classer_par_voisins(ctx, e)
     assert [x["k"] for x in r["runs"]] == [1, 3, 5, 7]
     assert all(x["questions"] == 3 for x in r["runs"])
-    m = etudes._experience(e, tmp_path / "m", e["intention"]["experience"])
+    m = etudes._experience(e, stockage_mlflow, e["intention"]["experience"])
     with m.start_run(run_name="voisins-k=1") as run:
         etudes.journaliser_classement(
             m, e, r["runs"][0], list(r["etiquettes"].values()), {"essai": "oui"}
         )
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "m"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     lu = mlflow.get_run(run.info.run_id)
     assert lu.data.tags["etude"] == "intention" and lu.data.params["k"] == "1"
     assert lu.data.metrics["reference_naive_exactitude"] == pytest.approx(1 / 3)

@@ -256,7 +256,9 @@ def test_client_ollama_keep_alive_options_dechargement(ollama_doublure):
     assert o.description()["modele_digest"] == "abc"
 
 
-def test_enregistrement_un_run_par_configuration_et_les_traces(tmp_path):
+def test_enregistrement_un_run_par_configuration_et_les_traces(
+    tmp_path, stockage_mlflow
+):
     import mlflow
 
     from mesures_recherche.enregistrement import uri_suivi
@@ -268,10 +270,10 @@ def test_enregistrement_un_run_par_configuration_et_les_traces(tmp_path):
         passages,
         Doublure(),
         enregistrer=True,
-        stockage=tmp_path / "mlflow",
+        stockage=stockage_mlflow,
         contexte={"mesurer_vram": lambda: 2**30, "parametres": {"essai": "oui"}},
     )
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     runs = mlflow.search_runs(
         experiment_names=[REGLAGES["mlflow"]["experience"]], output_format="list"
     )

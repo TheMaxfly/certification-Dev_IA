@@ -95,10 +95,10 @@ def run(stockage, contenu) -> str:
 
 
 @pytest.fixture
-def comparaison(banc, tmp_path):
+def comparaison(banc, tmp_path, stockage_mlflow):
     """Référence : 2 sur 3 (une reconnaissance réussie) ; nouveau : 3 sur 3."""
     dsn, _, _ = banc
-    stockage = tmp_path / "mlflow"
+    stockage = stockage_mlflow
     ref = run(
         stockage,
         resultat(

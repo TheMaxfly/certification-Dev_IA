@@ -129,7 +129,9 @@ def test_par_defaut_l_encodage_en_service(banc, encodeur_doublure):
     assert (r["corpus_id"], r["encodage_id"], tete(r, "Q001")) == ("v2", e2, "serie:1")
 
 
-def test_le_run_inscrit_son_corpus_et_son_encodage(banc, encodeur_doublure, tmp_path):
+def test_le_run_inscrit_son_corpus_et_son_encodage(
+    banc, encodeur_doublure, tmp_path, stockage_mlflow
+):
     import mlflow
 
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
@@ -138,13 +140,13 @@ def test_le_run_inscrit_son_corpus_et_son_encodage(banc, encodeur_doublure, tmp_
     e1 = encodage_v1(dsn)
     resultat = executer.mesurer(executer.ouvrir(dsn, config), 1)
     resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
+    run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
     with psycopg.connect(dsn) as cx:
         assert cx.execute(
             "SELECT corpus_id, encodage_id FROM bench.eval_runs WHERE run_id = %s",
             (run_id,),
         ).fetchall() == [("v1", e1)]
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     params = mlflow.get_run(run_id).data.params
     assert (params["corpus_id"], params["encodage_id"]) == ("v1", str(e1))
 

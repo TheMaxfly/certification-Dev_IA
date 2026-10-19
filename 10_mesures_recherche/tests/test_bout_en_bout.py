@@ -86,7 +86,7 @@ def test_rejeu_identique(banc):
     assert a["agregats"] == b["agregats"] and a["questions"] == b["questions"]
 
 
-def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
+def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path, stockage_mlflow):
     import mlflow
 
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
@@ -94,9 +94,9 @@ def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
     dsn, config, _ = banc
     resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
     resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
+    run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
 
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     run = mlflow.get_run(run_id)
     assert run.info.status == "FINISHED"
     assert run.data.params["jeu_version"] == "v9"
@@ -195,7 +195,7 @@ def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch)
     assert questions(r)["Q001"]["metriques"]["hit_rate@10"] == 1.0
 
 
-def test_enregistrement_tour_2_etiquete(banc, tmp_path):
+def test_enregistrement_tour_2_etiquete(banc, tmp_path, stockage_mlflow):
     import mlflow
 
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
@@ -203,8 +203,8 @@ def test_enregistrement_tour_2_etiquete(banc, tmp_path):
     dsn, config, _ = banc
     resultat = executer.mesurer(executer.ouvrir(dsn, config), 9)
     resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     run = mlflow.get_run(run_id)
     assert run.data.tags == run.data.tags | {
         "mesure": "9",
