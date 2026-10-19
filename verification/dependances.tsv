@@ -6,6 +6,7 @@
 # vérifie que les modules concernés depuis `origin/develop`, et la chaîne de GitHub ne
 # lance que leurs tâches. Chaque module de MODULES (verifier.sh) doit y figurer, et lui
 # seul : `verifier.sh graphe` le contrôle, `verification/tester_perimetre.sh` aussi.
+# `(toujours)` : le module est vérifié à chaque fois, quels que soient les changements.
 #
 # Dépendances relevées dans le code, au-delà du dossier du module :
 #   02     ← migrations (le harnais Compose rejoue `database/migrations/`)
@@ -21,12 +22,11 @@
 03	03_kitsu_api_exports/
 04	04_scraping_manga_sanctuary/
 05	05_nettoyage_agregation_bdd/ 06_benchmark_embeddings_llm/Bench_embedding.py database/
-06	06_benchmark_embeddings_llm/
 07	07_databricks_manga_export/
 08	08_enrichissement_personnages/
 09	09_service_embedding/ database/
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 database	database/
 demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
-workflows	.github/
+statique	(toujours)
 *	verification/ Makefile ruff.toml .pre-commit-config.yaml .github/workflows/verify.yml pyproject.toml

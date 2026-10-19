@@ -1,22 +1,12 @@
-# Hooks pre-commit communs au dépôt.
-# Installation :  pre-commit install
-# Mise à jour des versions :  pre-commit autoupdate
-# Adoption progressive : ruff --fix + ruff-format ne s'appliquent qu'aux fichiers
-# modifiés lors d'un commit, pas à tout le dépôt existant.
+# Version de Ruff du dépôt : `verification/verifier.sh` la lit ici (rev ci-dessous),
+# pour que le poste et la chaîne de GitHub lancent la même.
+#
+# Le framework pre-commit n'est pas branché : les hooks actifs du dépôt sont ceux de
+# `.githooks/`, activés par liens symboliques (CONTRIBUTING.md, « Les hooks »). Les six
+# crochets génériques qui figuraient ici n'étaient joués nulle part : retirés le
+# 2026-10-19 (chaîne de vérification, palier 2).
 
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-        exclude: ^database/migrations/(001_socle_identite|002_staging_referentiels)\.sql$
-      - id: end-of-file-fixer
-        exclude: ^database/migrations/(001_socle_identite|002_staging_referentiels)\.sql$
-      - id: check-yaml
-      - id: check-added-large-files
-      - id: detect-private-key
-      - id: check-merge-conflict
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
     hooks:

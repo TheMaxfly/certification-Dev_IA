@@ -40,22 +40,25 @@ else
   ok "un module inconnu du graphe est refusé"
 fi
 
-echo "Essai du périmètre"
-cas "aucun changement"                 ""
-cas "documentation seule"              ""                                      README.md CONTRIBUTING.md
-cas "hooks seuls"                      ""                                      .githooks/pre-push .githooks/tester.sh
-cas "un fichier du 01"                 "01"                                    01_scraping_manganews/x.py
-cas "un fichier du 05"                 "05 demo"                               05_nettoyage_agregation_bdd/src/corpus/x.py
-cas "l'atteignabilité du 05"           "05 10 demo"                            05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
-cas "Bench_embedding du 06"            "05 06"                                 06_benchmark_embeddings_llm/Bench_embedding.py
-cas "un autre fichier du 06"           "06"                                    06_benchmark_embeddings_llm/autre.py
-cas "un fichier du 09"                 "09 10"                                 09_service_embedding/src/x.py
-cas "une migration"                    "02 05 09 10 database demo"             database/migrations/099_x.sql
-cas "un outil de database"             "05 09 10 database demo"                database/outils/x.sh
-cas "un workflow"                      "workflows"                             .github/workflows/autre.yml
-cas "verify.yml"                       "01 02 03 04 05 06 07 08 09 10 database demo workflows" .github/workflows/verify.yml
-cas "le moteur de vérification"        "01 02 03 04 05 06 07 08 09 10 database demo workflows" verification/verifier.sh
-cas "plusieurs modules"                "01 04 demo"                            01_scraping_manganews/a 04_scraping_manga_sanctuary/b
+echo "Essai du périmètre (statique tourne toujours)"
+cas "aucun changement"                 "statique"
+cas "documentation seule"              "statique"                              README.md CONTRIBUTING.md
+cas "hooks seuls"                      "statique"                              .githooks/pre-push .githooks/tester.sh
+cas "un fichier du 01"                 "01 statique"                           01_scraping_manganews/x.py
+cas "un fichier du 05"                 "05 demo statique"                      05_nettoyage_agregation_bdd/src/corpus/x.py
+cas "l'atteignabilité du 05"           "05 10 demo statique"                   05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+cas "Bench_embedding du 06"            "05 statique"                           06_benchmark_embeddings_llm/Bench_embedding.py
+cas "un autre fichier du 06"           "statique"                              06_benchmark_embeddings_llm/archive/autre.py
+cas "un fichier du 09"                 "09 10 statique"                        09_service_embedding/src/x.py
+cas "une migration"                    "02 05 09 10 database demo statique"    database/migrations/099_x.sql
+cas "un outil de database"             "05 09 10 database demo statique"       database/outils/x.sh
+cas "un autre workflow"                "statique"                              .github/workflows/indicatif.yml
+cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 database demo statique" .github/workflows/verify.yml
+cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 database demo statique" verification/verifier.sh
+cas "plusieurs modules"                "01 04 demo statique"                   01_scraping_manganews/a 04_scraping_manga_sanctuary/b
+attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
+obtenu_tout="$(: | TOUT=1 bash "$VERIFIER" perimetre)"
+if [ "$obtenu_tout" = "$attendu_tout" ]; then ok "TOUT=1 → tous les modules"; else ko "TOUT=1 : obtenu $obtenu_tout"; fi
 
 if [ "$echecs" -gt 0 ]; then
   echo "$echecs scénario(s) en échec"

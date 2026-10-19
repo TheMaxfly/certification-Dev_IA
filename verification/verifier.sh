@@ -4,7 +4,10 @@
 #   verifier.sh verify [MODULE]     Ruff, format et tests des modules concernés par les
 #                                   changements depuis `origin/develop` et de ceux qui
 #                                   en dépendent (verification/dependances.tsv) ; tous
-#                                   les modules si TOUT=1 ; un seul si MODULE est donné
+#                                   les modules si TOUT=1 ; un seul si MODULE est donné.
+#                                   La tâche `statique` tourne toujours : Ruff du 06 et
+#                                   de docs/modeles/, actionlint, shellcheck, essais des
+#                                   hooks et du périmètre
 #   verifier.sh indicatif [MODULE]  Bandit et pip-audit — jamais exigés
 #   verifier.sh poste               mémoire d'abord ; verify complet, sauf si l'arbre,
 #                                   propre, est déjà vert (FORCER=1 pour le rejouer) ;
@@ -56,14 +59,15 @@ MODULES=(
   "03|03_kitsu_api_exports|03_kitsu_api_exports|unittest|||||"
   "04|04_scraping_manga_sanctuary|04_scraping_manga_sanctuary|pytest|--extra dev|tests/||"
   "05|05_nettoyage_agregation_bdd|05_nettoyage_agregation_bdd|pytest|--extra dev|||database"
-  "06|06_benchmark_embeddings_llm||ruff-seul||||"
   "07|07_databricks_manga_export|07_databricks_manga_export/lakehouse|pytest|--extra dev|||"
   "08|08_enrichissement_personnages|08_enrichissement_personnages|pytest|--extra dev|tests|.|"
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
   "database|database|database|pytest|--extra dev|tests/||"
   "demo|demo|demo|pytest|--extra dev|||"
-  "workflows|||actionlint||||"
+  # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,
+  # essais des hooks et du périmètre (voir verifier_statique).
+  "statique|||statique||||"
 )
 
 RESUME=()      # une ligne par module traité
@@ -168,6 +172,7 @@ attribut_junit() {  # <fichier> <attribut> : sur le premier <testsuite>
 verifier_module() {
   local nom lint projet lanceur options args couv prerequis
   IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$1"
+  if [ "$lanceur" = statique ]; then verifier_statique "$nom"; return; fi
   local sortie="$SORTIES/$nom" debut ruff=- format=- passes=- sautes=- echecs=- couverture=-
   mkdir -p "$sortie"
   debut=$SECONDS
@@ -189,14 +194,15 @@ verifier_module() {
   fi
 
   # Prérequis : l'environnement de database/, dont les bases jetables jouent migrate.py.
-  if [ "$prerequis" = database ]; then
+  # Sur GitHub, `preparer` vient de le synchroniser (VERIFY_PREPARE=1) : pas deux fois.
+  if [ "$prerequis" = database ] && [ "${VERIFY_PREPARE:-}" != 1 ]; then
     local cmd=(uv sync --locked --inexact)
     dire "$nom — prérequis database/ : ${cmd[*]}"
     (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || {
       RESUME+=("$nom|$ruff|$format|-|-|-|-|$((SECONDS - debut))|-|ÉCHEC"); echouer "$nom" "prérequis database/" "(database/) ${cmd[*]}"; }
   fi
 
-  # Tests, ou actionlint.
+  # Tests.
   local plafond total=0 rc journal="$sortie/tests.log" junit="$sortie/junit.xml"
   plafond=$(plafond_sauts "$nom")
   local cmd=() env_tests=()
@@ -209,11 +215,6 @@ verifier_module() {
         cmd+=(--cov="$couv" --cov-report=xml:"$sortie/coverage.xml")
         env_tests=(COVERAGE_FILE="$sortie/.coverage" COVERAGE_RCFILE="$COUVERTURE")
       fi ;;
-    actionlint)
-      cmd=(uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK"
-           actionlint -no-color)
-      projet=. ;;
-    ruff-seul) ;;
   esac
 
   if [ ${#cmd[@]} -gt 0 ]; then
@@ -247,7 +248,7 @@ verifier_module() {
       RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
       echouer "$nom" "tests (code $rc)" "(${projet}/) ${cmd[*]}"
     fi
-    if [ "$lanceur" != actionlint ] && [ "$total" -eq 0 ]; then
+    if [ "$total" -eq 0 ]; then
       RESUME+=("$nom|$ruff|$format|0|0|$plafond|0|$((SECONDS - debut))|-|ÉCHEC")
       echouer "$nom" "aucun test collecté" "(${projet}/) ${cmd[*]}"
     fi
@@ -259,7 +260,58 @@ verifier_module() {
         "(${projet}/) ${cmd[*]}"
     fi
   fi
+  if [ "$nom" = 02 ] && ! integration_02; then
+    RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
+    echouer "$nom" "intégration Compose" "(02_api_manga/) docker compose -f compose.integration.yml run --rm --build smoke"
+  fi
   RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ok")
+}
+
+# L'intégration du 02 : PostgreSQL jetable, schéma rejoué depuis database/migrations/,
+# rôle de lecture, API réelle, contrôles HTTP. Sur le poste comme sur GitHub.
+integration_02() {
+  local cmd=(docker compose -f compose.integration.yml run --rm -T --build smoke) rc
+  dire "02 — (02_api_manga/) ${cmd[*]}"
+  # Entrée fermée : `run` lirait sinon celle de l'appelant.
+  (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
+  (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
+  return "$rc"
+}
+
+# La tâche statique : ce qui ne s'exécute dans aucun module. Chaque contrôle compte
+# pour un « passé » ; le premier échec arrête.
+verifier_statique() {
+  local nom="$1" sortie="$SORTIES/$1" debut=$SECONDS controles=0 sortie_ruff=concise
+  mkdir -p "$sortie"
+  : >"$sortie/statique.log"
+  [ "${GITHUB_ACTIONS:-}" = true ] && sortie_ruff=github
+  controle() {  # controle <libellé> <commande…>
+    local libelle="$1"
+    shift
+    dire "$nom — $libelle : $*"
+    (cd "$RACINE" && "${PROPRE[@]}" "$@") 2>&1 | tee -a "$sortie/statique.log"
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+      RESUME+=("$nom|-|-|$controles|0|0|1|$((SECONDS - debut))|-|ÉCHEC")
+      echouer "$nom" "$libelle" "$*"
+    fi
+    controles=$((controles + 1))
+  }
+  controle "Ruff du 06 et de docs/modeles" uvx "ruff@$RUFF" check --no-cache \
+    --output-format="$sortie_ruff" 06_benchmark_embeddings_llm docs/modeles
+  controle "format du 06 et de docs/modeles" uvx "ruff@$RUFF" format --check --no-cache \
+    06_benchmark_embeddings_llm docs/modeles
+  controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
+    actionlint -no-color
+  controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \
+    shellcheck -x -P .githooks .githooks/pre-commit .githooks/pre-push .githooks/cles-fournisseurs \
+    verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh
+  # tester.sh : ses `eval '…'` sont voulus (SC2016), et ses variables ne servent que
+  # dans ces chaînes (SC2034).
+  controle "shellcheck de tester.sh" uvx --from "shellcheck-py==$SHELLCHECK" \
+    shellcheck -e SC2016,SC2034 .githooks/tester.sh
+  controle "essais des hooks" bash .githooks/tester.sh
+  controle "essais du périmètre" bash verification/tester_perimetre.sh
+  RESUME+=("$nom|ok|ok|$controles|0|0|0|$((SECONDS - debut))|-|ok")
 }
 
 choisir_modules() {  # [MODULE] → lignes de MODULES
@@ -328,9 +380,14 @@ fichiers_touches() {  # <base> : changés depuis la base, arbre de travail compr
   } | sort -u
 }
 
-perimetre() {  # chemins sur l'entrée → liste JSON des modules concernés
+perimetre() {  # chemins sur l'entrée → liste JSON des modules concernés (TOUT=1 : tous)
   local lignes
-  lignes="$(modules_concernes)" || exit 2
+  if [ "${TOUT:-}" = 1 ]; then
+    graphe || exit 2
+    lignes="$(choisir_modules)"
+  else
+    lignes="$(modules_concernes)" || exit 2
+  fi
   cut -d'|' -f1 <<<"$lignes" | jq -Rsc 'split("\n") | map(select(length > 0))'
 }
 
@@ -362,7 +419,13 @@ verify() {
     rm -f "$VERDICT"
     arbre_propre && depart="$(arbre)"
   fi
-  while IFS= read -r l; do verifier_module "$l"; done <<<"$lignes"
+  # Un tableau, pas une lecture de l'entrée : une commande qui la lit ne peut pas
+  # écourter la liste en silence.
+  local liste
+  mapfile -t liste <<<"$lignes"
+  for l in "${liste[@]}"; do verifier_module "$l"; done
+  [ "${#RESUME[@]}" -eq "${#liste[@]}" ] ||
+    echouer "vérification" "${#RESUME[@]} module(s) traité(s) sur ${#liste[@]} prévus" "verify"
   if [ -n "$depart" ] && arbre_propre && [ "$(arbre)" = "$depart" ]; then
     printf '%s\t%s\n' "$depart" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$VERDICT"
     dire "verdict enregistré : arbre ${depart:0:12}, propre et vert (${VERDICT#"$RACINE"/})"
@@ -556,10 +619,9 @@ arbre_deja_vert() {
 poste() {
   memoire_d_abord
   arbre_deja_vert || TOUT=1 verify
+  # Les essais des hooks (tâche statique) et l'intégration Compose du 02 font partie de
+  # make verify : ils tournent aussi sur GitHub. Restent ici les harnais du poste seul.
   local cmd
-  cmd=(bash .githooks/tester.sh)
-  dire "poste — ${cmd[*]}"
-  (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "hooks" "${cmd[*]}"
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
@@ -568,13 +630,7 @@ poste() {
   dire "poste — ${cmd[*]}"
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
   equivalence_du_service
-  cmd=(docker compose -f compose.integration.yml run --rm --build smoke)
-  dire "poste — (02_api_manga/) ${cmd[*]}"
-  local rc
-  (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}"); rc=$?
-  (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
-  [ "$rc" -eq 0 ] || echouer poste "intégration du 02 (code $rc)" "(02_api_manga/) ${cmd[*]}"
-  dire "poste — harnais : tester.sh, fidelite.sh, état d'apimanga, équivalence du service, Compose du 02 passés"
+  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service passés"
 }
 
 # --------------------------------------------------------------------------- #

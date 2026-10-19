@@ -3,15 +3,18 @@
 #
 #   make verify              les modules concernés par les changements depuis
 #                            origin/develop, et ceux qui en dépendent
-#                            (verification/dependances.tsv) : Ruff, format, tests
+#                            (verification/dependances.tsv) : Ruff, format, tests ;
+#                            et toujours la tâche statique (Ruff du 06 et de
+#                            docs/modeles, actionlint, shellcheck, essais des hooks
+#                            et du périmètre)
 #   make verify TOUT=1       tous les modules
-#   make verify MODULE=05    un seul module : 01 … 10, database, demo, workflows
+#   make verify MODULE=05    un seul module : 01 … 05, 07 … 10, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make verify-poste        la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
-#                            harnais du poste seul : hooks, fidélité du schéma,
-#                            équivalence du service d'embedding, état d'apimanga en
-#                            lecture seule, intégration Compose du 02
+#                            harnais du poste seul : fidélité du schéma, état
+#                            d'apimanga en lecture seule, équivalence du service
+#                            d'embedding
 #
 # Le moteur est verification/verifier.sh ; les tests sautés admis, avec leur raison,
 # sont dans verification/sauts_attendus.tsv. Sorties (JUnit, couverture, résumé,
