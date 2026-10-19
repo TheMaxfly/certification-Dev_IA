@@ -97,9 +97,9 @@ son seul emploi légitime, et il est réservé à ce cas.
 à `007` le 2026-07-16, `008` à `011` entre le 2026-07-17 et le 2026-07-24, `012`
 le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 `017` le 2026-09-29, `018` et `019` le 2026-09-30, `020` le 2026-10-07, `021` le
-2026-10-09 (22:03 UTC, après sauvegarde) ; `000` y a été **marquée
-appliquée** le 2026-07-15, sans exécution. Le contrôle affiche **22 migrations
-appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
+2026-10-09 (22:03 UTC, après sauvegarde), `022` le 2026-10-19 (21:53 UTC, après
+sauvegarde) ; `000` y a été **marquée appliquée** le 2026-07-15, sans exécution.
+Le contrôle affiche **23 migrations appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
 (1 986 lignes de part et d'autre, extensions et versions identiques, 2026-10-09).
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
