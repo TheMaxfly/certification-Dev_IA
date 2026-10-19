@@ -4,6 +4,7 @@
 # passe ou qu'il est refusé.
 #   bash .githooks/tester.sh      → code 0 si tous les scénarios tiennent
 # Les mots interdits sont construits à l'exécution : ce fichier ne les contient pas.
+# (Demande d'essai de la chaîne, palier 2 : hooks seuls, fermée sans fusion.)
 # De même, les clés de fournisseur sont FACTICES et construites à l'exécution.
 set -uo pipefail
 
