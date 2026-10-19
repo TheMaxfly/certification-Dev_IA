@@ -89,19 +89,40 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 35 scénarios sur 35
+bash .githooks/tester.sh   # 53 scénarios sur 53
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
-  l'exclusion locale, jetons.
+  l'exclusion locale, jetons, clés de fournisseur.
 - `pre-push`, avant que le distant change : auteur et validateur `TheMaxfly` pour
-  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé. Seule
-  exception, le commit de fusion créé par GitHub : exactement deux parents, validateur
-  `GitHub <noreply@github.com>`, auteur `TheMaxfly` ou le nom de profil GitHub du
-  mainteneur. Les autres contrôles s'appliquent aussi à ce commit.
+  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé, clés de
+  fournisseur dans les lignes ajoutées. Seule exception, le commit de fusion créé
+  par GitHub : exactement deux parents, validateur `GitHub <noreply@github.com>`,
+  auteur `TheMaxfly` ou le nom de profil GitHub du mainteneur. Les autres contrôles
+  s'appliquent aussi à ce commit.
 
 Ils s'appliquent à l'identique sur toutes les branches et ne lancent aucun test.
 **Jamais de `--no-verify`.**
+
+## Les secrets
+
+Aucun secret n'entre dans un fichier suivi. Un secret se pose dans l'environnement
+ou dans un fichier `.env` hors dépôt, ignoré par git. Les hooks lisent les deux et
+comparent la valeur à ce qui part, sans jamais l'afficher. Ils refusent aussi une
+chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
+
+| Secret | Où il se pose | Ce que les hooks refusent |
+|---|---|---|
+| jeton Hugging Face | `HF_TOKEN`, ou le fichier `$HF_HOME/token` | `pre-commit` : sa valeur ; `hf_` suivi de 34 caractères |
+| clé Mistral | `MISTRAL_API_KEY`, dans le `.env` du module de l'API du modèle | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale à `MISTRAL_API_KEY` |
+| clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
+
+- Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
+  elle. Une variable absente ou vide ne compare rien.
+- **Une clé Mistral ou OpenAI ne se pose sur un poste qu'après ces contrôles** :
+  fusionnés dans `develop`, hooks activés dans le clone.
+- La forme d'une clé Mistral n'est pas documentée. Seule sa valeur réelle la garde
+  partout ; le motif ne voit qu'une affectation.
 
 ## Nommer
 
