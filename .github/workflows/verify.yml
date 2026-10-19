@@ -86,11 +86,14 @@ jobs:
   module:
     name: verify ${{ matrix.module }}
     needs: perimetre
+    # Même si `perimetre` échoue : une tâche sautée compterait comme réussie pour les
+    # contrôles obligatoires. Sans périmètre établi, le module est vérifié (sûreté).
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       MODULE: ${{ matrix.module }}
-      CONCERNE: ${{ contains(fromJSON(needs.perimetre.outputs.modules), matrix.module) }}
+      CONCERNE: ${{ needs.perimetre.result != 'success' || contains(fromJSON(needs.perimetre.outputs.modules || '[]'), matrix.module) }}
     strategy:
       fail-fast: false
       matrix:
