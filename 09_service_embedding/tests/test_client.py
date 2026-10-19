@@ -49,7 +49,10 @@ class Doublure(BaseHTTPRequestHandler):
 @pytest.fixture
 def client_gemma():
     serveur = HTTPServer(("127.0.0.1", 0), Doublure)
-    fil = threading.Thread(target=serveur.serve_forever, daemon=True)
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    fil = threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     fil.start()
     Doublure.recues, Doublure.dimension, Doublure.statut = [], 768, 200
     instance = replace(charger("embeddinggemma"), port=serveur.server_address[1])

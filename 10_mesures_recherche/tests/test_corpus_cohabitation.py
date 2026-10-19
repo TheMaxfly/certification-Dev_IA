@@ -175,7 +175,10 @@ def service_simule(monkeypatch):
     from service_embedding import configuration
 
     serveur = HTTPServer(("127.0.0.1", 0), Info)
-    threading.Thread(target=serveur.serve_forever, daemon=True).start()
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     vraie = configuration.charger("embeddinggemma")
     monkeypatch.setattr(
         configuration,

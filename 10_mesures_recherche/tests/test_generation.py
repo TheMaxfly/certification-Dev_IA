@@ -231,7 +231,10 @@ class Serveur(BaseHTTPRequestHandler):
 def ollama_doublure():
     Serveur.recus = []
     serveur = HTTPServer(("127.0.0.1", 0), Serveur)
-    fil = threading.Thread(target=serveur.serve_forever, daemon=True)
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    fil = threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     fil.start()
     yield generation.Ollama(f"http://127.0.0.1:{serveur.server_port}", "m", "30m")
     serveur.shutdown()

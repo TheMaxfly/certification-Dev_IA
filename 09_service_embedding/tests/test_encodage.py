@@ -78,7 +78,10 @@ class Doublure(BaseHTTPRequestHandler):
 @pytest.fixture
 def doublure():
     serveur = HTTPServer(("127.0.0.1", 0), Doublure)
-    threading.Thread(target=serveur.serve_forever, daemon=True).start()
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     Doublure.recues, Doublure.panne_a, Doublure.revision = [], None, None
 
     def preparer(nom: str):
