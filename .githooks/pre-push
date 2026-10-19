@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push — les trois contrôles du dépôt public, rejoués avant chaque push.
+# pre-push — les quatre contrôles du dépôt public, rejoués avant chaque push.
 #
 #   1. AUTEUR : chaque commit poussé a pour auteur ET committer TheMaxfly. Seule
 #      exception, le commit de fusion créé par l'interface de GitHub : exactement
@@ -17,6 +17,10 @@
 #      l'exclusion LOCALE (`.git/info/exclude`, jamais versionnée pour ne pas
 #      nommer ces chemins), sauf `.githooks/docs-versionnes` (docs/ versionnés
 #      exprès).
+#   4. AUCUNE CLÉ DE FOURNISSEUR (Mistral, OpenAI) dans les lignes ajoutées de
+#      chaque commit poussé : ni la clé du poste en clair, ni une chaîne qui en a
+#      l'aspect — `.githooks/cles-fournisseurs`, partagé avec le pre-commit. Le
+#      refus nomme le fournisseur et le fichier, jamais la valeur.
 #
 # Refuse le push si un contrôle échoue, et dit lequel. Sans exclusion locale, le
 # contrôle 3 est impossible : refus aussi — le hook ne passe pas à l'aveugle.
@@ -43,6 +47,13 @@ ZERO=0000000000000000000000000000000000000000
 distant="${1:-origin}"
 exclusion="$(git rev-parse --git-path info/exclude)"
 echecs=()
+fragment="$(git rev-parse --show-toplevel)/.githooks/cles-fournisseurs"
+if [ ! -r "$fragment" ]; then
+    echo "pre-push : .githooks/cles-fournisseurs introuvable — clés non contrôlables, refus." >&2
+    exit 1
+fi
+# shellcheck source=cles-fournisseurs
+. "$fragment"
 
 liste_du_commit() {  # liste versionnée, lue dans le commit poussé
     git show "$1:.githooks/$2" 2>/dev/null | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true
@@ -89,6 +100,8 @@ while read -r _ local_sha _ distant_sha; do
                 echecs+=("$court : mention d'assistant ajoutée dans $chemin (fichier hors de .githooks/mentions-techniques)")
             fi
         done < <(lignes_ajoutees "$c" | grep -iE "$MOTS|$SIGNATURES" || true)
+        # 4. clés des fournisseurs, dans les lignes ajoutées
+        controler_cles "$court : " < <(lignes_ajoutees "$c")
     done
 
     # 3. fichiers interdits, dans l'arbre poussé
@@ -112,5 +125,5 @@ if [ ${#echecs[@]} -gt 0 ]; then
     printf '  - %s\n' "${echecs[@]}" >&2
     exit 1
 fi
-echo "pre-push : auteur, mentions, fichiers — contrôles passés." >&2
+echo "pre-push : auteur, mentions, fichiers, clés — contrôles passés." >&2
 exit 0

@@ -4,6 +4,7 @@
 # passe ou qu'il est refusé.
 #   bash .githooks/tester.sh      → code 0 si tous les scénarios tiennent
 # Les mots interdits sont construits à l'exécution : ce fichier ne les contient pas.
+# De même, les clés de fournisseur sont FACTICES et construites à l'exécution.
 set -uo pipefail
 
 HOOKS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,6 +13,13 @@ trap 'rm -rf "$TRAVAIL"' EXIT
 NOM="Cl$(printf a)ude"
 EDITEUR="Anthr$(printf o)pic"
 CO="Co-Author$(printf e)d-By"
+# Clés factices de la bonne forme, et valeurs « du poste » hors de tout motif. Les
+# vraies variables du poste n'entrent pas dans l'essai.
+unset MISTRAL_API_KEY OPENAI_API_KEY
+MISTRAL_FACTICE="Mq7$(printf 'Ab3dEf%.0s' $(seq 1 4))Zz9x5"            # 32 alphanumériques
+OPENAI_FACTICE="sk-proj-$(printf 'Ab3dEf9h_K-%.0s' $(seq 1 14))Xy"   # sk-proj- + 156
+HORS_MOTIF_M="valeur-factice-hors-motif-0042"
+HORS_MOTIF_O="autre-valeur-factice-hors-motif-0043"
 echecs=0
 
 git init -q --bare -b main "$TRAVAIL/distant.git"
@@ -22,6 +30,7 @@ git config user.email max@example.invalid
 git checkout -q -b main
 mkdir -p .githooks
 cp "$HOOKS/pre-push" .githooks/pre-push
+cp "$HOOKS/cles-fournisseurs" .githooks/cles-fournisseurs
 printf 'tech.txt\n' >.githooks/mentions-techniques
 printf 'docs/permis.md\n' >.githooks/docs-versionnes
 printf 'secret.md\n/docs/*\n!/docs/modeles/\n' >.git/info/exclude
@@ -80,6 +89,37 @@ scenario refuse "fusion à trois parents validée par GitHub" eval 'cote 5 && co
 scenario passe  "fusion de GitHub d'auteur MaxFlavigny" eval 'cote 7 && GIT_AUTHOR_NAME=MaxFlavigny par_github noreply@github.com merge -q --no-ff cote7 -m "Merge pull request #7"'
 scenario refuse "commit ordinaire d'auteur MaxFlavigny" eval 'ecrire m.txt "x" && git commit -q -m m --author="MaxFlavigny <max@example.invalid>"'
 scenario refuse "fusion locale d'auteur MaxFlavigny"  eval 'cote 8 && GIT_AUTHOR_NAME=MaxFlavigny git merge -q --no-ff cote8 -m "fusion locale"'
+
+# Clés des fournisseurs : par l'aspect, puis par la valeur du poste, lue dans
+# l'environnement ou dans un .env ignoré par git.
+message() { # message <libellé> <motif attendu> <motif interdit> <commande…> : sortie du hook
+    local libelle="$1" attendu="$2" interdit="$3" sortie
+    shift 3
+    sortie=$("$@" 2>&1)
+    if grep -qE -- "$attendu" <<<"$sortie" && ! grep -qiE -- "$interdit" <<<"$sortie"; then
+        echo "  ok    $libelle"
+    else
+        echo "  ÉCHEC $libelle"
+        echecs=$((echecs + 1))
+    fi
+}
+scenario refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire cle_m.py "MISTRAL_API_KEY = \"$MISTRAL_FACTICE\"" && git commit -q -m cle_m'
+scenario refuse "clé OpenAI factice dans un fichier suivi"  eval 'ecrire cle_o.txt "cle : $OPENAI_FACTICE" && git commit -q -m cle_o'
+scenario refuse "clé Mistral du poste (environnement), hors motif" eval 'export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire v_m.txt "note : $HORS_MOTIF_M" && git commit -q -m v_m'
+unset MISTRAL_API_KEY
+scenario refuse "clé OpenAI du poste (.env ignoré), hors motif" eval 'ecrire .gitignore ".env" && printf "OPENAI_API_KEY=%s\n" "$HORS_MOTIF_O" >.env && ecrire v_o.txt "note : $HORS_MOTIF_O" && git commit -q -m v_o'
+rm -f .env
+scenario refuse "clé factice dans un texte non UTF-8" eval 'export LC_ALL=C.UTF-8 && printf "caf\351 cle : %s\n" "$OPENAI_FACTICE" >l1.txt && git add l1.txt && git commit -q -m l1'
+unset LC_ALL
+scenario passe  "variable absente : aucun refus"      eval 'ecrire w.txt "texte ordinaire" && git commit -q -m w'
+scenario passe  "clé factice dans un .env ignoré"     eval 'ecrire .gitignore ".env" && printf "MISTRAL_API_KEY=%s\n" "$MISTRAL_FACTICE" >.env && ecrire x.txt "propre" && git commit -q -m x'
+rm -f .env
+message "refus du push : fournisseur et fichier nommés, valeur jamais" \
+    "clé Mistral du poste en clair dans v_m2\.txt" "$HORS_MOTIF_M" eval '
+    export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire v_m2.txt "note : $HORS_MOTIF_M" &&
+    git commit -q -m v_m2 && git push -q origin main'
+unset MISTRAL_API_KEY
+git fetch -q origin && git reset -q --hard origin/main 2>/dev/null
 
 # --------------------------------------------------------------------------- #
 # Hook pre-commit — sur un SECOND clone : le premier a besoin de commits fautifs
@@ -150,6 +190,49 @@ essai refuse "exclusion locale absente"            eval '
     mv .git/info/exclude .git/info/exclude.bak &&
     ecrire k.txt "x" && git commit -q -m k'
 mv .git/info/exclude.bak .git/info/exclude 2>/dev/null || true
+
+# Clés des fournisseurs.
+essai refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire pc_m.env "MISTRAL_API_KEY=$MISTRAL_FACTICE" && git commit -q -m m'
+essai refuse "clé OpenAI factice dans un fichier suivi"  eval 'ecrire pc_o.py "cle = \"$OPENAI_FACTICE\"" && git commit -q -m o'
+essai refuse "clé Mistral du poste (environnement), hors motif" eval '
+    export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire pc_vm.txt "note : $HORS_MOTIF_M" && git commit -q -m vm'
+unset MISTRAL_API_KEY
+# Le .env tel qu'on l'écrit : export, guillemets, commentaire en fin de ligne.
+essai refuse "clé OpenAI du poste (.env ignoré), hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore &&
+    printf "export OPENAI_API_KEY=\"%s\"  # clé du poste\n" "$HORS_MOTIF_O" >.env &&
+    ecrire pc_vo.txt "note : $HORS_MOTIF_O" && git commit -q -m vo'
+essai passe  "clé factice dans un .env ignoré"     eval '
+    printf ".env\n" >.gitignore && git add .gitignore &&
+    printf "MISTRAL_API_KEY=%s\n" "$MISTRAL_FACTICE" >.env &&
+    ecrire pc_x.txt "propre" && git commit -q -m x'
+# Une variable vide ne compare rien, même quand le .env en porte une autre valeur.
+essai passe  "variable vide : rien à comparer"     eval '
+    export MISTRAL_API_KEY= && printf ".env\n" >.gitignore && git add .gitignore &&
+    printf "MISTRAL_API_KEY=%s\nOPENAI_API_KEY=\n" "$HORS_MOTIF_M" >.env &&
+    ecrire pc_y.txt "propre" && git commit -q -m y'
+unset MISTRAL_API_KEY
+rm -f .env # ignoré par git : git clean ne l'ôte pas
+# Sans -a, grep tait la ligne qui porte un octet hors UTF-8 : la clé y passerait.
+essai refuse "clé factice dans un texte non UTF-8"  eval '
+    export LC_ALL=C.UTF-8 && printf "caf\351 cle : %s\n" "$OPENAI_FACTICE" >pc_l1.txt &&
+    git add pc_l1.txt && git commit -q -m l1'
+unset LC_ALL
+# Les formes courtes et les lectures de variable ne sont pas des clés.
+essai passe  "exemples courts et lectures de variable" eval '
+    ecrire pc_z.py "MISTRAL_API_KEY=changeme
+cle = os.environ[\"MISTRAL_API_KEY\"]
+exemple = \"sk-admin...def\"
+faux = \"sk-proj-SECRET-NE-DOIT-PAS-FUIR\"" && git commit -q -m z'
+message "variable absente : aucun refus, aucun message" "contrôles passés" "mistral|openai" eval '
+    ecrire pc_w.txt "texte ordinaire" && git commit -q -m w'
+git reset -q --hard origin/main && git clean -fdq
+message "refus du commit : fournisseur et fichier nommés, valeur jamais" \
+    "clé OpenAI du poste en clair dans pc_vo2\.txt" "$HORS_MOTIF_O" eval '
+    export OPENAI_API_KEY="$HORS_MOTIF_O" && ecrire pc_vo2.txt "note : $HORS_MOTIF_O" &&
+    git commit -q -m vo2'
+unset OPENAI_API_KEY
+git reset -q --hard origin/main && git clean -fdq
 
 if [ "$echecs" -gt 0 ]; then
     echo "$echecs scénario(s) en échec"

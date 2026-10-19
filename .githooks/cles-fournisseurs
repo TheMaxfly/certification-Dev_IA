@@ -1,0 +1,87 @@
+# shellcheck shell=bash
+# cles-fournisseurs — les clés d'API des fournisseurs de modèle de langage. Ce
+# fragment est sourcé par les hooks pre-commit et pre-push, et ne s'exécute pas
+# seul : un seul jeu de motifs, qui ne peut pas diverger d'un hook à l'autre.
+#
+# Sur les lignes ajoutées (« chemin<TAB>ligne », sur l'entrée de controler_cles),
+# pour chaque fournisseur :
+#   - VALEUR RÉELLE : la clé du poste, lue dans sa variable d'environnement et dans
+#     les fichiers .env de la racine et des dossiers jusqu'à deux niveaux sous elle
+#     (ceux des modules, ignorés par git). Variable absente ou vide : rien à
+#     comparer, aucun message ;
+#   - ASPECT : une chaîne qui a la forme d'une clé du fournisseur.
+# Le refus nomme le fournisseur et le fichier, jamais la valeur. La valeur ne passe
+# jamais en argument d'une commande (visible dans la liste des processus) : grep la
+# lit sur un descripteur. Les lignes sont lues en texte (grep -a) : sinon, grep tait
+# une ligne qui porte un octet hors UTF-8, et la clé qu'elle contient passerait.
+#
+# Formes relevées dans la documentation officielle le 2026-10-19 :
+#   - OpenAI : le préfixe « sk- » (« sk-admin- » pour une clé d'administration) ;
+#     ni longueur ni alphabet documentés. Motif : « sk- » en début de mot, suivi
+#     d'au moins 40 caractères [A-Za-z0-9_-] — les exemples courts passent (ceux de
+#     la documentation, le faux jeton des tests du module 05).
+#   - Mistral : forme non documentée (un exemple masqué, alphanumérique, sans
+#     préfixe). Motif : une affectation littérale à MISTRAL_API_KEY (« = » ou « : »,
+#     casse indifférente) d'au moins 20 caractères alphanumériques, la forme d'un
+#     .env recopié. La valeur réelle reste le filet.
+#
+# Ajouter un fournisseur : son nom de variable dans CLES_VARIABLES, une entrée dans
+# CLES_FOURNISSEUR et dans CLES_ASPECT.
+
+CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY)
+declare -A CLES_FOURNISSEUR=([MISTRAL_API_KEY]=Mistral [OPENAI_API_KEY]=OpenAI)
+declare -A CLES_ASPECT=(
+    [MISTRAL_API_KEY]="[Mm][Ii][Ss][Tt][Rr][Aa][Ll]_[Aa][Pp][Ii]_[Kk][Ee][Yy][\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9]{20,}"
+    [OPENAI_API_KEY]='(^|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{40,}'
+)
+
+cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
+    local v
+    v=$(grep -E "^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=" "$1" 2>/dev/null | tail -n 1)
+    v=${v#*=}
+    v=${v//$'\r'/}
+    v=${v#"${v%%[![:space:]]*}"}
+    case $v in
+        \"*) v=${v#\"} && v=${v%%\"*} ;;
+        \'*) v=${v#\'} && v=${v%%\'*} ;;
+        *) v=${v%%[[:space:]]#*} && v=${v%"${v##*[![:space:]]}"} ;; # commentaire ôté
+    esac
+    printf '%s' "$v"
+}
+
+cles_valeurs() { # <variable> : ses valeurs sur le poste, une par ligne, sans vide
+    local racine fichier
+    racine=$(git rev-parse --show-toplevel) || return 0
+    {
+        printf '%s\n' "${!1:-}"
+        while IFS= read -r -d '' fichier; do
+            cles_valeur_env "$fichier" "$1"
+            printf '\n'
+        done < <(find "$racine" -maxdepth 3 \( -name .git -o -name .venv -o -name node_modules \) \
+            -prune -o -name .env \( -type f -o -type l \) -print0)
+    } | grep -v '^[[:space:]]*$' | sort -u
+}
+
+declare -A CLES_VALEURS=()
+for _variable in "${CLES_VARIABLES[@]}"; do
+    CLES_VALEURS[$_variable]=$(cles_valeurs "$_variable")
+done
+unset _variable
+
+controler_cles() { # <préfixe des messages> ; entrée « chemin<TAB>ligne » ; complète echecs
+    local prefixe="$1" lignes variable fournisseur fichier
+    lignes=$(cat)
+    [ -n "$lignes" ] || return 0
+    for variable in "${CLES_VARIABLES[@]}"; do
+        fournisseur=${CLES_FOURNISSEUR[$variable]}
+        if [ -n "${CLES_VALEURS[$variable]}" ]; then
+            while IFS= read -r fichier; do
+                echecs+=("${prefixe}clé $fournisseur du poste en clair dans $fichier")
+            done < <(grep -aF -f <(printf '%s\n' "${CLES_VALEURS[$variable]}") <<<"$lignes" |
+                cut -f1 | sort -u)
+        fi
+        while IFS= read -r fichier; do
+            echecs+=("${prefixe}chaîne d'aspect clé $fournisseur dans $fichier")
+        done < <(grep -aE -- "${CLES_ASPECT[$variable]}" <<<"$lignes" | cut -f1 | sort -u)
+    done
+}

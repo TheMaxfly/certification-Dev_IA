@@ -9,6 +9,9 @@
 #      (.git/info/exclude), sauf .githooks/docs-versionnes.
 #   3. AUCUN JETON : ni le jeton Hugging Face du poste en clair (compté, jamais
 #      affiché), ni une chaîne qui en a l'aspect (hf_ + 34 caractères).
+#   4. AUCUNE CLÉ DE FOURNISSEUR (Mistral, OpenAI) : ni la clé du poste en clair,
+#      ni une chaîne qui en a l'aspect — .githooks/cles-fournisseurs, partagé avec
+#      le pre-push. Le refus nomme le fournisseur et le fichier, jamais la valeur.
 #
 # Ce qui est jugé : tout ce que le prochain push enverra, et non le seul écart à
 # HEAD. La base est le point de divergence avec la branche amont (sinon HEAD,
@@ -38,6 +41,12 @@ if [ -z "${MOTS:-}" ] || [ -z "${SIGNATURES:-}" ]; then
     exit 1
 fi
 ASPECT_JETON='hf_[A-Za-z0-9]{34}'
+if [ ! -r .githooks/cles-fournisseurs ]; then
+    echo "pre-commit : .githooks/cles-fournisseurs introuvable — clés non contrôlables, refus." >&2
+    exit 1
+fi
+# shellcheck source=cles-fournisseurs
+. .githooks/cles-fournisseurs
 
 if [ -n "${CONTROLE_BASE:-}" ]; then
     base="$CONTROLE_BASE"
@@ -98,10 +107,15 @@ if grep -qE "$ASPECT_JETON" <<<"$ajoutees"; then
     echecs+=("chaîne d'aspect jeton Hugging Face dans l'index")
 fi
 
+# 4. clés des fournisseurs
+controler_cles "" < <(git diff --cached "$base" --unified=0 --no-color --no-ext-diff |
+    awk '/^\+\+\+ / { f = substr($0, 7); next }
+         /^\+/      { print f "\t" substr($0, 2) }')
+
 if [ ${#echecs[@]} -gt 0 ]; then
     echo "pre-commit : COMMIT REFUSÉ — ${#echecs[@]} contrôle(s) en échec :" >&2
     printf '  - %s\n' "${echecs[@]}" >&2
     exit 1
 fi
-echo "pre-commit : mentions, fichiers, jetons — contrôles passés." >&2
+echo "pre-commit : mentions, fichiers, jetons, clés — contrôles passés." >&2
 exit 0
