@@ -287,6 +287,10 @@ verifier_module() {
     RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
     echouer "$nom" "intégration Compose" "(02_api_manga/) docker compose -f compose.integration.yml run --rm --build smoke"
   fi
+  if [ "$nom" = 11 ] && ! integration_11; then
+    RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
+    echouer "$nom" "intégration Compose" "(11_api_modele/) docker compose ${COMPOSE_11[*]} run --rm -T --build essai"
+  fi
   local exige=""
   if [ -n "$exigences" ]; then
     if ! exiger "$nom" "$projet" "$exigences"; then
@@ -358,6 +362,21 @@ integration_02() {
   # Entrée fermée : `run` lirait sinon celle de l'appelant.
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
+  return "$rc"
+}
+
+# L'intégration du 11 : le Compose du module, tel quel, et ce qu'un essai jetable change
+# (compose.integration.yml) — base jetable migrée, rôle modele_api par sa procédure,
+# jeu d'essai promu, doublure du service d'embedding (le modèle, à accès contrôlé, ne
+# tourne pas sur GitHub) ; l'API est la vraie (image construite, non root, réseau
+# interne, cohérence au démarrage), puis un essai HTTP. Sur le poste comme sur GitHub.
+# `--env-file /dev/null` : le `.env` du poste n'entre pas dans l'essai.
+COMPOSE_11=(--env-file /dev/null -f docker-compose.yml -f compose.integration.yml)
+integration_11() {
+  local cmd=(docker compose "${COMPOSE_11[@]}" run --rm -T --build essai) rc
+  dire "11 — (11_api_modele/) ${cmd[*]}"
+  (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
+  (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" docker compose "${COMPOSE_11[@]}" down -v >/dev/null 2>&1)
   return "$rc"
 }
 

@@ -36,6 +36,9 @@ dev = [
     "openapi-spec-validator==0.9.0",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
+    # La version du verrou (dépendance de jsonschema-path), déclarée parce que les tests
+    # lisent le Compose du module (tests/test_conteneurs.py).
+    "pyyaml==6.0.3",
 ]
 
 [tool.setuptools]

@@ -1,0 +1,18 @@
+# Contexte de construction de l'image de l'API : la RACINE du dépôt (le Dockerfile
+# exécute aussi le code des modules 09, 10 et 05). Liste blanche : n'y entre que ce
+# que l'image exécute — ni données, ni rapports, ni secrets, ni environnements.
+# BuildKit lit ce fichier parce qu'il porte le nom du Dockerfile, à côté de lui.
+*
+!05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+!09_service_embedding/README.md
+!09_service_embedding/config/
+!09_service_embedding/pyproject.toml
+!09_service_embedding/src/
+!10_mesures_recherche/src/mesures_recherche/
+!11_api_modele/README.md
+!11_api_modele/config/
+!11_api_modele/pyproject.toml
+!11_api_modele/src/
+!11_api_modele/uv.lock
+**/__pycache__
+**/*.egg-info

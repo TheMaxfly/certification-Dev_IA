@@ -49,6 +49,7 @@ def test_le_fichier_versionne_donne_les_valeurs_du_contrat():
     assert r.client_hote is None
     assert (r.hote, r.port) == ("127.0.0.1", 8010)
     assert r.journal_question is False
+    assert r.documentation is False
     assert ipaddress.ip_address("127.0.0.1") in r.metriques_reseaux[0]
     assert r.pool_max <= 10, "sous la borne du rôle modele_api (CONNECTION LIMIT 10)"
 
@@ -120,6 +121,7 @@ def test_le_dsn_est_exige_et_sans_mot_de_passe(valeur, attendu):
         ("API_MODELE_DEBIT_PAR_MINUTE", "0", "entre 1"),
         ("API_MODELE_METRIQUES_RESEAUX", "10.0.0.0/33", "réseau illisible"),
         ("API_MODELE_JOURNAL_QUESTION", "peut-être", "vrai ou faux"),
+        ("API_MODELE_DOCUMENTATION", "oui-non", "vrai ou faux"),
         ("CLIENT_HOTE", "hote;rm", "hôte invalide"),
         ("API_MODELE_PORT", "70000", "entre 1 et 65535"),
     ],
@@ -135,6 +137,7 @@ def test_les_surcharges_d_exploitation_sont_lues():
             "API_MODELE_DEBIT_PAR_MINUTE": "120",
             "API_MODELE_METRIQUES_RESEAUX": "10.0.0.0/8, 127.0.0.1/32",
             "API_MODELE_JOURNAL_QUESTION": "vrai",
+            "API_MODELE_DOCUMENTATION": "vrai",
             "CLIENT_HOTE": "tei.interne",
             "API_MODELE_HOTE": "0.0.0.0",
             "API_MODELE_PORT": "9010",
@@ -144,6 +147,7 @@ def test_les_surcharges_d_exploitation_sont_lues():
     assert r.debit_par_minute == 120
     assert len(r.metriques_reseaux) == 2
     assert r.journal_question is True
+    assert r.documentation is True
     assert r.client_hote == "tei.interne"
     assert (r.hote, r.port) == ("0.0.0.0", 9010)
 

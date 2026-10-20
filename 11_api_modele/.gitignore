@@ -11,3 +11,6 @@ htmlcov/
 
 # Secrets et adresses : seul `.env.example` est versionné.
 .env
+
+# Le pgpass monté dans le conteneur de l'API (Compose) : un secret.
+.pgpass.conteneur

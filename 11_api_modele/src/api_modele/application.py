@@ -3,7 +3,8 @@
 Au démarrage, le pool est ouvert, la cohérence vérifiée (`demarrage.verifier`) et
 le classement du banc chargé (rattachement et vecteurs de l'encodage en service) ;
 un écart, et l'API ne démarre pas. Routes : `/v1/recherche` et `/v1/info` (avec
-clé), `/v1/sante` (sans clé), `/metrics` (réseau interne).
+clé), `/v1/sante` (sans clé), `/metrics` (réseau interne), `/v1/openapi.json` (le
+contrat) et, sur réglage, `/v1/docs` (Swagger UI).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from psycopg import Error as ErreurBase
 from psycopg_pool import PoolTimeout
 
@@ -22,6 +23,7 @@ from api_modele import (
     __version__,
     base,
     demarrage,
+    documentation,
     erreurs,
     journal,
     memoire,
@@ -243,6 +245,15 @@ def creer_application(
     )
     def info(request: Request, _cle: CleExigee) -> Info:
         return decrire(etat_de(request))
+
+    if reglages.documentation:
+
+        @app.get(f"{prefixe}/docs", include_in_schema=False)
+        def documenter() -> HTMLResponse:
+            contenu, politique = documentation.page(
+                app.title, f"{prefixe}/openapi.json"
+            )
+            return HTMLResponse(contenu, headers={"Content-Security-Policy": politique})
 
     @app.get("/metrics", include_in_schema=False)
     def exposer_metriques(request: Request) -> Response:

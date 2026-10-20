@@ -57,6 +57,10 @@ motif = "Prometheus tourne sur le poste : /metrics ne répond qu'au bouclage, 40
 question_en_clair = false
 motif = "Le texte d'une question peut porter une donnée personnelle : absent du journal, sauf réglage explicite. Surchargeable : API_MODELE_JOURNAL_QUESTION (vrai ou faux)."
 
+[documentation]
+interactive = false
+motif = "La documentation interactive (Swagger UI, /v1/docs) charge deux fichiers d'un CDN tiers, à version exacte et sous empreinte d'intégrité : désactivée par défaut, on l'allume pour la démontrer ou pour essayer les routes. Le contrat, lui, est toujours servi (/v1/openapi.json). Surchargeable : API_MODELE_DOCUMENTATION (vrai ou faux)."
+
 [service]
 instance = "embeddinggemma"
 table = "bench.vecteurs_embeddinggemma"

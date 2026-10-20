@@ -52,7 +52,11 @@ commande sur le poste et sur GitHub.
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
   exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
 - L'intégration Compose du 02 (PostgreSQL jetable, migrations, rôle de lecture, API
-  réelle, contrôles HTTP) fait partie de la vérification du 02.
+  réelle, contrôles HTTP) fait partie de la vérification du 02. Celle du 11 lève le
+  Compose du module avec `compose.integration.yml` : base jetable, migrations, rôle
+  `modele_api` par sa procédure, jeu d'essai promu, doublure du service d'embedding
+  (le modèle, à accès contrôlé, ne tourne pas sur GitHub), API réelle, essai HTTP ;
+  elle fait partie de la vérification du 11.
 - Arrêt au premier échec, avec le module et la commande ; une ligne par module :
   passés, sautés, en échec, durée.
 - **Un test sauté n'est pas un test passé** : il est compté. Au-delà du plafond écrit,

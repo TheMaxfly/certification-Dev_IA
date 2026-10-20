@@ -96,6 +96,7 @@ class Reglages:
     pool_attente_s: float
     metriques_reseaux: tuple[Reseau, ...]
     journal_question: bool
+    documentation: bool
     instance: str
     table_vecteurs: str
     memoire_besoin_octets: int
@@ -352,6 +353,8 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     )
     t = lecteur.table("journal")
     journal_question = lecteur.booleen(t, "journal", "question_en_clair")
+    t = lecteur.table("documentation")
+    documentation = lecteur.booleen(t, "documentation", "interactive")
     t = lecteur.table("service")
     instance = lecteur.texte(t, "service", "instance")
     table_vecteurs = lecteur.texte(t, "service", "table")
@@ -400,6 +403,9 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         metriques_reseaux=reseaux,
         journal_question=_surcharge_booleenne(
             environ, "API_MODELE_JOURNAL_QUESTION", journal_question, ecarts
+        ),
+        documentation=_surcharge_booleenne(
+            environ, "API_MODELE_DOCUMENTATION", documentation, ecarts
         ),
         instance=instance,
         table_vecteurs=table_vecteurs,
