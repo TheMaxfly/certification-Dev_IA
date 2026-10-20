@@ -37,6 +37,58 @@
         "title": "BorneEntiere",
         "type": "object"
       },
+      "Contexte": {
+        "properties": {
+          "corpus_id": {
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "duree_ms": {
+            "title": "Duree Ms",
+            "type": "number"
+          },
+          "encodage_id": {
+            "title": "Encodage Id",
+            "type": "integer"
+          },
+          "identifiant_requete": {
+            "title": "Identifiant Requete",
+            "type": "string"
+          },
+          "modele": {
+            "title": "Modele",
+            "type": "string"
+          },
+          "precision": {
+            "title": "Precision",
+            "type": "string"
+          },
+          "reglages": {
+            "$ref": "#/components/schemas/ReglagesAppliques"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "version_api": {
+            "title": "Version Api",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reglages",
+          "modele",
+          "revision",
+          "precision",
+          "corpus_id",
+          "encodage_id",
+          "identifiant_requete",
+          "duree_ms",
+          "version_api"
+        ],
+        "title": "Contexte",
+        "type": "object"
+      },
       "Erreur": {
         "description": "La forme de toute erreur de l'API.",
         "properties": {
@@ -146,6 +198,44 @@
         "title": "Info",
         "type": "object"
       },
+      "Passage": {
+        "properties": {
+          "doc_key": {
+            "title": "Doc Key",
+            "type": "string"
+          },
+          "extrait": {
+            "title": "Extrait",
+            "type": "string"
+          },
+          "fragment_id": {
+            "title": "Fragment Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "type_document": {
+            "enum": [
+              "critique",
+              "resume_serie",
+              "synopsis_kitsu"
+            ],
+            "title": "Type Document",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fragment_id",
+          "doc_key",
+          "type_document",
+          "score",
+          "extrait"
+        ],
+        "title": "Passage",
+        "type": "object"
+      },
       "Question": {
         "properties": {
           "longueur_max_caracteres": {
@@ -157,6 +247,81 @@
           "longueur_max_caracteres"
         ],
         "title": "Question",
+        "type": "object"
+      },
+      "Recherche": {
+        "additionalProperties": false,
+        "description": "Une question et ses réglages ; rien d'autre (un champ inconnu est refusé).",
+        "properties": {
+          "catalogue_seul": {
+            "default": true,
+            "title": "Catalogue Seul",
+            "type": "boolean"
+          },
+          "identite": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._@:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recopiée dans le journal, sans effet sur la réponse.",
+            "title": "Identite"
+          },
+          "nombre_series": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Nombre Series",
+            "type": "integer"
+          },
+          "passages_par_serie": {
+            "default": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Passages Par Serie",
+            "type": "integer"
+          },
+          "question": {
+            "description": "Le texte de la question, encodé tel quel.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "Recherche",
+        "type": "object"
+      },
+      "ReglagesAppliques": {
+        "properties": {
+          "catalogue_seul": {
+            "title": "Catalogue Seul",
+            "type": "boolean"
+          },
+          "nombre_series": {
+            "title": "Nombre Series",
+            "type": "integer"
+          },
+          "passages_par_serie": {
+            "title": "Passages Par Serie",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nombre_series",
+          "passages_par_serie",
+          "catalogue_seul"
+        ],
+        "title": "ReglagesAppliques",
         "type": "object"
       },
       "ReglagesRecherche": {
@@ -177,6 +342,26 @@
           "catalogue_seul"
         ],
         "title": "ReglagesRecherche",
+        "type": "object"
+      },
+      "Resultat": {
+        "properties": {
+          "contexte": {
+            "$ref": "#/components/schemas/Contexte"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/Serie"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "series",
+          "contexte"
+        ],
+        "title": "Resultat",
         "type": "object"
       },
       "Sante": {
@@ -225,6 +410,68 @@
           "encodage"
         ],
         "title": "Sante",
+        "type": "object"
+      },
+      "Serie": {
+        "properties": {
+          "entite": {
+            "description": "« serie:<id> » ou « kitsu:<id> », la clé du banc.",
+            "title": "Entite",
+            "type": "string"
+          },
+          "kitsu_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kitsu Id"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/Passage"
+            },
+            "title": "Passages",
+            "type": "array"
+          },
+          "rang": {
+            "title": "Rang",
+            "type": "integer"
+          },
+          "score": {
+            "description": "Cosinus du meilleur fragment (non arrondi).",
+            "title": "Score",
+            "type": "number"
+          },
+          "serie_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Id"
+          },
+          "titre": {
+            "title": "Titre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rang",
+          "entite",
+          "serie_id",
+          "kitsu_id",
+          "titre",
+          "score",
+          "passages"
+        ],
+        "title": "Serie",
         "type": "object"
       }
     },
@@ -287,6 +534,92 @@
         "summary": "Le modèle, l'encodage et le corpus servis ; réglages et bornes",
         "tags": [
           "exploitation"
+        ]
+      }
+    },
+    "/v1/recherche": {
+      "post": {
+        "operationId": "rechercher_v1_recherche_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Recherche"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resultat"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Clé d'accès absente ou invalide."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Corps de requête trop volumineux."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Entrée invalide (`entree_invalide`) ou question trop longue (`question_trop_longue`)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Débit dépassé pour cette clé."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Service d'embedding indisponible ou incohérent, base indisponible, ou encodage en service changé depuis le démarrage."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Les séries classées pour une question, avec leurs passages",
+        "tags": [
+          "recherche"
         ]
       }
     },

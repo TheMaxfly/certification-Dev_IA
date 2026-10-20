@@ -30,6 +30,8 @@ VERSIONS_SERVIES = ("v1",)
 #: Une clé : un nom de consommateur, en minuscules ; un secret assez long.
 NOM_CLE = re.compile(r"^[a-z0-9_-]+$")
 SECRET_MIN = 32
+#: La table des vecteurs : interpolée dans la requête du module 10, elle est bornée ici.
+TABLE_VECTEURS = re.compile(r"^bench\.vecteurs_[a-z0-9_]+$")
 #: Un nom d'hôte ou une adresse, comme `CLIENT_HOTE` du module 09.
 HOTE = re.compile(r"^[A-Za-z0-9.:-]+$")
 VRAI = ("1", "vrai", "true", "oui")
@@ -66,6 +68,16 @@ class Borne:
 
 
 @dataclass(frozen=True, slots=True)
+class Contrat:
+    """Les réglages qui font partie du contrat `/v1/` : jamais surchargés."""
+
+    nombre_series: Borne
+    passages_par_serie: Borne
+    catalogue_seul: bool
+    longueur_question_max: int
+
+
+@dataclass(frozen=True, slots=True)
 class Reglages:
     cles: tuple[Cle, ...]
     dsn: str = field(repr=False)
@@ -78,15 +90,27 @@ class Reglages:
     debit_par_minute: int
     delai_service_s: float
     delai_base_s: float
+    delai_chargement_s: float
     pool_min: int
     pool_max: int
     pool_attente_s: float
     metriques_reseaux: tuple[Reseau, ...]
     journal_question: bool
     instance: str
+    table_vecteurs: str
+    memoire_besoin_octets: int
     client_hote: str | None
     hote: str
     port: int
+
+    @property
+    def contrat(self) -> Contrat:
+        return Contrat(
+            nombre_series=self.nombre_series,
+            passages_par_serie=self.passages_par_serie,
+            catalogue_seul=self.catalogue_seul,
+            longueur_question_max=self.longueur_question_max,
+        )
 
 
 class _Lecteur:
@@ -262,21 +286,49 @@ def _hote(valeur: str | None, nom: str, ecarts: list[str]) -> str | None:
     return valeur
 
 
-def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reglages:
-    """Les réglages validés ; `ConfigurationInvalide` au premier passage fautif."""
-    ecarts: list[str] = []
+def _lecteur(fichier: Path, ecarts: list[str]) -> _Lecteur:
     try:
         contenu = tomllib.loads(fichier.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise ConfigurationInvalide([f"{fichier.name} : illisible ({exc})"]) from exc
-    lecteur = _Lecteur(contenu, ecarts)
+    return _Lecteur(contenu, ecarts)
 
+
+def _contrat(lecteur: _Lecteur) -> Contrat:
     nombre_series = lecteur.borne("recherche.nombre_series")
     passages = lecteur.borne("recherche.passages_par_serie")
     t = lecteur.table("recherche.catalogue_seul")
     catalogue_seul = lecteur.booleen(t, "recherche.catalogue_seul", "defaut")
     t = lecteur.table("question")
     longueur = lecteur.entier(t, "question", "longueur_max", 1)
+    return Contrat(nombre_series, passages, catalogue_seul, longueur)
+
+
+def lire_contrat(fichier: Path = FICHIER_REGLAGES) -> Contrat:
+    """Les seuls réglages du contrat, sans l'environnement : les formes de l'API en
+    dérivent (bornes et défauts de la recherche, longueur de la question)."""
+    ecarts: list[str] = []
+    contrat = _contrat(_lecteur(fichier, ecarts))
+    if ecarts:
+        raise ConfigurationInvalide(ecarts)
+    return contrat
+
+
+def besoin_memoire(fichier: Path = FICHIER_REGLAGES) -> int:
+    """Le pic de mémoire vive de l'API, en octets (seuils de `verify-poste`)."""
+    ecarts: list[str] = []
+    lecteur = _lecteur(fichier, ecarts)
+    besoin = lecteur.entier(lecteur.table("memoire"), "memoire", "besoin_octets", 1)
+    if ecarts:
+        raise ConfigurationInvalide(ecarts)
+    return besoin
+
+
+def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reglages:
+    """Les réglages validés ; `ConfigurationInvalide` au premier passage fautif."""
+    ecarts: list[str] = []
+    lecteur = _lecteur(fichier, ecarts)
+    contrat = _contrat(lecteur)
     t = lecteur.table("corps")
     corps = lecteur.entier(t, "corps", "octets_max", 1)
     t = lecteur.table("debit")
@@ -284,6 +336,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     t = lecteur.table("delais")
     delai_service = lecteur.nombre(t, "delais", "service_s")
     delai_base = lecteur.nombre(t, "delais", "base_s")
+    delai_chargement = lecteur.nombre(t, "delais", "chargement_s")
     t = lecteur.table("pool")
     pool_min = lecteur.entier(t, "pool", "min", 1)
     pool_max = lecteur.entier(t, "pool", "max", 1)
@@ -301,6 +354,13 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     journal_question = lecteur.booleen(t, "journal", "question_en_clair")
     t = lecteur.table("service")
     instance = lecteur.texte(t, "service", "instance")
+    table_vecteurs = lecteur.texte(t, "service", "table")
+    if table_vecteurs and not TABLE_VECTEURS.fullmatch(table_vecteurs):
+        ecarts.append(
+            "reglages.toml : [service] table : bench.vecteurs_<modèle> attendu"
+        )
+    t = lecteur.table("memoire")
+    besoin = lecteur.entier(t, "memoire", "besoin_octets", 1)
     t = lecteur.table("serveur")
     hote_fichier = lecteur.texte(t, "serveur", "hote")
     port_fichier = lecteur.entier(t, "serveur", "port", 1)
@@ -323,16 +383,17 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         cles=lire_cles(environ.get("API_MODELE_CLES"), ecarts),
         dsn=lire_dsn(environ.get("API_MODELE_DSN"), ecarts),
         version=version,
-        nombre_series=nombre_series,
-        passages_par_serie=passages,
-        catalogue_seul=catalogue_seul,
-        longueur_question_max=longueur,
+        nombre_series=contrat.nombre_series,
+        passages_par_serie=contrat.passages_par_serie,
+        catalogue_seul=contrat.catalogue_seul,
+        longueur_question_max=contrat.longueur_question_max,
         corps_octets_max=corps,
         debit_par_minute=_surcharge_entiere(
             environ, "API_MODELE_DEBIT_PAR_MINUTE", debit, 1, 100_000, ecarts
         ),
         delai_service_s=delai_service,
         delai_base_s=delai_base,
+        delai_chargement_s=delai_chargement,
         pool_min=pool_min,
         pool_max=pool_max,
         pool_attente_s=pool_attente,
@@ -341,6 +402,8 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
             environ, "API_MODELE_JOURNAL_QUESTION", journal_question, ecarts
         ),
         instance=instance,
+        table_vecteurs=table_vecteurs,
+        memoire_besoin_octets=besoin,
         client_hote=_hote(environ.get("CLIENT_HOTE"), "CLIENT_HOTE", ecarts),
         hote=_hote(environ.get("API_MODELE_HOTE"), "API_MODELE_HOTE", ecarts)
         or hote_fichier,

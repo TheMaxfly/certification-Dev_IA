@@ -1,7 +1,7 @@
 # 11 — API du modèle
 
-> Ébauche (E3, étape 2, bloc 02). Le README complet vient avec la documentation de
-> l'étape.
+> Ébauche (E3, étape 2, blocs 02 et 03). Le README complet vient avec la
+> documentation de l'étape.
 
 Une API REST qui expose le modèle d'embedding en service : une question entre, une
 liste de séries classées sort, avec les passages qui les justifient. Elle reprend
@@ -35,12 +35,20 @@ Au démarrage, l'API vérifie, et refuse de démarrer au moindre écart :
 - un encodage est en service, terminé, sur un corpus clos, du modèle et de la
   dimension que sert l'instance ;
 - `/info` du service est conforme à cet encodage (`confronter` du module 09) ;
-- la borne de la question tient sous la longueur maximale du service.
+- la borne de la question tient sous la longueur maximale du service ;
+- le classement du banc se charge : rattachement des fragments et vecteurs de
+  l'encodage en service seulement (77 006 en 17 s, pic de 1,5 Go, puis 0,5 Go
+  résidents, mesurés le 2026-10-20).
 
-## Routes (bloc 02)
+Ce qui est servi est ce qui a été mesuré : `tests/test_egalite_banc.py` rejoue les
+69 questions du jeu gelé et compare les dix premières séries au run de référence du
+banc (étape d'équivalence de `make verify-poste`, sous `modele_api`).
+
+## Routes
 
 | Route | Clé | Rôle |
 |---|---|---|
+| `POST /v1/recherche` | oui | une question → les séries classées (`nombre_series` 10, de 1 à 50 ; `passages_par_serie` 1, de 1 à 5 ; `catalogue_seul` vrai), avec leurs passages et le contexte (modèle, révision, corpus, encodage, réglages, identifiant, durée) |
 | `GET /v1/sante` | non | base, service, encodage en service : `ok` ou `degrade` (503) |
 | `GET /v1/info` | oui | modèle, révision, encodage et corpus servis ; réglages et bornes |
 | `GET /metrics` | non | Prometheus, aux seules adresses de `API_MODELE_METRIQUES_RESEAUX` (404 ailleurs) |

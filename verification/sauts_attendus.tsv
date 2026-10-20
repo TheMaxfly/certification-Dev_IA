@@ -11,5 +11,5 @@
 05	4	base réelle (APIMANGA_DSN jamais fourni) : test_controle_tetes 1, test_rattachement_apimanga 3
 08	4	base et raw réels, poste seulement (étape « état d'apimanga » de verify-poste) : test_chargeur_kitsu_fidelite 2, test_perimetre_integration 1 ; raw Kitsu absent d'un clone : test_3_empreinte_du_raw_inchangee 1 (passe sur le poste, où le raw existe)
 09	1	échantillon d'équivalence absent ou instance non lancée : test_equivalence 1 (accord de Max, 2026-10-09 ; joué par verify-poste)
-11	0	aucun saut admis (E3 étape 2, bloc 02) ; le test d'égalité avec le banc, qui demande le service, en prendra 1 (accord du cadre)
+11	1	base réelle et instance EmbeddingGemma, poste seulement (étape d'équivalence de verify-poste, sous modele_api) : test_egalite_avec_le_banc_sur_les_69_questions 1 (accord du cadre, E3 étape 2)
 demo	4	base réelle (DATABASE_URL jamais fournie) : test_etat 4

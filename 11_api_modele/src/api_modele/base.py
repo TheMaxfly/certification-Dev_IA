@@ -36,6 +36,20 @@ SQL_CORPUS = (
     "SELECT clos_le IS NOT NULL, nb_documents, nb_fragments FROM bench.corpus"
     " WHERE corpus_id = %s"
 )
+SQL_TITRES_SERIES = (
+    "SELECT series_id, series_title FROM manga.ms_series_enriched"
+    " WHERE series_id = ANY(%s)"
+)
+SQL_TITRES_KITSU = (
+    "SELECT kitsu_id, title FROM bench.corpus_docs WHERE corpus_id = %s"
+    " AND source = 'kitsu_synopsis' AND kitsu_id = ANY(%s)"
+)
+SQL_PASSAGES = """
+SELECT k.chunk_id, k.doc_key, d.source, k.chunk_text
+  FROM bench.corpus_chunks k
+  JOIN bench.corpus_docs d ON d.corpus_id = k.corpus_id AND d.doc_key = k.doc_key
+ WHERE k.corpus_id = %s AND k.chunk_id = ANY(%s)
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,12 +93,16 @@ def creer_pool(reglages: Reglages) -> Pool:
 
 
 @contextmanager
-def transaction(pool: Pool, reglages: Reglages) -> Generator[Connection[TupleRow]]:
-    """Une connexion du pool, sa transaction bornée par le délai de la base."""
+def transaction(
+    pool: Pool, reglages: Reglages, delai_s: float | None = None
+) -> Generator[Connection[TupleRow]]:
+    """Une connexion du pool, sa transaction bornée par le délai de la base (ou par
+    `delai_s`, pour le chargement du démarrage)."""
+    delai = reglages.delai_base_s if delai_s is None else delai_s
     with pool.connection(timeout=reglages.pool_attente_s) as cx:
         cx.execute(
             "SELECT set_config('statement_timeout', %s, true)",
-            (f"{round(reglages.delai_base_s * 1000)}ms",),
+            (f"{round(delai * 1000)}ms",),
         )
         yield cx
 
@@ -129,3 +147,33 @@ def lire_corpus(
         None if ligne[1] is None else int(ligne[1]),
         None if ligne[2] is None else int(ligne[2]),
     )
+
+
+def lire_titres(
+    cx: Connection[TupleRow],
+    corpus_id: str,
+    series_ids: list[int],
+    kitsu_ids: list[int],
+) -> tuple[dict[int, str], dict[int, str]]:
+    """Le titre MS de chaque série ; celui du synopsis de chaque œuvre Kitsu."""
+    series = {
+        int(i): str(t)
+        for i, t in cx.execute(SQL_TITRES_SERIES, (series_ids,)).fetchall()
+        if t is not None
+    }
+    kitsu = {
+        int(i): str(t)
+        for i, t in cx.execute(SQL_TITRES_KITSU, (corpus_id, kitsu_ids)).fetchall()
+        if t is not None
+    }
+    return series, kitsu
+
+
+def lire_passages(
+    cx: Connection[TupleRow], corpus_id: str, chunk_ids: list[int]
+) -> dict[int, tuple[str, str, str]]:
+    """(doc_key, source, texte) de chaque fragment demandé, tel qu'au corpus."""
+    return {
+        int(c): (str(d), str(s), str(t))
+        for c, d, s, t in cx.execute(SQL_PASSAGES, (corpus_id, chunk_ids)).fetchall()
+    }

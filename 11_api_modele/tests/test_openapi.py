@@ -9,7 +9,7 @@ from openapi_spec_validator import OpenAPIV31SpecValidator
 import api_modele
 from api_modele.contrat import DESTINATION, contrat, exporter, serialiser
 
-ROUTES_PROTEGEES = {"/v1/info"}
+ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche"}
 ROUTES_OUVERTES = {"/v1/sante", "/v1/openapi.json"}
 
 
@@ -32,7 +32,7 @@ def test_le_contrat_est_un_openapi_3_1_valide():
 def test_les_routes_du_contrat_sont_sous_v1():
     chemins = set(contrat()["paths"])
 
-    assert chemins == {"/v1/sante", "/v1/info"}
+    assert chemins == {"/v1/sante", "/v1/info", "/v1/recherche"}
     assert all(c.startswith("/v1/") for c in chemins)
 
 
@@ -54,11 +54,37 @@ def test_un_seul_schema_de_securite_la_cle_en_en_tete():
 
 
 def test_les_erreurs_des_routes_protegees_sont_declarees():
-    reponses = contrat()["paths"]["/v1/info"]["get"]["responses"]
+    chemins = contrat()["paths"]
+    attendus = {
+        ("/v1/info", "get"): ("401", "429"),
+        ("/v1/recherche", "post"): ("401", "413", "422", "429", "503"),
+    }
+    for (chemin, methode), statuts in attendus.items():
+        reponses = chemins[chemin][methode]["responses"]
+        for statut in statuts:
+            schema = reponses[statut]["content"]["application/json"]["schema"]
+            assert schema == {"$ref": "#/components/schemas/Erreur"}, (chemin, statut)
 
-    for statut in ("401", "429"):
-        schema = reponses[statut]["content"]["application/json"]["schema"]
-        assert schema == {"$ref": "#/components/schemas/Erreur"}
+
+def test_le_422_natif_de_fastapi_n_apparait_pas():
+    """La forme d'erreur unique : pas de `HTTPValidationError` (la dette du 02)."""
+    document = contrat()
+
+    assert "HTTPValidationError" not in document["components"]["schemas"]
+
+
+def test_l_entree_de_la_recherche_porte_les_bornes_du_contrat():
+    schema = contrat()["components"]["schemas"]["Recherche"]
+    proprietes = schema["properties"]
+
+    assert schema["additionalProperties"] is False
+    assert schema["required"] == ["question"]
+    assert proprietes["question"]["maxLength"] == 500
+    nombre = proprietes["nombre_series"]
+    assert (nombre["default"], nombre["minimum"], nombre["maximum"]) == (10, 1, 50)
+    assert proprietes["passages_par_serie"]["default"] == 1
+    assert proprietes["passages_par_serie"]["maximum"] == 5
+    assert proprietes["catalogue_seul"]["default"] is True
 
 
 def test_la_sante_declare_son_503():

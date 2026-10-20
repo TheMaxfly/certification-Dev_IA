@@ -51,9 +51,12 @@ def test_le_demarrage_est_journalise(reglages, service_doublure, caplog):
             pass
 
     evenements = [r.getMessage() for r in caplog.records]
-    assert evenements[0] == "demarrage"
-    assert evenements[-1] == "arret"
-    assert caplog.records[0].champs["corpus_id"] == "v7"
+    assert evenements == ["chargement", "demarrage", "arret"]
+    chargement = caplog.records[0].champs
+    assert (chargement["corpus_id"], chargement["fragments"]) == ("v7", 4)
+    assert chargement["entites"] == 3
+    assert chargement["memoire_residente_octets"] > 0
+    assert caplog.records[1].champs["corpus_id"] == "v7"
 
 
 def test_le_format_json_met_les_champs_a_plat():

@@ -1,0 +1,7 @@
+id = "API-13"
+origine = "E3 étape 2, bloc 03 (2026-10-20) — catalogue_seul limite le classement au catalogue (mesure 8)"
+fichier = "11_api_modele/src/api_modele/classement.py"
+avant = '''            self._entites, scores, "catalogue" if catalogue_seul else "toutes"'''
+apres = '''            self._entites, scores, "toutes"'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "par_defaut_les_series_du_catalogue"]

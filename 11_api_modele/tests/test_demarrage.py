@@ -12,6 +12,7 @@ from dataclasses import replace
 import psycopg
 import pytest
 from conftest import (
+    AXES,
     BaseApi,
     Doublure,
     dsn_du_role,
@@ -19,6 +20,7 @@ from conftest import (
     garnir,
     inscrire_encodage,
     promouvoir,
+    vectoriser,
 )
 from fastapi.testclient import TestClient
 
@@ -155,6 +157,7 @@ def test_un_encodage_non_termine_refuse(base_api: BaseApi, reglages, service_dou
 def test_la_vue_designe_le_dernier_promu(base_api: BaseApi, reglages, service_doublure):
     with psycopg.connect(base_api.dsn_admin) as cx:
         autre = inscrire_encodage(cx, service_doublure.instance, outil_version="1.9.5")
+        vectoriser(cx, autre, AXES)
         promouvoir(cx, autre)
     Doublure.info["version"] = "1.9.5"
 

@@ -12,7 +12,7 @@
 #     dans l'ordre déclaré, arrêt à la première refusée ; inconnue : échec ; aucune
 #     lancée pour un module qui n'en déclare pas, ni après des tests en échec ;
 #   - volumes Docker créés pendant la vérification : supprimés (si Docker répond) ;
-#   - équivalence du service sans échantillon : échec (verify-poste) ;
+#   - équivalence du service sans échantillon, de l'API sans DSN : échec (verify-poste) ;
 #   - cohérence MODULES ↔ graphe ↔ matrice de verify.yml ;
 #   - règles des workflows (controler_workflows.sh), chaque écart provoqué.
 set -uo pipefail
@@ -208,6 +208,14 @@ verifier "$T/m_env" equivalence
 rc=$?
 constat "équivalence sans échantillon : échec" [ "$rc" -ne 0 ]
 constat "équivalence sans échantillon : le dit" dit "aucun échantillon"
+mkdir -p "$D/09_service_embedding/mesures/equivalence"
+: >"$D/09_service_embedding/mesures/equivalence/encodage_1.json"
+verifier "$T/m_env" equivalence
+rc=$?
+constat "équivalence de l'API sans DSN : échec" [ "$rc" -ne 0 ]
+constat "équivalence de l'API sans DSN : le dit, avant tout lancement" \
+  bash -c "grep -qF 'APIMANGA_MODELE_DSN absent' '$T/sortie' && ! grep -qF 'docker compose' '$T/sortie'"
+rm -rf "$D/09_service_embedding"
 
 # --- Cohérence MODULES ↔ graphe ↔ matrice ------------------------------------- #
 { ligne vert; ligne rouge; } >"$T/m_coherence"

@@ -1,8 +1,9 @@
 """L'application : routes `/v1/`, cycle de vie, enveloppe, erreurs.
 
-Au démarrage, le pool est ouvert et la cohérence vérifiée (`demarrage.verifier`) ;
-un écart, et l'API ne démarre pas. Les routes de ce bloc : `/v1/sante` (sans clé),
-`/v1/info` (avec clé), `/metrics` (réseau interne). La recherche vient au bloc 03.
+Au démarrage, le pool est ouvert, la cohérence vérifiée (`demarrage.verifier`) et
+le classement du banc chargé (rattachement et vecteurs de l'encodage en service) ;
+un écart, et l'API ne démarre pas. Routes : `/v1/recherche` et `/v1/info` (avec
+clé), `/v1/sante` (sans clé), `/metrics` (réseau interne).
 """
 
 from __future__ import annotations
@@ -17,7 +18,17 @@ from fastapi.responses import JSONResponse, Response
 from psycopg import Error as ErreurBase
 from psycopg_pool import PoolTimeout
 
-from api_modele import __version__, base, demarrage, erreurs, journal, service
+from api_modele import (
+    __version__,
+    base,
+    demarrage,
+    erreurs,
+    journal,
+    memoire,
+    recherche,
+    service,
+)
+from api_modele.classement import Classeur
 from api_modele.configuration import Reglages
 from api_modele.debit import Limiteur
 from api_modele.enveloppe import Enveloppe
@@ -29,7 +40,9 @@ from api_modele.modeles import (
     BorneEntiere,
     Info,
     Question,
+    Recherche,
     ReglagesRecherche,
+    Resultat,
     Sante,
 )
 from api_modele.securite import exiger_cle
@@ -49,7 +62,56 @@ REPONSES_CLE: dict[int | str, dict[str, object]] = {
     429: {"model": Erreur, "description": "Débit dépassé pour cette clé."},
 }
 
+REPONSES_RECHERCHE: dict[int | str, dict[str, object]] = {
+    **REPONSES_CLE,
+    413: {"model": Erreur, "description": "Corps de requête trop volumineux."},
+    422: {
+        "model": Erreur,
+        "description": "Entrée invalide (`entree_invalide`) ou question trop longue"
+        " (`question_trop_longue`).",
+    },
+    503: {
+        "model": Erreur,
+        "description": "Service d'embedding indisponible ou incohérent, base"
+        " indisponible, ou encodage en service changé depuis le démarrage.",
+    },
+}
+
 CleExigee = Annotated[str, Depends(exiger_cle)]
+
+
+def charger_classement(
+    pool: base.Pool, reglages: Reglages, coherence: demarrage.Coherence
+) -> Classeur:
+    """Le classement du banc, pour l'encodage en service ; rendu de la mémoire."""
+    encodage = coherence.encodage
+    debut = time.perf_counter()
+    try:
+        with base.transaction(pool, reglages, reglages.delai_chargement_s) as cx:
+            classeur = Classeur.charger(
+                cx, encodage.corpus_id, reglages.table_vecteurs, encodage.encodage_id
+            )
+    except (ErreurBase, PoolTimeout, ValueError) as exc:
+        raise demarrage.DemarrageRefuse(f"chargement du classement : {exc}") from exc
+    if classeur.nb_fragments != coherence.nb_fragments:
+        raise demarrage.DemarrageRefuse(
+            f"{classeur.nb_fragments} fragments chargés, l'encodage en compte"
+            f" {coherence.nb_fragments}"
+        )
+    memoire.rendre_au_systeme()
+    journal.evenement(
+        "chargement",
+        {
+            "corpus_id": classeur.corpus_id,
+            "fragments": classeur.nb_fragments,
+            "entites": classeur.nb_entites,
+            "matrice_octets": classeur.octets_matrice,
+            "duree_s": round(time.perf_counter() - debut, 1),
+            "memoire_residente_octets": memoire.rss_octets(),
+            "memoire_pic_octets": memoire.pic_octets(),
+        },
+    )
+    return classeur
 
 
 def creer_application(
@@ -76,6 +138,7 @@ def creer_application(
                     f" {reglages.pool_attente_s} s"
                 ) from exc
             coherence = demarrage.verifier(pool, client, inst, reglages)
+            classeur = charger_classement(pool, reglages, coherence)
         except demarrage.DemarrageRefuse as exc:
             journal.evenement("demarrage_refuse", {"raison": str(exc)}, 40)
             pool.close()
@@ -86,6 +149,7 @@ def creer_application(
             pool=pool,
             client=client,
             coherence=coherence,
+            classeur=classeur,
             limiteur=Limiteur(reglages.debit_par_minute, horloge),
             metriques=metriques,
         )
@@ -135,6 +199,27 @@ def creer_application(
         contexte=contexte,
     )
     prefixe = f"/{reglages.version}"
+
+    @app.post(
+        f"{prefixe}/recherche",
+        response_model=Resultat,
+        responses=REPONSES_RECHERCHE,
+        tags=["recherche"],
+        summary="Les séries classées pour une question, avec leurs passages",
+    )
+    def rechercher(request: Request, corps: Recherche, _cle: CleExigee) -> Resultat:
+        debut = time.perf_counter()
+        etat = etat_de(request)
+        if corps.identite is not None:
+            request.state.identite = corps.identite
+        request.state.reglages = {
+            "nombre_series": corps.nombre_series,
+            "passages_par_serie": corps.passages_par_serie,
+            "catalogue_seul": corps.catalogue_seul,
+        }
+        if etat.reglages.journal_question:
+            request.state.question = corps.question
+        return recherche.rechercher(etat, corps, erreurs.identifiant(request), debut)
 
     @app.get(
         f"{prefixe}/sante",

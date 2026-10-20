@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from api_modele.base import Pool
+from api_modele.classement import Classeur
 from api_modele.configuration import Reglages
 from api_modele.debit import Limiteur
 from api_modele.demarrage import Coherence
@@ -21,6 +22,7 @@ class EtatApi:
     pool: Pool
     client: ClientService
     coherence: Coherence
+    classeur: Classeur
     limiteur: Limiteur
     metriques: Metriques
 

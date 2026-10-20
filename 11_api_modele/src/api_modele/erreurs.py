@@ -93,6 +93,8 @@ RAISONS = {
     "dict_type": "type",
     "model_attributes_type": "type",
     "json_invalid": "json_invalide",
+    "string_pattern_mismatch": "forme",
+    "vide": "vide",
 }
 #: Les clés du contexte de Pydantic qui disent une borne.
 BORNES = (("ge", "le"), ("gt", "lt"), ("min_length", "max_length"))
@@ -134,12 +136,32 @@ async def _erreur_api(request: Request, exc: Exception) -> JSONResponse:
 async def _validation(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, RequestValidationError):
         raise exc
+    erreurs = list(exc.errors())
+    for erreur in erreurs:
+        # La question trop longue a son code : avant tout appel au service.
+        if (
+            tuple(erreur.get("loc", ())) == ("body", "question")
+            and erreur.get("type") == "string_too_long"
+        ):
+            contexte = cast(Mapping[str, Any], erreur.get("ctx") or {})
+            maximum = contexte.get("max_length")
+            return reponse(
+                request,
+                422,
+                "question_trop_longue",
+                f"La question dépasse {maximum} caractères.",
+                {
+                    "longueur": len(str(erreur.get("input", ""))),
+                    "maximum": maximum,
+                    "unite": "caracteres",
+                },
+            )
     return reponse(
         request,
         422,
         "entree_invalide",
         "Entrée invalide.",
-        {"champs": champs(list(exc.errors()), bornes_de(request))},
+        {"champs": champs(erreurs, bornes_de(request))},
     )
 
 

@@ -87,7 +87,7 @@ def test_info_dit_ce_qui_est_servi(api, base_api: BaseApi, service_doublure):
         "outil_version": "1.9.4",
         "corpus_id": "v7",
         "encodage_id": base_api.encodage_id,
-        "nb_fragments": 3,
+        "nb_fragments": 4,
         "reglages": {
             "nombre_series": {"defaut": 10, "min": 1, "max": 50},
             "passages_par_serie": {"defaut": 1, "min": 1, "max": 5},

@@ -19,7 +19,8 @@
 #                                   modules à base jetable se correspondent ; REGLES=1
 #                                   (poste) : les contrôles obligatoires de l'ensemble
 #                                   de règles de GitHub aussi, relevés par gh
-#   verifier.sh equivalence         l'étape d'équivalence du service (poste) seule
+#   verifier.sh equivalence         l'étape d'équivalence (poste) seule : le service,
+#                                   puis l'API du modèle, sur la même instance
 #   verifier.sh preparer MODULE     uv sync --locked de ce module (et de database/
 #                                   s'il en dépend) : l'étape d'avant verify sur GitHub
 #   verifier.sh image               tire, par empreinte, l'image PostgreSQL que les
@@ -707,27 +708,60 @@ preparer() {
 #  Poste : verify, puis les harnais qui ne tournent que sur ce poste
 # --------------------------------------------------------------------------- #
 
-# Le test d'équivalence du service (E3, étape 1, bloc F) : l'instance EmbeddingGemma
-# réencode les échantillons exportés (09_…/mesures/equivalence/, hors dépôt) et les
-# compare à leurs encodages. Une vérification qui ne tourne pas est un échec : sans
-# échantillon, refus. Une seule instance à la fois : refus si une instance tourne déjà.
+# Le DSN d'une étape du poste, lu dans verification/.env (sans mot de passe : il est
+# dans ~/.pgpass) par cette étape seule.
+dsn_du_poste() {  # dsn_du_poste <clé>
+  local fichier="$RACINE/verification/.env"
+  [ -r "$fichier" ] || return 1
+  grep -E "^[[:space:]]*(export[[:space:]]+)?$1=" "$fichier" | tail -n 1 |
+    sed -E 's/^[^=]*=//; s/^[[:space:]]*//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
+}
+
+# L'étape d'équivalence, sur UNE instance EmbeddingGemma, levée puis arrêtée quoi
+# qu'il arrive :
+#   - le service (E3, étape 1, bloc F) : l'instance réencode les échantillons exportés
+#     (09_…/mesures/equivalence/, hors dépôt) et les compare à leurs encodages ;
+#   - l'API du modèle (E3, étape 2, bloc 03) : les 69 questions du jeu gelé, rejouées
+#     par l'API, rendent les dix premières séries du run de référence. Seconde
+#     exception de CONTRIBUTING.md : la base réelle, sous modele_api, en lecture
+#     seule ; le DSN (APIMANGA_MODELE_DSN de verification/.env) n'est passé qu'à ce
+#     test, qui échoue au lieu de sauter s'il ne peut pas comparer.
+# Une vérification qui ne tourne pas est un échec : sans échantillon ou sans DSN,
+# refus. Une seule instance à la fois : refus si une instance tourne déjà.
 equivalence_du_service() {
-  local module="$RACINE/09_service_embedding" rc
+  local module="$RACINE/09_service_embedding" api="$RACINE/11_api_modele" rc dsn
   compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null ||
     echouer poste "équivalence du service : aucun échantillon exporté" \
       "(09_service_embedding/) uv run python -m service_embedding.equivalence exporter --encodage <n>"
+  dsn="$(dsn_du_poste APIMANGA_MODELE_DSN)"
+  [ -n "$dsn" ] ||
+    echouer poste "équivalence de l'API : APIMANGA_MODELE_DSN absent de verification/.env" \
+      "verification/.env.example"
   if docker ps --format '{{.Names}}' | grep -q '^tei-'; then
     echouer poste "équivalence du service" "une instance du service tourne déjà"
   fi
   (cd "$module" && "${PROPRE[@]}" uv run --locked python -m service_embedding.controles etat) ||
     echouer poste "équivalence du service" "mémoire sous les seuils"
+  (cd "$api" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire) ||
+    echouer poste "équivalence de l'API" "mémoire sous le seuil du service et de l'API"
   dire "poste — (09_service_embedding/) équivalence du service"
   (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma up -d >/dev/null) ||
     echouer poste "équivalence du service" "docker compose --profile embeddinggemma up -d"
   for _ in $(seq 1 90); do curl -sf 127.0.0.1:8082/health >/dev/null && break; sleep 2; done
   (cd "$module" && "${PROPRE[@]}" uv run --locked --extra dev pytest -q -p no:cacheprovider \
     tests/test_equivalence.py -k service_reel -rs); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    dire "poste — (11_api_modele/) équivalence de l'API : les 69 questions, sous modele_api"
+    mkdir -p "$SORTIES/poste"
+    (cd "$api" && "${PROPRE[@]}" API_MODELE_EGALITE_DSN="$dsn" API_MODELE_EGALITE_EXIGEE=1 \
+      API_MODELE_EGALITE_SORTIE="$SORTIES/poste/egalite_api.json" \
+      uv run --locked --extra dev pytest -q -p no:cacheprovider -s \
+      tests/test_egalite_banc.py -rs); rc=$?
+    [ "$rc" -eq 0 ] || rc=$((rc + 100))
+  fi
   (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma down >/dev/null 2>&1)
+  [ "$rc" -lt 100 ] || echouer poste "équivalence de l'API (code $((rc - 100)))" \
+    "(11_api_modele/) pytest tests/test_egalite_banc.py"
   [ "$rc" -eq 0 ] || echouer poste "équivalence du service (code $rc)" "pytest tests/test_equivalence.py"
 }
 
@@ -740,6 +774,14 @@ memoire_d_abord() {
     printf '%s\n' "$etat"
     echouer poste "mémoire sous les seuils : rien n'a été lancé" \
       "libérer de la mémoire (5 Go disponibles, 4 Go de mémoire vidéo libre), puis make verify-poste"
+  fi
+  printf '%s\n' "$etat"
+  # L'API du modèle s'ajoute au service pendant l'équivalence : son pic de démarrage
+  # (11_api_modele/config/reglages.toml, [memoire]) s'ajoute au seuil du service.
+  if ! etat="$(cd "$RACINE/11_api_modele" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire)"; then
+    printf '%s\n' "$etat"
+    echouer poste "mémoire sous le seuil du service et de l'API : rien n'a été lancé" \
+      "libérer de la mémoire (6,6 Go disponibles), puis make verify-poste"
   fi
   printf '%s\n' "$etat"
 }
@@ -770,7 +812,7 @@ poste() {
   equivalence_du_service
   dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
   REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
-  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service, ensemble de règles passés"
+  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service et de l'API, ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #

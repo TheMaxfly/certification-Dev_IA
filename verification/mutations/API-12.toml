@@ -1,0 +1,7 @@
+id = "API-12"
+origine = "E3 étape 2, bloc 03 (2026-10-20) — les vecteurs lus sont ceux de l'encodage en service, et d'aucun autre (filtre par encodage)"
+fichier = "11_api_modele/src/api_modele/classement.py"
+avant = '''            cx, entites, table, _sans_encodeur, encodage_id=encodage_id'''
+apres = '''            cx, entites, table, _sans_encodeur, encodage_id=encodage_id - 1'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "vecteurs_lus"]
