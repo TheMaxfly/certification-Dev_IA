@@ -90,8 +90,9 @@ scenario passe  "fusion de GitHub d'auteur MaxFlavigny" eval 'cote 7 && GIT_AUTH
 scenario refuse "commit ordinaire d'auteur MaxFlavigny" eval 'ecrire m.txt "x" && git commit -q -m m --author="MaxFlavigny <max@example.invalid>"'
 scenario refuse "fusion locale d'auteur MaxFlavigny"  eval 'cote 8 && GIT_AUTHOR_NAME=MaxFlavigny git merge -q --no-ff cote8 -m "fusion locale"'
 
-# Clés des fournisseurs : par l'aspect, puis par la valeur du poste, lue dans
-# l'environnement ou dans un .env ignoré par git.
+# Clés des fournisseurs. La logique (`controler_cles`, partagée) est éprouvée cas
+# par cas côté pre-commit ; ici, la preuve que le pre-push la branche sur SES lignes :
+# un refus par l'aspect, un par la valeur du poste (avec son message).
 message() { # message <libellé> <motif attendu> <motif interdit> <commande…> : sortie du hook
     local libelle="$1" attendu="$2" interdit="$3" sortie
     shift 3
@@ -104,16 +105,6 @@ message() { # message <libellé> <motif attendu> <motif interdit> <commande…> 
     fi
 }
 scenario refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire cle_m.py "MISTRAL_API_KEY = \"$MISTRAL_FACTICE\"" && git commit -q -m cle_m'
-scenario refuse "clé OpenAI factice dans un fichier suivi"  eval 'ecrire cle_o.txt "cle : $OPENAI_FACTICE" && git commit -q -m cle_o'
-scenario refuse "clé Mistral du poste (environnement), hors motif" eval 'export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire v_m.txt "note : $HORS_MOTIF_M" && git commit -q -m v_m'
-unset MISTRAL_API_KEY
-scenario refuse "clé OpenAI du poste (.env ignoré), hors motif" eval 'ecrire .gitignore ".env" && printf "OPENAI_API_KEY=%s\n" "$HORS_MOTIF_O" >.env && ecrire v_o.txt "note : $HORS_MOTIF_O" && git commit -q -m v_o'
-rm -f .env
-scenario refuse "clé factice dans un texte non UTF-8" eval 'export LC_ALL=C.UTF-8 && printf "caf\351 cle : %s\n" "$OPENAI_FACTICE" >l1.txt && git add l1.txt && git commit -q -m l1'
-unset LC_ALL
-scenario passe  "variable absente : aucun refus"      eval 'ecrire w.txt "texte ordinaire" && git commit -q -m w'
-scenario passe  "clé factice dans un .env ignoré"     eval 'ecrire .gitignore ".env" && printf "MISTRAL_API_KEY=%s\n" "$MISTRAL_FACTICE" >.env && ecrire x.txt "propre" && git commit -q -m x'
-rm -f .env
 message "refus du push : fournisseur et fichier nommés, valeur jamais" \
     "clé Mistral du poste en clair dans v_m2\.txt" "$HORS_MOTIF_M" eval '
     export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire v_m2.txt "note : $HORS_MOTIF_M" &&

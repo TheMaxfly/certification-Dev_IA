@@ -450,24 +450,21 @@ def test_volume_identity_isbn13_non_unique(base_migree):
     assert total[0] == 2
 
 
-@pytest.mark.parametrize("methode", ["kitsu_bridge", "trgm", "manual"])
-def test_match_decision_accepte_les_methodes_de_la_cascade(base_migree, methode):
+@pytest.mark.parametrize("statut", ["auto", "validated", "rejected", "needs_review"])
+def test_match_decision_accepte_les_statuts(base_migree, statut):
+    """Les quatre statuts du CHECK de 001 (le refus d'un statut inconnu suit).
+
+    Seul test de `database/tests` qui écrit `rejected` et `needs_review` : les
+    tests de la contrainte des méthodes, réunis dans les `test_018_*`, n'écrivent
+    plus que `auto`.
+    """
     with psycopg.connect(base_migree) as connexion:
         connexion.execute(
             "INSERT INTO manga.match_decision (series_id, method, status) "
-            "VALUES (1, %s, 'auto')",
-            (methode,),
+            "VALUES (1, 'exact', %s)",
+            (statut,),
         )
         connexion.commit()
-
-
-def test_match_decision_refuse_une_methode_hors_cascade(base_migree):
-    with psycopg.connect(base_migree) as connexion:
-        with pytest.raises(psycopg.errors.CheckViolation):
-            connexion.execute(
-                "INSERT INTO manga.match_decision (series_id, method, status) "
-                "VALUES (1, 'au_pif', 'auto')"
-            )
 
 
 def test_match_decision_refuse_un_statut_inconnu(base_migree):
@@ -1295,94 +1292,6 @@ def test_kitsu_meta_un_seul_enregistrement_par_oeuvre(base_migree):
             connexion.execute(
                 "INSERT INTO manga.kitsu_meta (kitsu_id, annee, subtype) "
                 "VALUES (1, 1999, 'manga')"
-            )
-
-
-@pytest.mark.parametrize("methode", ["exact_kitsu", "exact_kitsu_author", "llm_review"])
-def test_009_elargit_le_check_des_methodes(base_migree, methode):
-    """Le CHECK est un contrat : l'étage 2 et l'étage R ne s'autorisent pas une
-    méthode, ils la font ajouter par migration."""
-    with psycopg.connect(base_migree) as connexion:
-        connexion.execute(
-            "INSERT INTO manga.match_decision (series_id, method, status) "
-            "VALUES (1, %s, 'needs_review')",
-            (methode,),
-        )
-        connexion.commit()
-
-
-def test_009_conserve_les_methodes_anterieures(base_migree):
-    """Élargir n'est pas remplacer : les 3 523 décisions déjà journalisées
-    doivent rester valides au regard du nouveau CHECK."""
-    with psycopg.connect(base_migree) as connexion:
-        for methode in (
-            "kitsu_bridge",
-            "exact",
-            "exact_author",
-            "trgm",
-            "embedding",
-            "manual",
-        ):
-            connexion.execute(
-                "INSERT INTO manga.match_decision (series_id, method, status) "
-                "VALUES (1, %s, 'auto')",
-                (methode,),
-            )
-        connexion.commit()
-
-
-def test_009_refuse_toujours_une_methode_hors_cascade(base_migree):
-    """MUTATION : le CHECK élargi doit rester un CHECK."""
-    with psycopg.connect(base_migree) as connexion:
-        with pytest.raises(psycopg.errors.CheckViolation):
-            connexion.execute(
-                "INSERT INTO manga.match_decision (series_id, method, status) "
-                "VALUES (1, 'au_pif', 'auto')"
-            )
-
-
-def test_011_ajoute_human_review(base_migree):
-    """Le run 2 de l'étage R corrige les faux positifs du socle : la revue
-    HUMAINE tracée entre au CHECK, distincte du 'manual' générique (009 avait
-    déjà ajouté llm_review ; 011 complète le couple)."""
-    with psycopg.connect(base_migree) as connexion:
-        connexion.execute(
-            "INSERT INTO manga.match_decision (series_id, method, status) "
-            "VALUES (1, 'human_review', 'rejected')"
-        )
-        connexion.commit()
-
-
-def test_011_conserve_les_methodes_anterieures(base_migree):
-    """Élargir n'est pas remplacer : les dix méthodes (dont llm_review de 009)
-    restent valides au regard du CHECK de 011."""
-    with psycopg.connect(base_migree) as connexion:
-        for methode in (
-            "kitsu_bridge",
-            "exact",
-            "exact_author",
-            "exact_kitsu",
-            "exact_kitsu_author",
-            "trgm",
-            "embedding",
-            "llm_review",
-            "manual",
-        ):
-            connexion.execute(
-                "INSERT INTO manga.match_decision (series_id, method, status) "
-                "VALUES (1, %s, 'auto')",
-                (methode,),
-            )
-        connexion.commit()
-
-
-def test_011_refuse_toujours_une_methode_hors_cascade(base_migree):
-    """MUTATION : le CHECK à dix valeurs doit rester un CHECK."""
-    with psycopg.connect(base_migree) as connexion:
-        with pytest.raises(psycopg.errors.CheckViolation):
-            connexion.execute(
-                "INSERT INTO manga.match_decision (series_id, method, status) "
-                "VALUES (1, 'au_pif', 'auto')"
             )
 
 

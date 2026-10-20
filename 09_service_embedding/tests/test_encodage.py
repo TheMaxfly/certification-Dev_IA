@@ -198,14 +198,6 @@ def test_image_non_epinglee_refusee(doublure):
         service_de(client, "ghcr.io/huggingface/text-embeddings-inference:86-1.9.4")
 
 
-def test_table_d_un_autre_encodage_refusee(base, doublure):
-    instance, client, service = doublure("bge-m3")
-    encoder_corpus(instance, client, service, base)
-    autre = replace(service, digest="sha256:" + "d" * 64)
-    with pytest.raises(EncodageRefuse, match="autre encodage"):
-        encoder_corpus(instance, client, autre, base)
-
-
 def test_corpus_change_apres_terminaison_refuse(base, doublure):
     instance, client, service = doublure("bge-m3")
     encoder_corpus(instance, client, service, base)

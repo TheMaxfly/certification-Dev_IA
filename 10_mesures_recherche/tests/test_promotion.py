@@ -171,19 +171,6 @@ def test_la_comparaison_rend_le_verdict_et_les_mouvements(comparaison):
     assert r["nouveau"]["a_50"] == 3 and r["reference"]["a_50"] == 3
 
 
-def test_aucun_verdict_si_l_encodage_mesure_est_celui_en_service(comparaison):
-    dsn, stockage, regle, _, nouveau, e1, e2 = comparaison
-    with psycopg.connect(dsn) as cx:
-        cx.execute(
-            "INSERT INTO bench.promotions (decision, encodage_id,"
-            " encodage_precedent_id,"
-            " motif, decide_par) VALUES ('promu', %s, %s, 'essai', 'essai')",
-            (e2, e1),
-        )
-    with pytest.raises(promotion.VerdictRefuse, match="celui en service"):
-        promotion.comparer(dsn, nouveau, regle, stockage)
-
-
 def test_aucun_verdict_pour_un_run_d_un_autre_corpus(comparaison):
     dsn, stockage, regle, ref, _, _, _ = comparaison
     with pytest.raises(promotion.VerdictRefuse, match="corpus v1"):

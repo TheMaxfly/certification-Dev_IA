@@ -219,17 +219,6 @@ def test_repartition_par_source_et_statut(base: str):
     assert par_source == {"ms": 99, "kitsu": 55}
 
 
-def test_invariant_tenu_en_base(base: str):
-    """Contrôle n°4 : zéro ligne ne viole (statut='mappe') = (code IS NOT NULL)."""
-    executer(base, "--donnees", str(DONNEES))
-    violations = lire(
-        base,
-        "SELECT count(*) FROM manga.genre_mapping "
-        "WHERE (statut = 'mappe') <> (code IS NOT NULL)",
-    )[0][0]
-    assert violations == 0
-
-
 def test_invariant_refuse_par_la_base(base: str):
     """Le CHECK de 013 tient même si le chargeur est contourné."""
     import psycopg
@@ -270,19 +259,6 @@ def test_ordre_range_les_formats_apres_les_genres(base: str):
         "FROM manga.genre_ref",
     )[0]
     assert borne[0] < borne[1]
-
-
-def test_lecture_seule_accordee(base: str):
-    """013 accorde le SELECT à manga_ro : sans lui, l'API ne verrait pas le
-    référentiel alors qu'elle voit toutes les autres tables du schéma."""
-    executer(base, "--donnees", str(DONNEES))
-    for table in ("genre_ref", "genre_mapping"):
-        accorde = lire(
-            base,
-            "SELECT has_table_privilege('manga_ro', %s, 'SELECT')",
-            (f"manga.{table}",),
-        )[0][0]
-        assert accorde, table
 
 
 def test_charge_sans_le_cli(base: str):

@@ -125,7 +125,7 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 53 scénarios sur 53 ; joués aussi par la tâche statique
+bash .githooks/tester.sh   # 47 scénarios sur 47 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous

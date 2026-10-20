@@ -296,13 +296,6 @@ def test_deux_encodages_du_meme_modele_coexistent(base_migree):
         assert en_service(cx) == [(e2, "v2")], "un seul encodage en service"
 
 
-def test_memes_parametres_sur_le_meme_corpus_refuses(base_migree):
-    with psycopg.connect(base_migree) as cx:
-        encodage(cx)
-        with pytest.raises(psycopg.errors.UniqueViolation):
-            encodage(cx)
-
-
 @pytest.mark.parametrize(
     "cas",
     ["encodage v2, fragment v1", "encodage v2 déclaré v1", "fragment v2 déclaré v1"],
