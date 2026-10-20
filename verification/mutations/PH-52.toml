@@ -1,0 +1,7 @@
+id = "PH-52"
+origine = "Correctif (2026-10-20) — sauvegarde : l'empreinte des documents trie de nouveau sur doc_key seule, non unique depuis 021"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''ORDER BY corpus_id COLLATE \"C\", doc_key COLLATE \"C\")) FROM bench.corpus_docs t;'''
+apres = '''ORDER BY doc_key COLLATE \"C\")) FROM bench.corpus_docs t;'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sauvegarde_empreintes.py", "-k", "ordre_physique"]
