@@ -123,13 +123,16 @@ relecture**, par exception.
 uv run pytest tests -q
 ```
 
-**42 tests.** Les cinq contrôles imposés y figurent nommément : le `.gitignore`
+**82 tests** (2026-10-20). Les cinq contrôles imposés y figurent nommément : le `.gitignore`
 ne masque jamais un `MANIFEST.md` (vérifié par `git check-ignore`), la fusion
 d'un run partiel rend l'union et non le second seul, la cadence se vérifie sans
 réseau ni attente réelle, aucun compteur générique ne passe, et un échec sort en
 code non nul. S'y ajoutent l'idempotence du manifeste, l'égalité d'ensembles, le
-rattachement catalogue de chaque enregistrement, et — si `APIMANGA_DSN` est
-défini — la dérivation contre la base réelle, en lecture seule.
+rattachement catalogue de chaque enregistrement, et les deux chargeurs joués de bout
+en bout (raw → staging → tables, puis rejeu) sur une base PostgreSQL **jetable**
+lancée par Docker, à partir de raws factices. Seuls l'égalité au raw réel et la
+volumétrie de la base réelle exigent `APIMANGA_DSN` : ils tournent dans l'étape
+« état d'apimanga » de `make verify-poste`, en lecture seule.
 
 ## État
 

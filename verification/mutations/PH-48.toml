@@ -1,0 +1,7 @@
+id = "PH-48"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : un chemin qui remonte hors du dossier personnel est admis"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''    ..|../*|*/..|*/../*) echouer'''
+apres = '''    ..) echouer'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

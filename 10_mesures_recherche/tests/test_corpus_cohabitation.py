@@ -4,7 +4,8 @@ que le banc doit tenir.
   - aucune lecture de vecteurs sans encodage désigné ;
   - la mesure lit l'encodage désigné, sinon celui en service, sinon le seul de son
     modèle — jamais deviné entre plusieurs ; le corpus suit l'encodage ;
-  - le run inscrit son corpus et son encodage, avec ses mesures ;
+  - le run inscrit son corpus et son encodage, avec ses mesures
+    (`test_bout_en_bout.py::test_enregistrement_mlflow_et_eval_mesures`) ;
   - ce que sert l'instance est confronté au registre avant de mesurer.
 """
 
@@ -19,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import psycopg
 import pytest
 from conftest import FRAGMENTS, unitaire
+from service_embedding.client import ServiceNonConforme
 
 from mesures_recherche import executer, recherche
 
@@ -75,6 +77,21 @@ def tete(resultat: dict, question_id: str) -> str:
     return q["top"][0][0]
 
 
+def test_la_regle_du_corpus_lu_est_la_meme_dans_le_05_et_le_09():
+    """« Plusieurs corpus → le nommer » est écrite deux fois, sans vue partagée
+    (décision de Max, pas de migration) : 05 `atteignabilite.corpus_lu` et 09
+    `controles.fragments`. Le 10 voit les deux ; une copie qui dériverait casse
+    ici. Le comportement est éprouvé dans le 05
+    (`test_un_seul_corpus_est_lu_sans_etre_nomme`)."""
+    from service_embedding import controles
+
+    from mesures_recherche.entites import charger_atteignabilite
+
+    attendu = charger_atteignabilite().SQL_CORPUS_PAR_DEFAUT
+    assert "v_encodage_en_service" in attendu, "le test ne prouverait rien"
+    assert controles.SQL_CORPUS_LU == attendu
+
+
 def test_aucune_lecture_de_vecteurs_sans_encodage_designe():
     p = inspect.signature(recherche.Semantique.charger).parameters["encodage_id"]
     assert p.kind is inspect.Parameter.KEYWORD_ONLY
@@ -129,24 +146,46 @@ def test_par_defaut_l_encodage_en_service(banc, encodeur_doublure):
     assert (r["corpus_id"], r["encodage_id"], tete(r, "Q001")) == ("v2", e2, "serie:1")
 
 
-def test_le_run_inscrit_son_corpus_et_son_encodage(banc, encodeur_doublure, tmp_path):
-    import mlflow
-
-    from mesures_recherche.enregistrement import enregistrer, uri_suivi
-
+def test_l_encodage_en_service_d_un_autre_corpus_arrete_la_mesure(
+    banc, encodeur_doublure
+):
+    """La mesure lit le v2 (`--corpus v2`), l'encodage en service est celui du v1 :
+    la mesure par le sens s'arrête — désigner l'encodage ; la lexicale, elle, lit le
+    v2 sans vecteurs."""
     dsn, config, _ = banc
+    ajouter_v2(dsn)
     e1 = encodage_v1(dsn)
-    resultat = executer.mesurer(executer.ouvrir(dsn, config), 1)
-    resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
     with psycopg.connect(dsn) as cx:
-        assert cx.execute(
-            "SELECT corpus_id, encodage_id FROM bench.eval_runs WHERE run_id = %s",
-            (run_id,),
-        ).fetchall() == [("v1", e1)]
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
-    params = mlflow.get_run(run_id).data.params
-    assert (params["corpus_id"], params["encodage_id"]) == ("v1", str(e1))
+        cx.execute(
+            "INSERT INTO bench.promotions (decision, encodage_id, motif, decide_par)"
+            " VALUES ('promu', %s, 'essai', 'essai')",
+            (e1,),
+        )
+    ctx = executer.ouvrir(dsn, config, corpus_id="v2")
+    assert executer.mesurer(ctx, 3)["corpus_id"] == "v2"
+    with pytest.raises(RuntimeError, match=f"encodage {e1} : corpus v1, la mesure lit"):
+        executer.mesurer(ctx, 1)
+
+
+def test_un_encodage_d_un_autre_modele_ou_non_termine_refuse(banc):
+    dsn, _, _ = banc
+    e1 = encodage_v1(dsn)
+    with psycopg.connect(dsn) as cx:
+        with pytest.raises(RuntimeError, match="la mesure attend google/"):
+            executer.encodage_designe(cx, "google/embeddinggemma-300m", e1)
+        (en_cours,) = cx.execute(
+            "INSERT INTO bench.encodages (modele, revision, dimension,"
+            " precision_calcul, prefixe_document, prefixe_requete, outil,"
+            " outil_version, image, image_digest, taille_lot) SELECT modele, %s,"
+            " dimension, precision_calcul, prefixe_document, prefixe_requete, outil,"
+            " outil_version, image, image_digest, taille_lot FROM bench.encodages"
+            " WHERE encodage_id = %s RETURNING encodage_id",
+            ("d" * 40, e1),
+        ).fetchone()
+        with pytest.raises(RuntimeError, match=f"encodage {en_cours} : non terminé"):
+            executer.encodage_designe(cx, "BAAI/bge-m3", en_cours)
+        # Sans désignation, un encodage en cours n'est jamais choisi.
+        assert executer.encodage_designe(cx, "BAAI/bge-m3")["encodage_id"] == e1
 
 
 # --------------------------------------------------------------------------- #
@@ -175,7 +214,10 @@ def service_simule(monkeypatch):
     from service_embedding import configuration
 
     serveur = HTTPServer(("127.0.0.1", 0), Info)
-    threading.Thread(target=serveur.serve_forever, daemon=True).start()
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     vraie = configuration.charger("embeddinggemma")
     monkeypatch.setattr(
         configuration,
@@ -205,13 +247,30 @@ def test_un_service_conforme_au_registre_est_admis(service_simule):
     assert params["service_revision"] == service_simule["revision"]
 
 
-@pytest.mark.parametrize(
-    "champ, valeur",
-    [("model_sha", "0" * 40), ("model_dtype", "float16"), ("version", "1.9.5")],
-)
-def test_un_ecart_avec_le_registre_arrete(service_simule, champ, valeur):
-    Info.reponse = Info.reponse | {champ: valeur}
-    with pytest.raises(executer.ServiceNonConforme):
+def test_l_encodeur_rendu_encode_la_question_au_role_requete(
+    service_simule, monkeypatch
+):
+    """Une question, un appel au service, rôle « requete » : son vecteur."""
+    from service_embedding.client import ClientService
+
+    recus = []
+
+    def encoder(self, textes, role):
+        recus.append((list(textes), role))
+        return [[0.6, 0.8]]
+
+    monkeypatch.setattr(ClientService, "encoder", encoder)
+    d = executer.Designation("embeddinggemma", service_simule)
+    encoder_question, _ = executer.encodeur_du_service(d)
+    assert encoder_question("un manga de pirates") == [0.6, 0.8]
+    assert recus == [(["un manga de pirates"], "requete")]
+
+
+def test_un_ecart_avec_le_registre_arrete(service_simule):
+    """La preuve du branchement : la règle, champ par champ, est éprouvée dans le
+    09 (`test_client.py`, `confronter`)."""
+    Info.reponse = Info.reponse | {"model_sha": "0" * 40}
+    with pytest.raises(ServiceNonConforme):
         executer.encodeur_du_service(
             executer.Designation("embeddinggemma", service_simule)
         )
@@ -220,5 +279,15 @@ def test_un_ecart_avec_le_registre_arrete(service_simule, champ, valeur):
 def test_sans_encodage_le_service_est_confronte_a_la_configuration(service_simule):
     executer.encodeur_du_service(executer.Designation("embeddinggemma"))
     Info.reponse = Info.reponse | {"model_sha": "0" * 40}
-    with pytest.raises(executer.ServiceNonConforme):
+    with pytest.raises(ServiceNonConforme):
         executer.encodeur_du_service(executer.Designation("embeddinggemma"))
+
+
+def test_un_prefixe_de_requete_qui_n_est_pas_celui_de_l_encodage_arrete(
+    service_simule,
+):
+    """La mesure confronte le préfixe du rôle « requete » (EmbeddingGemma en a un,
+    distinct de celui des documents)."""
+    encodage = service_simule | {"prefixe_requete": "un autre préfixe : "}
+    with pytest.raises(ServiceNonConforme, match="prefixe_requete"):
+        executer.encodeur_du_service(executer.Designation("embeddinggemma", encodage))

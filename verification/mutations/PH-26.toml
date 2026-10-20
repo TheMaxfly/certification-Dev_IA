@@ -1,0 +1,7 @@
+id = "PH-26"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — verify n'est plus lancé dans un environnement vidé"
+fichier = "verification/verifier.sh"
+avant = '''PROPRE=(env -i HOME='''
+apres = '''PROPRE=(env HOME='''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

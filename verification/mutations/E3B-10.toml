@@ -1,0 +1,10 @@
+id = "E3B-10"
+origine = "E3 étape 1, bloc B (2026-10-09) — journal des promotions sans déclencheur d'ajout seul"
+fichier = "database/migrations/021_corpus_cohabitation.sql"
+avant = '''CREATE TRIGGER promotions_ajout_seul
+    BEFORE UPDATE OR DELETE ON bench.promotions
+    FOR EACH ROW EXECUTE FUNCTION bench.refuser_modification_journal();
+'''
+apres = ""
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_une_ligne_du_journal_ne_se_modifie_ni_ne_se_supprime"]

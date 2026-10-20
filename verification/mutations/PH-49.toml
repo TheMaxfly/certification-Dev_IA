@@ -1,0 +1,7 @@
+id = "PH-49"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : une configuration sans objet est admise"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''  [ ${#FICHIERS[@]} -gt 0 ] || echouer "configuration : aucun FICHIER à sauvegarder"'''
+apres = '''  :'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

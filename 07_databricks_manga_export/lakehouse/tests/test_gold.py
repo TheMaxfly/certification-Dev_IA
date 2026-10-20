@@ -4,13 +4,15 @@ La fixture fabrique deux snapshots où : le total de séries MONTE (4→5) mais 
 préfixe « di » PERD 2 séries (masqué par 0 nouvelle) — le déficit localisé qui
 DOIT flasher. `test_completude_disparues_flash` est la vérification-mutation :
 retirer le calcul de `disparues` du gold rend `disparues` null et casse le test.
+
+Silver et gold sont construits une fois par session (`gold_fabrique`, par
+`gold.build_all`, qui enchaîne les cinq constructions) ; chaque test lit sa table.
 """
 
 from __future__ import annotations
 
 from pyspark.sql import functions as F
 
-from lakehouse import gold
 from lakehouse.config import chemin_table
 
 
@@ -18,8 +20,7 @@ def _lire(spark, table):
     return spark.read.format("delta").load(str(chemin_table(table)))
 
 
-def test_volumetrie_delta(spark, silver_fabrique):
-    gold.build_volumetrie(spark)
+def test_volumetrie_delta(spark, gold_fabrique):
     lignes = {
         (r["grain"], r["snapshot_date"]): r
         for r in _lire(spark, "gold.volumetrie").collect()
@@ -31,9 +32,8 @@ def test_volumetrie_delta(spark, silver_fabrique):
     assert lignes[("series", "2026-07")]["delta_pct"] == 25.0
 
 
-def test_completude_disparues_flash(spark, silver_fabrique):
+def test_completude_disparues_flash(spark, gold_fabrique):
     """VÉRIFICATION-MUTATION : le déficit fabriqué « di » DOIT flasher."""
-    gold.build_completude_par_prefixe(spark)
     di = (
         _lire(spark, "gold.completude_par_prefixe")
         .where((F.col("prefixe") == "di") & (F.col("snapshot_date") == "2026-07"))
@@ -44,8 +44,7 @@ def test_completude_disparues_flash(spark, silver_fabrique):
     assert di["nouvelles"] == 0
 
 
-def test_remplissage_champs(spark, silver_fabrique):
-    gold.build_remplissage_champs(spark)
+def test_remplissage_champs(spark, gold_fabrique):
     lignes = {
         (r["champ"], r["snapshot_date"]): r
         for r in _lire(spark, "gold.remplissage_champs").collect()
@@ -58,8 +57,7 @@ def test_remplissage_champs(spark, silver_fabrique):
     assert lignes[("series_genres", "2026-07")]["pct_non_vide"] == 80.0
 
 
-def test_recouvrement(spark, silver_fabrique):
-    gold.build_recouvrement_snapshots(spark)
+def test_recouvrement(spark, gold_fabrique):
     lignes = {
         r["cle_type"]: r for r in _lire(spark, "gold.recouvrement_snapshots").collect()
     }
@@ -69,8 +67,7 @@ def test_recouvrement(spark, silver_fabrique):
     assert lignes["volume_url"]["communes"] == 2
 
 
-def test_qualite_ean(spark, silver_fabrique):
-    gold.build_qualite_ean(spark)
+def test_qualite_ean(spark, gold_fabrique):
     q = {r["snapshot_date"]: r for r in _lire(spark, "gold.qualite_ean").collect()}
     assert q["2026-07"]["total_volumes"] == 6
     assert q["2026-07"]["renseignes"] == 5

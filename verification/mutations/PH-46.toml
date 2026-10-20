@@ -1,0 +1,7 @@
+id = "PH-46"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : une clé inconnue de la configuration est admise"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''      *) echouer "configuration : clé inconnue « $cle »" ;;'''
+apres = '''      *) : ;;'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

@@ -19,6 +19,7 @@ dev = [
     # une. Groupe DEV uniquement : l'API ne l'embarque pas en production.
     "openapi-spec-validator>=0.7,<1",
     "pytest>=8.3.4,<10",
+    "pytest-cov>=7.1",
     "ruff>=0.8.4,<1",
 ]
 

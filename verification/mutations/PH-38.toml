@@ -1,0 +1,7 @@
+id = "PH-38"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — un jeton persistant passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''  [ "$recuperations" -eq "$sans_jeton" ] ||'''
+apres = '''  true ||'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

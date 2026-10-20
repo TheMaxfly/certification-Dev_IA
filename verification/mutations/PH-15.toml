@@ -1,0 +1,7 @@
+id = "PH-15"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le filtre des mentions du pre-push tait les lignes hors UTF-8"
+fichier = ".githooks/pre-push"
+avant = '''done < <(lignes_ajoutees "$c" | grep -aiE "$MOTS|$SIGNATURES" || true)'''
+apres = '''done < <(lignes_ajoutees "$c" | grep -iE "$MOTS|$SIGNATURES" || true)'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

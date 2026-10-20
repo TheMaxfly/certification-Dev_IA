@@ -1,0 +1,7 @@
+id = "HK-15"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — le pre-commit n'appelle plus le contrôle des clés"
+fichier = ".githooks/pre-commit"
+avant = '''controler_cles "" < <('''
+apres = '''cat >/dev/null < <('''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

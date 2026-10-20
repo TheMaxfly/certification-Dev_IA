@@ -9,105 +9,61 @@ base — jamais de repli sur `apimanga`.
 from __future__ import annotations
 
 import copy
-import json
-import os
+import importlib
+import importlib.util
+import inspect
+import pkgutil
 import shutil
-import subprocess
-import time
-import uuid
+import sys
 from pathlib import Path
 
 import numpy as np
 import psycopg
 import pytest
 
-from mesures_recherche import configuration, executer, jeu
+import mesures_recherche
+from mesures_recherche import configuration, enregistrement, executer, jeu
 
 RACINE_DEPOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = RACINE_DEPOT / "database"
-# Celle de database/tests : PostgreSQL 16 + pgvector 0.6.0, par digest.
-IMAGE_POSTGRES = (
-    "pgvector/pgvector:0.6.0-pg16"
-    "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
-)
-DELAI_DEMARRAGE = 60
 
 
-def docker_utilisable() -> bool:
-    if shutil.which("docker") is None:
-        return False
-    return subprocess.run(["docker", "info"], capture_output=True).returncode == 0
+def _charger_harnais():
+    """Le harnais partagé des bases jetables (`database/harnais_tests/`), par chemin."""
+    spec = importlib.util.spec_from_file_location(
+        "harnais_tests", MIGRATIONS / "harnais_tests" / "__init__.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["harnais_tests"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+harnais = _charger_harnais()
 
 
 @pytest.fixture(scope="session")
 def conteneur() -> str:
-    if not docker_utilisable():
-        pytest.skip("Docker indisponible : pas de base jetable, pas de repli réel.")
-    nom = f"mesures-test-{uuid.uuid4().hex[:8]}"
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "--name",
-            nom,
-            "-e",
-            "POSTGRES_PASSWORD=postgres",
-            "-p",
-            "0:5432",
-            IMAGE_POSTGRES,
-        ],
-        capture_output=True,
-        check=True,
-    )
-    try:
-        liaison = json.loads(
-            subprocess.run(
-                ["docker", "inspect", nom], capture_output=True, text=True, check=True
-            ).stdout
-        )[0]["NetworkSettings"]["Ports"]["5432/tcp"][0]
-        dsn = f"postgresql://postgres:postgres@127.0.0.1:{liaison['HostPort']}/postgres"
-
-        import psycopg
-
-        limite = time.monotonic() + DELAI_DEMARRAGE
-        while True:
-            try:
-                with psycopg.connect(dsn, connect_timeout=2):
-                    break
-            except psycopg.OperationalError:
-                if time.monotonic() > limite:
-                    raise
-                time.sleep(0.3)
+    """Un PostgreSQL jetable pour toute la session."""
+    raison = harnais.raison_de_sauter()
+    if raison:
+        pytest.skip(raison)
+    with harnais.conteneur("mesures-test") as dsn:
         yield dsn
-    finally:
-        subprocess.run(["docker", "rm", "-f", nom], capture_output=True, check=False)
+
+
+@pytest.fixture(scope="session")
+def gabarit(conteneur) -> str:
+    """La base gabarit, migrée une fois par session par le runner du dépôt."""
+    return harnais.creer_gabarit(conteneur)
 
 
 @pytest.fixture
-def base(conteneur) -> str:
-    """Une base neuve par test, migrée (000 → dernière) par le runner du dépôt."""
-    import psycopg
-
-    nom = f"t_{uuid.uuid4().hex[:12]}"
-    with psycopg.connect(conteneur, autocommit=True) as cx:
-        cx.execute(f'CREATE DATABASE "{nom}"')
-    dsn = conteneur.rsplit("/", 1)[0] + f"/{nom}"
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-    sortie = subprocess.run(
-        ["uv", "run", "python", "migrate.py", "up"],
-        cwd=MIGRATIONS,
-        capture_output=True,
-        text=True,
-        env=env | {"DATABASE_URL": dsn},
-    )
-    assert sortie.returncode == 0, f"migrations en échec : {sortie.stderr}"
-    try:
+def base(conteneur, gabarit) -> str:
+    """Une base neuve par test, copiée du gabarit migré par le runner du dépôt."""
+    with harnais.base_depuis_gabarit(conteneur, gabarit) as dsn:
         yield dsn
-    finally:
-        with psycopg.connect(conteneur, autocommit=True) as cx:
-            cx.execute(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)')
 
 
 # --------------------------------------------------------------------------- #
@@ -230,3 +186,100 @@ def encodeur_doublure(monkeypatch):
         return encoder, {"service_version": "doublure"}
 
     monkeypatch.setattr(executer, "encodeur_du_service", fabrique)
+
+
+# --------------------------------------------------------------------------- #
+#  Le magasin MLflow : initialisé une fois par session, copié pour chaque test
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="session")
+def gabarit_mlflow(tmp_path_factory) -> Path:
+    """Un magasin MLflow initialisé, une fois par session.
+
+    Créer le schéma SQLite d'un magasin coûte près de 3 s ; l'utiliser ensuite, quelques
+    centièmes. Chaque test en reçoit une copie (`stockage_mlflow`) : isolé, mais sans
+    payer l'initialisation.
+    """
+    from mlflow.tracking import MlflowClient
+
+    from mesures_recherche.enregistrement import uri_suivi
+
+    dossier = tmp_path_factory.mktemp("gabarit_mlflow")
+    MlflowClient(tracking_uri=uri_suivi(dossier)).search_experiments()
+    return dossier / "mlflow.db"
+
+
+@pytest.fixture
+def stockage_mlflow(gabarit_mlflow, tmp_path) -> Path:
+    """Un magasin MLflow propre au test, copié du gabarit de la session."""
+    dossier = tmp_path / "mlflow"
+    dossier.mkdir()
+    shutil.copyfile(gabarit_mlflow, dossier / "mlflow.db")
+    return dossier
+
+
+# --------------------------------------------------------------------------- #
+#  Les commandes (`main`) : ce qu'elles prennent par défaut, remplacé
+# --------------------------------------------------------------------------- #
+
+#: L'état git que relève l'enregistrement, dans les tests des commandes : un arbre
+#: propre, à un commit fixé — le test ne dépend pas de l'état du dépôt où il tourne.
+ARBRE_PROPRE = {"commit": "c" * 40, "arbre_module_propre": "True"}
+
+
+def modules_du_paquet() -> list:
+    """Tous les modules de `mesures_recherche`, importés."""
+    return [
+        importlib.import_module(f"mesures_recherche.{m.name}")
+        for m in pkgutil.iter_modules(mesures_recherche.__path__)
+    ]
+
+
+@pytest.fixture
+def magasin_par_defaut(stockage_mlflow, monkeypatch) -> Path:
+    """Le magasin MLflow du test, à la place de celui du module (`mlflow/`), partout où
+    une commande le prend par défaut : la constante `STOCKAGE` de chaque module, et
+    les valeurs par défaut des fonctions, figées à leur définition (`uri_suivi()`,
+    `enregistrer`, `promotion.comparer`, `journal_promotions.decider`…). Une commande
+    lancée dans le test n'écrit ni ne lit jamais le magasin du module."""
+    reel = enregistrement.STOCKAGE
+
+    def remplacer(valeur):
+        return stockage_mlflow if valeur == reel else valeur
+
+    for module in modules_du_paquet():
+        if getattr(module, "STOCKAGE", None) == reel:
+            monkeypatch.setattr(module, "STOCKAGE", stockage_mlflow)
+        for f in vars(module).values():
+            if not inspect.isfunction(f) or f.__module__ != module.__name__:
+                continue
+            if f.__defaults__ and reel in f.__defaults__:
+                monkeypatch.setattr(
+                    f, "__defaults__", tuple(map(remplacer, f.__defaults__))
+                )
+            if f.__kwdefaults__ and reel in f.__kwdefaults__.values():
+                monkeypatch.setattr(
+                    f,
+                    "__kwdefaults__",
+                    {k: remplacer(v) for k, v in f.__kwdefaults__.items()},
+                )
+    return stockage_mlflow
+
+
+@pytest.fixture
+def arbre_propre(monkeypatch) -> dict[str, str]:
+    """L'état git relevé par l'enregistrement : `ARBRE_PROPRE`."""
+    monkeypatch.setattr(enregistrement, "etat_git", lambda: dict(ARBRE_PROPRE))
+    return ARBRE_PROPRE
+
+
+@pytest.fixture
+def commande(banc, magasin_par_defaut, arbre_propre, monkeypatch):
+    """Ce que voit une commande (`main`) lancée dans le test : DATABASE_URL = la base
+    jetable, la configuration du mini-jeu à la place de la versionnée, le magasin
+    MLflow du test, un arbre propre. Rend (dsn, config, magasin)."""
+    dsn, config, _ = banc
+    monkeypatch.setenv("DATABASE_URL", dsn)
+    monkeypatch.setattr(
+        configuration, "charger", lambda chemin=None: copy.deepcopy(config)
+    )
+    return dsn, config, magasin_par_defaut

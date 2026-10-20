@@ -1,0 +1,7 @@
+id = "PH-39"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — un échec avalé passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''    done < <(grep -nE 'continue-on-error|\|\|[[:space:]]*true' "$w")'''
+apres = '''    done < <(true)'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

@@ -23,18 +23,12 @@ from tests.faux_pool import FakePool
 CLE_VALIDE = "cle-valide-de-test-0123456789abcdefghij"
 LIBELLE = "app_backend"
 
-# Les six routes de données. Cette liste est le contrat : si une septième route
-# de données apparaissait sans y figurer, `test_openapi.py` le signalerait.
-ROUTES_PROTEGEES = [
-    "/kitsu/38",
-    "/rag/preview",
-    "/rag/export",
-    "/rag/export/composition",
-    "/rag/doc/kitsu:38",
-    "/search?q=one%20piece",
-]
-
-ROUTES_OUVERTES = ["/live", "/health", "/docs", "/redoc", "/openapi.json"]
+# Une route de données suffit ici : la règle d'accès, route par route (les onze
+# routes protégées et les routes ouvertes), est éprouvée contre l'API réelle par
+# `http_smoke.verifier_le_controle_d_acces`, à chaque vérification du module ; le
+# contrat des routes est tenu par `test_openapi.py`. Ces tests-ci gardent le retour
+# rapide sans Docker et la couverture de `app/security.py`.
+ROUTE_PROTEGEE = "/rag/export"
 
 
 def construire_client(resultats: list[Any] | None = None) -> Iterator[TestClient]:
@@ -52,62 +46,27 @@ def client() -> TestClient:
     return construire_client()
 
 
-@pytest.mark.parametrize("route", ROUTES_PROTEGEES)
-def test_sans_en_tete_une_route_de_donnees_repond_401(
-    client: TestClient, route: str
-) -> None:
-    reponse = client.get(route)
+def test_sans_en_tete_une_route_de_donnees_repond_401(client: TestClient) -> None:
+    reponse = client.get(ROUTE_PROTEGEE)
 
     assert reponse.status_code == 401
     assert reponse.json()["detail"] == UNAUTHORIZED_DETAIL
 
 
-@pytest.mark.parametrize("route", ROUTES_PROTEGEES)
-def test_une_cle_invalide_repond_401(client: TestClient, route: str) -> None:
-    reponse = client.get(route, headers={API_KEY_HEADER_NAME: "cle-inventee"})
+def test_une_cle_invalide_repond_401(client: TestClient) -> None:
+    reponse = client.get(ROUTE_PROTEGEE, headers={API_KEY_HEADER_NAME: "cle-inventee"})
 
     assert reponse.status_code == 401
 
 
-@pytest.mark.parametrize("route", ROUTES_PROTEGEES)
-def test_une_cle_valide_a_un_caractere_pres_repond_401(
-    client: TestClient, route: str
-) -> None:
+def test_une_cle_valide_a_un_caractere_pres_repond_401(client: TestClient) -> None:
     """Le test qui distingue `compare_digest` d'un `startswith` déguisé."""
     presque = CLE_VALIDE[:-1] + ("z" if CLE_VALIDE[-1] != "z" else "a")
     assert presque != CLE_VALIDE and len(presque) == len(CLE_VALIDE)
 
-    reponse = client.get(route, headers={API_KEY_HEADER_NAME: presque})
+    reponse = client.get(ROUTE_PROTEGEE, headers={API_KEY_HEADER_NAME: presque})
 
     assert reponse.status_code == 401
-
-
-def test_le_message_de_refus_n_est_pas_un_oracle(client: TestClient) -> None:
-    """En-tête absent et clé invalide doivent être indiscernables du dehors.
-
-    Deux messages différents diraient à un appelant que sa clé a bien été lue
-    puis rejetée — donc qu'elle a la bonne forme. Le journal, lui, distingue.
-    """
-    sans = client.get("/rag/export")
-    invalide = client.get("/rag/export", headers={API_KEY_HEADER_NAME: "cle-inventee"})
-
-    assert sans.status_code == invalide.status_code == 401
-    assert sans.json() == invalide.json()
-
-
-@pytest.mark.parametrize("route", ROUTES_OUVERTES)
-def test_les_sondes_et_la_documentation_restent_ouvertes(route: str) -> None:
-    """C'est une RÈGLE, pas un oubli : la doc est ouverte, les données fermées.
-
-    Un `/docs` qui deviendrait protégé par inadvertance casserait ce test —
-    comme un `/live` qui le deviendrait, et rendrait l'API impilotable par un
-    orchestrateur.
-    """
-    client = construire_client([(1,)])
-
-    reponse = client.get(route)
-
-    assert reponse.status_code == 200, route
 
 
 def test_une_cle_valide_ouvre_la_route() -> None:

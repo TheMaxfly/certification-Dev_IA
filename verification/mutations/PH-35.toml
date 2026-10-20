@@ -1,0 +1,7 @@
+id = "PH-35"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — un exécuteur mobile passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''  done < <(grep -nE '^[[:space:]]*runs-on:.*latest' "$w")'''
+apres = '''  done < <(true)'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

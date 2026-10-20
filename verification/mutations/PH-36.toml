@@ -1,0 +1,7 @@
+id = "PH-36"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — un workflow sans permissions en lecture passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''    ecarts+=("$nom : pas de « permissions: contents: read » au premier niveau")'''
+apres = '''    :'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

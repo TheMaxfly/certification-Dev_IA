@@ -1,0 +1,7 @@
+id = "PH-31"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — verify-poste passe sans échantillon d'équivalence"
+fichier = "verification/verifier.sh"
+avant = '''  compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null ||'''
+apres = '''  true ||'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

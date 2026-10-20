@@ -11,7 +11,9 @@ GARDE-FOUS (décision de Max, 2026-10-10) — sinon, AUCUN verdict :
     un encodage ;
   - cet encodage n'est PAS celui en service (`bench.v_encodage_en_service`) : on ne
     compare pas l'application à elle-même ;
-  - la référence rend bien les nombres de la règle (31, 21, 10).
+  - la référence rend bien les nombres de la règle (31, 21, 10) ;
+  - la règle lue est celle du commit de la mesure (paramètre `commit` du run) :
+    commitée avant la mesure, inchangée depuis — son empreinte est COMPARÉE.
 
 Le verdict est celui de la règle : « promotion proposée » ou « refus proposé ». La
 décision reste celle de Max. Compté en questions, jamais en pourcentage.
@@ -23,6 +25,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tomllib
 import uuid
@@ -31,7 +34,7 @@ from pathlib import Path
 
 import psycopg
 
-from mesures_recherche.configuration import RACINE_MODULE
+from mesures_recherche.configuration import RACINE_DEPOT, RACINE_MODULE
 from mesures_recherche.enregistrement import STOCKAGE, uri_suivi
 
 FICHIER = RACINE_MODULE / "config/promotion_corpus_v2.toml"
@@ -46,7 +49,26 @@ def charger_regle(chemin: Path = FICHIER) -> dict:
     brut = chemin.read_bytes()
     r = tomllib.loads(brut.decode("utf-8"))
     r["empreinte"] = hashlib.sha256(brut).hexdigest()
+    r["chemin"] = chemin
     return r
+
+
+def empreinte_au_commit(commit: str, chemin: Path) -> str | None:
+    """L'empreinte du fichier tel qu'il était à ce commit ; None s'il n'y était pas."""
+    relatif = chemin.resolve().relative_to(RACINE_DEPOT).as_posix()
+    r = subprocess.run(  # nosec B603 B607 — commande fixe, sans shell
+        ["git", "show", f"{commit}:{relatif}"],
+        cwd=RACINE_DEPOT,
+        capture_output=True,
+        check=False,
+    )
+    return hashlib.sha256(r.stdout).hexdigest() if r.returncode == 0 else None
+
+
+def parametres_du_run(run_id: str, stockage: Path = STOCKAGE) -> dict[str, str]:
+    from mlflow.tracking import MlflowClient
+
+    return MlflowClient(tracking_uri=uri_suivi(stockage)).get_run(run_id).data.params
 
 
 def resultat_du_run(run_id: str, stockage: Path = STOCKAGE) -> dict:
@@ -179,6 +201,17 @@ def comparer(dsn: str, run_id: str, regle: dict, stockage: Path = STOCKAGE) -> d
                 " la comparaison ne rend pas de verdict"
             )
         reference_run = ligne_eval_runs(cx, m["reference_run"])
+    commit = parametres_du_run(run_id, stockage).get("commit")
+    if not commit:
+        raise VerdictRefuse(
+            f"run {run_id} sans commit enregistré : la règle ne peut pas lui être"
+            " confrontée"
+        )
+    if empreinte_au_commit(commit, regle["chemin"]) != regle["empreinte"]:
+        raise VerdictRefuse(
+            f"la règle lue n'est pas celle du commit {commit[:12]} de la mesure :"
+            " elle se commite avant la mesure, et ne change plus"
+        )
     nouveau = comptes(resultat_du_run(run_id, stockage))
     reference = comptes(resultat_du_run(m["reference_run"], stockage))
     attendu = m["reference"]
@@ -190,6 +223,7 @@ def comparer(dsn: str, run_id: str, regle: dict, stockage: Path = STOCKAGE) -> d
         "reference_run": {k: str(v) for k, v in (reference_run or {}).items()},
         "encodage_en_service": list(service) if service else None,
         "regle_empreinte": regle["empreinte"],
+        "regle_commit": commit,
         "regle": {
             k: regle["regle"][k]
             for k in ("metrique", "global_min", "reconnaissance_min")

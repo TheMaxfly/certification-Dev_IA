@@ -7,11 +7,13 @@
 #      un marqueur d'auteur, même là.
 #   2. AUCUN FICHIER INTERDIT indexé : rien sous l'exclusion LOCALE
 #      (.git/info/exclude), sauf .githooks/docs-versionnes.
-#   3. AUCUN JETON : ni le jeton Hugging Face du poste en clair (compté, jamais
-#      affiché), ni une chaîne qui en a l'aspect (hf_ + 34 caractères).
-#   4. AUCUNE CLÉ DE FOURNISSEUR (Mistral, OpenAI) : ni la clé du poste en clair,
-#      ni une chaîne qui en a l'aspect — .githooks/cles-fournisseurs, partagé avec
-#      le pre-push. Le refus nomme le fournisseur et le fichier, jamais la valeur.
+#   3. AUCUNE CLÉ NI AUCUN JETON (Mistral, OpenAI, Hugging Face) : ni la valeur du
+#      poste en clair, ni une chaîne qui en a l'aspect — .githooks/cles-fournisseurs,
+#      partagé avec le pre-push. Le refus nomme le fournisseur et le fichier, jamais
+#      la valeur, qui ne passe jamais en argument d'une commande.
+#
+# Les lignes sont lues en texte (grep -a) : une ligne qui porte un octet hors UTF-8
+# n'est pas tue.
 #
 # Ce qui est jugé : tout ce que le prochain push enverra, et non le seul écart à
 # HEAD. La base est le point de divergence avec la branche amont (sinon HEAD,
@@ -31,20 +33,12 @@ set -uo pipefail
 racine="$(git rev-parse --show-toplevel)" || exit 1
 cd "$racine" || exit 1
 
-if [ ! -r .githooks/pre-push ]; then
-    echo "pre-commit : .githooks/pre-push introuvable — motifs inconnus, refus." >&2
-    exit 1
-fi
+refus() { echo "pre-commit : COMMIT REFUSÉ — $*" >&2; exit 1; }
+[ -r .githooks/pre-push ] || refus ".githooks/pre-push introuvable : motifs inconnus."
 eval "$(grep -E "^(MOTS|SIGNATURES)=" .githooks/pre-push)"
-if [ -z "${MOTS:-}" ] || [ -z "${SIGNATURES:-}" ]; then
-    echo "pre-commit : motifs absents de .githooks/pre-push — refus." >&2
-    exit 1
-fi
-ASPECT_JETON='hf_[A-Za-z0-9]{34}'
-if [ ! -r .githooks/cles-fournisseurs ]; then
-    echo "pre-commit : .githooks/cles-fournisseurs introuvable — clés non contrôlables, refus." >&2
-    exit 1
-fi
+[ -n "${MOTS:-}" ] && [ -n "${SIGNATURES:-}" ] || refus "motifs absents de .githooks/pre-push."
+[ -r .githooks/cles-fournisseurs ] ||
+    refus ".githooks/cles-fournisseurs introuvable : clés non contrôlables."
 # shellcheck source=cles-fournisseurs
 . .githooks/cles-fournisseurs
 
@@ -70,16 +64,16 @@ echecs=()
 # 1. mentions et marqueurs d'auteur
 while IFS=$'\t' read -r chemin ligne; do
     [ -n "$chemin" ] || continue
-    if printf '%s\n' "$ligne" | grep -qiE "$SIGNATURES"; then
+    if printf '%s\n' "$ligne" | grep -qaiE "$SIGNATURES"; then
         echecs+=("marqueur d'auteur dans $chemin")
-    elif printf '%s\n' "$ligne" | grep -qiE "$MOTS" &&
+    elif printf '%s\n' "$ligne" | grep -qaiE "$MOTS" &&
         ! grep -qxF "$chemin" <<<"$techniques"; then
         echecs+=("mention d'assistant dans $chemin (fichier hors de .githooks/mentions-techniques)")
     fi
 done < <(git diff --cached "$base" --unified=0 --no-color --no-ext-diff |
     awk '/^\+\+\+ / { f = substr($0, 7); next }
          /^\+/      { print f "\t" substr($0, 2) }' |
-    grep -iE "$MOTS|$SIGNATURES" || true)
+    grep -aiE "$MOTS|$SIGNATURES" || true)
 
 # 2. fichiers indexés sous l'exclusion locale
 exclusion="$(git rev-parse --git-path info/exclude)"
@@ -93,21 +87,7 @@ else
     done < <(git ls-files -i -c --exclude-from="$exclusion")
 fi
 
-# 3. jetons
-ajoutees=$(git diff --cached "$base" --unified=0 --no-color --no-ext-diff | grep '^+' || true)
-fichier_jeton="${HF_HOME:-$HOME/.cache/huggingface}/token"
-for jeton in "${HF_TOKEN:-}" "$(cat "$fichier_jeton" 2>/dev/null)"; do
-    [ -n "$jeton" ] || continue
-    if grep -qF -- "$jeton" <<<"$ajoutees"; then
-        echecs+=("jeton Hugging Face du poste en clair dans l'index")
-        break
-    fi
-done
-if grep -qE "$ASPECT_JETON" <<<"$ajoutees"; then
-    echecs+=("chaîne d'aspect jeton Hugging Face dans l'index")
-fi
-
-# 4. clés des fournisseurs
+# 3. clés et jetons des fournisseurs
 controler_cles "" < <(git diff --cached "$base" --unified=0 --no-color --no-ext-diff |
     awk '/^\+\+\+ / { f = substr($0, 7); next }
          /^\+/      { print f "\t" substr($0, 2) }')
@@ -117,5 +97,5 @@ if [ ${#echecs[@]} -gt 0 ]; then
     printf '  - %s\n' "${echecs[@]}" >&2
     exit 1
 fi
-echo "pre-commit : mentions, fichiers, jetons, clés — contrôles passés." >&2
+echo "pre-commit : mentions, fichiers, clés et jetons — contrôles passés." >&2
 exit 0

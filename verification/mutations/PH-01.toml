@@ -1,0 +1,7 @@
+id = "PH-01"
+origine = "Harnais de tests, bloc D (2026-10-20) — 09 — l'échantillon d'équivalence lit les vecteurs de tous les encodages"
+fichier = "09_service_embedding/src/service_embedding/equivalence.py"
+avant = '''" WHERE encodage_id = %s AND chunk_id = ANY(%s)",'''
+apres = '''" WHERE %s IS NOT NULL AND chunk_id = ANY(%s)",'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_equivalence.py", "-k", "ne_lit_que"]

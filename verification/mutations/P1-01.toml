@@ -1,0 +1,7 @@
+id = "P1-01"
+origine = "CI/CD palier 1, bloc D (2026-10-09, rejoué le 2026-10-19) — critère « fusion créée par GitHub » retiré : toute fusion de GitHub est refusée"
+fichier = ".githooks/pre-push"
+avant = '''if [ "$(wc -w <<<"$parents")" -eq 2 ] && [ "$committer <$adresse>" = "$VALIDATEUR_GITHUB" ]; then'''
+apres = '''if false; then'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

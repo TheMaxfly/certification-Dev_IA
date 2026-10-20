@@ -1,0 +1,7 @@
+id = "E3C-01"
+origine = "E3 étape 1, bloc C (2026-10-10) — R4 : abréviations et initiales ignorées, elles coupent la phrase"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/phrases.py"
+avant = '''                if ouvre and not abrege:'''
+apres = '''                if ouvre:'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_phrases.py", "-k", "(abreviations) and not strategie"]

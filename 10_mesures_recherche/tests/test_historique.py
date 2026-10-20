@@ -52,11 +52,11 @@ def test_deux_encodages_dans_un_run_refuses():
         )
 
 
-def test_inscrits_une_fois_depuis_mlflow(banc, tmp_path):
+def test_inscrits_une_fois_depuis_mlflow(banc, tmp_path, stockage_mlflow):
     dsn, _, _ = banc
     with psycopg.connect(dsn) as cx:
         (eid,) = cx.execute("SELECT encodage_id FROM bench.encodages").fetchone()
-    stockage = tmp_path / "mlflow"
+    stockage = stockage_mlflow
     sens = run_mlflow(stockage, "8", {"encodage_id": str(eid)})
     lexical = run_mlflow(stockage, "3", {"vocabulaire": "100"})
     for r in (sens, lexical):
@@ -71,9 +71,9 @@ def test_inscrits_une_fois_depuis_mlflow(banc, tmp_path):
         assert cx.execute("SELECT count(*) FROM bench.eval_runs").fetchone() == (2,)
 
 
-def test_un_run_sans_trace_mlflow_arrete_tout(banc, tmp_path):
+def test_un_run_sans_trace_mlflow_arrete_tout(banc, tmp_path, stockage_mlflow):
     dsn, _, _ = banc
-    stockage = tmp_path / "mlflow"
+    stockage = stockage_mlflow
     connu = run_mlflow(stockage, "8", {"encodage_id": "2"})
     mesurer(dsn, connu)
     mesurer(dsn, uuid.uuid4().hex)

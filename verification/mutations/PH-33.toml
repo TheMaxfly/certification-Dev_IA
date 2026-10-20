@@ -1,0 +1,7 @@
+id = "PH-33"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — les modules à base jetable ne sont plus confrontés à l'image tirée"
+fichier = "verification/verifier.sh"
+avant = '''  if [ "$jetables" != "$declares" ]; then'''
+apres = '''  if false; then'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

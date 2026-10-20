@@ -1,0 +1,7 @@
+id = "E3C-04"
+origine = "E3 étape 1, bloc C (2026-10-10) — phrase longue coupée à la limite, dans un mot (espace ignorée)"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/phrases.py"
+avant = '''            espace = fenetre.rfind(" ", 1)'''
+apres = '''            espace = -1'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_phrases.py", "-k", "(hasard or espace) and not strategie"]

@@ -1,0 +1,10 @@
+id = "E3B-01"
+origine = "E3 étape 1, bloc B (2026-10-09) — une écriture du corpus hors de la porte ecrire_corpus (05)"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/mesurer.py"
+avant = '''PAR_MARQUEUR = 5
+'''
+apres = '''PAR_MARQUEUR = 5
+FUITE = "DELETE FROM bench.corpus_docs"
+'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_toute_ecriture_du_corpus_passe_par_ecrire_corpus"]

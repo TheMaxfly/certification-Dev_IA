@@ -41,7 +41,7 @@ ROUTES_PROTEGEES = (
     "/identity/4242",
     "/coverage",
 )
-ROUTES_OUVERTES = ("/live", "/health", "/docs", "/openapi.json")
+ROUTES_OUVERTES = ("/live", "/health", "/docs", "/redoc", "/openapi.json")
 
 # Formule de boost de la vue `manga.rag_docs_scored` en production :
 #   100 / trending_pos + 30 / popular_pos + 20 / top_pos

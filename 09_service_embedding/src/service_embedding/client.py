@@ -28,6 +28,10 @@ class ErreurService(Exception):
     """Le service a refusé la requête, ou rendu une réponse inattendue."""
 
 
+class ServiceNonConforme(RuntimeError):
+    """L'instance ne sert pas ce que dit le registre (ou la configuration)."""
+
+
 class ClientService:
     def __init__(self, instance: Instance, hote: str | None = None, delai=300.0):
         self.instance = instance
@@ -112,6 +116,44 @@ class ClientService:
         if len(jetons) != len(textes):
             raise ErreurService("réponse de /tokenize de forme inattendue")
         return [len(j) for j in jetons]
+
+
+def confronter(client: ClientService, encodage: dict | None, role: Role) -> dict:
+    """Ce que sert l'instance, confronté au registre avant d'encoder ; rend `/info`.
+
+    Servi : `/info` (modèle, révision, précision, version de l'outil) et le préfixe
+    que la configuration applique au rôle. Attendu : la ligne de l'encodage
+    (`bench.encodages`) — ou, sans encodage, la configuration de l'instance, qui ne
+    dit pas de version. Un écart lève `ServiceNonConforme`, champs nommés.
+
+    Seul endroit de la règle : l'équivalence (09, rôle « document ») et la mesure
+    (10, rôle « requete ») l'appellent.
+    """
+    info = client.info()
+    prefixe = f"prefixe_{role}"
+    servi = {
+        "modele": info["model_id"],
+        "revision": info["model_sha"],
+        "precision_calcul": info["model_dtype"],
+        prefixe: client.instance.prefixe(role),
+    }
+    if encodage is not None:
+        servi["outil_version"] = info["version"]
+        attendu = {k: encodage[k] for k in servi}
+    else:
+        i = client.instance
+        attendu = {
+            "modele": i.model_id,
+            "revision": i.revision,
+            "precision_calcul": i.dtype,
+            prefixe: i.prefixe(role),
+        }
+    ecarts = {k: (servi[k], attendu[k]) for k in servi if servi[k] != attendu[k]}
+    if ecarts:
+        raise ServiceNonConforme(
+            f"{client.instance.nom} : servi ≠ attendu (servi, attendu) {ecarts}"
+        )
+    return info
 
 
 def norme(vecteur: Sequence[float]) -> float:

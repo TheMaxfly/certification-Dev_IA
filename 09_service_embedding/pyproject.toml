@@ -34,3 +34,8 @@ select = ["E", "W", "F", "I", "B", "C4", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `manuel` : un test qui exige une instance que la vérification ne lance pas
+# (BGE-M3 occupe la carte graphique). Ni joué ni compté comme sauté ; à lancer
+# à la main, instance levée : `uv run --extra dev pytest -m manuel`.
+markers = ["manuel: exige une instance lancée à la main (voir le README)"]
+addopts = "-m 'not manuel'"

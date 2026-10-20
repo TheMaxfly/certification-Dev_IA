@@ -1,0 +1,7 @@
+id = "PH-11"
+origine = "Harnais de tests, bloc D (2026-10-20) — 10 — un run sans commit reçoit un verdict"
+fichier = "10_mesures_recherche/src/mesures_recherche/promotion.py"
+avant = '''    if not commit:'''
+apres = '''    if False:'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_promotion.py", "-k", "sans_commit"]

@@ -1,0 +1,10 @@
+id = "E3B-09"
+origine = "E3 étape 1, bloc B (2026-10-09) — corpus clos sans déclencheur : il accepterait des écritures"
+fichier = "database/migrations/021_corpus_cohabitation.sql"
+avant = '''CREATE TRIGGER corpus_docs_corpus_clos
+    BEFORE INSERT OR UPDATE OR DELETE ON bench.corpus_docs
+    FOR EACH ROW EXECUTE FUNCTION bench.corpus_clos_refuser();
+'''
+apres = ""
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_un_corpus_clos_refuse_toute_ecriture"]

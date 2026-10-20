@@ -1,0 +1,7 @@
+id = "E3B-05"
+origine = "E3 étape 1, bloc B (2026-10-09) — fragments à encoder lus sans filtre de corpus (09)"
+fichier = "09_service_embedding/src/service_embedding/encodage.py"
+avant = '''" WHERE c.corpus_id = %s"'''
+apres = '''" WHERE %s IS NOT NULL"'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_deux_encodages_du_meme_modele_un_par_corpus"]

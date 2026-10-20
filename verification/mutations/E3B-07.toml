@@ -1,0 +1,7 @@
+id = "E3B-07"
+origine = "E3 étape 1, bloc B (2026-10-09) — vecteurs lus sans filtre d'encodage (10)"
+fichier = "10_mesures_recherche/src/mesures_recherche/recherche.py"
+avant = '''" WHERE encodage_id = %s ORDER BY chunk_id"'''
+apres = '''" WHERE %s IS NOT NULL ORDER BY chunk_id"'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_la_mesure_lit_l_encodage_designe_et_son_corpus"]

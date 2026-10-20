@@ -1,0 +1,7 @@
+id = "PH-13"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le jeton Hugging Face n'est plus contrôlé"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN)'''
+apres = '''CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY)'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]
