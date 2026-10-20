@@ -316,3 +316,116 @@ def test_rechargement_a_l_identique_quel_que_soit_l_ordre(jeu_v2, conteneur, tmp
             cx.execute(
                 f'DROP DATABASE IF EXISTS "{url.rsplit("/", 1)[1]}" WITH (FORCE)'
             )
+
+
+# --------------------------------------------------------------------------- #
+#  Le contrôle des pseudonymes, chaque arrêt provoqué (règle pure)
+# --------------------------------------------------------------------------- #
+
+PSEUDO = "Zorglub"
+H = pseudonymes.empreinte(PSEUDO)
+
+
+def doc(cle: str, source: str, texte: str, titre: str = "Serie") -> tuple[str, dict]:
+    return cle, {
+        "doc_key": cle,
+        "source": source,
+        "doc_text": texte,
+        "title": titre,
+        "metadata_json": "{}",
+    }
+
+
+def controle(tmp_path, *docs, masquage=(), homonymes=()) -> dict:
+    donnees = ecrire_listes(tmp_path, list(masquage), list(homonymes))
+    return construire_v2.controler_pseudonymes(dict(docs), {H: PSEUDO}, donnees)[
+        "ecarts"
+    ]
+
+
+def test_les_occurrences_connues_passent(tmp_path):
+    assert (
+        controle(
+            tmp_path,
+            doc("ms_review:1", "ms_review", f"Merci {PSEUDO} pour le conseil."),
+            doc("kitsu:2", "kitsu_synopsis", f"The hero {PSEUDO} sails away."),
+            masquage=[("ms_review:1", H, "remerciement")],
+            homonymes=[("kitsu:2", H, "provenance_kitsu")],
+        )
+        == {}
+    )
+
+
+def test_une_occurrence_connue_manquante_arrete(tmp_path):
+    """Masquée en v1, absente du v2 : la liste ne décrit plus le corpus."""
+    ecarts = controle(
+        tmp_path,
+        doc("ms_review:1", "ms_review", "Une critique sans aucun nom."),
+        masquage=[("ms_review:1", H, "remerciement")],
+    )
+    assert ecarts == {"ms_review": {"en_trop": [], "manquants": [("ms_review:1", H)]}}
+
+
+def test_une_occurrence_kitsu_non_admise_arrete(tmp_path):
+    ecarts = controle(
+        tmp_path, doc("kitsu:2", "kitsu_synopsis", f"The hero {PSEUDO} sails away.")
+    )
+    assert ecarts == {"kitsu_synopsis": {"en_trop": [("kitsu:2", H)], "manquants": []}}
+
+
+def test_un_resume_de_serie_porteur_arrete(tmp_path):
+    """Aucune occurrence n'est admise dans un résumé de série."""
+    ecarts = controle(
+        tmp_path, doc("ms_synopsis:3", "ms_synopsis", f"Une série que {PSEUDO} aime.")
+    )
+    assert ecarts == {
+        "ms_synopsis": {"en_trop": [("ms_synopsis:3", H)], "manquants": []}
+    }
+
+
+def test_une_occurrence_hors_texte_non_admise_arrete(tmp_path):
+    """Dans le titre, même quand le texte en est exempt."""
+    ecarts = controle(
+        tmp_path,
+        doc("ms_review:4", "ms_review", "Une critique sans nom.", titre=PSEUDO),
+    )
+    assert ecarts["hors_texte"] == {"non_admis": [("ms_review:4", H)]}
+
+
+# --------------------------------------------------------------------------- #
+#  Les motifs d'exclusion des résumés, dans l'ordre : un résumé reçoit le premier
+# --------------------------------------------------------------------------- #
+
+
+def test_un_resume_recoit_son_premier_motif_d_exclusion(jeu_v2, tmp_path):
+    """Court ET porteur d'un pseudonyme : « moins de 50 », pas « pseudonyme ».
+    Amorce de chronique ET pseudonyme : « faux résumé »."""
+    autres = RESUMES | {
+        11: "Plume, en bref.",
+        12: "Plume signe un extrait de chronique bien tourné, qui donne envie."
+        " LA CHRONIQUE COMPLETE...",
+    }
+    catalogue(jeu_v2["url"], autres)
+    jeu_v2["config"]["resumes"]["raw"] = str(ecrire_volumes(tmp_path / "v", autres))
+    r = batir(jeu_v2)
+    assert r["resumes"]["exclus"] == {
+        "1_absent_du_raw_de_juillet": 1,
+        "2_moins_de_50": 2,
+        "3_faux_resume": 4,
+        "4_pseudonyme": 1,
+    }
+
+
+# --------------------------------------------------------------------------- #
+#  L'enveloppe Kitsu : un run altéré arrête la construction du v2
+# --------------------------------------------------------------------------- #
+
+
+def test_un_run_kitsu_altere_arrete_le_v2(jeu_v2):
+    with (jeu_v2["kitsu"] / "manga.ndjson").open("a", encoding="utf-8") as f:
+        f.write("{}\n")
+    with pytest.raises(construire.ErreurChargement, match="Kitsu — "):
+        batir(jeu_v2)
+    assert lire(
+        jeu_v2["url"], "SELECT count(*) FROM bench.corpus WHERE corpus_id = 'v2'"
+    ) == [(0,)]
