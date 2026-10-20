@@ -1,0 +1,7 @@
+id = "API-02"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — 023 : le titre des séries est accordé par colonnes, pas la table entière"
+fichier = "database/migrations/023_role_modele.sql"
+avant = '''GRANT SELECT (series_id, series_title) ON manga.ms_series_enriched TO modele_ro;'''
+apres = '''GRANT SELECT ON manga.ms_series_enriched TO modele_ro;'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_role_modele.py", "-k", "quatre_colonnes"]
