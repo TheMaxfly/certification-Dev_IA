@@ -1,0 +1,7 @@
+id = "API-09"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — /metrics ne répond qu'aux réseaux admis"
+fichier = "11_api_modele/src/api_modele/metriques.py"
+avant = '''    return any(ip in reseau for reseau in reseaux)'''
+apres = '''    return True'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_metriques.py", "-k", "hors_du_reseau_interne"]

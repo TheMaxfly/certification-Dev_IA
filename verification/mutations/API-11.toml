@@ -1,0 +1,7 @@
+id = "API-11"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — santé : un encodage promu depuis le démarrage est signalé (change)"
+fichier = "11_api_modele/src/api_modele/application.py"
+avant = '''            if en_service is not None and en_service.encodage_id == charge.encodage_id'''
+apres = '''            if en_service is not None'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sante_info.py", "-k", "encodage_change"]

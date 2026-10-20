@@ -22,6 +22,42 @@ inférence.
 Les versions dont le calcul dépend (numpy, pgvector, psycopg, typer) sont celles du
 verrou du module 10 ; `tests/test_verrous.py` compare les deux verrous.
 
+## Lancer
+
+```bash
+cp .env.example .env    # puis y poser les clés et le DSN (sans mot de passe)
+uv run --env-file .env python -m api_modele
+```
+
+Au démarrage, l'API vérifie, et refuse de démarrer au moindre écart :
+
+- la base répond sous `modele_api` ;
+- un encodage est en service, terminé, sur un corpus clos, du modèle et de la
+  dimension que sert l'instance ;
+- `/info` du service est conforme à cet encodage (`confronter` du module 09) ;
+- la borne de la question tient sous la longueur maximale du service.
+
+## Routes (bloc 02)
+
+| Route | Clé | Rôle |
+|---|---|---|
+| `GET /v1/sante` | non | base, service, encodage en service : `ok` ou `degrade` (503) |
+| `GET /v1/info` | oui | modèle, révision, encodage et corpus servis ; réglages et bornes |
+| `GET /metrics` | non | Prometheus, aux seules adresses de `API_MODELE_METRIQUES_RESEAUX` (404 ailleurs) |
+| `GET /v1/openapi.json` | non | le contrat, égal à `openapi.json` (versionné) |
+
+Erreurs : `{"code", "message", "details", "identifiant_requete"}`, un code stable par
+cas ; l'identifiant aussi en en-tête `X-Identifiant-Requete`.
+
+## Réglages
+
+Un seul lecteur, `api_modele.configuration` : défauts, bornes et motif dans
+`config/reglages.toml` (versionné) ; secrets et adresses dans `.env` (hors dépôt).
+
+**Limite** : le débit (60 requêtes par minute et par clé, fenêtre glissante) est
+compté en mémoire du processus. Il vaut pour **une** instance de l'API ; plusieurs
+instances derrière un répartiteur auraient chacune leur compte.
+
 ## Vérifier
 
 ```bash
