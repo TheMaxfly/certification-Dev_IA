@@ -1420,3 +1420,447 @@ def test_015_l_unicite_porte_sur_la_source_jamais_sur_le_nom(base_migree):
                 "INSERT INTO manga.characters (source, source_id, canonical_name)"
                 " VALUES ('kitsu', '1', 'Un autre nom')"
             )
+
+
+def _personnage(connexion, source_id: str = "1") -> int:
+    """Un personnage Kitsu ; rend son character_uid."""
+    (uid,) = connexion.execute(
+        "INSERT INTO manga.characters (source, source_id, canonical_name)"
+        " VALUES ('kitsu', %s, 'Monkey D. Luffy') RETURNING character_uid",
+        (source_id,),
+    ).fetchone()
+    return uid
+
+
+def test_015_les_vocabulaires_fermes_refusent_l_inconnu(base_migree):
+    """Trois types de forme, trois langues de description : une valeur hors liste
+    est refusée, jamais rangée dans la case la moins fausse. Une description sans
+    langue reste admise, et sa longueur est dérivée du texte."""
+    with psycopg.connect(base_migree, autocommit=True) as connexion:
+        uid = _personnage(connexion)
+        for forme_type in ("canonical", "name_lang", "alias"):
+            connexion.execute(
+                "INSERT INTO manga.character_forms"
+                " (character_uid, forme, forme_norm, forme_type, source)"
+                " VALUES (%s, 'Luffy', 'luffy', %s, 'kitsu')",
+                (uid, forme_type),
+            )
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.character_forms"
+                " (character_uid, forme, forme_norm, forme_type, source)"
+                " VALUES (%s, 'Mugiwara', 'mugiwara', 'surnom', 'kitsu')",
+                (uid,),
+            )
+        connexion.execute(
+            "INSERT INTO manga.character_descriptions (character_uid, source, texte)"
+            " VALUES (%s, 'kitsu', 'Capitaine des Chapeaux de paille.')",
+            (uid,),
+        )
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.character_descriptions"
+                " (character_uid, source, lang, texte)"
+                " VALUES (%s, 'wikipedia_fr', 'de', 'Kapitän der Strohhutbande.')",
+                (uid,),
+            )
+        descriptions = connexion.execute(
+            "SELECT lang, longueur FROM manga.character_descriptions"
+        ).fetchall()
+    assert descriptions == [(None, 33)]
+
+
+def test_015_supprimer_un_personnage_emporte_ses_formes_descriptions_et_liens(
+    base_migree,
+):
+    """ON DELETE CASCADE sur les trois tables filles : un personnage retiré ne
+    laisse aucune forme, description ni lien orphelin — ceux d'un autre
+    personnage restent."""
+    with psycopg.connect(base_migree) as connexion:
+        retire, garde = _personnage(connexion, "1"), _personnage(connexion, "2")
+        for uid in (retire, garde):
+            connexion.execute(
+                "INSERT INTO manga.character_forms"
+                " (character_uid, forme, forme_norm, forme_type, source)"
+                " VALUES (%s, 'Luffy', 'luffy', 'canonical', 'kitsu')",
+                (uid,),
+            )
+            connexion.execute(
+                "INSERT INTO manga.character_descriptions"
+                " (character_uid, source, lang, texte)"
+                " VALUES (%s, 'kitsu', 'en', 'Captain.')",
+                (uid,),
+            )
+            connexion.execute(
+                "INSERT INTO manga.character_work (character_uid, oeuvre_source,"
+                " oeuvre_id, role_source, role_normalise, source)"
+                " VALUES (%s, 'kitsu', '13', 'main', 'principal', 'kitsu')",
+                (uid,),
+            )
+        connexion.execute(
+            "DELETE FROM manga.characters WHERE character_uid = %s", (retire,)
+        )
+        connexion.commit()
+        restants = [
+            connexion.execute(
+                f"SELECT array_agg(DISTINCT character_uid) FROM {table}"  # nosec B608
+            ).fetchone()[0]
+            for table in (
+                "manga.character_forms",
+                "manga.character_descriptions",
+                "manga.character_work",
+            )
+        ]
+    assert restants == [[garde], [garde], [garde]]
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 008 — formes des auteurs et sitelink japonais
+# --------------------------------------------------------------------------- #
+
+
+def test_008_ajoute_wiki_ja_et_auteur_lang(base_migree):
+    """Deux colonnes additives, en TEXT et facultatives, à côté de leurs sœurs."""
+    with psycopg.connect(base_migree) as connexion:
+        colonnes = connexion.execute(
+            "SELECT table_name, column_name, data_type, is_nullable"
+            " FROM information_schema.columns WHERE table_schema = 'manga'"
+            " AND (table_name, column_name) IN"
+            " (('wd_pivot', 'wiki_ja'), ('wd_auteurs', 'auteur_lang'))"
+            " ORDER BY table_name"
+        ).fetchall()
+        connexion.execute(
+            "INSERT INTO manga.wd_pivot (qid, wiki_fr, wiki_ja)"
+            " VALUES ('Q1', 'JoJo''s Bizarre Adventure', 'ジョジョの奇妙な冒険')"
+        )
+        connexion.execute(
+            "INSERT INTO manga.wd_auteurs (qid, auteur_qid, auteur, auteur_lang)"
+            " VALUES ('Q1', 'Q2', '荒木飛呂彦', 'ja')"
+        )
+        connexion.commit()
+        lu = connexion.execute(
+            "SELECT p.wiki_ja, a.auteur_lang FROM manga.wd_pivot p"
+            " JOIN manga.wd_auteurs a USING (qid)"
+        ).fetchone()
+    assert colonnes == [
+        ("wd_auteurs", "auteur_lang", "text", "YES"),
+        ("wd_pivot", "wiki_ja", "text", "YES"),
+    ]
+    assert lu == ("ジョジョの奇妙な冒険", "ja")
+
+
+def test_wd_auteurs_formes_une_forme_par_auteur(base_migree):
+    """UNIQUE (auteur_qid, forme_norm) : la même forme normalisée ne s'empile pas
+    sur un auteur, mais deux auteurs homonymes la portent chacun."""
+    with psycopg.connect(base_migree) as connexion:
+        for auteur_qid in ("Q2", "Q3"):
+            connexion.execute(
+                "INSERT INTO manga.wd_auteurs_formes"
+                " (auteur_qid, forme, forme_norm, forme_type, langue)"
+                " VALUES (%s, 'Hirohiko Araki', 'hirohiko araki', 'label', 'en')",
+                (auteur_qid,),
+            )
+        connexion.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.wd_auteurs_formes"
+                " (auteur_qid, forme, forme_norm, forme_type)"
+                " VALUES ('Q2', 'HIROHIKO ARAKI', 'hirohiko araki', 'alias')"
+            )
+
+
+def test_wd_auteurs_formes_refuse_un_type_de_forme_inconnu(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.wd_auteurs_formes"
+                " (auteur_qid, forme, forme_norm, forme_type)"
+                " VALUES ('Q2', 'Araki', 'araki', 'pseudonyme')"
+            )
+
+
+def test_wd_auteurs_formes_n_a_aucune_cle_vers_wd_pivot(base_migree):
+    """auteur_qid n'est pas un qid d'œuvre : un auteur absent de wd_pivot est
+    accepté, et la table ne porte aucune clé étrangère."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.wd_auteurs_formes"
+            " (auteur_qid, forme, forme_norm, forme_type, langue)"
+            " VALUES ('Q404', '荒木飛呂彦', '荒木飛呂彦', 'label', 'ja')"
+        )
+        connexion.commit()
+        cles = connexion.execute(
+            "SELECT count(*) FROM pg_constraint"
+            " WHERE conrelid = 'manga.wd_auteurs_formes'::regclass AND contype = 'f'"
+        ).fetchone()
+        pivot = connexion.execute("SELECT count(*) FROM manga.wd_pivot").fetchone()
+    assert cles == (0,)
+    assert pivot == (0,), "l'auteur est entré sans qid d'œuvre"
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 010 — les avis du juge, hors du journal des décisions
+# --------------------------------------------------------------------------- #
+
+AVIS = (
+    "INSERT INTO manga.llm_avis (series_id, run_ts, phase, candidat_type,"
+    " candidat_id, verdict, confiance, modele, prompt_version)"
+    " VALUES (%(series_id)s, %(run_ts)s, %(phase)s, %(candidat_type)s,"
+    " %(candidat_id)s, %(verdict)s, %(confiance)s, 'juge', 'p1')"
+)
+UN_AVIS = {
+    "series_id": 1,
+    "run_ts": "2026-09-20T10:00:00Z",
+    "phase": "file",
+    "candidat_type": "qid",
+    "candidat_id": "Q1",
+    "verdict": "same_work",
+    "confiance": "haute",
+}
+
+
+def _serie(connexion, series_id: int = 1) -> None:
+    connexion.execute(
+        "INSERT INTO manga.ms_series_enriched (series_id) VALUES (%s)", (series_id,)
+    )
+
+
+def test_llm_avis_accepte_un_avis_et_pose_les_marqueurs_a_faux(base_migree):
+    """Les deux marqueurs de mesure valent faux par défaut : un avis n'est
+    « partiel » ou « de pré-validation » que si l'écriture le dit."""
+    with psycopg.connect(base_migree) as connexion:
+        _serie(connexion)
+        connexion.execute(AVIS, UN_AVIS)
+        connexion.commit()
+        ligne = connexion.execute(
+            "SELECT pre_validation_bandes, dossier_partiel, created_at IS NOT NULL,"
+            " justification FROM manga.llm_avis"
+        ).fetchone()
+    assert ligne == (False, False, True, None)
+
+
+@pytest.mark.parametrize(
+    "colonne, valeur",
+    [
+        ("phase", "production"),
+        ("candidat_type", "mal_id"),
+        ("verdict", "probably_same"),
+        ("confiance", "basse"),
+    ],
+)
+def test_llm_avis_refuse_une_valeur_hors_contrat(base_migree, colonne, valeur):
+    """Trois phases, deux référentiels candidats, trois verdicts, deux niveaux de
+    confiance : rien d'autre ne s'écrit."""
+    with psycopg.connect(base_migree) as connexion:
+        _serie(connexion)
+        connexion.commit()
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(AVIS, UN_AVIS | {colonne: valeur})
+
+
+def test_llm_avis_rejouer_un_run_n_empile_pas(base_migree):
+    """L'unicité porte sur (série, candidat, run, phase) : un rejeu est refusé ;
+    un nouveau run, une autre phase ou un autre référentiel sur le même couple
+    est une autre mesure."""
+    with psycopg.connect(base_migree, autocommit=True) as connexion:
+        _serie(connexion)
+        connexion.execute(AVIS, UN_AVIS)
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(AVIS, UN_AVIS | {"verdict": "different_work"})
+        connexion.execute(AVIS, UN_AVIS | {"run_ts": "2026-09-21T10:00:00Z"})
+        connexion.execute(AVIS, UN_AVIS | {"phase": "echantillon"})
+        connexion.execute(AVIS, UN_AVIS | {"candidat_type": "kitsu_id"})
+        total = connexion.execute("SELECT count(*) FROM manga.llm_avis").fetchone()
+    assert total == (4,)
+
+
+def test_llm_avis_suit_la_serie_du_socle(base_migree):
+    """Un avis sur une série inexistante est refusé ; une série retirée du socle
+    emporte ses avis (ON DELETE CASCADE)."""
+    with psycopg.connect(base_migree, autocommit=True) as connexion:
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.execute(AVIS, UN_AVIS | {"series_id": 404})
+        _serie(connexion, 1)
+        _serie(connexion, 2)
+        connexion.execute(AVIS, UN_AVIS)
+        connexion.execute(AVIS, UN_AVIS | {"series_id": 2})
+        connexion.execute("DELETE FROM manga.ms_series_enriched WHERE series_id = 1")
+        restants = connexion.execute("SELECT series_id FROM manga.llm_avis").fetchall()
+    assert restants == [(2,)]
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 013 — le référentiel des genres
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "code, label_fr",
+    [
+        ("Science_fiction", "Science-fiction"),
+        ("tranche de vie", "Tranche de vie"),
+        ("1_shonen", "Shōnen"),
+        ("école", "École"),
+        ("_romance", "Romance"),
+        ("romance", ""),
+    ],
+)
+def test_genre_ref_refuse_un_code_ou_un_libelle_mal_forme(base_migree, code, label_fr):
+    """Le code est un identifiant ASCII minuscule en snake_case, jamais du
+    français ; un code sans libellé français serait invisible à l'écran."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.genre_ref (code, label_fr) VALUES (%s, %s)",
+                (code, label_fr),
+            )
+
+
+def test_genre_mapping_mappe_si_et_seulement_si_un_code(base_migree):
+    """L'invariant central : un `mappe` sans code (décision annoncée mais pas
+    prise) et un `exclu` / `inconnu` avec code (décision prise en douce) sont
+    tous deux refusés."""
+    with psycopg.connect(base_migree, autocommit=True) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr) VALUES ('romance', 'Romance')"
+        )
+        insertion = (
+            "INSERT INTO manga.genre_mapping (source, libelle_brut, code, statut)"
+            " VALUES ('ms', %s, %s, %s)"
+        )
+        for libelle, code, statut in (
+            ("romance", None, "mappe"),
+            ("Manga", "romance", "exclu"),
+            ("Ecole", "romance", "inconnu"),
+        ):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                connexion.execute(insertion, (libelle, code, statut))
+        connexion.execute(insertion, ("romance", "romance", "mappe"))
+        connexion.execute(insertion, ("Manga", None, "exclu"))
+        connexion.execute(insertion, ("Ecole", None, "inconnu"))
+        total = connexion.execute("SELECT count(*) FROM manga.genre_mapping").fetchone()
+    assert total == (3,)
+
+
+def test_genre_mapping_une_ligne_par_libelle_observe_et_par_source(base_migree):
+    """Le libellé est gardé TEL QU'OBSERVÉ : « Ecole » n'est pas « École », et le
+    même libellé chez deux sources fait deux lignes. Une troisième source, un
+    doublon ou un code absent du référentiel sont refusés."""
+    with psycopg.connect(base_migree, autocommit=True) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr) VALUES ('fantasy', 'Fantasy')"
+        )
+        insertion = (
+            "INSERT INTO manga.genre_mapping (source, libelle_brut, code, statut)"
+            " VALUES (%s, %s, %s, %s)"
+        )
+        for source in ("ms", "kitsu"):
+            connexion.execute(insertion, (source, "Fantasy", "fantasy", "mappe"))
+        for libelle in ("Ecole", "École"):
+            connexion.execute(insertion, ("ms", libelle, None, "inconnu"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(insertion, ("ms", "Fantasy", None, "exclu"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(insertion, ("anilist", "Fantasy", "fantasy", "mappe"))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.execute(insertion, ("ms", "Isekai", "isekai", "mappe"))
+        total = connexion.execute("SELECT count(*) FROM manga.genre_mapping").fetchone()
+    assert total == (4,)
+
+
+def test_013_accorde_la_seule_lecture_a_manga_ro(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        droits = connexion.execute(
+            "SELECT t, p, has_table_privilege('manga_ro', t, p)"
+            " FROM unnest(ARRAY['manga.genre_ref', 'manga.genre_mapping']) t,"
+            " unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) p"
+        ).fetchall()
+    assert {(t, p) for t, p, accorde in droits if accorde} == {
+        ("manga.genre_mapping", "SELECT"),
+        ("manga.genre_ref", "SELECT"),
+    }
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 014 — la hiérarchie et la nature des codes
+# --------------------------------------------------------------------------- #
+
+
+def test_014_type_vaut_genre_par_defaut_et_ne_connait_que_deux_natures(base_migree):
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr) VALUES ('romance', 'Romance')"
+        )
+        connexion.commit()
+        (nature,) = connexion.execute(
+            "SELECT type FROM manga.genre_ref WHERE code = 'romance'"
+        ).fetchone()
+        assert nature == "genre"
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.genre_ref (code, label_fr, type)"
+                " VALUES ('isekai', 'Isekai', 'theme')"
+            )
+
+
+def test_014_le_parent_se_verifie_a_la_validation_pas_a_l_ecriture(base_migree):
+    """FK DEFERRABLE INITIALLY DEFERRED : dans une transaction, l'enfant peut
+    précéder son parent (un `unnest` n'ordonne rien) ; c'est l'état à la
+    validation qui compte, et un parent qui n'arrive jamais fait échouer le
+    COMMIT."""
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr, parent)"
+            " VALUES ('yaoi', 'Yaoi', 'lgbt')"
+        )
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr) VALUES ('lgbt', 'LGBT')"
+        )
+        connexion.commit()
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr, parent)"
+            " VALUES ('yuri', 'Yuri', 'inexistant')"
+        )
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connexion.commit()
+        codes = connexion.execute(
+            "SELECT code, parent FROM manga.genre_ref ORDER BY code"
+        ).fetchall()
+    assert codes == [("lgbt", None), ("yaoi", "lgbt")]
+
+
+def test_014_un_code_n_est_pas_son_propre_parent(base_migree):
+    """Le seul cycle qu'une contrainte de ligne sait voir ; il est refusé dès
+    l'écriture, sans attendre la validation."""
+    with psycopg.connect(base_migree) as connexion:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connexion.execute(
+                "INSERT INTO manga.genre_ref (code, label_fr, parent)"
+                " VALUES ('adulte', 'Adulte', 'adulte')"
+            )
+
+
+def test_014_rejouee_sur_des_codes_charges_bascule_les_formats(base_migree):
+    """Le chemin d'`apimanga` : les codes de 013 sont déjà là quand 014 passe. Le
+    rattrapage les range par leur préfixe, et la migration se rejoue sans
+    erreur (IF NOT EXISTS, contraintes reposées)."""
+    sql = (migrate.MIGRATIONS_DIR / "014_hierarchie_genres.sql").read_text(
+        encoding="utf-8"
+    )
+    with psycopg.connect(base_migree) as connexion:
+        connexion.execute(
+            "INSERT INTO manga.genre_ref (code, label_fr) VALUES"
+            " ('format_doujinshi', 'Doujinshi'), ('romance', 'Romance'),"
+            " ('formation', 'Récit de formation')"
+        )
+        connexion.commit()
+        connexion.execute(sql)
+        connexion.commit()
+        natures = connexion.execute(
+            "SELECT code, type FROM manga.genre_ref ORDER BY code"
+        ).fetchall()
+    assert natures == [
+        ("format_doujinshi", "format"),
+        ("formation", "genre"),
+        ("romance", "genre"),
+    ], "seul le préfixe « format_ » (souligné compris) fait un format"
