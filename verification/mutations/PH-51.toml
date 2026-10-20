@@ -1,0 +1,7 @@
+id = "PH-51"
+origine = "Correctif (2026-10-20) — 09 : une ligne attendue absente fait lever les contrôles d'après encodage"
+fichier = "09_service_embedding/src/service_embedding/verification.py"
+avant = '''            return None if ligne is None else ligne[0]'''
+apres = '''            return ligne[0]'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_verification.py", "-k", "ligne_attendue_absente"]

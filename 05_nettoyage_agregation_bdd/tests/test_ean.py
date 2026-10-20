@@ -82,3 +82,18 @@ class TestNormalisation:
 
     def test_un_ean_valide_est_rendu_tel_quel(self):
         assert isbn13_ou_none("9782355929489") == "9782355929489"
+
+
+@pytest.mark.parametrize(
+    "valeur",
+    [
+        "٩٧٨٢٣٥٥٩٢٩٤٨٩",  # chiffres arabes : le même EAN, que `isdigit()` admet
+        "９７８２３５５９２９４８９",  # pleine chasse
+        "²" * 13,  # exposants : `isdigit()` vrai, `int()` lève
+    ],
+)
+def test_des_chiffres_non_ascii_sont_refuses_sans_exception(valeur):
+    """Seuls les chiffres ASCII font un EAN : le CHECK `^[0-9]{13}$` de la base
+    refuserait les autres, et la fonction ne doit jamais lever."""
+    assert not ean13_valide(valeur)
+    assert isbn13_ou_none(valeur) is None

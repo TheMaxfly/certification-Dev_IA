@@ -65,7 +65,10 @@ def verifier(dsn: str) -> list[dict]:
     with psycopg.connect(dsn, options="-c default_transaction_read_only=on") as cx:
 
         def un(sql: str, *params):
-            return cx.execute(sql, params or None).fetchone()[0]
+            # Une ligne attendue qui manque (le jeu absent de bench.eval_jeux) rend
+            # None : le contrôle la rapporte en écart, jamais une exception.
+            ligne = cx.execute(sql, params or None).fetchone()
+            return None if ligne is None else ligne[0]
 
         # Les vecteurs ne se lisent que filtrés par encodage : ceux du corpus.
         ses_encodages = "SELECT encodage_id FROM bench.encodages WHERE corpus_id = %s"
