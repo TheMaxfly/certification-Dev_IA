@@ -86,15 +86,22 @@ def test_rejeu_identique(banc):
     assert a["agregats"] == b["agregats"] and a["questions"] == b["questions"]
 
 
+#: L'état git que l'enregistrement relève : un arbre propre, à un commit fixé. Le
+#: test ne dépend pas de l'état du dépôt où il tourne.
+ARBRE_PROPRE = {"commit": "c" * 40, "arbre_module_propre": "True"}
+
+
 def test_enregistrement_mlflow_et_eval_mesures(
-    banc, encodeur_doublure, tmp_path, stockage_mlflow
+    banc, encodeur_doublure, tmp_path, stockage_mlflow, monkeypatch
 ):
     """Un run de la mesure 1 (sens, donc un corpus et un encodage) : MLflow et la
     base portent les mêmes valeurs, corpus et encodage compris."""
     import mlflow
 
+    from mesures_recherche import enregistrement
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
 
+    monkeypatch.setattr(enregistrement, "etat_git", lambda: dict(ARBRE_PROPRE))
     dsn, config, _ = banc
     with psycopg.connect(dsn) as cx:
         (e1,) = cx.execute(
@@ -112,6 +119,7 @@ def test_enregistrement_mlflow_et_eval_mesures(
     assert params["reglage.instance"] == "bge-m3"
     assert params["reglage.table"] == "bench.vecteurs_bge_m3"
     assert len(params["code_empreinte"]) == 64
+    assert (params["commit"], params["arbre_module_propre"]) == ("c" * 40, "True")
     assert (params["corpus_id"], params["encodage_id"]) == ("v1", str(e1))
     assert run.data.metrics["hit_rate_10/global/toutes"] == pytest.approx(1.0)
     assert run.data.tags == run.data.tags | {
@@ -144,6 +152,31 @@ def test_enregistrement_mlflow_et_eval_mesures(
         for a in resultat["agregats"]
     }
     assert set(lignes) == attendu
+
+
+def test_un_arbre_sale_refuse_l_enregistrement(
+    banc, encodeur_doublure, stockage_mlflow, monkeypatch
+):
+    """On commite d'abord, on mesure ensuite : rien n'est écrit, ni run MLflow ni
+    ligne en base."""
+    import mlflow
+
+    from mesures_recherche import enregistrement
+
+    monkeypatch.setattr(
+        enregistrement,
+        "etat_git",
+        lambda: ARBRE_PROPRE | {"arbre_module_propre": "False"},
+    )
+    dsn, config, _ = banc
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
+    resultat["experience"] = "essai_arbre_sale"
+    with pytest.raises(enregistrement.EnregistrementRefuse, match="non propre"):
+        enregistrement.enregistrer(resultat, dsn, stockage=stockage_mlflow)
+    mlflow.set_tracking_uri(enregistrement.uri_suivi(stockage_mlflow))
+    assert mlflow.get_experiment_by_name("essai_arbre_sale") is None
+    with psycopg.connect(dsn) as cx:
+        assert cx.execute("SELECT count(*) FROM bench.eval_runs").fetchone() == (0,)
 
 
 # --------------------------------------------------------------------------- #

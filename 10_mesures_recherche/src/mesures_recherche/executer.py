@@ -327,6 +327,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("DATABASE_URL absente")
     config = configuration.charger()
     debut = time.monotonic()
+    if args.enregistrer:
+        # Avant de mesurer : une mesure faite sur un arbre sale ne s'enregistrerait pas.
+        from mesures_recherche.enregistrement import exiger_arbre_propre
+
+        exiger_arbre_propre()
     ctx = ouvrir(dsn, config, args.encodage, args.corpus)
     try:
         resultat = mesurer(ctx, args.mesure)

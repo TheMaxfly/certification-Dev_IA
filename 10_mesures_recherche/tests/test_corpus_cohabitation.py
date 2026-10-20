@@ -220,3 +220,13 @@ def test_sans_encodage_le_service_est_confronte_a_la_configuration(service_simul
     Info.reponse = Info.reponse | {"model_sha": "0" * 40}
     with pytest.raises(ServiceNonConforme):
         executer.encodeur_du_service(executer.Designation("embeddinggemma"))
+
+
+def test_un_prefixe_de_requete_qui_n_est_pas_celui_de_l_encodage_arrete(
+    service_simule,
+):
+    """La mesure confronte le préfixe du rôle « requete » (EmbeddingGemma en a un,
+    distinct de celui des documents)."""
+    encodage = service_simule | {"prefixe_requete": "un autre préfixe : "}
+    with pytest.raises(ServiceNonConforme, match="prefixe_requete"):
+        executer.encodeur_du_service(executer.Designation("embeddinggemma", encodage))
