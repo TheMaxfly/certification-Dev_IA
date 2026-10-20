@@ -199,24 +199,15 @@ def test_chargement_puis_rejeu(base: str):
 
     assert lire(base, "SELECT count(*) FROM manga.genre_ref")[0][0] == 73
     assert lire(base, "SELECT count(*) FROM manga.genre_mapping")[0][0] == 154
+    par_source = dict(
+        lire(base, "SELECT source, count(*) FROM manga.genre_mapping GROUP BY 1")
+    )
+    assert par_source == {"ms": 99, "kitsu": 55}
 
     second = executer(base, "--donnees", str(DONNEES))
     assert second.returncode == 0, second.stderr
     assert "+0 nouveaux, 0 modifiés" in second.stdout
     assert second.stdout.count("+0 nouveaux, 0 modifiés") == 2
-
-
-def test_repartition_par_source_et_statut(base: str):
-    executer(base, "--donnees", str(DONNEES))
-    lignes = lire(
-        base,
-        "SELECT source, statut, count(*) FROM manga.genre_mapping "
-        "GROUP BY 1, 2 ORDER BY 1, 2",
-    )
-    par_source: dict[str, int] = {}
-    for source, _statut, n in lignes:
-        par_source[source] = par_source.get(source, 0) + n
-    assert par_source == {"ms": 99, "kitsu": 55}
 
 
 def test_invariant_refuse_par_la_base(base: str):

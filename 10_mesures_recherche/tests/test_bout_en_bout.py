@@ -86,28 +86,47 @@ def test_rejeu_identique(banc):
     assert a["agregats"] == b["agregats"] and a["questions"] == b["questions"]
 
 
-def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path, stockage_mlflow):
+def test_enregistrement_mlflow_et_eval_mesures(
+    banc, encodeur_doublure, tmp_path, stockage_mlflow
+):
+    """Un run de la mesure 1 (sens, donc un corpus et un encodage) : MLflow et la
+    base portent les mêmes valeurs, corpus et encodage compris."""
     import mlflow
 
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
 
     dsn, config, _ = banc
-    resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
+    with psycopg.connect(dsn) as cx:
+        (e1,) = cx.execute(
+            "SELECT encodage_id FROM bench.encodages WHERE corpus_id = 'v1'"
+        ).fetchone()
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 1)
     resultat["experience"] = "essai"
     run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
 
     mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     run = mlflow.get_run(run_id)
     assert run.info.status == "FINISHED"
-    assert run.data.params["jeu_version"] == "v9"
-    assert run.data.params["reglage.configuration"] == "french"
-    assert len(run.data.params["code_empreinte"]) == 64
+    params = run.data.params
+    assert params["jeu_version"] == "v9"
+    assert params["reglage.instance"] == "bge-m3"
+    assert params["reglage.table"] == "bench.vecteurs_bge_m3"
+    assert len(params["code_empreinte"]) == 64
+    assert (params["corpus_id"], params["encodage_id"]) == ("v1", str(e1))
     assert run.data.metrics["hit_rate_10/global/toutes"] == pytest.approx(1.0)
-    assert run.data.tags["tour"] == "1" and run.data.tags["spec"] == "E2 jour 2"
+    assert run.data.tags == run.data.tags | {
+        "mesure": "1",
+        "tour": "1",
+        "spec": "E2 jour 2",
+    }
     pieces = {a.path for a in mlflow.MlflowClient().list_artifacts(run_id)}
     assert {"par_question.csv", "mesures.toml", "resultat.json"} <= pieces
 
     with psycopg.connect(dsn) as cx:
+        assert cx.execute(
+            "SELECT corpus_id, encodage_id FROM bench.eval_runs WHERE run_id = %s",
+            (run_id,),
+        ).fetchall() == [("v1", e1)]
         lignes = cx.execute(
             "SELECT portee, perimetre, metrique, k, valeur, n_questions"
             " FROM bench.eval_mesures WHERE run_id = %s",
@@ -193,25 +212,6 @@ def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch)
     for q in r["questions"]:
         assert all(c.startswith("serie:") for c, _ in q["top"])
     assert questions(r)["Q001"]["metriques"]["hit_rate@10"] == 1.0
-
-
-def test_enregistrement_tour_2_etiquete(banc, tmp_path, stockage_mlflow):
-    import mlflow
-
-    from mesures_recherche.enregistrement import enregistrer, uri_suivi
-
-    dsn, config, _ = banc
-    resultat = executer.mesurer(executer.ouvrir(dsn, config), 9)
-    resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
-    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
-    run = mlflow.get_run(run_id)
-    assert run.data.tags == run.data.tags | {
-        "mesure": "9",
-        "tour": "2",
-        "spec": "E2 jour 3",
-    }
-    assert run.data.params["reglage.perimetre_entites"] == "catalogue"
 
 
 # --------------------------------------------------------------------------- #

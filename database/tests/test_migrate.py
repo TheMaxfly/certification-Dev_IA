@@ -1169,22 +1169,36 @@ def test_007_une_sortie_sans_ean_est_acceptee(base_migree):
 
 
 def test_v_mi_ean_multiples_signale_les_titres_divergents(base_migree):
-    """La vue distingue l'erreur source (deux œuvres) de la simple réédition."""
+    """Un EAN sur des titres différents est signalé, sur un même titre il ne l'est pas.
+
+    Deux œuvres sur un EAN (erreur de la source), ou deux éditions titrées
+    différemment (NonNonBa) : titres divergents. Le même titre deux fois (une
+    réimpression) : non. Un EAN seul n'est pas multiple.
+    """
+    sorties = [
+        ("9782487369641", "Berserk of Gluttony Vol.12"),
+        ("9782487369641", "Martial Universe Vol.10"),
+        ("9782360810284", "NonNonBa - Edition 2011"),
+        ("9782360810284", "NonNonBa - Edition 2024"),
+        ("9780000000017", "Réimpression Vol.1"),
+        ("9780000000017", "Réimpression Vol.1"),
+        ("9780000000024", "Seul"),
+    ]
     with psycopg.connect(base_migree) as connexion:
-        for titre in ("Berserk of Gluttony Vol.12", "Martial Universe Vol.10"):
-            connexion.execute(
-                "INSERT INTO manga.mi_sorties (ean, titre) "
-                "VALUES ('9782487369641', %s)",
-                (titre,),
+        with connexion.cursor() as curseur:
+            curseur.executemany(
+                "INSERT INTO manga.mi_sorties (ean, titre) VALUES (%s, %s)", sorties
             )
-        connexion.execute(
-            "INSERT INTO manga.mi_sorties (ean, titre) VALUES ('9782360810284', 'Seul')"
-        )
         connexion.commit()
         lignes = connexion.execute(
             "SELECT ean, nb_sorties, titres_divergents FROM manga.v_mi_ean_multiples"
+            " ORDER BY ean"
         ).fetchall()
-    assert lignes == [("9782487369641", 2, True)], "un EAN seul n'est pas multiple"
+    assert lignes == [
+        ("9780000000017", 2, False),
+        ("9782360810284", 2, True),
+        ("9782487369641", 2, True),
+    ], "un EAN seul n'est pas multiple"
 
 
 # --------------------------------------------------------------------------- #
