@@ -54,10 +54,6 @@ class Contexte:
     encodage_id: int | None = None  # désigné explicitement (--encodage)
 
 
-class ServiceNonConforme(RuntimeError):
-    """L'instance ne sert pas ce que dit le registre (ou la configuration)."""
-
-
 @dataclass(frozen=True)
 class Designation:
     """L'instance qui encode les questions, et la ligne de `bench.encodages` dont
@@ -149,33 +145,13 @@ def ouvrir(
 def encodeur_du_service(designation: Designation):
     """Question → vecteur, par l'instance du service (rôle « requete »), APRÈS
     confrontation de ce qu'elle sert (`/info`) à la ligne de l'encodage — ou, sans
-    encodage, à la configuration de l'instance. Un écart arrête."""
-    from service_embedding.client import ClientService
+    encodage, à la configuration de l'instance (`service_embedding.client.confronter`).
+    Un écart arrête (`ServiceNonConforme`)."""
+    from service_embedding.client import ClientService, confronter
     from service_embedding.configuration import charger
 
     client = ClientService(charger(designation.instance))
-    info = client.info()
-    servi = {
-        "modele": info["model_id"],
-        "revision": info["model_sha"],
-        "precision_calcul": info["model_dtype"],
-        "prefixe_requete": client.instance.prefixe_requete,
-    }
-    e = designation.encodage
-    if e is not None:
-        servi["outil_version"] = info["version"]
-        attendu = {k: e[k] for k in servi}
-    else:
-        i = client.instance
-        attendu = {
-            "modele": i.model_id,
-            "revision": i.revision,
-            "precision_calcul": i.dtype,
-            "prefixe_requete": i.prefixe_requete,
-        }
-    if servi != attendu:
-        ecarts = {k: (servi[k], attendu[k]) for k in servi if servi[k] != attendu[k]}
-        raise ServiceNonConforme(f"{designation.instance} : servi ≠ attendu {ecarts}")
+    info = confronter(client, designation.encodage, "requete")
 
     def encoder(texte: str):
         return client.encoder([texte], role="requete")[0]

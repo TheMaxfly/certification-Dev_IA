@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import psycopg
 import pytest
 from conftest import FRAGMENTS, unitaire
+from service_embedding.client import ServiceNonConforme
 
 from mesures_recherche import executer, recherche
 
@@ -74,6 +75,21 @@ def encodage_v1(dsn: str) -> int:
 def tete(resultat: dict, question_id: str) -> str:
     (q,) = [q for q in resultat["questions"] if q["question_id"] == question_id]
     return q["top"][0][0]
+
+
+def test_la_regle_du_corpus_lu_est_la_meme_dans_le_05_et_le_09():
+    """« Plusieurs corpus → le nommer » est écrite deux fois, sans vue partagée
+    (décision de Max, pas de migration) : 05 `atteignabilite.corpus_lu` et 09
+    `controles.fragments`. Le 10 voit les deux ; une copie qui dériverait casse
+    ici. Le comportement est éprouvé dans le 05
+    (`test_un_seul_corpus_est_lu_sans_etre_nomme`)."""
+    from service_embedding import controles
+
+    from mesures_recherche.entites import charger_atteignabilite
+
+    attendu = charger_atteignabilite().SQL_CORPUS_PAR_DEFAUT
+    assert "v_encodage_en_service" in attendu, "le test ne prouverait rien"
+    assert controles.SQL_CORPUS_LU == attendu
 
 
 def test_aucune_lecture_de_vecteurs_sans_encodage_designe():
@@ -189,13 +205,11 @@ def test_un_service_conforme_au_registre_est_admis(service_simule):
     assert params["service_revision"] == service_simule["revision"]
 
 
-@pytest.mark.parametrize(
-    "champ, valeur",
-    [("model_sha", "0" * 40), ("model_dtype", "float16"), ("version", "1.9.5")],
-)
-def test_un_ecart_avec_le_registre_arrete(service_simule, champ, valeur):
-    Info.reponse = Info.reponse | {champ: valeur}
-    with pytest.raises(executer.ServiceNonConforme):
+def test_un_ecart_avec_le_registre_arrete(service_simule):
+    """La preuve du branchement : la règle, champ par champ, est éprouvée dans le
+    09 (`test_client.py`, `confronter`)."""
+    Info.reponse = Info.reponse | {"model_sha": "0" * 40}
+    with pytest.raises(ServiceNonConforme):
         executer.encodeur_du_service(
             executer.Designation("embeddinggemma", service_simule)
         )
@@ -204,5 +218,5 @@ def test_un_ecart_avec_le_registre_arrete(service_simule, champ, valeur):
 def test_sans_encodage_le_service_est_confronte_a_la_configuration(service_simule):
     executer.encodeur_du_service(executer.Designation("embeddinggemma"))
     Info.reponse = Info.reponse | {"model_sha": "0" * 40}
-    with pytest.raises(executer.ServiceNonConforme):
+    with pytest.raises(ServiceNonConforme):
         executer.encodeur_du_service(executer.Designation("embeddinggemma"))

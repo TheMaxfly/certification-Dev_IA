@@ -17,6 +17,7 @@ import pytest
 from test_encodage import doublure  # noqa: F401 — la fixture du service simulé
 
 from service_embedding import equivalence
+from service_embedding.client import ServiceNonConforme
 from service_embedding.encodage import encoder_corpus
 
 CONFIG = equivalence.charger_config()
@@ -116,7 +117,7 @@ def test_un_service_qui_ne_sert_pas_l_encodage_est_refuse(encodee):
     with psycopg.connect(base) as cx:
         e, ech = equivalence.echantillon(cx, eid, config)
     e = e | {"revision": "0" * 40}
-    with pytest.raises(equivalence.ServiceNonConforme):
+    with pytest.raises(ServiceNonConforme):
         equivalence.comparer(client, {"encodage": e, "echantillon": ech}, config)
 
 

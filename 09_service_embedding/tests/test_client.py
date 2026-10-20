@@ -15,7 +15,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from service_embedding.client import ClientService, ErreurService, cosinus, norme
+from service_embedding.client import (
+    ClientService,
+    ErreurService,
+    ServiceNonConforme,
+    confronter,
+    cosinus,
+    norme,
+)
 from service_embedding.configuration import charger
 
 
@@ -117,3 +124,84 @@ def test_norme_et_cosinus():
     assert norme([3.0, 4.0]) == 5.0
     assert cosinus([1.0, 0.0], [2.0, 0.0]) == pytest.approx(1.0)
     assert cosinus([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+
+
+# --------------------------------------------------------------------------- #
+#  La confrontation au registre — une règle pure, appelée par l'équivalence (09,
+#  rôle « document ») et par la mesure (10, rôle « requete »)
+# --------------------------------------------------------------------------- #
+
+
+class ClientFige:
+    """Un client dont `/info` est figé : aucun service n'est appelé."""
+
+    def __init__(self, instance, info):
+        self.instance, self._info = instance, info
+
+    def info(self):
+        return self._info
+
+
+@pytest.fixture
+def registre():
+    """L'instance, ce qu'elle sert, et la ligne d'encodage qui lui correspond."""
+    i = charger("embeddinggemma")
+    assert i.prefixe_document != i.prefixe_requete, "les deux rôles se distinguent"
+    info = {
+        "model_id": i.model_id,
+        "model_sha": i.revision,
+        "model_dtype": i.dtype,
+        "version": "1.9.4",
+    }
+    encodage = {
+        "modele": i.model_id,
+        "revision": i.revision,
+        "precision_calcul": i.dtype,
+        "outil_version": "1.9.4",
+        "prefixe_document": i.prefixe_document,
+        "prefixe_requete": i.prefixe_requete,
+    }
+    return i, info, encodage
+
+
+@pytest.mark.parametrize("role", ["document", "requete"])
+def test_un_service_conforme_est_admis(registre, role):
+    instance, info, encodage = registre
+    assert confronter(ClientFige(instance, info), encodage, role) == info
+    assert confronter(ClientFige(instance, info), None, role) == info
+
+
+@pytest.mark.parametrize(
+    "champ, valeur, nomme",
+    [
+        ("model_id", "autre/modele", "modele"),
+        ("model_sha", "0" * 40, "revision"),
+        ("model_dtype", "float16", "precision_calcul"),
+        ("version", "1.9.5", "outil_version"),
+    ],
+)
+def test_un_ecart_avec_l_encodage_arrete(registre, champ, valeur, nomme):
+    instance, info, encodage = registre
+    with pytest.raises(ServiceNonConforme, match=nomme):
+        confronter(ClientFige(instance, info | {champ: valeur}), encodage, "document")
+
+
+@pytest.mark.parametrize(
+    "role, autre", [("document", "requete"), ("requete", "document")]
+)
+def test_le_prefixe_du_role_est_confronte_a_l_encodage(registre, role, autre):
+    instance, info, encodage = registre
+    encodage = encodage | {f"prefixe_{role}": "un autre préfixe : "}
+    with pytest.raises(ServiceNonConforme, match=f"prefixe_{role}"):
+        confronter(ClientFige(instance, info), encodage, role)
+    # Le préfixe de l'autre rôle n'entre pas dans la confrontation.
+    confronter(ClientFige(instance, info), encodage, autre)
+
+
+def test_sans_encodage_la_configuration_fait_foi_sans_version(registre):
+    instance, info, _ = registre
+    confronter(ClientFige(instance, info | {"version": "9.9.9"}), None, "requete")
+    with pytest.raises(ServiceNonConforme, match="revision"):
+        confronter(
+            ClientFige(instance, info | {"model_sha": "0" * 40}), None, "requete"
+        )
