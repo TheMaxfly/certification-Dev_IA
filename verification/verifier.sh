@@ -36,6 +36,9 @@
 #   - une ligne par module : passés, sautés, en échec, durée. Un test sauté n'est
 #     pas un test passé : il est compté, et au-delà du plafond de
 #     verification/sauts_attendus.tsv, c'est un échec ;
+#   - les exigences d'un module (9e champ de MODULES : Pyright strict, Bandit,
+#     pip-audit) sont bloquantes : un constat est un échec. Un module neuf les porte
+#     dès son premier commit ;
 #   - les volumes Docker créés pendant la vérification, et eux seuls, sont
 #     supprimés à la fin (les bases jetables des tests en laissent un chacune).
 set -uo pipefail
@@ -59,10 +62,15 @@ ENSEMBLE_REGLES=24783901
 RUFF="$(sed -n '/ruff-pre-commit/,/rev:/s/^ *rev: *v//p' "$RACINE/.pre-commit-config.yaml")"
 BANDIT=1.9.4
 PIP_AUDIT=2.10.1
+PYRIGHT=1.1.414       # paquet pyright[nodejs] : Node embarqué, sans dépendance au poste
 ACTIONLINT=1.7.12.25  # paquet actionlint-py : actionlint 1.7.12
 SHELLCHECK=0.11.0.1   # paquet shellcheck-py : shellcheck 0.11.0
 
-# nom | dossier Ruff | dossier du projet (verrou, tests) | lanceur | options uv | arguments | couverture | prérequis
+# nom | dossier Ruff | dossier du projet (verrou, tests) | lanceur | options uv | arguments | couverture | prérequis | exigences
+# Exigences (bloquantes, après les tests) : `pyright` (strict, configuré dans le
+# pyproject du module), `bandit` (sur src/), `pip-audit` (sur le verrou), séparées
+# par des virgules. Les modules d'avant E3 étape 2 n'en portent pas : leurs
+# constats restent indicatifs (`make verify-indicatif`).
 MODULES=(
   "01|01_scraping_manganews|01_scraping_manganews|pytest|--extra dev|tests|.|"
   "02|02_api_manga|02_api_manga|pytest|||.|"
@@ -73,6 +81,7 @@ MODULES=(
   "08|08_enrichissement_personnages|08_enrichissement_personnages|pytest|--extra dev|tests|.|"
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
+  "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
   "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,
@@ -132,19 +141,20 @@ volumes_fin() {
 # --------------------------------------------------------------------------- #
 resume() {
   [ ${#RESUME[@]} -gt 0 ] || return 0
-  printf '\n%-10s %-7s %-7s %8s %15s %8s %9s %8s  %s\n' \
-    module ruff format passés "sautés/plafond" échecs durée couv. verdict
+  printf '\n%-10s %-7s %-7s %8s %15s %8s %9s %8s %-10s %s\n' \
+    module ruff format passés "sautés/plafond" échecs durée couv. exigences verdict
   local l
+  # 11e champ, les exigences : absent des lignes qui n'en ont pas (« - »).
   for l in "${RESUME[@]}"; do
-    IFS='|' read -r m r f p s pl e d c v <<<"$l"
-    printf '%-10s %-7s %-7s %8s %15s %8s %8ss %8s  %s\n' "$m" "$r" "$f" "$p" "$s/$pl" "$e" "$d" "$c" "$v"
+    IFS='|' read -r m r f p s pl e d c v x <<<"$l"
+    printf '%-10s %-7s %-7s %8s %15s %8s %8ss %8s %-10s %s\n' "$m" "$r" "$f" "$p" "$s/$pl" "$e" "$d" "$c" "${x:--}" "$v"
   done
   {
-    echo "| module | Ruff | format | passés | sautés / plafond | en échec | durée | couverture | verdict |"
-    echo "|---|---|---|---:|---:|---:|---:|---:|---|"
+    echo "| module | Ruff | format | passés | sautés / plafond | en échec | durée | couverture | exigences | verdict |"
+    echo "|---|---|---|---:|---:|---:|---:|---:|---|---|"
     for l in "${RESUME[@]}"; do
-      IFS='|' read -r m r f p s pl e d c v <<<"$l"
-      echo "| $m | $r | $f | $p | $s / $pl | $e | $d s | $c | $v |"
+      IFS='|' read -r m r f p s pl e d c v x <<<"$l"
+      echo "| $m | $r | $f | $p | $s / $pl | $e | $d s | $c | ${x:--} | $v |"
     done
   } >"$SORTIES/resume.md"
   [ -n "${GITHUB_STEP_SUMMARY:-}" ] && cat "$SORTIES/resume.md" >>"$GITHUB_STEP_SUMMARY"
@@ -181,8 +191,8 @@ attribut_junit() {  # <fichier> <attribut> : sur le premier <testsuite>
 }
 
 verifier_module() {
-  local nom lint projet lanceur options args couv prerequis
-  IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$1"
+  local nom lint projet lanceur options args couv prerequis exigences
+  IFS='|' read -r nom lint projet lanceur options args couv prerequis exigences <<<"$1"
   if [ "$lanceur" = statique ]; then verifier_statique "$nom"; return; fi
   local sortie="$SORTIES/$nom" debut ruff=- format=- passes=- sautes=- echecs=- couverture=-
   mkdir -p "$sortie"
@@ -276,7 +286,67 @@ verifier_module() {
     RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
     echouer "$nom" "intégration Compose" "(02_api_manga/) docker compose -f compose.integration.yml run --rm --build smoke"
   fi
-  RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ok")
+  local exige=""
+  if [ -n "$exigences" ]; then
+    if ! exiger "$nom" "$projet" "$exigences"; then
+      RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC|$EXIGE")
+      echouer "$nom" "exigence $REFUS" "(${projet}/) $COMMANDE_REFUS"
+    fi
+    exige=$EXIGE
+  fi
+  RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ok|$exige")
+}
+
+# Les exigences d'un module (9e champ de MODULES), bloquantes, après ses tests :
+# l'environnement du module existe alors (`uv run --locked`, ou `preparer` sur
+# GitHub). Un constat, comme une panne d'outil, est un échec. Pour les essais du
+# moteur, VERIFY_DOUBLURE_PYRIGHT, _BANDIT et _PIP_AUDIT désignent un exécutable qui
+# remplace l'outil ; il reçoit le nom de l'exigence et le dossier du projet.
+EXIGE=""          # exigences tenues / déclarées, pour le résumé
+REFUS=""          # l'exigence refusée
+COMMANDE_REFUS="" # sa commande
+exiger() {  # exiger <nom> <projet> <exigences, séparées par des virgules>
+  local nom="$1" projet="$2" sortie="$SORTIES/$1" exigence doublure faites=0 rc
+  local -a liste cmd
+  IFS=',' read -ra liste <<<"$3"
+  : >"$sortie/exigences.log"
+  for exigence in "${liste[@]}"; do
+    doublure="VERIFY_DOUBLURE_${exigence^^}"
+    doublure="${doublure//-/_}"
+    case $exigence in
+      pyright) cmd=(uvx --from "pyright[nodejs]==$PYRIGHT" pyright
+        --pythonpath "$RACINE/$projet/.venv/bin/python" -p .) ;;
+      bandit) cmd=(uvx "bandit@$BANDIT" -q -c pyproject.toml -r src) ;;
+      pip-audit) cmd=(uvx "pip-audit@$PIP_AUDIT" -r "$sortie/verrou_exige.txt" --no-deps
+        --disable-pip --strict --progress-spinner off) ;;
+      *)
+        EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (inconnue)"
+        COMMANDE_REFUS="9e champ de MODULES (verification/verifier.sh) : pyright, bandit, pip-audit"
+        return 1 ;;
+    esac
+    [ -n "${!doublure:-}" ] && cmd=("${!doublure}" "$exigence" "$RACINE/$projet")
+    dire "$nom — exigence $exigence : ${cmd[*]}"
+    if [ "$exigence" = pip-audit ] && [ -z "${!doublure:-}" ]; then
+      # Le verrou d'abord, en requirements épinglés et hachés (paquets locaux exclus).
+      (cd "$RACINE/$projet" && "${PROPRE[@]}" uv export --locked --all-extras --all-groups \
+        --no-emit-project --no-emit-local --format requirements-txt \
+        -o "$sortie/verrou_exige.txt" >/dev/null) 2>&1 | tee -a "$sortie/exigences.log"
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ]; then
+        EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (export du verrou)"
+        COMMANDE_REFUS="uv export --locked …"
+        return 1
+      fi
+    fi
+    (cd "$RACINE/$projet" && "${PROPRE[@]}" "${cmd[@]}") 2>&1 | tee -a "$sortie/exigences.log"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+      EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (code $rc)"; COMMANDE_REFUS="${cmd[*]}"
+      return 1
+    fi
+    faites=$((faites + 1))
+  done
+  EXIGE="$faites/${#liste[@]}"
 }
 
 # L'intégration du 02 : PostgreSQL jetable, schéma rejoué depuis database/migrations/,
@@ -619,9 +689,10 @@ PY
 #  Préparer : l'environnement d'un module depuis son verrou (sur GitHub, avant verify)
 # --------------------------------------------------------------------------- #
 preparer() {
-  local l nom lint projet lanceur options args couv prerequis
+  local l nom lint projet lanceur options args couv prerequis exigences
   l="$(choisir_modules "$1")" || exit 2
-  IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$l"
+  # shellcheck disable=SC2034  # exigences : lue pour que prerequis reste un seul champ
+  IFS='|' read -r nom lint projet lanceur options args couv prerequis exigences <<<"$l"
   if [ "$prerequis" = database ]; then
     dire "$nom — prérequis database/ : uv sync --locked --inexact"
     (cd "$RACINE/database" && "${PROPRE[@]}" uv sync --locked --inexact) || exit 1

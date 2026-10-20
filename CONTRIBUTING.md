@@ -26,13 +26,20 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
 | `make verify TOUT=1` | tous les modules |
-| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `10`, `database`, `demo`, `statique` |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `11`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
 | `make verify-poste` | la mémoire d'abord (5 Go disponibles, 4 Go de mémoire vidéo libre) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés ; **sans échantillon, échec** : une vérification qui ne tourne pas est un échec), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
-  vidé. **Jamais de DSN réel pour les tests, sauf l'étape « état d'`apimanga` » de
-  `verify-poste`, en lecture seule sous `verif_ro`** (plus bas).
+  vidé. **Jamais de DSN réel pour les tests, sauf deux étapes de `verify-poste`, en
+  lecture seule** (plus bas) : l'état d'`apimanga`, sous `verif_ro` ; l'équivalence de
+  l'API du modèle, sous `modele_ro`.
+- **Les exigences d'un module neuf sont bloquantes**, dès son premier commit : Pyright
+  strict sur `src/`, Bandit sur `src/`, pip-audit sur le verrou, après ses tests, dans
+  `make verify` ; un constat est un échec, et la couverture est mesurée. Elles se
+  déclarent dans le 9e champ de sa ligne de `MODULES` (`verification/verifier.sh`) ;
+  le module 11 (API du modèle) les porte. Pour les modules d'avant, Bandit et
+  pip-audit restent indicatifs.
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
   `verification/` et de `sauvegarde/`, les essais des hooks (`tester.sh`), du
@@ -99,6 +106,24 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   (`bash verification/etat_apimanga.sh --relever`) et la commiter avec ce qui l'a
   changée.
 
+### L'équivalence de l'API du modèle, en lecture seule
+
+Seconde exception à « jamais de DSN réel », accordée par le mainteneur le 2026-10-20
+(E3, étape 2) : ce que l'API sert doit être ce que le banc a mesuré, et seule la base
+réelle porte les vecteurs du corpus en service.
+
+- **Une étape de `verify-poste`** : l'équivalence de l'API, après celle du service, sur
+  la même et unique instance EmbeddingGemma. Les questions du jeu gelé, rejouées par
+  l'API, doivent rendre les mêmes dix premières séries que le run de référence du
+  banc. Sautée partout ailleurs, et comptée comme telle (`sauts_attendus.tsv`).
+- **Sous `modele_ro`** (migration `023`) : `SELECT` sur le corpus, les fragments, les
+  vecteurs EmbeddingGemma, le registre des encodages et l'encodage en service, le
+  rattachement et le titre des séries — rien d'autre. Le rôle de connexion
+  `modele_api` est créé par `database/outils/creer_role_modele.sh` ; ses sessions sont
+  en lecture seule.
+- **Le DSN n'est visible que de cette étape** : lu dans `verification/.env`, sans mot
+  de passe (il est dans `~/.pgpass`), et passé au seul test qu'elle nomme.
+
 **Documentation seule.** Pour un changement qui ne touche que des fichiers de
 documentation (`.md`), `make verify` complet n'est pas exigé sur le poste avant le
 push : les hooks suffisent, et la chaîne de GitHub garde la fusion. Dès qu'un fichier
@@ -130,9 +155,11 @@ reste obligatoire.
   permissions en lecture seule.
 
 **Tout module neuf entre dans la matrice ET dans les contrôles obligatoires, dans la
-même étape** : sa ligne dans `verification/verifier.sh`, ses dépendances dans
-`verification/dependances.tsv`, son entrée dans la matrice de `verify.yml`, et son
-contrôle `verify <module>` dans l'ensemble de règles.
+même étape** : sa ligne dans `verification/verifier.sh`, avec ses exigences, ses
+dépendances dans `verification/dependances.tsv`, son plafond de tests sautés dans
+`verification/sauts_attendus.tsv` (0 s'il n'en saute aucun), son entrée dans la
+matrice de `verify.yml`, et son contrôle `verify <module>` dans l'ensemble de
+règles.
 
 ## Les protections de `main` et `develop`
 

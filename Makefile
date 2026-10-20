@@ -8,7 +8,7 @@
 #                            docs/modeles, actionlint, shellcheck, essais des hooks
 #                            et du périmètre)
 #   make verify TOUT=1       tous les modules
-#   make verify MODULE=05    un seul module : 01 … 05, 07 … 10, database, demo, statique
+#   make verify MODULE=05    un seul module : 01 … 05, 07 … 11, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make verify-poste        la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les

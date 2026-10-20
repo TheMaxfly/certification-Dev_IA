@@ -33,7 +33,7 @@ else
   ok "un module absent du graphe est refusé"
 fi
 # Mutation : un nom inconnu dans le graphe doit être vu.
-{ cat "$ICI/dependances.tsv"; printf '11\t11_inconnu/\n'; } >"$TRAVAIL/en_trop.tsv"
+{ cat "$ICI/dependances.tsv"; printf '12\t12_inconnu/\n'; } >"$TRAVAIL/en_trop.tsv"
 if VERIFY_GRAPHE="$TRAVAIL/en_trop.tsv" bash "$VERIFIER" graphe >/dev/null 2>&1; then
   ko "un module inconnu du graphe passe inaperçu"
 else
@@ -47,17 +47,21 @@ cas "hooks seuls"                      "statique"                              .
 cas "le script de sauvegarde"          "database statique"                     sauvegarde/sauvegarder.sh
 cas "un fichier du 01"                 "01 statique"                           01_scraping_manganews/x.py
 cas "un fichier du 05"                 "05 demo statique"                      05_nettoyage_agregation_bdd/src/corpus/x.py
-cas "l'atteignabilité du 05"           "05 10 demo statique"                   05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+cas "l'atteignabilité du 05"           "05 10 11 demo statique"                05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 cas "Bench_embedding du 06"            "05 statique"                           06_benchmark_embeddings_llm/Bench_embedding.py
 cas "un autre fichier du 06"           "statique"                              06_benchmark_embeddings_llm/archive/autre.py
-cas "un fichier du 09"                 "09 10 statique"                        09_service_embedding/src/x.py
-cas "une migration"                    "02 05 08 09 10 database demo statique" database/migrations/099_x.sql
-cas "un outil de database"             "05 08 09 10 database demo statique"    database/outils/x.sh
+cas "un fichier du 09"                 "09 10 11 statique"                     09_service_embedding/src/x.py
+cas "le code du 10"                    "10 11 statique"                        10_mesures_recherche/src/mesures_recherche/x.py
+cas "le verrou du 10"                  "10 11 statique"                        10_mesures_recherche/uv.lock
+cas "un autre fichier du 10"           "10 statique"                           10_mesures_recherche/README.md
+cas "un fichier du 11"                 "11 statique"                           11_api_modele/src/api_modele/x.py
+cas "une migration"                    "02 05 08 09 10 11 database demo statique" database/migrations/099_x.sql
+cas "un outil de database"             "05 08 09 10 11 database demo statique" database/outils/x.sh
 cas "un autre workflow"                "statique"                              .github/workflows/indicatif.yml
-cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 database demo statique" .github/workflows/verify.yml
-cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 database demo statique" verification/verifier.sh
+cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 database demo statique" .github/workflows/verify.yml
+cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 database demo statique" verification/verifier.sh
 cas "plusieurs modules"                "01 04 demo statique"                   01_scraping_manganews/a 04_scraping_manga_sanctuary/b
-attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
+attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 11 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
 obtenu_tout="$(: | TOUT=1 bash "$VERIFIER" perimetre)"
 if [ "$obtenu_tout" = "$attendu_tout" ]; then ok "TOUT=1 → tous les modules"; else ko "TOUT=1 : obtenu $obtenu_tout"; fi
 
