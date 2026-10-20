@@ -2,6 +2,8 @@
 
 - un identifiant de requête (UUID v4), dans l'état de la requête et en en-tête
   `X-Identifiant-Requete` de toute réponse ;
+- `Cache-Control: no-store` sur toute réponse (contrat, B.1) : une réponse porte un
+  classement, des extraits ou un état qui ne valent qu'au moment de la requête ;
 - le corps borné : au-delà du maximum, 413 `corps_trop_volumineux`, avant que
   l'application ne le lise ;
 - l'erreur imprévue rattrapée : 500 `erreur_interne`, sans trace de pile dans la
@@ -63,7 +65,9 @@ class Enveloppe:
             if message["type"] == "http.response.start":
                 reponse["statut"] = message["status"]
                 reponse["commencee"] = True
-                MutableHeaders(scope=message)[ENTETE_IDENTIFIANT] = ident
+                entetes = MutableHeaders(scope=message)
+                entetes[ENTETE_IDENTIFIANT] = ident
+                entetes.setdefault("Cache-Control", "no-store")
             await send(message)
 
         try:

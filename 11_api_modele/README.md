@@ -52,7 +52,7 @@ banc (étape d'équivalence de `make verify-poste`, sous `modele_api`).
 | `GET /v1/sante` | non | base, service, encodage en service : `ok` ou `degrade` (503) |
 | `GET /v1/info` | oui | modèle, révision, encodage et corpus servis ; réglages et bornes |
 | `GET /metrics` | non | Prometheus, aux seules adresses de `API_MODELE_METRIQUES_RESEAUX` (404 ailleurs) |
-| `GET /v1/openapi.json` | non | le contrat, égal à `openapi.json` (versionné) |
+| `GET /v1/openapi.json` | non | le contrat, égal à `contrat/openapi_v1.json` (versionné) |
 
 Erreurs : `{"code", "message", "details", "identifiant_requete"}`, un code stable par
 cas ; l'identifiant aussi en en-tête `X-Identifiant-Requete`.

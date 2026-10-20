@@ -11,12 +11,17 @@ L'API y tourne sous un rôle de connexion de test, membre de `modele_ro` seul
 l'API lit, elle doit pouvoir le lire sous ce rôle. Le service d'embedding est une
 doublure (`/health`, `/info`, `/embed`, `/tokenize`) ; aucun test ne demande le
 service réel.
+
+Le contrat est gardé sur toute la suite : une réponse de l'API, dans n'importe quel
+test, sur une opération du contrat versionné, doit avoir un statut que le contrat
+déclare pour elle (`aucun_statut_hors_contrat`).
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import secrets
 import sys
 import threading
@@ -36,6 +41,7 @@ from service_embedding.configuration import charger as charger_instance
 
 from api_modele.application import creer_application
 from api_modele.configuration import Reglages, charger
+from api_modele.contrat import DESTINATION
 
 RACINE_MODULE = Path(__file__).resolve().parents[1]
 RACINE_DEPOT = RACINE_MODULE.parent
@@ -58,6 +64,63 @@ def _charger_harnais():
 
 
 harnais = _charger_harnais()
+
+
+# --------------------------------------------------------------------------- #
+#  Le contrat, gardé sur toute la suite : aucun statut qu'il ne déclare pas
+# --------------------------------------------------------------------------- #
+#: (gabarit de route, méthode) → statuts déclarés, lus dans le contrat versionné.
+OPERATIONS: dict[tuple[str, str], set[int]] = {
+    (chemin, methode.upper()): {int(statut) for statut in operation["responses"]}
+    for chemin, operations in json.loads(DESTINATION.read_text(encoding="utf-8"))[
+        "paths"
+    ].items()
+    for methode, operation in operations.items()
+}
+
+
+class Reponses(logging.Handler):
+    """Recueille (route, méthode, statut) de chaque ligne « requete » du journal."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.vues: list[tuple[str, str, int]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        champs = getattr(record, "champs", None)
+        if record.getMessage() == "requete" and isinstance(champs, dict):
+            vue = (champs.get("route"), champs.get("methode"), champs.get("statut"))
+            self.vues.append(vue)  # type: ignore[arg-type]
+
+
+@pytest.fixture(autouse=True)
+def aucun_statut_hors_contrat() -> Iterator[Reponses]:
+    """Spec 04, A.2 : aucun code non documenté n'est produit. Les routes d'essai
+    ajoutées par un test, les routes inconnues (404) et les méthodes non permises
+    (405) ne sont pas des opérations du contrat."""
+    journal = logging.getLogger("api_modele.requetes")
+    niveau = journal.level
+    capteur = Reponses()
+    journal.addHandler(capteur)
+    journal.setLevel(logging.INFO)
+    try:
+        yield capteur
+    finally:
+        journal.removeHandler(capteur)
+        journal.setLevel(niveau)
+    hors = statuts_hors_contrat(capteur.vues)
+    assert not hors, f"statuts que le contrat ne déclare pas : {hors}"
+
+
+def statuts_hors_contrat(
+    vues: list[tuple[str, str, int]],
+) -> list[tuple[str, str, int]]:
+    """Les réponses d'une opération du contrat dont le statut n'y est pas déclaré."""
+    return [
+        (route, methode, statut)
+        for route, methode, statut in vues
+        if (route, methode) in OPERATIONS and statut not in OPERATIONS[route, methode]
+    ]
 
 
 @pytest.fixture(scope="session")

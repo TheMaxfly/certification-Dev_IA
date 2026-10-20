@@ -1,0 +1,7 @@
+id = "API-20"
+origine = "E3 étape 2, bloc 04 (2026-10-20) — la borne d'un réglage de la recherche (nombre_series, 1 à 50) est celle du contrat : 51 est refusé en 422"
+fichier = "11_api_modele/src/api_modele/modeles.py"
+avant = '''    nombre_series: Annotated[int, Field(ge=_N.min, le=_N.max)] = _N.defaut'''
+apres = '''    nombre_series: Annotated[int, Field(ge=_N.min, le=_N.max + 1)] = _N.defaut'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "bornes_des_reglages"]

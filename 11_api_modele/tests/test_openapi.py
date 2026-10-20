@@ -105,6 +105,6 @@ def test_le_contrat_est_servi_sans_cle(api):
 
 
 def test_exporter_ecrit_le_contrat(tmp_path):
-    fichier = exporter(tmp_path / "openapi.json")
+    fichier = exporter(tmp_path / "openapi_v1.json")
 
     assert fichier.read_text(encoding="utf-8") == serialiser(contrat())
