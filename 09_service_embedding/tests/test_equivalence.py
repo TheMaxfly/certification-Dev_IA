@@ -17,6 +17,7 @@ import pytest
 from test_encodage import doublure  # noqa: F401 — la fixture du service simulé
 
 from service_embedding import equivalence
+from service_embedding.client import ServiceNonConforme
 from service_embedding.encodage import encoder_corpus
 
 CONFIG = equivalence.charger_config()
@@ -116,7 +117,7 @@ def test_un_service_qui_ne_sert_pas_l_encodage_est_refuse(encodee):
     with psycopg.connect(base) as cx:
         e, ech = equivalence.echantillon(cx, eid, config)
     e = e | {"revision": "0" * 40}
-    with pytest.raises(equivalence.ServiceNonConforme):
+    with pytest.raises(ServiceNonConforme):
         equivalence.comparer(client, {"encodage": e, "echantillon": ech}, config)
 
 
@@ -149,3 +150,52 @@ def test_equivalence_du_service_reel():
         resultats.append(r)
     echecs = [r for r in resultats if r["verdict"] == "echec"]
     assert not echecs, [(r["encodage_id"], r["cos_min"]) for r in echecs]
+
+
+# --------------------------------------------------------------------------- #
+#  Deux encodages du même modèle et du même corpus : l'échantillon ne lit que
+#  les vecteurs de celui qu'il exporte
+# --------------------------------------------------------------------------- #
+
+
+def second_encodage(base: str, eid: int) -> int:
+    """Un autre encodage du même modèle et du même corpus (une autre révision) :
+    d'autres vecteurs, unitaires, pour les mêmes fragments."""
+    autre = "[" + ",".join(["0", "1"] + ["0"] * 1022) + "]"
+    with psycopg.connect(base) as cx:
+        (e2,) = cx.execute(
+            "INSERT INTO bench.encodages (corpus_id, modele, revision, dimension,"
+            " precision_calcul, prefixe_document, prefixe_requete, outil,"
+            " outil_version, image, image_digest, taille_lot, nb_fragments,"
+            " termine_le)"
+            " SELECT corpus_id, modele, repeat('e', 40), dimension, precision_calcul,"
+            " prefixe_document, prefixe_requete, outil, outil_version, image,"
+            " image_digest, taille_lot, nb_fragments, now() FROM bench.encodages"
+            " WHERE encodage_id = %s RETURNING encodage_id",
+            (eid,),
+        ).fetchone()
+        cx.execute(
+            "INSERT INTO bench.vecteurs_bge_m3 (encodage_id, chunk_id, modele,"
+            " corpus_id, embedding) SELECT %s, chunk_id, modele, corpus_id,"
+            " %s::public.vector FROM bench.vecteurs_bge_m3 WHERE encodage_id = %s",
+            (e2, autre, eid),
+        )
+    return e2
+
+
+def test_l_echantillon_ne_lit_que_les_vecteurs_de_son_encodage(encodee):
+    base, _, eid, config = encodee
+    e2 = second_encodage(base, eid)
+    with psycopg.connect(base) as cx:
+        _, a = equivalence.echantillon(cx, eid, config)
+        _, b = equivalence.echantillon(cx, e2, config)
+        propres = dict(
+            cx.execute(
+                "SELECT chunk_id, embedding::text FROM bench.vecteurs_bge_m3"
+                " WHERE encodage_id = %s",
+                (eid,),
+            ).fetchall()
+        )
+    assert [f["chunk_id"] for f in a] == [f["chunk_id"] for f in b], "même tirage"
+    assert all(f["vecteur"] == json.loads(propres[f["chunk_id"]]) for f in a)
+    assert all(f["vecteur"] != g["vecteur"] for f, g in zip(a, b, strict=True))

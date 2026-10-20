@@ -1,0 +1,7 @@
+id = "HK-08"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — garde du vide retirée : une ligne vide devient une valeur de clé à chercher"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''| grep -v '^[[:space:]]*$' | sort -u'''
+apres = '''| sort -u'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

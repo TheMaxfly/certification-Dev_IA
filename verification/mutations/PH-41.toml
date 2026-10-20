@@ -1,0 +1,7 @@
+id = "PH-41"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : une instance du service en cours n'arrête plus la préparation"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''  if docker ps --format '{{.Names}}' | grep -qE '^tei-'; then'''
+apres = '''  if false; then'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

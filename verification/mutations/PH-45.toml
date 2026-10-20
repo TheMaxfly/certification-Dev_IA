@@ -1,0 +1,7 @@
+id = "PH-45"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : une configuration absente n'est plus nommée"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''  [ -r "$CONFIG" ] || echouer'''
+apres = '''  true || echouer'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

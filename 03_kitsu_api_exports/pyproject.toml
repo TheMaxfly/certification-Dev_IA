@@ -22,3 +22,9 @@ apimanga-full = "api_manga.run_full_catalog:main"
 [project.urls]
 homepage = "https://github.com/example/ApiManga"
 repository = "https://github.com/example/ApiManga"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=7.1",
+]

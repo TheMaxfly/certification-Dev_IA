@@ -231,7 +231,10 @@ class Serveur(BaseHTTPRequestHandler):
 def ollama_doublure():
     Serveur.recus = []
     serveur = HTTPServer(("127.0.0.1", 0), Serveur)
-    fil = threading.Thread(target=serveur.serve_forever, daemon=True)
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    fil = threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     fil.start()
     yield generation.Ollama(f"http://127.0.0.1:{serveur.server_port}", "m", "30m")
     serveur.shutdown()
@@ -251,9 +254,19 @@ def test_client_ollama_keep_alive_options_dechargement(ollama_doublure):
     assert Serveur.recus[-1] == ("/api/generate", {"model": "m", "keep_alive": 0})
     assert o.charge() == {"taille": 5, "taille_memoire_video": 5, "contexte": 8192}
     assert o.description()["modele_digest"] == "abc"
+    assert "format" not in corps, "sans schéma, la réponse est libre"
 
 
-def test_enregistrement_un_run_par_configuration_et_les_traces(tmp_path):
+def test_client_ollama_reponse_contrainte_par_un_schema(ollama_doublure):
+    schema = {"type": "object", "properties": {"mode": {"type": "string"}}}
+    ollama_doublure.discuter([{"role": "user", "content": "x"}], {}, schema)
+    chemin, corps = Serveur.recus[-1]
+    assert chemin == "/api/chat" and corps["format"] == schema
+
+
+def test_enregistrement_un_run_par_configuration_et_les_traces(
+    tmp_path, stockage_mlflow
+):
     import mlflow
 
     from mesures_recherche.enregistrement import uri_suivi
@@ -265,10 +278,10 @@ def test_enregistrement_un_run_par_configuration_et_les_traces(tmp_path):
         passages,
         Doublure(),
         enregistrer=True,
-        stockage=tmp_path / "mlflow",
+        stockage=stockage_mlflow,
         contexte={"mesurer_vram": lambda: 2**30, "parametres": {"essai": "oui"}},
     )
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     runs = mlflow.search_runs(
         experiment_names=[REGLAGES["mlflow"]["experience"]], output_format="list"
     )

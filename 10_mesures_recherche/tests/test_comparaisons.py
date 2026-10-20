@@ -47,3 +47,9 @@ def test_questions_non_appariees_refusees():
     resultats[2] = resultat(2, ["Q001"])
     with pytest.raises(ValueError, match="1 contre 2"):
         comparer(resultats, config)
+
+
+def test_bras_de_tailles_differentes_refuses():
+    """Apparié : chaque question tirée l'est des deux côtés — il faut les mêmes."""
+    with pytest.raises(ValueError, match="mêmes questions des deux côtés"):
+        bootstrap_apparie(np.ones(3), np.ones(2), 100, 1, NIVEAU)

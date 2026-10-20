@@ -24,21 +24,80 @@ commande sur le poste et sur GitHub.
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| `make verify` | pour chaque module : Ruff, format, tests ; puis actionlint sur les workflows |
-| `make verify MODULE=<nom>` | la même chose pour un seul module : `01` … `10`, `database`, `demo`, `workflows` |
+| `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
+| `make verify TOUT=1` | tous les modules |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `10`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | `make verify`, puis les harnais du poste seul : hooks, fidélité du schéma, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés), intégration Compose du 02 |
+| `make verify-poste` | la mémoire d'abord (5 Go disponibles, 4 Go de mémoire vidéo libre) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés ; **sans échantillon, échec** : une vérification qui ne tourne pas est un échec), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
-  vidé : aucune suite ne reçoit la base réelle.
+  vidé. **Jamais de DSN réel pour les tests, sauf l'étape « état d'`apimanga` » de
+  `verify-poste`, en lecture seule sous `verif_ro`** (plus bas).
+- La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
+  `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
+  `verification/` et de `sauvegarde/`, les essais des hooks (`tester.sh`), du
+  périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
+  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…)
+  et de la sauvegarde (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
+  graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
+  workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
+  exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
+- L'intégration Compose du 02 (PostgreSQL jetable, migrations, rôle de lecture, API
+  réelle, contrôles HTTP) fait partie de la vérification du 02.
 - Arrêt au premier échec, avec le module et la commande ; une ligne par module :
   passés, sautés, en échec, durée.
 - **Un test sauté n'est pas un test passé** : il est compté. Au-delà du plafond écrit,
   avec sa raison, dans `verification/sauts_attendus.tsv`, c'est un échec.
 - Les volumes Docker créés par la vérification, et eux seuls, sont supprimés.
 
-Avant une demande de fusion vers `develop` : `make verify`. Vers `main` :
-`make verify-poste`, et une sauvegarde de ce qui vit hors du dépôt.
+Avant une demande de fusion vers `develop` : `make verify` (les modules touchés). Vers
+`main` : `make verify-poste`, `make verify-mutations`, et une sauvegarde de ce qui vit
+hors du dépôt ; si le harnais a changé (`verification/`, `Makefile`, workflows),
+`make verify TOUT=1` d'abord.
+
+### Les mutations versionnées
+
+Une mutation casse le code exprès pour prouver qu'un test le voit. Chacune est un
+fichier de `verification/mutations/` (TOML) : le fichier visé, le texte exact à
+remplacer (présent une seule fois), son remplaçant, et la commande qui doit échouer
+une fois la mutation posée. `make verify-mutations` les rejoue dans un arbre jetable
+(`git worktree`, au commit courant : l'arbre de travail doit être propre), après un
+passage témoin sans mutation où la commande doit passer sans test sauté. La tâche
+`statique` contrôle, à chaque vérification, que chaque mutation se lit et vise un
+texte toujours présent une fois : un code qui bouge sans sa mutation se voit tout
+de suite. Une mutation écrite pour un correctif s'ajoute dans le même commit.
+
+### La sauvegarde
+
+`sauvegarde/sauvegarder.sh` sauvegarde ce qui vit hors du dépôt (bases, magasin
+MLflow, raw, rapports) : préparation locale avec manifeste, envoi chiffré
+(`duplicity`, phrase secrète au clavier, jamais en variable), relecture contre le
+manifeste, essai de restauration dans un PostgreSQL jetable. **Ce qui dépend du poste
+n'est pas dans le dépôt** : la liste des objets et les chemins se lisent dans
+`sauvegarde/.env`, ignoré par git (modèle : `sauvegarde/.env.example`, chemins relatifs
+au dossier personnel). Ses refus — configuration absente ou fautive, échec d'une
+commande, chaîne d'aspect jeton, instance du service en cours, phrase secrète en
+variable — sont éprouvés par `sauvegarde/tester_sauvegarde.sh`, sur une arborescence
+jetable et des doublures de PostgreSQL, Docker et duplicity.
+
+### L'état d'`apimanga`, en lecture seule
+
+La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
+`verify-poste`.
+
+- **Sous `verif_ro`** (migration `022`) : `SELECT` sur `manga`, `bench` et le suivi des
+  migrations, rien d'autre. Le rôle de connexion `verif_lecture` est créé par
+  `database/outils/creer_role_verification.sh` ; ses sessions sont en lecture seule. Le
+  mot de passe est dans `~/.pgpass`, le DSN dans `verification/.env` (modèle :
+  `verification/.env.example`), lu par cette étape seule.
+- **Ce qu'elle vérifie**, contre `verification/etat_apimanga.tsv` : les empreintes des
+  corpus v1 et v2, des mesures, des runs et des promotions ; le jeu v2 ; l'encodage en
+  service ; les migrations appliquées, égales aux fichiers. Puis le contrôle du module
+  09, et les tests qui ne peuvent tourner que sur la base réelle (05, 08, `demo`) :
+  ils doivent passer, aucun ne doit sauter.
+- **Une mesure, une promotion ou une migration change l'état** : relever la référence
+  (`bash verification/etat_apimanga.sh --relever`) et la commiter avec ce qui l'a
+  changée.
 
 **Documentation seule.** Pour un changement qui ne touche que des fichiers de
 documentation (`.md`), `make verify` complet n'est pas exigé sur le poste avant le
@@ -48,24 +107,32 @@ reste obligatoire.
 
 ## La chaîne d'intégration continue — `.github/workflows/verify.yml`
 
-- **Déclencheurs** : push sur `main` et `develop`, toute demande de fusion, lancement
-  manuel.
+- **Déclencheurs** : toute demande de fusion, le push sur `develop` (le commit de
+  fusion), le lancement manuel. **Pas de push sur `main`** : l'arbre livré dans `main`
+  est celui de `develop`, déjà vérifié.
+- **Périmètre** : la tâche `perimetre` lit les fichiers changés et le graphe
+  `verification/dependances.tsv`. Une tâche de module non concernée réussit sans rien
+  faire — ses étapes sont sautées —, et compte comme réussie pour les contrôles
+  obligatoires. Un lancement manuel vérifie tout.
 - **Une tâche par module** (`verify <module>`), qui lance `make verify MODULE=<nom>`
-  après `uv sync --locked` ; l'image PostgreSQL des bases jetables est tirée par son
-  empreinte, Java 8 est installé pour le 07.
-- **Une tâche `indicatif`** (Bandit, pip-audit), jamais exigée pour fusionner. Elle
-  réussit dès que les deux outils ont tourné et produit leurs rapports, quel que soit
-  le nombre de constats, qu'elle affiche par module et par outil dans le résumé et
-  publie comme pièces ; elle n'échoue que si un outil plante ou si un rapport manque.
-  La synthèse d'un commit dont les contrôles passent reste ainsi verte.
+  après une seule synchronisation (`uv sync --locked`) ; l'image PostgreSQL des bases
+  jetables est tirée par son empreinte, Java 8 est installé pour le 07. **La tâche
+  `statique`** tourne toujours.
+- **Caches** : celui d'`uv`, propre à chaque tâche (Ruff compris) ; le jar Delta (Ivy)
+  et l'extension DuckDB du 07.
+- **`indicatif`** (Bandit, pip-audit) vit dans `.github/workflows/indicatif.yml` :
+  chaque lundi et à la main, jamais exigé. Il réussit dès que les deux outils ont
+  tourné et produit leurs rapports, quel que soit le nombre de constats ; il n'échoue
+  que si un outil plante ou si un rapport manque.
 - JUnit, couverture et journaux sont publiés comme pièces de chaque exécution, même en
   échec ; le résumé reprend la ligne de chaque module.
 - Actions épinglées par l'empreinte de leur commit, exécuteur à version fixe,
   permissions en lecture seule.
 
 **Tout module neuf entre dans la matrice ET dans les contrôles obligatoires, dans la
-même étape** : sa ligne dans `verification/verifier.sh`, son entrée dans la matrice de
-`verify.yml`, et son contrôle `verify <module>` dans l'ensemble de règles.
+même étape** : sa ligne dans `verification/verifier.sh`, ses dépendances dans
+`verification/dependances.tsv`, son entrée dans la matrice de `verify.yml`, et son
+contrôle `verify <module>` dans l'ensemble de règles.
 
 ## Les protections de `main` et `develop`
 
@@ -73,7 +140,7 @@ Un ensemble de règles GitHub s'applique aux deux branches, **sans exemption, pa
 pour l'administrateur** :
 
 - pas de push direct : une demande de fusion est obligatoire ;
-- les tâches `verify <module>` de la matrice doivent être vertes — jamais `indicatif` ;
+- les tâches `verify <module>` de la matrice et `statique` doivent être vertes ;
 - commit de fusion seul (ni écrasement, ni rebase) ; aucune approbation d'un tiers : le
   mainteneur valide en fusionnant ;
 - ni push forcé, ni suppression.
@@ -89,19 +156,46 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 35 scénarios sur 35
+bash .githooks/tester.sh   # 69 scénarios sur 69 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
-  l'exclusion locale, jetons.
+  l'exclusion locale, clés et jetons des fournisseurs.
 - `pre-push`, avant que le distant change : auteur et validateur `TheMaxfly` pour
-  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé. Seule
-  exception, le commit de fusion créé par GitHub : exactement deux parents, validateur
-  `GitHub <noreply@github.com>`, auteur `TheMaxfly` ou le nom de profil GitHub du
-  mainteneur. Les autres contrôles s'appliquent aussi à ce commit.
+  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé, clés et
+  jetons dans les lignes ajoutées, nom des branches et des étiquettes poussées,
+  message des étiquettes annotées. Seule exception, le commit de fusion créé par
+  GitHub : exactement deux parents, validateur `GitHub <noreply@github.com>`, auteur
+  `TheMaxfly` ou le nom de profil GitHub du mainteneur. Les autres contrôles
+  s'appliquent aussi à ce commit.
+- Sur GitHub, la tâche `statique` contrôle le titre et le corps de chaque demande de
+  fusion (`.githooks/controler-texte`, mêmes motifs), à l'ouverture et à chaque
+  modification.
+- Les lignes sont lues en texte : une ligne qui porte un octet hors UTF-8 n'échappe
+  à aucun contrôle.
 
 Ils s'appliquent à l'identique sur toutes les branches et ne lancent aucun test.
 **Jamais de `--no-verify`.**
+
+## Les secrets
+
+Aucun secret n'entre dans un fichier suivi. Un secret se pose dans l'environnement
+ou dans un fichier `.env` hors dépôt, ignoré par git. Les hooks lisent les deux et
+comparent la valeur à ce qui part, sans jamais l'afficher. Ils refusent aussi une
+chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
+
+| Secret | Où il se pose | Ce que les hooks refusent |
+|---|---|---|
+| jeton Hugging Face | `HF_TOKEN`, ou le fichier `$HF_HOME/token` | `pre-commit` et `pre-push` : sa valeur ; `hf_` suivi de 34 caractères |
+| clé Mistral | `MISTRAL_API_KEY`, dans le `.env` du module de l'API du modèle | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale à `MISTRAL_API_KEY` |
+| clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
+
+- Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
+  elle. Une variable absente ou vide ne compare rien.
+- **Une clé Mistral ou OpenAI ne se pose sur un poste qu'après ces contrôles** :
+  fusionnés dans `develop`, hooks activés dans le clone.
+- La forme d'une clé Mistral n'est pas documentée. Seule sa valeur réelle la garde
+  partout ; le motif ne voit qu'une affectation.
 
 ## Nommer
 
@@ -159,7 +253,8 @@ chore(git): fusionner develop dans main — e3-etape1
 Le type `chore` ne compte pas une seconde fois les `feat` et les `fix` que la
 branche apporte : chacun porte déjà son propre commit. Titre et corps se relisent
 avant de fusionner : aucune mention d'assistant, aucune signature d'outil, aucun
-secret — le message du commit de fusion passe ensuite par le `pre-push`.
+secret. La tâche `statique` refuse une demande dont le titre ou le corps porte une
+mention ; le message du commit de fusion passe ensuite par le `pre-push`.
 
 ### Étiquettes
 
@@ -168,8 +263,8 @@ Annotées, posées sur `main`, une par livraison de `develop` dans `main` :
 (`methode-branches`). Si plusieurs étapes passent ensemble, l'étiquette prend le nom
 de la dernière. Message : `<étiquette> — <titre>`, puis la liste des étapes apportées.
 
-Le `pre-push` ne juge que des commits : **le message d'une étiquette n'est relu par
-aucun hook**. Il se relit avant le push.
+Le `pre-push` relit le nom de l'étiquette et son message : une mention d'assistant
+ou de co-auteur refuse le push. Le message se relit quand même avant le push.
 
 ## Trois règles imposées par les hooks
 

@@ -1,0 +1,7 @@
+id = "HK-14"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — le pre-push n'appelle plus le contrôle des clés"
+fichier = ".githooks/pre-push"
+avant = '''controler_cles "$court : " < <(lignes_ajoutees "$c")'''
+apres = ''':'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

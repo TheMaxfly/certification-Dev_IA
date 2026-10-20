@@ -15,12 +15,15 @@
 set -euo pipefail
 
 REFERENCE="${1:-postgresql://postgres@localhost:5432/apimanga}"
-# PostgreSQL 16 + pgvector 0.6.0 (la version d'apimanga), épinglée par digest :
-# la migration 020 crée l'extension `vector`. Même image que database/tests.
-IMAGE="${IMAGE_POSTGRES:-pgvector/pgvector:0.6.0-pg16@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3}"
 SCHEMAS=(-n manga -n bench -n staging)
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# PostgreSQL 16 + pgvector 0.6.0 (la version d'apimanga), épinglée par digest :
+# l'empreinte n'est écrite qu'une fois, dans le harnais des tests
+# (harnais_tests/__init__.py, IMAGE_POSTGRES), et lue ici.
+IMAGE="${IMAGE_POSTGRES:-$(awk '/^IMAGE_POSTGRES = \(/ { f = 1; next }
+    f && /^\)/ { exit } f { gsub(/[ "]/, ""); printf "%s", $0 }' "$RACINE/harnais_tests/__init__.py")}"
+[[ $IMAGE == *@sha256:* ]] || { echo "image introuvable dans harnais_tests/__init__.py" >&2; exit 1; }
 TRAVAIL="$(mktemp -d)"
 NOM="fidelite-$$"
 

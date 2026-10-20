@@ -1,30 +1,58 @@
-"""Derivation du perimetre contre la base reelle.
+"""Derivation du perimetre contre une base.
 
-Ignore si `APIMANGA_DSN` n'est pas defini : la suite reste verte hors poste de
-developpement, mais le controle porte sur la vraie base quand elle est la.
+L'ordre et le contenu de chaque perimetre sont eprouves sur une base jetable, a
+partir d'un catalogue factice. La volumetrie de la base reelle (`APIMANGA_DSN`)
+ne se controle que sur le poste, dans l'etape « etat d'apimanga » de
+`verify-poste`.
 """
 
 import os
 
+import psycopg
 import pytest
 
-from commun.perimetre import DERIVATIONS, deriver
+from commun.perimetre import deriver
 
 DSN = os.environ.get("APIMANGA_DSN")
 besoin_base = pytest.mark.skipif(not DSN, reason="APIMANGA_DSN non defini")
 
 
-@besoin_base
-@pytest.mark.parametrize("source", sorted(DERIVATIONS))
-def test_le_perimetre_est_ordonne_et_sans_trou(source: str) -> None:
-    series = deriver(DSN, source)
-    assert series, f"perimetre {source} vide"
-    rangs = [(s.rang_popularite, s.series_id) for s in series]
-    assert rangs == sorted(rangs), (
-        "parcours non rejouable : 4 rangs de popularite sont en doublon dans le "
-        "catalogue, le departage par series_id doit tenir"
-    )
-    assert all(s.series_id and s.cle_source for s in series)
+def _catalogue(dsn: str) -> None:
+    """Cinq series. Les series 2 et 3 partagent le rang 1 : le departage par
+    series_id doit tenir. La serie 4 n'atteint AniList que par le pont Kitsu ;
+    la serie 3 n'a qu'un titre d'article blanc ; la serie 5 n'a aucune cle."""
+    with psycopg.connect(dsn) as cx:
+        cx.execute(
+            "INSERT INTO manga.ms_series_enriched"
+            " (series_id, series_popularity_rank, kitsu_id)"
+            " VALUES (1, 3, NULL), (2, 1, NULL), (3, 1, 30), (4, 2, 40), (5, 5, NULL)"
+        )
+        cx.execute(
+            "INSERT INTO manga.work_identity (series_id, wikidata_qid, anilist_id)"
+            " VALUES (1, 'Q1', '101'), (2, 'Q2', '102'), (3, 'Q3', '103'),"
+            " (5, NULL, ' ')"
+        )
+        cx.execute(
+            "INSERT INTO manga.wd_pivot (qid, wiki_fr)"
+            " VALUES ('Q1', 'Naruto'), ('Q2', 'Bleach'), ('Q3', '  ')"
+        )
+        cx.execute(
+            "INSERT INTO manga.kitsu_mappings (kitsu_id, external_site, external_id)"
+            " VALUES (40, 'anilist/manga', '104'), (30, 'myanimelist/manga', '3')"
+        )
+
+
+@pytest.mark.parametrize(
+    "source, attendu",
+    [
+        ("wikipedia_fr", [(2, "Bleach", 1), (1, "Naruto", 3)]),
+        ("anilist", [(2, "102", 1), (3, "103", 1), (4, "104", 2), (1, "101", 3)]),
+    ],
+)
+def test_le_perimetre_est_ordonne_et_sans_trou(base, source, attendu) -> None:
+    _catalogue(base)
+    series = deriver(base, source)
+    assert [(s.series_id, s.cle_source, s.rang_popularite) for s in series] == attendu
 
 
 @besoin_base
@@ -38,14 +66,3 @@ def test_volumetrie_des_deux_perimetres() -> None:
         f"Le referentiel seul rend 8 051 : il n est pas un sur-ensemble."
     )
     assert len({s.series_id for s in wp}) == len(wp), "doublon de serie"
-
-
-@besoin_base
-def test_la_connexion_est_en_lecture_seule() -> None:
-    """Le module ne modifie jamais la base."""
-    import psycopg
-
-    with psycopg.connect(DSN) as conn:
-        conn.read_only = True
-        with conn.cursor() as cur, pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-            cur.execute("create temp table sentinelle_ecriture(x int)")

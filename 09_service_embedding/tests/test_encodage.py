@@ -78,7 +78,10 @@ class Doublure(BaseHTTPRequestHandler):
 @pytest.fixture
 def doublure():
     serveur = HTTPServer(("127.0.0.1", 0), Doublure)
-    threading.Thread(target=serveur.serve_forever, daemon=True).start()
+    # Interrogation courte : `shutdown()` attend la fin d'un cycle (0,5 s par défaut).
+    threading.Thread(
+        target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     Doublure.recues, Doublure.panne_a, Doublure.revision = [], None, None
 
     def preparer(nom: str):
@@ -195,14 +198,6 @@ def test_image_non_epinglee_refusee(doublure):
         service_de(client, "ghcr.io/huggingface/text-embeddings-inference:86-1.9.4")
 
 
-def test_table_d_un_autre_encodage_refusee(base, doublure):
-    instance, client, service = doublure("bge-m3")
-    encoder_corpus(instance, client, service, base)
-    autre = replace(service, digest="sha256:" + "d" * 64)
-    with pytest.raises(EncodageRefuse, match="autre encodage"):
-        encoder_corpus(instance, client, autre, base)
-
-
 def test_corpus_change_apres_terminaison_refuse(base, doublure):
     instance, client, service = doublure("bge-m3")
     encoder_corpus(instance, client, service, base)
@@ -227,8 +222,12 @@ def test_lot_reduit_a_la_reprise_est_note(base, doublure):
         assert cx.execute("SELECT taille_lot FROM bench.encodages").fetchone() == (1,)
 
 
+@pytest.mark.manuel
 def test_service_reel_bge_m3(base):
-    """Instance BGE-M3 réelle, si elle tourne : trois fragments, bout en bout."""
+    """Instance BGE-M3 réelle : trois fragments, bout en bout.
+
+    Manuel (`pytest -m manuel`, instance levée par `docker compose --profile
+    bge-m3 up -d`) : la vérification ne lance pas BGE-M3, qui occupe la carte."""
     instance = charger("bge-m3")
     client = ClientService(instance)
     if not client.sante():

@@ -10,3 +10,6 @@ htmlcov/
 
 # Sorties de make verify (JUnit, couverture, résumé)
 /.verify/
+
+# Fichiers d'environnement locaux (DSN, secrets) : jamais suivis, à toute profondeur
+.env

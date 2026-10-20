@@ -1,0 +1,7 @@
+id = "E3H-01"
+origine = "E3 étape 1, bloc H (2026-10-10) — comparaison : garde « encodage en service » retirée ; le test de test_promotion.py qui la visait a été retiré le 2026-10-20 (8bb6997), reste celui du journal"
+fichier = "10_mesures_recherche/src/mesures_recherche/promotion.py"
+avant = '''        if service is not None and service[0] == run["encodage_id"]:'''
+apres = '''        if False:'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_journal_promotions.py", "-k", "test_apres_la_promotion_la_comparaison_ne_rend_plus_de_verdict"]

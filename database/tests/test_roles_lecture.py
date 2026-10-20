@@ -39,12 +39,6 @@ SENTINELLE_TABLE_CONNUE = "manga.ms_series_enriched"
 ECRITURES = ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 
 
-@pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    return base
-
-
 def relations(connexion, schema: str) -> list[str]:
     """Tables et vues d'un schéma, qualifiées, telles que la base les porte."""
     return [

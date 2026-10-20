@@ -1,0 +1,7 @@
+id = "PH-30"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — les volumes Docker créés ne sont plus supprimés"
+fichier = "verification/verifier.sh"
+avant = '''      docker volume rm "$v" >/dev/null && supprimes=$((supprimes + 1))'''
+apres = '''      supprimes=$((supprimes + 1))'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

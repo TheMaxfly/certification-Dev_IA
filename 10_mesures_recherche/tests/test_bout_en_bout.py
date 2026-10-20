@@ -10,12 +10,15 @@ Le banc et la doublure sont dans `conftest.py`.
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import subprocess
 
+import numpy as np
 import psycopg
 import pytest
 
-from mesures_recherche import diagnostic, executer, jeu, recherche
+from mesures_recherche import configuration, diagnostic, executer, jeu, recherche
 
 
 def questions(resultat):
@@ -86,28 +89,55 @@ def test_rejeu_identique(banc):
     assert a["agregats"] == b["agregats"] and a["questions"] == b["questions"]
 
 
-def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
+#: L'état git que l'enregistrement relève : un arbre propre, à un commit fixé. Le
+#: test ne dépend pas de l'état du dépôt où il tourne.
+ARBRE_PROPRE = {"commit": "c" * 40, "arbre_module_propre": "True"}
+
+
+def test_enregistrement_mlflow_et_eval_mesures(
+    banc, encodeur_doublure, tmp_path, stockage_mlflow, monkeypatch
+):
+    """Un run de la mesure 1 (sens, donc un corpus et un encodage) : MLflow et la
+    base portent les mêmes valeurs, corpus et encodage compris."""
     import mlflow
 
+    from mesures_recherche import enregistrement
     from mesures_recherche.enregistrement import enregistrer, uri_suivi
 
+    monkeypatch.setattr(enregistrement, "etat_git", lambda: dict(ARBRE_PROPRE))
     dsn, config, _ = banc
-    resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
+    with psycopg.connect(dsn) as cx:
+        (e1,) = cx.execute(
+            "SELECT encodage_id FROM bench.encodages WHERE corpus_id = 'v1'"
+        ).fetchone()
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 1)
     resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
+    run_id = enregistrer(resultat, dsn, stockage=stockage_mlflow)
 
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
+    mlflow.set_tracking_uri(uri_suivi(stockage_mlflow))
     run = mlflow.get_run(run_id)
     assert run.info.status == "FINISHED"
-    assert run.data.params["jeu_version"] == "v9"
-    assert run.data.params["reglage.configuration"] == "french"
-    assert len(run.data.params["code_empreinte"]) == 64
+    params = run.data.params
+    assert params["jeu_version"] == "v9"
+    assert params["reglage.instance"] == "bge-m3"
+    assert params["reglage.table"] == "bench.vecteurs_bge_m3"
+    assert len(params["code_empreinte"]) == 64
+    assert (params["commit"], params["arbre_module_propre"]) == ("c" * 40, "True")
+    assert (params["corpus_id"], params["encodage_id"]) == ("v1", str(e1))
     assert run.data.metrics["hit_rate_10/global/toutes"] == pytest.approx(1.0)
-    assert run.data.tags["tour"] == "1" and run.data.tags["spec"] == "E2 jour 2"
+    assert run.data.tags == run.data.tags | {
+        "mesure": "1",
+        "tour": "1",
+        "spec": "E2 jour 2",
+    }
     pieces = {a.path for a in mlflow.MlflowClient().list_artifacts(run_id)}
     assert {"par_question.csv", "mesures.toml", "resultat.json"} <= pieces
 
     with psycopg.connect(dsn) as cx:
+        assert cx.execute(
+            "SELECT corpus_id, encodage_id FROM bench.eval_runs WHERE run_id = %s",
+            (run_id,),
+        ).fetchall() == [("v1", e1)]
         lignes = cx.execute(
             "SELECT portee, perimetre, metrique, k, valeur, n_questions"
             " FROM bench.eval_mesures WHERE run_id = %s",
@@ -125,6 +155,79 @@ def test_enregistrement_mlflow_et_eval_mesures(banc, tmp_path):
         for a in resultat["agregats"]
     }
     assert set(lignes) == attendu
+
+
+def test_un_arbre_sale_refuse_l_enregistrement(
+    banc, encodeur_doublure, stockage_mlflow, monkeypatch
+):
+    """On commite d'abord, on mesure ensuite : rien n'est écrit, ni run MLflow ni
+    ligne en base."""
+    import mlflow
+
+    from mesures_recherche import enregistrement
+
+    monkeypatch.setattr(
+        enregistrement,
+        "etat_git",
+        lambda: ARBRE_PROPRE | {"arbre_module_propre": "False"},
+    )
+    dsn, config, _ = banc
+    resultat = executer.mesurer(executer.ouvrir(dsn, config), 3)
+    resultat["experience"] = "essai_arbre_sale"
+    with pytest.raises(enregistrement.EnregistrementRefuse, match="non propre"):
+        enregistrement.enregistrer(resultat, dsn, stockage=stockage_mlflow)
+    mlflow.set_tracking_uri(enregistrement.uri_suivi(stockage_mlflow))
+    assert mlflow.get_experiment_by_name("essai_arbre_sale") is None
+    with psycopg.connect(dsn) as cx:
+        assert cx.execute("SELECT count(*) FROM bench.eval_runs").fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    "statut, propre", [("", "True"), (" M 10_mesures_recherche/src/x.py\n", "False")]
+)
+def test_etat_git_commit_et_proprete_du_seul_arbre_du_module(
+    statut, propre, monkeypatch
+):
+    """`etat_git` demande à git, depuis la racine du dépôt, le commit et l'état du
+    SEUL dossier du module — ici une doublure de git, qui répond comme lui."""
+    from mesures_recherche import enregistrement
+
+    appels = []
+
+    def git(commande, **options):
+        appels.append((commande, options["cwd"]))
+        sortie = {"status": statut, "rev-parse": "f" * 40 + "\n"}[commande[1]]
+        return subprocess.CompletedProcess(commande, 0, stdout=sortie, stderr="")
+
+    monkeypatch.setattr(enregistrement.subprocess, "run", git)
+    etat = enregistrement.etat_git()
+    assert etat == {"commit": "f" * 40, "arbre_module_propre": propre}
+    module = str(configuration.RACINE_MODULE)
+    assert appels == [
+        (["git", "status", "--porcelain", "--", module], configuration.RACINE_DEPOT),
+        (["git", "rev-parse", "HEAD"], configuration.RACINE_DEPOT),
+    ]
+    if propre == "True":
+        assert enregistrement.exiger_arbre_propre() == etat
+    else:
+        with pytest.raises(enregistrement.EnregistrementRefuse, match="f" * 12):
+            enregistrement.exiger_arbre_propre()
+
+
+def test_un_type_de_mesure_inconnu_arrete():
+    config = copy.deepcopy(configuration.charger())
+    config["mesures"].append({"numero": 104, "nom": "essai", "type": "oracle"})
+    ctx = executer.Contexte(None, config, [], None, "")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="type de mesure inconnu : oracle"):
+        executer.configuration_de(ctx, 104)
+    assert 104 not in ctx.caches
+
+
+def test_resultat_en_json_les_nombres_numpy_seulement():
+    assert executer._json(np.float32(0.5)) == 0.5
+    assert executer._json(np.int64(7)) == 7
+    with pytest.raises(TypeError):
+        executer._json(object())
 
 
 # --------------------------------------------------------------------------- #
@@ -193,25 +296,6 @@ def test_fusion_tfidf_et_sens_au_catalogue(banc, encodeur_doublure, monkeypatch)
     for q in r["questions"]:
         assert all(c.startswith("serie:") for c, _ in q["top"])
     assert questions(r)["Q001"]["metriques"]["hit_rate@10"] == 1.0
-
-
-def test_enregistrement_tour_2_etiquete(banc, tmp_path):
-    import mlflow
-
-    from mesures_recherche.enregistrement import enregistrer, uri_suivi
-
-    dsn, config, _ = banc
-    resultat = executer.mesurer(executer.ouvrir(dsn, config), 9)
-    resultat["experience"] = "essai"
-    run_id = enregistrer(resultat, dsn, stockage=tmp_path / "mlflow")
-    mlflow.set_tracking_uri(uri_suivi(tmp_path / "mlflow"))
-    run = mlflow.get_run(run_id)
-    assert run.data.tags == run.data.tags | {
-        "mesure": "9",
-        "tour": "2",
-        "spec": "E2 jour 3",
-    }
-    assert run.data.params["reglage.perimetre_entites"] == "catalogue"
 
 
 # --------------------------------------------------------------------------- #

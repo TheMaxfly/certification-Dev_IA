@@ -1,0 +1,7 @@
+id = "PH-32"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — la matrice de verify.yml n'est plus confrontée à MODULES"
+fichier = "verification/verifier.sh"
+avant = '''  if [ "$attendus" != "$matrice" ]; then'''
+apres = '''  if false; then'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

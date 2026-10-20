@@ -142,7 +142,8 @@ et l'épingler par digest.
 
 | Contrôle | Commande | Résultat attendu |
 |---|---|---|
-| Tests du module (72) | `uv run --extra dev pytest` | tous verts ; une base PostgreSQL + pgvector **jetable** est lancée par Docker ; deux tests sautent sans instance : celui qui passe par l'instance BGE-M3 réelle, et le test d'équivalence contre le service réel (plafond de sautés : 2) |
+| Tests du module (80) | `uv run --extra dev pytest` | tous verts ; une base PostgreSQL + pgvector **jetable** est lancée par Docker ; le test d'équivalence contre le service réel saute sans instance (plafond de sautés : 1 ; `make verify-poste` le joue) |
+| Test de l'instance BGE-M3 réelle (manuel) | `uv run --extra dev pytest -m manuel`, instance levée (`docker compose --profile bge-m3 up -d`) | vert : trois fragments encodés de bout en bout ; ni joué ni compté par `make verify`, qui ne lance pas BGE-M3 |
 | Mémoire avant lancement | `uv run python -m service_embedding.controles etat` | code 0 et `"seuils_non_tenus": []` |
 | Contrôle d'une instance lancée | `uv run python -m service_embedding.controles instance bge-m3 --sortie mesures/controles_bge-m3.json` (avec `DATABASE_URL`) | voir le tableau suivant |
 | Après l'encodage du corpus | `uv run python -m service_embedding.verification --sortie mesures/verification.json` (avec `DATABASE_URL`) | code 0, chaque ligne « OK » |

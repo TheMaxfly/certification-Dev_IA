@@ -1,0 +1,25 @@
+# État de référence d'apimanga, relevé par verification/etat_apimanga.sh --relever.
+# Contrôlé par l'étape « état d'apimanga » de make verify-poste. Une mesure, une
+# promotion ou une migration le change : relever, puis commiter avec elle.
+# Relevé le 2026-10-19T21:54:03Z.
+# portée	objet	valeurs
+v1	docs	48090	3a34c78565230d13a13366336a863c01
+v1	fragments	66290	d1b0692681459910e7a067b71224c657
+v1	vecteurs_bge_m3	66290	1e16ca154153681ef80b09d56c7964f5
+v1	vecteurs_embeddinggemma	66290	917138d9d5cc9f3dc228eae95f8c4862
+v1	encodages	2	6a6d32ea2fc2f20f0a3a1a8c4500594b
+-	eval_mesures	1872	d3733cbf26d7f38dcf23cbeb96cb5db8
+v2	docs	56775	ef95cb474897e314b03bad89ddb9acba
+v2	fragments	77006	254549aba3841608511f9e526631bfc0
+v2	vecteurs_bge_m3	0	
+v2	vecteurs_embeddinggemma	77006	636d155c08169ad791c1ace032daa9cf
+v2	encodages	1	5c3255081ce689b6f74f48e36145e8f6
+-	eval_runs	18	5952932371be9863da69952665647ceb
+-	promotions	2	1ca65231a82c3696426427e27ca9d598
+-	corpus	v1	48090	66290	t
+-	corpus	v2	56775	77006	t
+-	encodage_en_service	3	v2
+-	jeu	v1	07a3f4f8e43350c7389a2b18f223b3e60652e475e63ae459f7478b8149f424a3
+-	jeu	v2	31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30
+-	migrations	23	ae9e27de5053a815df358a9c4f53bcc4482ac5cc25c78aea9da4a8165dfe684b
+-	migrations_egales_aux_fichiers	oui

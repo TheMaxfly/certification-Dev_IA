@@ -115,3 +115,29 @@ def test_recalcul_different_arret(banc):
     reference["questions"][0]["top"] = list(reversed(reference["questions"][0]["top"]))
     with pytest.raises(RuntimeError, match="recalcul ≠ jour 2"):
         diagnostic.diagnostiquer(ctx, 3, reference)
+
+
+def test_rang_different_du_run_arret(banc):
+    """Mêmes dix premières entités, mais un autre rang de la première série
+    attendue : le recalcul n'est pas celui du run, arrêt."""
+    dsn, config, _ = banc
+    ctx = executer.ouvrir(dsn, config)
+    reference = copy.deepcopy(executer.mesurer(ctx, 3)) | {"run_id": "essai"}
+    q = next(q for q in reference["questions"] if q["de_rang"])
+    q["rang_premiere_attendue"] += 1
+    with pytest.raises(RuntimeError, match=f"{q['question_id']} : rang"):
+        diagnostic.diagnostiquer(ctx, 3, reference)
+
+
+def test_controle_filtre_questions_de_rang_differentes():
+    def r(n, ids):
+        return {
+            "mesure": n,
+            "questions": [
+                {"question_id": i, "de_rang": True, "rang_premiere_attendue": 1}
+                for i in ids
+            ],
+        }
+
+    with pytest.raises(ValueError, match="questions de rang différentes"):
+        diagnostic.controle_filtre(r(1, ["Q001"]), r(7, ["Q001", "Q002"]))

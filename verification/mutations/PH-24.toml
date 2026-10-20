@@ -1,0 +1,7 @@
+id = "PH-24"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — les .env à deux niveaux ne sont plus lus"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''find "$racine" -maxdepth 3'''
+apres = '''find "$racine" -maxdepth 2'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

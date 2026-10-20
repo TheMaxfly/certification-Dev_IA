@@ -1,0 +1,25 @@
+id = "PH-08"
+origine = "Harnais de tests, bloc D (2026-10-20) — 05 — les motifs d'exclusion des résumés changent d'ordre"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/construire_v2.py"
+avant = '''        if len(texte) < r["plancher"]:
+            exclus["2_moins_de_50"] += 1
+            continue
+        if amorce.search(texte) or any(c in texte for c in critiques.get(sid, [])):
+            exclus["3_faux_resume"] += 1
+            continue
+        if any(m.search(texte) for m in motifs):
+            exclus["4_pseudonyme"] += 1
+            continue
+'''
+apres = '''        if any(m.search(texte) for m in motifs):
+            exclus["4_pseudonyme"] += 1
+            continue
+        if len(texte) < r["plancher"]:
+            exclus["2_moins_de_50"] += 1
+            continue
+        if amorce.search(texte) or any(c in texte for c in critiques.get(sid, [])):
+            exclus["3_faux_resume"] += 1
+            continue
+'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_v2.py", "-k", "premier_motif"]

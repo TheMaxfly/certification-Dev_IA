@@ -1,150 +1,71 @@
 """Harnais de test : une base PostgreSQL JETABLE, dans un conteneur.
 
 Garde-fou central : les tests ne doivent JAMAIS pointer sur `apimanga`. Le DSN
-est donc toujours fabriqué ici, à partir du conteneur lancé par le harnais ;
-une DATABASE_URL présente dans l'environnement est ignorée (et l'absence de
-Docker provoque un skip explicite, jamais un repli sur une base réelle).
+est donc toujours fabriqué par le harnais partagé (`database/harnais_tests/`), à
+partir du conteneur qu'il lance ; une DATABASE_URL présente dans l'environnement
+est ignorée (et l'absence de Docker provoque un skip explicite, jamais un repli
+sur une base réelle).
+
+Deux bases par test, selon le besoin :
+  - `base_migree` : une copie de la base gabarit, migrée une fois par session ;
+  - `base` : une base vide, pour les tests qui jouent les migrations eux-mêmes
+    (pas à pas, cible intermédiaire, rejeu).
 """
 
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
-import shutil
-import subprocess
 import sys
-import time
-import uuid
 from pathlib import Path
 
 import pytest
 
-# PostgreSQL 16 avec pgvector 0.6.0 — la version d'`apimanga` —, épinglée par
-# digest : la migration 020 crée l'extension `vector`, que `postgres:16-alpine`
-# n'embarque pas. Même image pour `outils/fidelite.sh`, le harnais du module 05
-# et l'intégration du module 02.
-IMAGE_POSTGRES = (
-    "pgvector/pgvector:0.6.0-pg16"
-    "@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3"
-)
-MOT_DE_PASSE = "postgres"
-DELAI_DEMARRAGE = 60
-
 RACINE = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("migrate", RACINE / "migrate.py")
-migrate = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
-# Enregistré avant exec_module : @dataclass résout ses annotations via
-# sys.modules[cls.__module__], absent sinon.
-sys.modules["migrate"] = migrate
-SPEC.loader.exec_module(migrate)
 
 
-def docker_utilisable() -> bool:
-    if shutil.which("docker") is None:
-        return False
-    return (
-        subprocess.run(["docker", "info"], capture_output=True, check=False).returncode
-        == 0
+def _charger_harnais():
+    spec = importlib.util.spec_from_file_location(
+        "harnais_tests", RACINE / "harnais_tests" / "__init__.py"
     )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["harnais_tests"] = module
+    spec.loader.exec_module(module)
+    return module
 
 
-def image_presente() -> bool:
-    resultat = subprocess.run(
-        ["docker", "image", "inspect", IMAGE_POSTGRES],
-        capture_output=True,
-        check=False,
-    )
-    return resultat.returncode == 0
+harnais = _charger_harnais()
+migrate = harnais.charger_migrate()
 
 
 @pytest.fixture(scope="session")
 def conteneur_postgres() -> str:
     """Lance un PostgreSQL jetable et rend le DSN de la base d'administration."""
-    if not docker_utilisable():
-        pytest.skip(
-            "Docker est indisponible : les tests de migration ont besoin d'une "
-            "base jetable. Ils ne se rabattront jamais sur une base réelle."
-        )
-    if not image_presente():
-        pytest.skip(
-            f"Image {IMAGE_POSTGRES} absente en local. La récupérer avec "
-            f"`docker pull {IMAGE_POSTGRES}` (accès réseau requis)."
-        )
-
-    nom = f"migrations-test-{uuid.uuid4().hex[:8]}"
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "--name",
-            nom,
-            "-e",
-            f"POSTGRES_PASSWORD={MOT_DE_PASSE}",
-            "-p",
-            "0:5432",
-            IMAGE_POSTGRES,
-        ],
-        capture_output=True,
-        check=True,
-    )
-    try:
-        brut = subprocess.run(
-            ["docker", "inspect", nom],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        liaison = json.loads(brut)[0]["NetworkSettings"]["Ports"]["5432/tcp"][0]
-        port = liaison["HostPort"]
-        dsn = f"postgresql://postgres:{MOT_DE_PASSE}@127.0.0.1:{port}/postgres"
-
-        limite = time.monotonic() + DELAI_DEMARRAGE
-        while True:
-            pret = subprocess.run(
-                ["docker", "exec", nom, "pg_isready", "-U", "postgres"],
-                capture_output=True,
-                check=False,
-            )
-            if pret.returncode == 0:
-                break
-            if time.monotonic() > limite:
-                raise RuntimeError("PostgreSQL n'a pas démarré à temps")
-            time.sleep(0.3)
-
-        # pg_isready répond avant que les connexions soient réellement servies.
-        import psycopg
-
-        while True:
-            try:
-                with psycopg.connect(dsn, connect_timeout=2):
-                    break
-            except psycopg.OperationalError:
-                if time.monotonic() > limite:
-                    raise
-                time.sleep(0.3)
-
+    raison = harnais.raison_de_sauter()
+    if raison:
+        pytest.skip(raison)
+    with harnais.conteneur("migrations-test") as dsn:
         yield dsn
-    finally:
-        subprocess.run(["docker", "rm", "-f", nom], capture_output=True, check=False)
+
+
+@pytest.fixture(scope="session")
+def gabarit(conteneur_postgres) -> str:
+    """La base gabarit : migrée une fois par session, copiée pour chaque test."""
+    return harnais.creer_gabarit(conteneur_postgres)
 
 
 @pytest.fixture
 def base(conteneur_postgres, monkeypatch) -> str:
-    """Une base neuve par test, et DATABASE_URL pointée dessus."""
-    import psycopg
-
-    nom = f"t_{uuid.uuid4().hex[:12]}"
-    with psycopg.connect(conteneur_postgres, autocommit=True) as connexion:
-        connexion.execute(f'CREATE DATABASE "{nom}"')
-
-    dsn = conteneur_postgres.rsplit("/", 1)[0] + f"/{nom}"
-    monkeypatch.setitem(os.environ, "DATABASE_URL", dsn)
-    try:
+    """Une base neuve et vide par test, et DATABASE_URL pointée dessus."""
+    with harnais.base_vide(conteneur_postgres) as dsn:
+        monkeypatch.setitem(os.environ, "DATABASE_URL", dsn)
         yield dsn
-    finally:
-        with psycopg.connect(conteneur_postgres, autocommit=True) as connexion:
-            connexion.execute(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)')
+
+
+@pytest.fixture
+def base_migree(conteneur_postgres, gabarit, monkeypatch) -> str:
+    """Une base neuve par test, copiée du gabarit migré ; DATABASE_URL y pointe."""
+    with harnais.base_depuis_gabarit(conteneur_postgres, gabarit) as dsn:
+        monkeypatch.setitem(os.environ, "DATABASE_URL", dsn)
+        yield dsn

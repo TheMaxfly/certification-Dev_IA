@@ -1,16 +1,27 @@
 name: verify
 
 # Chaîne d'intégration continue : la même commande que sur le poste,
-# `make verify MODULE=<nom>`, une tâche par module. Une tâche rouge bloque.
-# La tâche `indicatif` (Bandit, pip-audit) n'est jamais exigée : elle réussit dès que
-# ses rapports sont produits, quel que soit le nombre de constats, qu'elle affiche.
-# Détail des règles et des plafonds de tests sautés : Makefile,
-# verification/verifier.sh, verification/sauts_attendus.tsv.
+# `make verify MODULE=<nom>`, une tâche par module, plus la tâche `statique`.
+# Une tâche rouge bloque. Détail des règles : Makefile, verification/verifier.sh,
+# verification/sauts_attendus.tsv, verification/dependances.tsv.
+#
+# Déclencheurs (palier 2) : toute demande de fusion, le push sur `develop` (le commit
+# de fusion), le lancement manuel. Pas de push sur `main` : l'arbre livré dans `main`
+# est celui de `develop`, déjà vérifié. Bandit et pip-audit vivent dans
+# `indicatif.yml`, chaque lundi.
+#
+# Périmètre : la tâche `perimetre` lit les fichiers changés et le graphe des
+# dépendances. Une tâche de module non concernée réussit sans rien faire : ses étapes
+# sont sautées, et elle compte comme réussie pour les contrôles obligatoires. Un
+# lancement manuel, ou un push dont la base est inconnue, vérifie tout. `statique`
+# tourne toujours.
 
 on:
-  push:
-    branches: [main, develop]
   pull_request:
+    # `edited` : un titre ou un corps de demande modifié est contrôlé à nouveau.
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
@@ -22,62 +33,141 @@ concurrency:
 
 env:
   UV_PYTHON: "3.12"
-  # Image des bases jetables des tests (05, 09, 10, database), tirée par empreinte.
-  MODULES_BASE_JETABLE: '["05", "09", "10", "database"]'
+  # Image des bases jetables des tests (05, 08, 09, 10, database), tirée par empreinte.
+  MODULES_BASE_JETABLE: '["05", "08", "09", "10", "database"]'
 
 jobs:
+  perimetre:
+    name: perimetre
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      modules: ${{ steps.calcul.outputs.modules }}
+    steps:
+      - name: Récupérer le dépôt, avec l'historique (pour le diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Modules concernés par les changements
+        id: calcul
+        env:
+          EVENEMENT: ${{ github.event_name }}
+          BASE_DEMANDE: ${{ github.event.pull_request.base.sha }}
+          TETE_DEMANDE: ${{ github.event.pull_request.head.sha }}
+          AVANT: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          tout=0
+          case "$EVENEMENT" in
+            pull_request)
+              fichiers="$(git diff --name-only --no-renames "$BASE_DEMANDE...$TETE_DEMANDE")" ;;
+            push)
+              if git cat-file -e "${AVANT}^{commit}" 2>/dev/null; then
+                fichiers="$(git diff --name-only --no-renames "$AVANT" "$GITHUB_SHA")"
+              else
+                fichiers=""; tout=1
+              fi ;;
+            *) fichiers=""; tout=1 ;;
+          esac
+          modules="$(printf '%s\n' "$fichiers" | TOUT="$tout" bash verification/verifier.sh perimetre)"
+          echo "modules=$modules" >>"$GITHUB_OUTPUT"
+          {
+            echo "### Périmètre"
+            echo
+            if [ "$tout" = 1 ]; then echo "Tous les modules ($EVENEMENT)."; fi
+            echo "Modules concernés : \`$modules\`"
+            echo
+            echo "<details><summary>$(sed '/^$/d' <<<"$fichiers" | wc -l) fichier(s) changé(s)</summary>"
+            echo
+            printf '%s\n' "$fichiers" | sed '/^$/d; s/^/- /'
+            echo "</details>"
+          } >>"$GITHUB_STEP_SUMMARY"
+
   module:
     name: verify ${{ matrix.module }}
+    needs: perimetre
+    # Même si `perimetre` échoue : une tâche sautée compterait comme réussie pour les
+    # contrôles obligatoires. Sans périmètre établi, le module est vérifié (sûreté).
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       MODULE: ${{ matrix.module }}
+      CONCERNE: ${{ needs.perimetre.result != 'success' || contains(fromJSON(needs.perimetre.outputs.modules || '[]'), matrix.module) }}
     strategy:
       fail-fast: false
       matrix:
-        module: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", database, demo, workflows]
+        module: ["01", "02", "03", "04", "05", "07", "08", "09", "10", database, demo]
     steps:
+      - name: Module non concerné par les changements
+        if: env.CONCERNE != 'true'
+        run: |
+          echo "verify $MODULE : non concerné par les changements (verification/dependances.tsv), rien à vérifier." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Récupérer le dépôt
+        if: env.CONCERNE == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Installer uv
+      - name: Installer uv (cache propre au module, Ruff compris)
+        if: env.CONCERNE == 'true'
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.9.17"
+          enable-cache: true
+          cache-suffix: ${{ matrix.module }}
 
       - name: Java 8 (Spark, module 07)
-        if: matrix.module == '07'
+        if: env.CONCERNE == 'true' && matrix.module == '07'
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "8"
 
+      - name: Cache Ivy (jar Delta) et extension DuckDB (module 07)
+        if: env.CONCERNE == 'true' && matrix.module == '07'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.ivy2
+            ~/.duckdb/extensions
+          key: lakehouse-${{ hashFiles('07_databricks_manga_export/lakehouse/uv.lock') }}
+
       - name: Image PostgreSQL des bases jetables, tirée par empreinte
-        if: contains(fromJSON(env.MODULES_BASE_JETABLE), matrix.module)
+        if: env.CONCERNE == 'true' && contains(fromJSON(env.MODULES_BASE_JETABLE), matrix.module)
         run: bash verification/verifier.sh image
 
-      - name: Environnement du module, depuis son verrou
+      - name: Environnement du module, depuis son verrou (une seule synchronisation)
+        if: env.CONCERNE == 'true'
         run: bash verification/verifier.sh preparer "$MODULE"
 
       - name: make verify MODULE=${{ matrix.module }}
+        if: env.CONCERNE == 'true'
+        env:
+          # L'environnement vient d'être synchronisé : `uv run` ne le refait pas.
+          UV_NO_SYNC: "1"
+          VERIFY_PREPARE: "1"
         run: make verify MODULE="$MODULE"
 
       - name: Pièces de l'exécution (JUnit, couverture, journal)
-        if: always()
+        if: always() && env.CONCERNE == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verify-${{ matrix.module }}
           path: .verify/${{ matrix.module }}/
           if-no-files-found: ignore
 
-  indicatif:
-    name: indicatif (Bandit, pip-audit)
+  statique:
+    # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck
+    # des scripts de .githooks/ et verification/, essais des hooks (tester.sh) et du
+    # périmètre (tester_perimetre.sh).
+    name: statique
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    # Jamais exigée pour fusionner. Les constats ne la font pas échouer ; une panne
-    # d'outil ou un rapport manquant, si.
+    timeout-minutes: 15
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,20 +178,23 @@ jobs:
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: "0.9.17"
+          enable-cache: true
+          cache-suffix: statique
 
-      - name: make verify-indicatif
-        run: make verify-indicatif
+      - name: Titre et corps de la demande, sans mention
+        if: github.event_name == 'pull_request'
+        env:
+          TITRE: ${{ github.event.pull_request.title }}
+          CORPS: ${{ github.event.pull_request.body }}
+        run: printf '%s\n%s\n' "$TITRE" "$CORPS" | bash .githooks/controler-texte "demande de fusion"
 
-      - name: Rapports Bandit et pip-audit
+      - name: make verify MODULE=statique
+        run: make verify MODULE=statique
+
+      - name: Pièces de l'exécution (journal)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: indicatif
-          # `.verify/` est un dossier caché : sans include-hidden-files, l'action n'y
-          # trouve rien (constaté sur les exécutions 37915436388 et 37915941227).
-          # Seuls ces deux rapports sont publiés.
-          path: |
-            .verify/*/bandit.json
-            .verify/*/audit.json
-          include-hidden-files: true
+          name: verify-statique
+          path: .verify/statique/
           if-no-files-found: ignore

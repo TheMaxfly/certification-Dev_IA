@@ -1,0 +1,7 @@
+id = "PH-42"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : une chaîne d'aspect jeton passe dans la préparation"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''  if grep -rqE 'hf_[A-Za-z0-9]{34}' "$prep/fichiers" "$prep/mlflow" 2>/dev/null; then'''
+apres = '''  if false; then'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

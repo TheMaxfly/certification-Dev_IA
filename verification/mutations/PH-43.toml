@@ -1,0 +1,7 @@
+id = "PH-43"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : les fichiers .env ne sont plus écartés"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''--exclude='.venv/' --exclude='.env' '''
+apres = '''--exclude='.venv/' '''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

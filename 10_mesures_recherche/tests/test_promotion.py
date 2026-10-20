@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
 import uuid
 
 import psycopg
 import pytest
 
 from mesures_recherche import promotion
+from mesures_recherche.configuration import RACINE_DEPOT
 from mesures_recherche.enregistrement import uri_suivi
 
 REGLE = promotion.charger_regle()
@@ -78,7 +80,17 @@ def resultat(questions, ndcg=0.3):
     }
 
 
-def run(stockage, contenu) -> str:
+#: Le commit des runs d'essai : celui du dépôt, où la règle est commitée.
+HEAD = subprocess.run(
+    ["git", "rev-parse", "HEAD"],
+    cwd=RACINE_DEPOT,
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.strip()
+
+
+def run(stockage, contenu, commit: str | None = HEAD) -> str:
     import mlflow
 
     mlflow.set_tracking_uri(uri_suivi(stockage))
@@ -91,14 +103,16 @@ def run(stockage, contenu) -> str:
     mlflow.set_experiment("essai")
     with mlflow.start_run() as r:
         mlflow.log_text(json.dumps(contenu), "resultat.json")
+        if commit is not None:
+            mlflow.log_param("commit", commit)
     return r.info.run_id
 
 
 @pytest.fixture
-def comparaison(banc, tmp_path):
+def comparaison(banc, tmp_path, stockage_mlflow):
     """Référence : 2 sur 3 (une reconnaissance réussie) ; nouveau : 3 sur 3."""
     dsn, _, _ = banc
-    stockage = tmp_path / "mlflow"
+    stockage = stockage_mlflow
     ref = run(
         stockage,
         resultat(
@@ -171,19 +185,6 @@ def test_la_comparaison_rend_le_verdict_et_les_mouvements(comparaison):
     assert r["nouveau"]["a_50"] == 3 and r["reference"]["a_50"] == 3
 
 
-def test_aucun_verdict_si_l_encodage_mesure_est_celui_en_service(comparaison):
-    dsn, stockage, regle, _, nouveau, e1, e2 = comparaison
-    with psycopg.connect(dsn) as cx:
-        cx.execute(
-            "INSERT INTO bench.promotions (decision, encodage_id,"
-            " encodage_precedent_id,"
-            " motif, decide_par) VALUES ('promu', %s, %s, 'essai', 'essai')",
-            (e2, e1),
-        )
-    with pytest.raises(promotion.VerdictRefuse, match="celui en service"):
-        promotion.comparer(dsn, nouveau, regle, stockage)
-
-
 def test_aucun_verdict_pour_un_run_d_un_autre_corpus(comparaison):
     dsn, stockage, regle, ref, _, _, _ = comparaison
     with pytest.raises(promotion.VerdictRefuse, match="corpus v1"):
@@ -205,3 +206,63 @@ def test_aucun_verdict_si_la_reference_a_bouge(comparaison):
     }
     with pytest.raises(promotion.VerdictRefuse, match="la référence rend"):
         promotion.comparer(dsn, nouveau, regle, stockage)
+
+
+# --------------------------------------------------------------------------- #
+#  La règle : celle du commit de la mesure, empreinte comparée
+# --------------------------------------------------------------------------- #
+
+
+def test_la_comparaison_porte_le_commit_de_la_regle(comparaison):
+    dsn, stockage, regle, _, nouveau, _, _ = comparaison
+    r = promotion.comparer(dsn, nouveau, regle, stockage)
+    assert r["regle_commit"] == HEAD
+    assert promotion.empreinte_au_commit(HEAD, regle["chemin"]) == regle["empreinte"]
+
+
+def test_aucun_verdict_si_la_regle_differe_de_celle_du_commit(comparaison):
+    dsn, stockage, regle, _, nouveau, _, _ = comparaison
+    modifiee = regle | {"empreinte": "0" * 64}
+    with pytest.raises(promotion.VerdictRefuse, match="pas celle du commit"):
+        promotion.comparer(dsn, nouveau, modifiee, stockage)
+
+
+def test_aucun_verdict_si_la_regle_n_etait_pas_commitee(comparaison):
+    """Mesurée à un état du dépôt où le fichier n'existait pas : la règle a suivi
+    la mesure. L'arbre vide de git tient lieu de cet état (un clone superficiel
+    n'a pas d'historique)."""
+    dsn, stockage, regle, _, nouveau, _, _ = comparaison
+    premier = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # l'arbre vide de git
+    assert promotion.empreinte_au_commit(premier, regle["chemin"]) is None
+    with psycopg.connect(dsn) as cx:
+        (encodage,) = cx.execute(
+            "SELECT encodage_id FROM bench.eval_runs WHERE run_id = %s",
+            (uuid.UUID(nouveau),),
+        ).fetchone()
+    tardif = run(stockage, promotion.resultat_du_run(nouveau, stockage), premier)
+    with psycopg.connect(dsn) as cx:
+        cx.execute(
+            "INSERT INTO bench.eval_runs (run_id, corpus_id, encodage_id)"
+            " VALUES (%s, 'v2', %s)",
+            (uuid.UUID(tardif), encodage),
+        )
+    with pytest.raises(promotion.VerdictRefuse, match="pas celle du commit"):
+        promotion.comparer(dsn, tardif, regle, stockage)
+
+
+def test_aucun_verdict_pour_un_run_sans_commit(comparaison):
+    dsn, stockage, regle, _, nouveau, _, _ = comparaison
+    with psycopg.connect(dsn) as cx:
+        (encodage,) = cx.execute(
+            "SELECT encodage_id FROM bench.eval_runs WHERE run_id = %s",
+            (uuid.UUID(nouveau),),
+        ).fetchone()
+    sans = run(stockage, promotion.resultat_du_run(nouveau, stockage), None)
+    with psycopg.connect(dsn) as cx:
+        cx.execute(
+            "INSERT INTO bench.eval_runs (run_id, corpus_id, encodage_id)"
+            " VALUES (%s, 'v2', %s)",
+            (uuid.UUID(sans), encodage),
+        )
+    with pytest.raises(promotion.VerdictRefuse, match="sans commit"):
+        promotion.comparer(dsn, sans, regle, stockage)

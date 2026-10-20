@@ -1,0 +1,7 @@
+id = "E3H-05"
+origine = "E3 étape 1, bloc H (2026-10-10) — retour arrière vers la première décision au lieu de la précédente"
+fichier = "10_mesures_recherche/src/mesures_recherche/journal_promotions.py"
+avant = '''                (avant["promotion_id"],),'''
+apres = '''                (1,),'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_journal_promotions.py", "-k", "revenir"]

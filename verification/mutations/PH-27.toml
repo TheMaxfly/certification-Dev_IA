@@ -1,0 +1,9 @@
+id = "PH-27"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — un échec n'arrête plus la vérification"
+fichier = "verification/verifier.sh"
+avant = '''  ECHEC="module $1 : $2"$'\n'"  commande : $3"
+  exit 1'''
+apres = '''  ECHEC="module $1 : $2"$'\n'"  commande : $3"
+  return 1'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

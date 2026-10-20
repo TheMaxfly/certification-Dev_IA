@@ -1,0 +1,7 @@
+id = "E3B-02"
+origine = "E3 étape 1, bloc B (2026-10-09) — le corpus écrit reçoit un défaut (v1) au lieu d'être nommé (05)"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/ecriture.py"
+avant = '''*, corpus_id: str, vider'''
+apres = '''*, corpus_id: str = "v1", vider'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_le_corpus_est_nomme_sans_defaut"]

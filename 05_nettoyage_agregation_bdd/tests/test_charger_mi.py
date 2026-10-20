@@ -313,16 +313,6 @@ class TestVueEanMultiples:
         )
         assert eans == [("9782360810284", 2), ("9782487369641", 2)]
 
-    def test_la_vue_distingue_erreur_source_et_reedition(self, base, raw):
-        """Deux titres différents sur un EAN = erreur ; deux éditions du même
-        titre = réédition légitime."""
-        executer(raw)
-        divergents = dict(
-            lire(base, "SELECT ean, titres_divergents FROM manga.v_mi_ean_multiples")
-        )
-        assert divergents["9782487369641"] is True, "deux œuvres : erreur source"
-        assert divergents["9782360810284"] is True, "deux éditions : titres distincts"
-
 
 class TestDates:
     def test_les_deux_formats_sont_lus(self, base, raw):

@@ -31,8 +31,14 @@ def scan(con: duckdb.DuckDBPyConnection, table: str):
     return con.sql(f"SELECT * FROM delta_scan('{chemin}')")
 
 
-def synthese(con: duckdb.DuckDBPyConnection | None = None) -> dict:
-    """Tableau de synthèse consommable par le cycle mensuel (métriques clés)."""
+def synthese(
+    con: duckdb.DuckDBPyConnection | None = None, seuil_disparues: int = 5
+) -> dict:
+    """Tableau de synthèse consommable par le cycle mensuel (métriques clés).
+
+    Un préfixe entre dans les déficits à partir de `seuil_disparues` séries
+    disparues (5 pour le cycle mensuel).
+    """
     fermer = con is None
     con = con or connexion()
     try:
@@ -51,10 +57,11 @@ def synthese(con: duckdb.DuckDBPyConnection | None = None) -> dict:
             f"FROM delta_scan('{chemin_table('gold.volumetrie')}') "
             "ORDER BY grain, snapshot_date"
         ).fetchall()
-        deficits = con.sql(
+        deficits = con.execute(
             "SELECT prefixe, snapshot_date, delta_abs, disparues, nouvelles "
             f"FROM delta_scan('{chemin_table('gold.completude_par_prefixe')}') "
-            "WHERE disparues >= 5 ORDER BY disparues DESC"
+            "WHERE disparues >= ? ORDER BY disparues DESC",
+            [seuil_disparues],
         ).fetchall()
         recouvrement = con.sql(
             "SELECT cle_type, n_precedent, n_courant, disparues "

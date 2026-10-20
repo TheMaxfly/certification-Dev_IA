@@ -1,0 +1,7 @@
+id = "PH-25"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — la valeur du poste passe en argument de grep"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''done < <(grep -aF -f <(printf '%s\n' "${CLES_VALEURS[$variable]}") <<<"$lignes" |'''
+apres = '''done < <(grep -aF -e "${CLES_VALEURS[$variable]}" <<<"$lignes" |'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

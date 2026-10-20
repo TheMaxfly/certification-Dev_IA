@@ -32,7 +32,7 @@ import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
-from service_embedding.client import ClientService, cosinus
+from service_embedding.client import ClientService, confronter, cosinus
 from service_embedding.configuration import RACINE as RACINE_MODULE
 from service_embedding.configuration import charger
 from service_embedding.encodage import TABLES
@@ -42,10 +42,6 @@ INSTANCE_DU_MODELE = {
     "google/embeddinggemma-300m": "embeddinggemma",
     "BAAI/bge-m3": "bge-m3",
 }
-
-
-class ServiceNonConforme(RuntimeError):
-    """L'instance ne sert pas l'encodage de l'échantillon."""
 
 
 def charger_config(chemin: Path = CONFIG) -> dict:
@@ -165,21 +161,9 @@ def exporter(dsn: str, encodage_id: int, config: dict) -> Path:
 # --------------------------------------------------------------------------- #
 
 
-def confronter(client: ClientService, encodage: dict) -> None:
-    info = client.info()
-    servi = (info["model_id"], info["model_sha"], info["model_dtype"], info["version"])
-    attendu = (
-        encodage["modele"],
-        encodage["revision"],
-        encodage["precision_calcul"],
-        encodage["outil_version"],
-    )
-    if servi != attendu:
-        raise ServiceNonConforme(f"servi {servi} ≠ encodage {attendu}")
-
-
 def comparer(client: ClientService, export: dict, config: dict) -> dict:
-    confronter(client, export["encodage"])
+    # Préfixe de document compris : l'échantillon est réencodé en rôle « document ».
+    confronter(client, export["encodage"], "document")
     ech = export["echantillon"]
     lot = client.instance.taille_lot
     rendus = []

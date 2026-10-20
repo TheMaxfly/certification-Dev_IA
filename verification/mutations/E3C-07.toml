@@ -1,0 +1,7 @@
+id = "E3C-07"
+origine = "E3 étape 1, bloc C (2026-10-10) — le début neuf d'un fragment confondu avec son début"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/phrases.py"
+avant = '''        fragments.append(Fragment(depart, fin, texte[depart:fin], unites[i][0]))'''
+apres = '''        fragments.append(Fragment(depart, fin, texte[depart:fin], depart))'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_phrases.py", "-k", "(reconstitue or recouvrement_par) and not strategie"]

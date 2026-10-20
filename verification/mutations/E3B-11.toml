@@ -1,0 +1,10 @@
+id = "E3B-11"
+origine = "E3 étape 1, bloc B (2026-10-09) — clé composite de corpus retirée des vecteurs EmbeddingGemma : un vecteur pourrait mêler deux corpus"
+fichier = "database/migrations/021_corpus_cohabitation.sql"
+avant = '''    ADD CONSTRAINT vecteurs_embeddinggemma_chunk_id_fkey
+        FOREIGN KEY (chunk_id, corpus_id)
+        REFERENCES bench.corpus_chunks (chunk_id, corpus_id),
+'''
+apres = ""
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_un_vecteur_ne_mele_jamais_deux_corpus"]

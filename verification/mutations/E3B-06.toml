@@ -1,0 +1,13 @@
+id = "E3B-06"
+origine = "E3 étape 1, bloc B (2026-10-09) — une écriture de vecteurs à table dynamique (09)"
+fichier = "09_service_embedding/src/service_embedding/encodage.py"
+avant = '''TOLERANCE_NORME = 1e-3
+'''
+apres = '''TOLERANCE_NORME = 1e-3
+
+
+def fuite(table):
+    return f"COPY {table} (x) FROM STDIN"
+'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_aucune_ecriture_a_table_dynamique"]

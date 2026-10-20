@@ -1,0 +1,7 @@
+id = "HK-07"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — lecture des fichiers .env du poste retirée"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''-name .env \('''
+apres = '''-name .env-jamais \('''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

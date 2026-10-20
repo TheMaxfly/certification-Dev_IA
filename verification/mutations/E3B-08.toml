@@ -1,0 +1,7 @@
+id = "E3B-08"
+origine = "E3 étape 1, bloc B (2026-10-09) — service non confronté au registre ; cible déplacée le 2026-10-20 (3f5339d) de 10 executer.py vers 09 client.py, fonction confronter"
+fichier = "09_service_embedding/src/service_embedding/client.py"
+avant = '''    if ecarts:'''
+apres = '''    if False:'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_client.py", "-k", "ecart or prefixe or sans_encodage"]

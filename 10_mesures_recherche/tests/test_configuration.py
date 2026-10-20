@@ -121,3 +121,25 @@ def test_representation_inconnue_refusee(tmp_path):
 
     with pytest.raises(ConfigurationInvalide, match="representation"):
         charger(_ecrire(tmp_path, casser))
+
+
+@pytest.mark.parametrize(
+    "casser, motif",
+    [
+        (lambda c: c["mesures"][1].update(numero=20), "numérotées 1..n"),
+        (lambda c: c["mesures"][3].update(sources=[3, 5]), "sources postérieures"),
+        (
+            lambda c: c["bootstrap"]["comparaisons"].append([1, 99]),
+            "comparaison 1–99 : mesure inconnue",
+        ),
+    ],
+    ids=["numerotation", "fusion", "comparaison"],
+)
+def test_configuration_incoherente_refusee(tmp_path, casser, motif):
+    with pytest.raises(ConfigurationInvalide, match=motif):
+        charger(_ecrire(tmp_path, casser))
+
+
+def test_mesure_absente_refusee():
+    with pytest.raises(ConfigurationInvalide, match="mesure 99 absente"):
+        configuration.mesure(charger(), 99)

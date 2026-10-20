@@ -1,0 +1,7 @@
+id = "E3H-03"
+origine = "E3 étape 1, bloc H (2026-10-10) — décision conforme : une dérogation est acceptée"
+fichier = "10_mesures_recherche/src/mesures_recherche/journal_promotions.py"
+avant = '''    if conforme and derogation:'''
+apres = '''    if False:'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_journal_promotions.py", "-k", "test_une_decision_conforme_ne_porte_pas_de_derogation"]

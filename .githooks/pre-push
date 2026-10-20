@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push — les trois contrôles du dépôt public, rejoués avant chaque push.
+# pre-push — les quatre contrôles du dépôt public, rejoués avant chaque push.
 #
 #   1. AUTEUR : chaque commit poussé a pour auteur ET committer TheMaxfly. Seule
 #      exception, le commit de fusion créé par l'interface de GitHub : exactement
@@ -17,6 +17,17 @@
 #      l'exclusion LOCALE (`.git/info/exclude`, jamais versionnée pour ne pas
 #      nommer ces chemins), sauf `.githooks/docs-versionnes` (docs/ versionnés
 #      exprès).
+#   4. AUCUNE CLÉ NI AUCUN JETON (Mistral, OpenAI, Hugging Face) dans les lignes
+#      ajoutées de chaque commit poussé : ni la valeur du poste en clair, ni une
+#      chaîne qui en a l'aspect — `.githooks/cles-fournisseurs`, partagé avec le
+#      pre-commit. Le refus nomme le fournisseur et le fichier, jamais la valeur.
+#   5. RÉFÉRENCES : ni le nom d'une branche ou d'une étiquette poussée, ni le
+#      message d'une étiquette annotée ne mentionnent un assistant ou un co-auteur.
+#      (Le titre et le corps d'une demande de fusion — le message du commit de
+#      fusion — sont contrôlés sur GitHub, par `.githooks/controler-texte`.)
+#
+# Les lignes sont lues en texte (grep -a) : une ligne qui porte un octet hors UTF-8
+# n'est pas tue.
 #
 # Refuse le push si un contrôle échoue, et dit lequel. Sans exclusion locale, le
 # contrôle 3 est impossible : refus aussi — le hook ne passe pas à l'aveugle.
@@ -43,6 +54,13 @@ ZERO=0000000000000000000000000000000000000000
 distant="${1:-origin}"
 exclusion="$(git rev-parse --git-path info/exclude)"
 echecs=()
+fragment="$(git rev-parse --show-toplevel)/.githooks/cles-fournisseurs"
+if [ ! -r "$fragment" ]; then
+    echo "pre-push : PUSH REFUSÉ — .githooks/cles-fournisseurs introuvable : clés non contrôlables." >&2
+    exit 1
+fi
+# shellcheck source=cles-fournisseurs
+. "$fragment"
 
 liste_du_commit() {  # liste versionnée, lue dans le commit poussé
     git show "$1:.githooks/$2" 2>/dev/null | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true
@@ -55,8 +73,17 @@ lignes_ajoutees() {  # « chemin<TAB>ligne » pour chaque ligne ajoutée du comm
              /^\+/      { print f "\t" substr($0, 2) }'
 }
 
-while read -r _ local_sha _ distant_sha; do
+while read -r local_ref local_sha distant_ref distant_sha; do
     [ "$local_sha" = "$ZERO" ] && continue  # suppression de branche
+    # 5. références : leur nom, et le message d'une étiquette annotée
+    while read -r ref; do
+        grep -qaiE "$MOTS" <<<"$ref" &&
+            echecs+=("référence « $ref » : son nom mentionne un assistant")
+    done < <(printf '%s\n%s\n' "$local_ref" "$distant_ref" | sort -u)
+    if [ "$(git cat-file -t "$local_sha")" = tag ] &&
+        git cat-file -p "$local_sha" | sed '1,/^$/d' | grep -qaiE "$MOTS|$SIGNATURES"; then
+        echecs+=("étiquette « $local_ref » : son message mentionne un assistant ou un co-auteur")
+    fi
     if [ "$distant_sha" = "$ZERO" ] || ! git cat-file -e "$distant_sha" 2>/dev/null; then
         commits=$(git rev-list "$local_sha" --not --remotes="$distant")
     else
@@ -77,18 +104,20 @@ while read -r _ local_sha _ distant_sha; do
                 echecs+=("$court : committer « $committer <$adresse> », attendu « $AUTEUR » (ou « $VALIDATEUR_GITHUB » pour une fusion à deux parents)")
         fi
         # 2a. message
-        if git log -1 --format=%B "$c" | grep -qiE "$MOTS"; then
+        if git log -1 --format=%B "$c" | grep -qaiE "$MOTS"; then
             echecs+=("$court : le message de commit mentionne un assistant ou un co-auteur")
         fi
         # 2b. lignes ajoutées
         while IFS=$'\t' read -r chemin ligne; do
-            if printf '%s\n' "$ligne" | grep -qiE "$SIGNATURES"; then
+            if printf '%s\n' "$ligne" | grep -qaiE "$SIGNATURES"; then
                 echecs+=("$court : marqueur d'auteur ajouté dans $chemin")
-            elif printf '%s\n' "$ligne" | grep -qiE "$MOTS" &&
+            elif printf '%s\n' "$ligne" | grep -qaiE "$MOTS" &&
                 ! grep -qxF "$chemin" <<<"$techniques"; then
                 echecs+=("$court : mention d'assistant ajoutée dans $chemin (fichier hors de .githooks/mentions-techniques)")
             fi
-        done < <(lignes_ajoutees "$c" | grep -iE "$MOTS|$SIGNATURES" || true)
+        done < <(lignes_ajoutees "$c" | grep -aiE "$MOTS|$SIGNATURES" || true)
+        # 4. clés et jetons des fournisseurs, dans les lignes ajoutées
+        controler_cles "$court : " < <(lignes_ajoutees "$c")
     done
 
     # 3. fichiers interdits, dans l'arbre poussé
@@ -112,5 +141,5 @@ if [ ${#echecs[@]} -gt 0 ]; then
     printf '  - %s\n' "${echecs[@]}" >&2
     exit 1
 fi
-echo "pre-push : auteur, mentions, fichiers — contrôles passés." >&2
+echo "pre-push : auteur, mentions, fichiers, clés et jetons, références — contrôles passés." >&2
 exit 0

@@ -14,6 +14,13 @@ qui doit tenir, et ne se vérifie que sur le corpus réel :
 Les comptes sont ceux du corpus `bench` du 2026-09-28 (part Kitsu refaite le
 2026-09-29) et du moyeu du 2026-09-30 : un corpus reconstruit, ou un moyeu
 enrichi, les changera — le test le dira, et c'est son rôle.
+
+CORPUS NOMMÉ (2026-10-19). Depuis la migration 021, `bench` porte deux corpus, et une
+lecture sans corpus nommé lit celui de l'encodage en service — le v2 depuis le
+2026-10-10. Ces comptes sont ceux du v1, clos et figé par déclencheur : chaque
+lecture nomme `'v1'`, et la définition d'avant, écrite quand le v1 était tout le
+corpus, est bornée au v1 (seul ajout : les filtres `corpus_id`). Tournent dans
+l'étape « état d'apimanga » de `make verify-poste`, sous `verif_ro`.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from evaluation import atteignabilite
 APIMANGA_DSN = os.environ.get("APIMANGA_DSN")
 besoin_apimanga = pytest.mark.skipif(not APIMANGA_DSN, reason="APIMANGA_DSN non défini")
 
+CORPUS = "v1"
 FRAGMENTS = 66_290
 SERIES_ATTEIGNABLES = 8_718
 ENTITES_KITSU = 29_310
@@ -38,15 +46,17 @@ SQL_ATTEIGNABLES_AVANT = """
 WITH par_critique AS (
   SELECT DISTINCT d.series_id
   FROM bench.corpus_docs d
-  WHERE d.source = 'ms_review'
-    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
+  WHERE d.corpus_id = 'v1' AND d.source = 'ms_review'
+    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k
+                WHERE k.corpus_id = 'v1' AND k.doc_key = d.doc_key)
 ),
 par_kitsu AS (
   SELECT DISTINCT w.series_id::bigint AS series_id
   FROM bench.corpus_docs d
   JOIN manga.work_identity w ON w.kitsu_id = d.kitsu_id::text
-  WHERE d.source = 'kitsu_synopsis' AND w.series_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k WHERE k.doc_key = d.doc_key)
+  WHERE d.corpus_id = 'v1' AND d.source = 'kitsu_synopsis' AND w.series_id IS NOT NULL
+    AND EXISTS (SELECT 1 FROM bench.corpus_chunks k
+                WHERE k.corpus_id = 'v1' AND k.doc_key = d.doc_key)
 )
 SELECT series_id FROM par_critique
 UNION
@@ -65,18 +75,20 @@ def cx():
 @besoin_apimanga
 def test_atteignables_identiques_avant_et_apres(cx):
     avant = {s for (s,) in cx.execute(SQL_ATTEIGNABLES_AVANT)}
-    apres = atteignabilite.atteignables(cx)
+    apres = atteignabilite.atteignables(cx, CORPUS)
     assert apres == avant
     assert len(apres) == SERIES_ATTEIGNABLES
 
 
 @besoin_apimanga
 def test_chaque_fragment_a_une_entite_et_une_seule(cx):
-    lignes = atteignabilite.rattachement(cx)
+    lignes = atteignabilite.rattachement(cx, CORPUS)
     fragments = [chunk_id for chunk_id, *_ in lignes]
     assert len(lignes) == FRAGMENTS
     assert len(set(fragments)) == FRAGMENTS, "un fragment, une ligne"
-    total = cx.execute("SELECT count(*) FROM bench.corpus_chunks").fetchone()[0]
+    total = cx.execute(
+        "SELECT count(*) FROM bench.corpus_chunks WHERE corpus_id = %s", (CORPUS,)
+    ).fetchone()[0]
     assert total == FRAGMENTS, "aucun fragment hors du rattachement"
     sans_entite = [
         c for c, _, serie, kitsu in lignes if serie is None and kitsu is None
@@ -86,10 +98,10 @@ def test_chaque_fragment_a_une_entite_et_une_seule(cx):
 
 @besoin_apimanga
 def test_entites_du_corpus(cx):
-    lignes = atteignabilite.rattachement(cx)
+    lignes = atteignabilite.rattachement(cx, CORPUS)
     series = {serie for _, _, serie, _ in lignes if serie is not None}
     kitsu = {kitsu for _, _, serie, kitsu in lignes if serie is None}
     assert len(series) == SERIES_ATTEIGNABLES
-    assert series == atteignabilite.atteignables(cx)
+    assert series == atteignabilite.atteignables(cx, CORPUS)
     assert len(kitsu) == ENTITES_KITSU
     assert len(series) + len(kitsu) == 38_028

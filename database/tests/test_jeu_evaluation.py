@@ -8,26 +8,21 @@ doit ÉCHOUER ici.
 
 from __future__ import annotations
 
-from argparse import Namespace
-
 import psycopg
 import pytest
-from conftest import migrate
 
-UP = Namespace(commande="up", target=None)
 EMPREINTE = "a" * 64
 RUN = "00000000-0000-0000-0000-000000000001"
 
 
 @pytest.fixture
-def base_migree(base):
-    migrate.commande_up(UP)
-    with psycopg.connect(base) as cx:
+def base_migree(base_migree):
+    with psycopg.connect(base_migree) as cx:
         cx.execute(
             "INSERT INTO manga.ms_series_enriched (series_id, series_title)"
             " VALUES (1, 'Une'), (2, 'Deux'), (3, 'Trois')"
         )
-    return base
+    return base_migree
 
 
 def question(

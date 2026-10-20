@@ -1,0 +1,7 @@
+id = "PH-14"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le fichier du jeton Hugging Face n'est plus lu"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''            tr -d '\r' <"${CLES_FICHIER[$1]}"'''
+apres = '''            :'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

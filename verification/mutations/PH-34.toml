@@ -1,0 +1,7 @@
+id = "PH-34"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — une action épinglée par étiquette passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''      *@*) [[ ${action##*@} =~ ^[0-9a-f]{40}$ ]] ||'''
+apres = '''      *@*) true ||'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

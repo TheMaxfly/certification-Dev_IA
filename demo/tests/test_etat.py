@@ -51,15 +51,45 @@ def test_bloc_raw_voit_les_snapshots():
     assert {"2025-12", "2026-07"} <= noms
 
 
-def test_bloc_lakehouse_liste_les_tables_gold():
-    bloc = etat.bloc_lakehouse()
-    libelles = {libelle for libelle, _, _ in bloc.lignes}
-    assert "tables gold" in libelles
+def test_bloc_lakehouse_liste_les_tables_gold(tmp_path, monkeypatch):
+    module = tmp_path / "07_databricks_manga_export"
+    for table in ("volumetrie", "qualite_ean"):
+        (module / "data" / "lakehouse" / "gold" / table).mkdir(parents=True)
+    (module / "rapports").mkdir()
+    for nom in ("rapport_qualite_20260701.md", "rapport_qualite_20260801.md"):
+        (module / "rapports" / nom).write_text("x", encoding="utf-8")
+    monkeypatch.setattr(etat, "RACINE", tmp_path)
+
+    assert etat.bloc_lakehouse().lignes == [
+        ("tables gold", "2 : qualite_ean, volumetrie", "ok"),
+        ("dernier rapport", "rapport_qualite_20260801.md", "ok"),
+    ]
+
+
+def test_bloc_lakehouse_sans_pipeline_le_dit(tmp_path, monkeypatch):
+    monkeypatch.setattr(etat, "RACINE", tmp_path)
+    assert etat.bloc_lakehouse().lignes == [
+        ("tables gold", "aucune (lancer le pipeline)", "attention"),
+        ("dernier rapport", "aucun", "attention"),
+    ]
 
 
 def test_bloc_git_donne_le_dernier_commit():
     bloc = etat.bloc_git()
-    assert bloc.lignes or bloc.note
+    assert not bloc.note
+    ((libelle, valeur, statut),) = bloc.lignes
+    assert (libelle, statut) == ("dernier commit", "ok")
+    assert re.fullmatch(r"[0-9a-f]{7,} · .+", valeur), valeur
+
+
+def test_bloc_git_sans_git_le_dit(monkeypatch):
+    def absent(*_args, **_kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(etat.subprocess, "run", absent)
+    bloc = etat.bloc_git()
+    assert bloc.lignes == []
+    assert bloc.note == "git indisponible : FileNotFoundError"
 
 
 def test_la_requete_des_critiques_vise_le_referentiel():

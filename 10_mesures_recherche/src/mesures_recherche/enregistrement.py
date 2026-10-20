@@ -13,6 +13,9 @@ Le run porte :
 
 `bench.eval_mesures` reçoit les mêmes valeurs, `run_id` = identifiant du run
 MLflow : la table est immuable, un rejeu enregistré serait un nouveau run.
+
+On commite d'abord, on mesure ensuite : l'enregistrement est REFUSÉ si l'arbre du
+module n'est pas propre — le commit inscrit au run doit être le code qui a tourné.
 """
 
 from __future__ import annotations
@@ -61,7 +64,22 @@ def etat_git() -> dict[str, str]:
     return {"commit": git("rev-parse", "HEAD"), "arbre_module_propre": str(propre)}
 
 
-def parametres(resultat: dict) -> dict[str, str]:
+class EnregistrementRefuse(RuntimeError):
+    """L'arbre du module n'est pas propre : rien n'est enregistré."""
+
+
+def exiger_arbre_propre() -> dict[str, str]:
+    """L'état git, si l'arbre du module est propre ; sinon `EnregistrementRefuse`."""
+    etat = etat_git()
+    if etat["arbre_module_propre"] != "True":
+        raise EnregistrementRefuse(
+            f"arbre du module non propre (commit {etat['commit'][:12]}) : commiter"
+            " d'abord, mesurer ensuite — rien n'est enregistré"
+        )
+    return etat
+
+
+def parametres(resultat: dict, etat: dict[str, str] | None = None) -> dict[str, str]:
     p = {
         f"reglage.{k}": json.dumps(v) if isinstance(v, list) else str(v)
         for k, v in resultat["reglages"].items()
@@ -79,7 +97,7 @@ def parametres(resultat: dict) -> dict[str, str]:
         "corpus_id": str(resultat["corpus_id"]),
         "encodage_id": str(resultat["encodage_id"]),
     }
-    return p | etat_git()
+    return p | (etat if etat is not None else etat_git())
 
 
 def tableau_par_question(resultat: dict) -> str:
@@ -121,6 +139,7 @@ def enregistrer(resultat: dict, dsn_ecriture: str, stockage: Path = STOCKAGE) ->
     import mlflow
     import psycopg
 
+    etat = exiger_arbre_propre()
     stockage.mkdir(parents=True, exist_ok=True)
     mlflow.set_tracking_uri(uri_suivi(stockage))
     nom = resultat["experience"]
@@ -136,7 +155,7 @@ def enregistrer(resultat: dict, dsn_ecriture: str, stockage: Path = STOCKAGE) ->
                 "spec": resultat["spec"],
             }
         )
-        mlflow.log_params(parametres(resultat))
+        mlflow.log_params(parametres(resultat, etat))
         mlflow.log_metrics(
             {
                 nom_metrique(a["metrique"], a["k"], a["portee"], a["perimetre"]): a[
