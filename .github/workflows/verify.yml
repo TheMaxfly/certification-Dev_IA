@@ -18,6 +18,8 @@ name: verify
 
 on:
   pull_request:
+    # `edited` : un titre ou un corps de demande modifié est contrôlé à nouveau.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop]
   workflow_dispatch:
@@ -178,6 +180,13 @@ jobs:
           version: "0.9.17"
           enable-cache: true
           cache-suffix: statique
+
+      - name: Titre et corps de la demande, sans mention
+        if: github.event_name == 'pull_request'
+        env:
+          TITRE: ${{ github.event.pull_request.title }}
+          CORPS: ${{ github.event.pull_request.body }}
+        run: printf '%s\n%s\n' "$TITRE" "$CORPS" | bash .githooks/controler-texte "demande de fusion"
 
       - name: make verify MODULE=statique
         run: make verify MODULE=statique

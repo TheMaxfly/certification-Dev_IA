@@ -304,6 +304,7 @@ verifier_statique() {
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \
     shellcheck -x -P .githooks .githooks/pre-commit .githooks/pre-push .githooks/cles-fournisseurs \
+    .githooks/controler-texte \
     verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh
   # tester.sh : ses `eval '…'` sont voulus (SC2016), et ses variables ne servent que
   # dans ces chaînes (SC2034).

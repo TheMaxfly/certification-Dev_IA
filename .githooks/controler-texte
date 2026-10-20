@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# controler-texte — un texte sur l'entrée, les motifs du pre-push : refus s'il
+# mentionne un assistant ou un co-auteur. Pour ce qu'aucun hook ne voit : le titre
+# et le corps d'une demande de fusion, qui deviennent le message du commit de fusion
+# (tâche `statique` de verify.yml).
+#
+#   printf '%s\n%s\n' "$TITRE" "$CORPS" | bash .githooks/controler-texte "demande de fusion"
+#
+# Les motifs sont lus dans .githooks/pre-push : ils ne peuvent pas diverger. Le texte
+# est lu en texte (grep -a), jamais affiché.
+set -uo pipefail
+
+libelle="${1:-texte}"
+racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+eval "$(grep -E "^(MOTS|SIGNATURES)=" "$racine/.githooks/pre-push")"
+if [ -z "${MOTS:-}" ] || [ -z "${SIGNATURES:-}" ]; then
+    echo "controler-texte : REFUS — motifs absents de .githooks/pre-push." >&2
+    exit 1
+fi
+if grep -qaiE "$MOTS|$SIGNATURES"; then
+    echo "controler-texte : REFUS — $libelle : mentionne un assistant ou un co-auteur." >&2
+    exit 1
+fi
+echo "controler-texte : $libelle — aucune mention." >&2

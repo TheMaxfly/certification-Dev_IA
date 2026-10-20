@@ -1,11 +1,13 @@
 # shellcheck shell=bash
-# cles-fournisseurs — les clés d'API des fournisseurs de modèle de langage. Ce
-# fragment est sourcé par les hooks pre-commit et pre-push, et ne s'exécute pas
-# seul : un seul jeu de motifs, qui ne peut pas diverger d'un hook à l'autre.
+# cles-fournisseurs — les clés d'API des fournisseurs de modèle de langage, et le
+# jeton Hugging Face. Ce fragment est sourcé par les hooks pre-commit et pre-push,
+# et ne s'exécute pas seul : un seul jeu de motifs, qui ne peut pas diverger d'un
+# hook à l'autre.
 #
 # Sur les lignes ajoutées (« chemin<TAB>ligne », sur l'entrée de controler_cles),
 # pour chaque fournisseur :
-#   - VALEUR RÉELLE : la clé du poste, lue dans sa variable d'environnement et dans
+#   - VALEUR RÉELLE : la clé du poste, lue dans sa variable d'environnement, dans
+#     le fichier où l'outil du fournisseur la range (le jeton Hugging Face), et dans
 #     les fichiers .env de la racine et des dossiers jusqu'à deux niveaux sous elle
 #     (ceux des modules, ignorés par git). Variable absente ou vide : rien à
 #     comparer, aucun message ;
@@ -24,16 +26,22 @@
 #     préfixe). Motif : une affectation littérale à MISTRAL_API_KEY (« = » ou « : »,
 #     casse indifférente) d'au moins 20 caractères alphanumériques, la forme d'un
 #     .env recopié. La valeur réelle reste le filet.
+#   - Hugging Face : « hf_ » suivi de 34 caractères alphanumériques ; la valeur du
+#     poste est aussi lue dans le fichier où `huggingface-cli login` la range.
 #
 # Ajouter un fournisseur : son nom de variable dans CLES_VARIABLES, une entrée dans
-# CLES_FOURNISSEUR et dans CLES_ASPECT.
+# CLES_FOURNISSEUR et dans CLES_ASPECT (et, s'il y a lieu, CLES_NATURE, CLES_FICHIER).
 
-CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY)
-declare -A CLES_FOURNISSEUR=([MISTRAL_API_KEY]=Mistral [OPENAI_API_KEY]=OpenAI)
+CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN)
+declare -A CLES_FOURNISSEUR=([MISTRAL_API_KEY]=Mistral [OPENAI_API_KEY]=OpenAI [HF_TOKEN]="Hugging Face")
+declare -A CLES_NATURE=([HF_TOKEN]=jeton)  # « clé » sinon
 declare -A CLES_ASPECT=(
     [MISTRAL_API_KEY]="[Mm][Ii][Ss][Tt][Rr][Aa][Ll]_[Aa][Pp][Ii]_[Kk][Ee][Yy][\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9]{20,}"
     [OPENAI_API_KEY]='(^|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{40,}'
+    [HF_TOKEN]='hf_[A-Za-z0-9]{34}'
 )
+# Le fichier où l'outil du fournisseur range la valeur du poste.
+declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
 
 cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
     local v
@@ -54,6 +62,10 @@ cles_valeurs() { # <variable> : ses valeurs sur le poste, une par ligne, sans vi
     racine=$(git rev-parse --show-toplevel) || return 0
     {
         printf '%s\n' "${!1:-}"
+        if [ -n "${CLES_FICHIER[$1]:-}" ] && [ -r "${CLES_FICHIER[$1]}" ]; then
+            tr -d '\r' <"${CLES_FICHIER[$1]}"
+            printf '\n'
+        fi
         while IFS= read -r -d '' fichier; do
             cles_valeur_env "$fichier" "$1"
             printf '\n'
@@ -69,19 +81,20 @@ done
 unset _variable
 
 controler_cles() { # <préfixe des messages> ; entrée « chemin<TAB>ligne » ; complète echecs
-    local prefixe="$1" lignes variable fournisseur fichier
+    local prefixe="$1" lignes variable fournisseur nature fichier
     lignes=$(cat)
     [ -n "$lignes" ] || return 0
     for variable in "${CLES_VARIABLES[@]}"; do
         fournisseur=${CLES_FOURNISSEUR[$variable]}
+        nature=${CLES_NATURE[$variable]:-clé}
         if [ -n "${CLES_VALEURS[$variable]}" ]; then
             while IFS= read -r fichier; do
-                echecs+=("${prefixe}clé $fournisseur du poste en clair dans $fichier")
+                echecs+=("${prefixe}$nature $fournisseur du poste en clair dans $fichier")
             done < <(grep -aF -f <(printf '%s\n' "${CLES_VALEURS[$variable]}") <<<"$lignes" |
                 cut -f1 | sort -u)
         fi
         while IFS= read -r fichier; do
-            echecs+=("${prefixe}chaîne d'aspect clé $fournisseur dans $fichier")
+            echecs+=("${prefixe}chaîne d'aspect $nature $fournisseur dans $fichier")
         done < <(grep -aE -- "${CLES_ASPECT[$variable]}" <<<"$lignes" | cut -f1 | sort -u)
     done
 }

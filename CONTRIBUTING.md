@@ -125,17 +125,23 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 47 scénarios sur 47 ; joués aussi par la tâche statique
+bash .githooks/tester.sh   # 69 scénarios sur 69 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
-  l'exclusion locale, jetons, clés de fournisseur.
+  l'exclusion locale, clés et jetons des fournisseurs.
 - `pre-push`, avant que le distant change : auteur et validateur `TheMaxfly` pour
-  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé, clés de
-  fournisseur dans les lignes ajoutées. Seule exception, le commit de fusion créé
-  par GitHub : exactement deux parents, validateur `GitHub <noreply@github.com>`,
-  auteur `TheMaxfly` ou le nom de profil GitHub du mainteneur. Les autres contrôles
+  chaque commit, mêmes mentions, fichiers interdits dans l'arbre poussé, clés et
+  jetons dans les lignes ajoutées, nom des branches et des étiquettes poussées,
+  message des étiquettes annotées. Seule exception, le commit de fusion créé par
+  GitHub : exactement deux parents, validateur `GitHub <noreply@github.com>`, auteur
+  `TheMaxfly` ou le nom de profil GitHub du mainteneur. Les autres contrôles
   s'appliquent aussi à ce commit.
+- Sur GitHub, la tâche `statique` contrôle le titre et le corps de chaque demande de
+  fusion (`.githooks/controler-texte`, mêmes motifs), à l'ouverture et à chaque
+  modification.
+- Les lignes sont lues en texte : une ligne qui porte un octet hors UTF-8 n'échappe
+  à aucun contrôle.
 
 Ils s'appliquent à l'identique sur toutes les branches et ne lancent aucun test.
 **Jamais de `--no-verify`.**
@@ -149,7 +155,7 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 
 | Secret | Où il se pose | Ce que les hooks refusent |
 |---|---|---|
-| jeton Hugging Face | `HF_TOKEN`, ou le fichier `$HF_HOME/token` | `pre-commit` : sa valeur ; `hf_` suivi de 34 caractères |
+| jeton Hugging Face | `HF_TOKEN`, ou le fichier `$HF_HOME/token` | `pre-commit` et `pre-push` : sa valeur ; `hf_` suivi de 34 caractères |
 | clé Mistral | `MISTRAL_API_KEY`, dans le `.env` du module de l'API du modèle | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale à `MISTRAL_API_KEY` |
 | clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
 
@@ -216,7 +222,8 @@ chore(git): fusionner develop dans main — e3-etape1
 Le type `chore` ne compte pas une seconde fois les `feat` et les `fix` que la
 branche apporte : chacun porte déjà son propre commit. Titre et corps se relisent
 avant de fusionner : aucune mention d'assistant, aucune signature d'outil, aucun
-secret — le message du commit de fusion passe ensuite par le `pre-push`.
+secret. La tâche `statique` refuse une demande dont le titre ou le corps porte une
+mention ; le message du commit de fusion passe ensuite par le `pre-push`.
 
 ### Étiquettes
 
@@ -225,8 +232,8 @@ Annotées, posées sur `main`, une par livraison de `develop` dans `main` :
 (`methode-branches`). Si plusieurs étapes passent ensemble, l'étiquette prend le nom
 de la dernière. Message : `<étiquette> — <titre>`, puis la liste des étapes apportées.
 
-Le `pre-push` ne juge que des commits : **le message d'une étiquette n'est relu par
-aucun hook**. Il se relit avant le push.
+Le `pre-push` relit le nom de l'étiquette et son message : une mention d'assistant
+ou de co-auteur refuse le push. Le message se relit quand même avant le push.
 
 ## Trois règles imposées par les hooks
 

@@ -14,8 +14,14 @@ NOM="Cl$(printf a)ude"
 EDITEUR="Anthr$(printf o)pic"
 CO="Co-Author$(printf e)d-By"
 # Clés factices de la bonne forme, et valeurs « du poste » hors de tout motif. Les
-# vraies variables du poste n'entrent pas dans l'essai.
-unset MISTRAL_API_KEY OPENAI_API_KEY
+# vraies variables du poste n'entrent pas dans l'essai : un HOME jetable porte un
+# jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
+unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME
+export HOME="$TRAVAIL/maison"
+mkdir -p "$HOME/.cache/huggingface"
+JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
+printf '%s\n' "$JETON_POSTE" >"$HOME/.cache/huggingface/token"
+ASPECT="hf_$(printf 'Ab3%.0s' $(seq 1 11))x"  # hf_ + 34 caractères
 MISTRAL_FACTICE="Mq7$(printf 'Ab3dEf%.0s' $(seq 1 4))Zz9x5"            # 32 alphanumériques
 OPENAI_FACTICE="sk-proj-$(printf 'Ab3dEf9h_K-%.0s' $(seq 1 14))Xy"   # sk-proj- + 156
 HORS_MOTIF_M="valeur-factice-hors-motif-0042"
@@ -38,10 +44,18 @@ ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 git add .githooks && git commit -q -m "socle"
 
 scenario() {  # scenario <attendu : passe|refuse> <libellé> <commande…>
-    local attendu="$1" libelle="$2"
+    # Un refus ne compte que s'il vient du hook (son message) : un push qui échoue
+    # pour une autre raison est une erreur d'essai.
+    local attendu="$1" libelle="$2" sortie
     shift 2
     "$@"
-    if git push -q origin main 2>/dev/null; then obtenu=passe; else obtenu=refuse; fi
+    if sortie=$(git push -q origin main 2>&1); then
+        obtenu=passe
+    elif grep -q "PUSH REFUSÉ" <<<"$sortie"; then
+        obtenu=refuse
+    else
+        obtenu="erreur d'essai"
+    fi
     if [ "$obtenu" = "$attendu" ]; then
         echo "  ok    $libelle ($obtenu)"
     else
@@ -105,12 +119,52 @@ message() { # message <libellé> <motif attendu> <motif interdit> <commande…> 
     fi
 }
 scenario refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire cle_m.py "MISTRAL_API_KEY = \"$MISTRAL_FACTICE\"" && git commit -q -m cle_m'
+scenario refuse "jeton Hugging Face du poste en clair" eval 'ecrire j_pp.txt "jeton : $JETON_POSTE" && git commit -q -m j_pp'
+scenario refuse "chaîne d'aspect jeton Hugging Face" eval 'ecrire j_pp2.env "TOKEN=$ASPECT" && git commit -q -m j_pp2'
+# Sans -a, grep tait la ligne qui porte un octet hors UTF-8 : la mention passerait.
+scenario refuse "mention dans un texte non UTF-8" eval '
+    export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >nu.txt &&
+    git add nu.txt && git commit -q -m nu'
+unset LC_ALL
+# Les listes d'exceptions sont lues dans le commit poussé, pas dans l'arbre de travail.
+scenario refuse "liste d'exceptions modifiée sans commit" eval '
+    ecrire m3.py "import ${EDITEUR,,}" && git commit -q -m m3 &&
+    printf "tech.txt\nm3.py\n" >.githooks/mentions-techniques'
+scenario refuse "fragment des clés absent" eval '
+    ecrire k10.txt "x" && git commit -q -m k10 && rm .githooks/cles-fournisseurs'
+# (le reset de fin de scénario rend la liste et le fragment)
 message "refus du push : fournisseur et fichier nommés, valeur jamais" \
     "clé Mistral du poste en clair dans v_m2\.txt" "$HORS_MOTIF_M" eval '
     export MISTRAL_API_KEY="$HORS_MOTIF_M" && ecrire v_m2.txt "note : $HORS_MOTIF_M" &&
     git commit -q -m v_m2 && git push -q origin main'
 unset MISTRAL_API_KEY
 git fetch -q origin && git reset -q --hard origin/main 2>/dev/null
+
+# Les références : le nom d'une branche ou d'une étiquette, le message d'une étiquette
+# annotée. La commande pousse elle-même.
+pousser() {  # pousser <attendu : passe|refuse> <libellé> <commande…>
+    local attendu="$1" libelle="$2" sortie
+    shift 2
+    if sortie=$("$@" 2>&1); then
+        obtenu=passe
+    elif grep -q "PUSH REFUSÉ" <<<"$sortie"; then
+        obtenu=refuse
+    else
+        obtenu="erreur d'essai"
+    fi
+    if [ "$obtenu" = "$attendu" ]; then
+        echo "  ok    $libelle ($obtenu)"
+    else
+        echo "  ÉCHEC $libelle : attendu $attendu, obtenu $obtenu"
+        echecs=$((echecs + 1))
+    fi
+    git tag -l | xargs -r git tag -d >/dev/null
+}
+pousser refuse "branche au nom fautif" eval 'git push -q origin "HEAD:refs/heads/essai-${NOM,,}"'
+pousser refuse "étiquette au nom fautif" eval 'git tag "v-${NOM,,}" && git push -q origin "v-${NOM,,}"'
+pousser refuse "étiquette annotée au message fautif" eval '
+    git tag -a t1 -m "étape rédigée avec $NOM Code" && git push -q origin t1'
+pousser passe  "étiquette annotée propre" eval 'git tag -a t2 -m "étape livrée" && git push -q origin t2'
 
 # --------------------------------------------------------------------------- #
 # Hook pre-commit — sur un SECOND clone : le premier a besoin de commits fautifs
@@ -124,11 +178,6 @@ git config user.email max@example.invalid
 cp "$HOOKS/pre-commit" .githooks/pre-commit
 printf 'secret.md\n/docs/*\n!/docs/modeles/\n' >.git/info/exclude
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-# Jeton du poste, dans un HOME jetable : le hook le lit sans jamais l'afficher.
-export HOME="$TRAVAIL/maison"
-mkdir -p "$HOME/.cache/huggingface"
-printf 'jeton-du-poste-pour-l-essai-0042\n' >"$HOME/.cache/huggingface/token"
-ASPECT="hf_$(printf 'Ab3%.0s' $(seq 1 11))x"  # hf_ + 34 caractères
 git add .githooks && git commit -q -m "socle du pre-commit" 2>/dev/null &&
     git push -q origin HEAD:main 2>/dev/null
 git branch -q -u origin/main
@@ -209,6 +258,55 @@ essai refuse "clé factice dans un texte non UTF-8"  eval '
     export LC_ALL=C.UTF-8 && printf "caf\351 cle : %s\n" "$OPENAI_FACTICE" >pc_l1.txt &&
     git add pc_l1.txt && git commit -q -m l1'
 unset LC_ALL
+# Les .env lus : la racine et deux niveaux sous elle, jamais .venv ; fin de ligne CRLF.
+essai refuse "clé du poste dans le .env d'un module" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "OPENAI_API_KEY=%s\n" "$HORS_MOTIF_O" >mod/.env &&
+    ecrire pc_k4a.txt "note : $HORS_MOTIF_O" && git commit -q -m k4a'
+essai refuse "clé du poste dans un .env à deux niveaux" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p a/b &&
+    printf "OPENAI_API_KEY=%s\n" "$HORS_MOTIF_O" >a/b/.env &&
+    ecrire pc_k4b.txt "note : $HORS_MOTIF_O" && git commit -q -m k4b'
+essai passe  "un .env sous .venv n'est pas lu" eval '
+    printf ".env\n.venv/\n" >.gitignore && git add .gitignore && mkdir -p .venv &&
+    printf "OPENAI_API_KEY=%s\n" "$HORS_MOTIF_O" >.venv/.env &&
+    ecrire pc_k4c.txt "note : $HORS_MOTIF_O" && git commit -q -m k4c'
+essai refuse "fin de ligne CRLF dans le .env" eval '
+    printf ".env\n" >.gitignore && git add .gitignore &&
+    printf "MISTRAL_API_KEY=%s\r\n" "$HORS_MOTIF_M" >.env &&
+    ecrire pc_k4d.txt "note : $HORS_MOTIF_M" && git commit -q -m k4d'
+rm -rf .env mod a .venv # ignorés : git clean ne les ôte pas
+essai refuse "mention dans un texte non UTF-8" eval '
+    export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >pc_nu.txt &&
+    git add pc_nu.txt && git commit -q -m nu'
+unset LC_ALL
+# La liste d'exceptions est lue dans l'index : modifiée sans être indexée, elle ne
+# compte pas.
+essai refuse "liste d'exceptions modifiée sans l'indexer" eval '
+    printf "tech.txt\npc_m3.py\n" >.githooks/mentions-techniques &&
+    ecrire pc_m3.py "import ${EDITEUR,,}" && git commit -q -m m3'
+essai refuse "fragment des clés absent" eval '
+    rm .githooks/cles-fournisseurs && ecrire pc_k10.txt "x" && git commit -q -m k10'
+# Les valeurs du poste ne passent jamais en argument d'une commande (visible dans la
+# liste des processus) : un grep espion, en tête du PATH, consigne ses arguments.
+VRAI_GREP="$(command -v grep)"
+mkdir -p "$TRAVAIL/espion"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\nexec "%s" "$@"\n' \
+    "$TRAVAIL/arguments.log" "$VRAI_GREP" >"$TRAVAIL/espion/grep"
+chmod +x "$TRAVAIL/espion/grep"
+CHEMIN_AVANT="$PATH"
+essai refuse "valeurs du poste lues, refusées" eval '
+    export PATH="$TRAVAIL/espion:$PATH" MISTRAL_API_KEY="$HORS_MOTIF_M" &&
+    ecrire pc_k11.txt "note : $HORS_MOTIF_M et $JETON_POSTE" && git commit -q -m k11'
+export PATH="$CHEMIN_AVANT"
+unset MISTRAL_API_KEY
+if [ -s "$TRAVAIL/arguments.log" ] && ! "$VRAI_GREP" -qF \
+    -f <(printf '%s\n%s\n' "$HORS_MOTIF_M" "$JETON_POSTE") "$TRAVAIL/arguments.log"; then
+    echo "  ok    valeurs du poste jamais en argument de grep"
+else
+    echo "  ÉCHEC valeurs du poste jamais en argument de grep"
+    echecs=$((echecs + 1))
+fi
 # Les formes courtes et les lectures de variable ne sont pas des clés.
 essai passe  "exemples courts et lectures de variable" eval '
     ecrire pc_z.py "MISTRAL_API_KEY=changeme
@@ -224,6 +322,28 @@ message "refus du commit : fournisseur et fichier nommés, valeur jamais" \
     git commit -q -m vo2'
 unset OPENAI_API_KEY
 git reset -q --hard origin/main && git clean -fdq
+
+# --------------------------------------------------------------------------- #
+# Le titre et le corps d'une demande de fusion : .githooks/controler-texte
+# --------------------------------------------------------------------------- #
+echo "Essai du contrôle des textes (demandes de fusion)"
+texte() {  # texte <attendu : passe|refuse> <libellé> <texte>
+    if printf '%s\n' "$3" | bash "$HOOKS/controler-texte" essai 2>/dev/null; then
+        obtenu=passe
+    else
+        obtenu=refuse
+    fi
+    if [ "$obtenu" = "$1" ]; then
+        echo "  ok    $2 ($obtenu)"
+    else
+        echo "  ÉCHEC $2 : attendu $1, obtenu $obtenu"
+        echecs=$((echecs + 1))
+    fi
+}
+texte refuse "titre qui nomme l'outil" "chore(git): fusionner, rédigé avec $NOM Code"
+texte refuse "co-auteur dans le corps" "$(printf 'chore(git): fusionner\n\n%s: x <y@z>' "$CO")"
+texte refuse "nom de l'éditeur, texte non UTF-8" "$(printf 'caf\351 %s' "$EDITEUR")"
+texte passe  "titre et corps ordinaires" "$(printf 'chore(git): fusionner b dans develop\n\n- abc1234 test: x')"
 
 if [ "$echecs" -gt 0 ]; then
     echo "$echecs scénario(s) en échec"
