@@ -28,15 +28,20 @@ commande sur le poste et sur GitHub.
 | `make verify TOUT=1` | tous les modules |
 | `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `10`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | la mémoire d'abord (5 Go disponibles, 4 Go de mémoire vidéo libre) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés) |
+| `make verify-poste` | la mémoire d'abord (5 Go disponibles, 4 Go de mémoire vidéo libre) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés ; **sans échantillon, échec** : une vérification qui ne tourne pas est un échec), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
   vidé. **Jamais de DSN réel pour les tests, sauf l'étape « état d'`apimanga` » de
   `verify-poste`, en lecture seule sous `verif_ro`** (plus bas).
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/` et de
-  `verification/`, les essais des hooks (`tester.sh`) et du périmètre
-  (`verification/tester_perimetre.sh`).
+  `verification/`, les essais des hooks (`tester.sh`), du périmètre
+  (`verification/tester_perimetre.sh`) et du moteur de vérification
+  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
+  la cohérence `MODULES` ↔
+  graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
+  workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
+  exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
 - L'intégration Compose du 02 (PostgreSQL jetable, migrations, rôle de lecture, API
   réelle, contrôles HTTP) fait partie de la vérification du 02.
 - Arrêt au premier échec, avec le module et la commande ; une ligne par module :

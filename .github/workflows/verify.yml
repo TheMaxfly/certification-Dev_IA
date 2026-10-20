@@ -79,7 +79,7 @@ jobs:
             if [ "$tout" = 1 ]; then echo "Tous les modules ($EVENEMENT)."; fi
             echo "Modules concernés : \`$modules\`"
             echo
-            echo "<details><summary>$(grep -c . <<<"$fichiers" || true) fichier(s) changé(s)</summary>"
+            echo "<details><summary>$(sed '/^$/d' <<<"$fichiers" | wc -l) fichier(s) changé(s)</summary>"
             echo
             printf '%s\n' "$fichiers" | sed '/^$/d; s/^/- /'
             echo "</details>"

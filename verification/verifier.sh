@@ -15,6 +15,11 @@
 #   verifier.sh perimetre           lit des chemins changés sur l'entrée, écrit les
 #                                   modules concernés (liste JSON) : pour GitHub
 #   verifier.sh graphe              contrôle que MODULES et le graphe se correspondent
+#   verifier.sh coherence           MODULES, le graphe, la matrice de verify.yml et les
+#                                   modules à base jetable se correspondent ; REGLES=1
+#                                   (poste) : les contrôles obligatoires de l'ensemble
+#                                   de règles de GitHub aussi, relevés par gh
+#   verifier.sh equivalence         l'étape d'équivalence du service (poste) seule
 #   verifier.sh preparer MODULE     uv sync --locked de ce module (et de database/
 #                                   s'il en dépend) : l'étape d'avant verify sur GitHub
 #   verifier.sh image               tire, par empreinte, l'image PostgreSQL que les
@@ -36,13 +41,18 @@
 set -uo pipefail
 export LC_ALL=C
 
-RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# VERIFY_RACINE, VERIFY_MODULES, VERIFY_WORKFLOW : pour les essais du moteur
+# (verification/tester_verifier.sh), sur un dépôt jetable et des modules factices.
+RACINE="${VERIFY_RACINE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SORTIES="${VERIFY_SORTIES:-$RACINE/.verify}"
 SAUTS="${VERIFY_SAUTS:-$RACINE/verification/sauts_attendus.tsv}"
 GRAPHE="${VERIFY_GRAPHE:-$RACINE/verification/dependances.tsv}"
 # Verdict du dernier `make verify` complet : l'arbre vérifié, s'il était propre et vert.
 VERDICT="$SORTIES/verdict_complet"
 COUVERTURE="$RACINE/verification/couverture.ini"
+WORKFLOW="${VERIFY_WORKFLOW:-$RACINE/.github/workflows/verify.yml}"
+# L'ensemble de règles qui protège `main` et `develop` (contrôles obligatoires).
+ENSEMBLE_REGLES=24783901
 
 # Outils lancés par uvx, à version fixée (absents des verrous des modules).
 # Ruff : la version du pre-commit, lue à sa source pour ne jamais en diverger.
@@ -69,6 +79,7 @@ MODULES=(
   # essais des hooks et du périmètre (voir verifier_statique).
   "statique|||statique||||"
 )
+if [ -n "${VERIFY_MODULES:-}" ]; then mapfile -t MODULES <"$VERIFY_MODULES"; fi
 
 RESUME=()      # une ligne par module traité
 ECHEC=""       # premier échec : module, commande
@@ -244,13 +255,14 @@ verifier_module() {
           | grep -o '[0-9.]*' | awk '{ printf "%.0f %%", $1 * 100 }')
       fi
     fi
-    if [ "$rc" -ne 0 ] || { [ "$echecs" != - ] && [ "$echecs" -gt 0 ]; }; then
-      RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
-      echouer "$nom" "tests (code $rc)" "(${projet}/) ${cmd[*]}"
-    fi
+    # Avant le code de sortie : pytest et unittest rendent 5 quand rien n'a tourné.
     if [ "$total" -eq 0 ]; then
       RESUME+=("$nom|$ruff|$format|0|0|$plafond|0|$((SECONDS - debut))|-|ÉCHEC")
       echouer "$nom" "aucun test collecté" "(${projet}/) ${cmd[*]}"
+    fi
+    if [ "$rc" -ne 0 ] || { [ "$echecs" != - ] && [ "$echecs" -gt 0 ]; }; then
+      RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
+      echouer "$nom" "tests (code $rc)" "(${projet}/) ${cmd[*]}"
     fi
     if [ "$sautes" != - ] && [ "$sautes" -gt "$plafond" ]; then
       RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
@@ -305,13 +317,17 @@ verifier_statique() {
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \
     shellcheck -x -P .githooks .githooks/pre-commit .githooks/pre-push .githooks/cles-fournisseurs \
     .githooks/controler-texte \
-    verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh
+    verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh \
+    verification/tester_verifier.sh verification/controler_workflows.sh
   # tester.sh : ses `eval '…'` sont voulus (SC2016), et ses variables ne servent que
   # dans ces chaînes (SC2034).
   controle "shellcheck de tester.sh" uvx --from "shellcheck-py==$SHELLCHECK" \
     shellcheck -e SC2016,SC2034 .githooks/tester.sh
   controle "essais des hooks" bash .githooks/tester.sh
   controle "essais du périmètre" bash verification/tester_perimetre.sh
+  controle "cohérence MODULES, graphe, matrice" bash verification/verifier.sh coherence
+  controle "règles des workflows" bash verification/controler_workflows.sh
+  controle "essais du moteur de vérification" bash verification/tester_verifier.sh
   RESUME+=("$nom|ok|ok|$controles|0|0|0|$((SECONDS - debut))|-|ok")
 }
 
@@ -343,6 +359,55 @@ graphe() {  # MODULES et le graphe se correspondent, un pour un
     printf '%s\n' "${MODULES[@]%%|*}" | grep -qxF -- "$n" ||
       { echo "graphe : $n n'est pas un module de MODULES (verifier.sh)" >&2; ecarts=$((ecarts + 1)); }
   done <<<"$noms"
+  [ "$ecarts" -eq 0 ]
+}
+
+# MODULES, le graphe, la matrice de verify.yml et les modules à base jetable (ceux dont
+# les tests chargent le harnais, et dont GitHub tire l'image) se correspondent. REGLES=1
+# (poste) : les contrôles obligatoires de l'ensemble de règles aussi — un module neuf y
+# entre dans la même étape —, et l'ensemble est actif, sans exemption.
+coherence() {
+  local ecarts=0 attendus matrice jetables declares l n projet exiges regles
+  graphe || ecarts=$((ecarts + 1))
+  attendus="$(printf '%s\n' "${MODULES[@]%%|*}" | grep -vx statique | sort)"
+  matrice="$(sed -nE 's/^[[:space:]]*module:[[:space:]]*\[(.*)\][[:space:]]*$/\1/p' "$WORKFLOW" |
+    tr -d '" ' | tr ',' '\n' | sed '/^$/d' | sort)"
+  if [ "$attendus" != "$matrice" ]; then
+    echo "cohérence : la matrice de ${WORKFLOW#"$RACINE"/} ≠ MODULES :" \
+      "$(diff <(echo "$attendus") <(echo "$matrice") | grep '^[<>]' | paste -sd' ')" >&2
+    ecarts=$((ecarts + 1))
+  fi
+  grep -qE '^  statique:' "$WORKFLOW" ||
+    { echo "cohérence : pas de tâche statique dans ${WORKFLOW#"$RACINE"/}" >&2; ecarts=$((ecarts + 1)); }
+  jetables="$(for l in "${MODULES[@]}"; do
+      IFS='|' read -r n _ projet _ <<<"$l"
+      [ -n "$projet" ] && grep -qs harnais_tests "$RACINE/$projet/tests/conftest.py" && echo "$n"
+    done | sort)"
+  declares="$(sed -nE "s/^[[:space:]]*MODULES_BASE_JETABLE:[[:space:]]*'(.*)'.*/\1/p" "$WORKFLOW" |
+    tr -d '"[] ' | tr ',' '\n' | sed '/^$/d' | sort)"
+  if [ "$jetables" != "$declares" ]; then
+    echo "cohérence : modules à base jetable [$(paste -sd' ' <<<"$jetables")] ≠" \
+      "MODULES_BASE_JETABLE [$(paste -sd' ' <<<"$declares")]" >&2
+    ecarts=$((ecarts + 1))
+  fi
+  if [ "${REGLES:-}" = 1 ]; then
+    exiges="$( { while IFS= read -r n; do echo "verify $n"; done <<<"$attendus"; echo statique; } | sort)"
+    if ! regles="$(cd "$RACINE" && gh api "repos/{owner}/{repo}/rulesets/$ENSEMBLE_REGLES" --jq \
+        '[.enforcement, (.bypass_actors | length | tostring)] + [.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | .[]')"; then
+      echo "cohérence : ensemble de règles $ENSEMBLE_REGLES illisible (gh)" >&2
+      ecarts=$((ecarts + 1))
+    else
+      [ "$(sed -n 1p <<<"$regles")" = active ] ||
+        { echo "cohérence : ensemble de règles $ENSEMBLE_REGLES inactif" >&2; ecarts=$((ecarts + 1)); }
+      [ "$(sed -n 2p <<<"$regles")" = 0 ] ||
+        { echo "cohérence : ensemble de règles $ENSEMBLE_REGLES avec exemption" >&2; ecarts=$((ecarts + 1)); }
+      if [ "$(sed '1,2d' <<<"$regles" | sort)" != "$exiges" ]; then
+        echo "cohérence : contrôles obligatoires ≠ tâches de verify.yml :" \
+          "$(diff <(echo "$exiges") <(sed '1,2d' <<<"$regles" | sort) | grep '^[<>]' | paste -sd' ')" >&2
+        ecarts=$((ecarts + 1))
+      fi
+    fi
+  fi
   [ "$ecarts" -eq 0 ]
 }
 
@@ -569,14 +634,13 @@ preparer() {
 
 # Le test d'équivalence du service (E3, étape 1, bloc F) : l'instance EmbeddingGemma
 # réencode les échantillons exportés (09_…/mesures/equivalence/, hors dépôt) et les
-# compare à leurs encodages. Sans échantillon, l'étape est sautée et le dit. Une
-# seule instance à la fois : refus si une instance tourne déjà.
+# compare à leurs encodages. Une vérification qui ne tourne pas est un échec : sans
+# échantillon, refus. Une seule instance à la fois : refus si une instance tourne déjà.
 equivalence_du_service() {
   local module="$RACINE/09_service_embedding" rc
-  if ! compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null; then
-    dire "poste — équivalence du service : aucun échantillon exporté, étape sautée"
-    return 0
-  fi
+  compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null ||
+    echouer poste "équivalence du service : aucun échantillon exporté" \
+      "(09_service_embedding/) uv run python -m service_embedding.equivalence exporter --encodage <n>"
   if docker ps --format '{{.Names}}' | grep -q '^tei-'; then
     echouer poste "équivalence du service" "une instance du service tourne déjà"
   fi
@@ -629,7 +693,9 @@ poste() {
   dire "poste — ${cmd[*]}"
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
   equivalence_du_service
-  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service passés"
+  dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
+  REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
+  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service, ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #
@@ -637,14 +703,20 @@ poste() {
 mkdir -p "$SORTIES"
 action="${1:-verify}"; shift || true
 case $action in
-  verify|poste)
+  verify|poste|equivalence)
     volumes_debut
     trap terminer EXIT
-    if [ "$action" = verify ]; then verify "${1:-}"; else poste; fi ;;
+    case $action in
+      verify) verify "${1:-}" ;;
+      poste) poste ;;
+      equivalence) equivalence_du_service ;;
+    esac ;;
+  coherence) coherence && echo "cohérence : MODULES, graphe, matrice et modules à base jetable" \
+    "se correspondent${REGLES:+, ensemble de règles compris}" ;;
   indicatif) indicatif "${1:-}" ;;
   preparer) preparer "${1:?Usage : $0 preparer MODULE}" ;;
   image) image ;;
   perimetre) perimetre ;;
   graphe) graphe && echo "graphe : ${#MODULES[@]} modules, tous dans ${GRAPHE#"$RACINE"/}, et eux seuls" ;;
-  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste | preparer MODULE | image | perimetre | graphe" >&2; exit 2 ;;
+  *) echo "Usage : $0 verify [MODULE] | indicatif [MODULE] | poste | equivalence | preparer MODULE | image | perimetre | graphe | coherence" >&2; exit 2 ;;
 esac
