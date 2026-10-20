@@ -12,9 +12,10 @@
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make verify-poste        la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
-#                            harnais du poste seul : fidélité du schéma, état
-#                            d'apimanga en lecture seule, équivalence du service
-#                            d'embedding, ensemble de règles de GitHub
+#                            harnais du poste seul : fidélité du schéma, équivalence du
+#                            service d'embedding et de l'API du modèle, état d'apimanga
+#                            en lecture seule (pseudonymes des passages rendus compris),
+#                            ensemble de règles de GitHub
 #   make verify-mutations    les mutations versionnées (verification/mutations/),
 #                            rejouées dans un arbre jetable : chacune doit faire
 #                            rougir son test (poste, avant une demande vers main ;

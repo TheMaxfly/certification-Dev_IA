@@ -1,0 +1,7 @@
+id = "API-17"
+origine = "E3 étape 2, suite de 03 (décision de Max, 2026-10-20) — une occurrence de pseudonyme dans un passage rendu par l'API n'est admise que si le couple (document, pseudonyme) est connu, et non le document seul"
+fichier = "verification/pseudonymes_passages.py"
+avant = '''        if (doc_key, h) not in admis'''
+apres = '''        if doc_key not in {d for d, _ in admis}'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_pseudonymes_passages.py"]

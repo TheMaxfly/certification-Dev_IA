@@ -385,6 +385,8 @@ verifier_statique() {
     --check --no-cache 06_benchmark_embeddings_llm docs/modeles verification
   controle "mutations versionnées : lisibles, texte visé présent une fois" \
     uv run --no-project python -I verification/rejouer_mutations.py --controler
+  controle "essais du contrôle des pseudonymes des passages de l'API" \
+    uv run --no-project python -I verification/tester_pseudonymes_passages.py
   controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \
@@ -740,6 +742,9 @@ equivalence_du_service() {
   if docker ps --format '{{.Names}}' | grep -q '^tei-'; then
     echouer poste "équivalence du service" "une instance du service tourne déjà"
   fi
+  # Le bilan d'un passage précédent ne doit pas survivre : l'état d'apimanga relit les
+  # passages de CE passage-ci.
+  rm -f "$SORTIES/poste/egalite_api.json"
   (cd "$module" && "${PROPRE[@]}" uv run --locked python -m service_embedding.controles etat) ||
     echouer poste "équivalence du service" "mémoire sous les seuils"
   (cd "$api" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire) ||
@@ -805,14 +810,16 @@ poste() {
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
-  # La seule étape qui lit la base réelle : sous verif_ro, en lecture seule.
+  # L'équivalence d'abord : l'état d'apimanga relit les passages que l'API y a rendus.
+  equivalence_du_service
+  # L'état de la base réelle, sous verif_ro, en lecture seule ; il confirme aussi que
+  # l'équivalence n'a rien changé.
   cmd=(bash verification/etat_apimanga.sh)
   dire "poste — ${cmd[*]}"
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
-  equivalence_du_service
   dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
   REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
-  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service et de l'API, ensemble de règles passés"
+  dire "poste — harnais : fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages compris), ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #

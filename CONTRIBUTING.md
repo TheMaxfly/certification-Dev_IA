@@ -28,7 +28,7 @@ commande sur le poste et sur GitHub.
 | `make verify TOUT=1` | tous les modules |
 | `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `11`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
+| `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
   vidé. **Jamais de DSN réel pour les tests, sauf deux étapes de `verify-poste`, en
@@ -44,8 +44,10 @@ commande sur le poste et sur GitHub.
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
   `verification/` et de `sauvegarde/`, les essais des hooks (`tester.sh`), du
   périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
-  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…)
-  et de la sauvegarde (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
+  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
+  du contrôle des pseudonymes des passages de l'API
+  (`verification/tester_pseudonymes_passages.py`) et de la sauvegarde
+  (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
   graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
   exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
@@ -102,6 +104,14 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   service ; les migrations appliquées, égales aux fichiers. Puis le contrôle du module
   09, et les tests qui ne peuvent tourner que sur la base réelle (05, 08, `demo`) :
   ils doivent passer, aucun ne doit sauter.
+- **Les pseudonymes des passages rendus par l'API du modèle** : l'étape d'équivalence,
+  jouée juste avant, écrit les identifiants des fragments que l'API a rendus ;
+  `verification/pseudonymes_passages.py` relit leur texte et y cherche les
+  pseudonymes, par la méthode du corpus v2. Hors des occurrences connues
+  (`database/donnees/corpus_references_masquees.csv`, `corpus_homonymes_admis.csv`),
+  aucune n'est admise ; un témoin retrouve d'abord chaque référence connue dans son
+  document. Sans passages rendus, refus. La sortie ne porte que des nombres, des
+  identifiants et des empreintes.
 - **Une mesure, une promotion ou une migration change l'état** : relever la référence
   (`bash verification/etat_apimanga.sh --relever`) et la commiter avec ce qui l'a
   changée.

@@ -15,7 +15,9 @@ CONTRIBUTING.md : sous `modele_api`, en lecture seule), qui pose
 alors une condition manquante est un échec, jamais un saut.
 
 Le jeu n'est lu que par ce test, depuis ses fichiers versionnés, empreinte vérifiée ;
-aucun réglage n'en dépend. Les sorties ne portent que des identifiants et des nombres.
+aucun réglage n'en dépend. Les sorties ne portent que des identifiants et des nombres :
+parmi eux, les fragments de chaque passage rendu, que l'étape « état d'apimanga »
+relit sous `verif_ro` pour y chercher les pseudonymes (règle 3.1 de l'étape 1).
 """
 
 from __future__ import annotations
@@ -97,6 +99,7 @@ def test_egalite_avec_le_banc_sur_les_69_questions():
     durees_ms: list[float] = []
     ecart_score = 0.0
     hors_catalogue_differents = 0
+    fragments_rendus: set[int] = set()
     with TestClient(creer_application(reglages)) as api:
         info = api.get("/v1/info", headers=entetes).json()
         if (info["encodage_id"], info["corpus_id"]) != (3, "v2"):
@@ -112,6 +115,9 @@ def test_egalite_avec_le_banc_sur_les_69_questions():
             durees_ms.append((time.perf_counter() - debut) * 1000)
             assert r.status_code == 200, (qid, r.json()["code"])
             series = r.json()["series"]
+            fragments_rendus.update(
+                p["fragment_id"] for s in series for p in s["passages"]
+            )
             obtenu = [s["entite"] for s in series]
             if obtenu != attendus[qid]:
                 differentes.append(qid)
@@ -125,7 +131,11 @@ def test_egalite_avec_le_banc_sur_les_69_questions():
                 headers=entetes,
             )
             assert toutes.status_code == 200, (qid, toutes.json()["code"])
-            if [s["entite"] for s in toutes.json()["series"]] != obtenu:
+            series_toutes = toutes.json()["series"]
+            fragments_rendus.update(
+                p["fragment_id"] for s in series_toutes for p in s["passages"]
+            )
+            if [s["entite"] for s in series_toutes] != obtenu:
                 hors_catalogue_differents += 1
         pic = memoire.pic_octets()
 
@@ -140,11 +150,16 @@ def test_egalite_avec_le_banc_sur_les_69_questions():
         "duree_ms_p95": round(statistics.quantiles(durees_ms, n=20)[18], 1),
         "memoire_residente_apres_demarrage_octets": rss_apres_demarrage,
         "memoire_pic_octets": pic,
+        "passages": {
+            "corpus_id": info["corpus_id"],
+            "encodage_id": info["encodage_id"],
+            "fragments": sorted(fragments_rendus),
+        },
     }
     sortie = os.environ.get("API_MODELE_EGALITE_SORTIE")
     if sortie:
         Path(sortie).write_text(json.dumps(bilan, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(bilan))
+    print(json.dumps({k: v for k, v in bilan.items() if k != "passages"}))
 
     assert differentes == [], f"{len(differentes)} question(s) : {differentes}"
     assert hors_catalogue_differents >= 1
