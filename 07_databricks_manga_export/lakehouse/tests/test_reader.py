@@ -20,7 +20,9 @@ def _par_spark(spark, table, colonnes, filtre=None):
 
 
 def test_lecteur_lit_ce_que_gold_ecrit(spark, gold_fabrique):
-    s = reader.synthese()  # ouvre sa propre connexion DuckDB
+    # Seuil 1 : la fixture n'a aucun préfixe à 5 disparues, et deux listes vides
+    # égales ne prouveraient rien. La connexion DuckDB est celle du lecteur.
+    s = reader.synthese(seuil_disparues=1)
 
     # (snapshot_date, grain) est unique : le tri ne compare jamais les colonnes
     # suivantes, qui peuvent être nulles.
@@ -52,9 +54,11 @@ def test_lecteur_lit_ce_que_gold_ecrit(spark, gold_fabrique):
         ["snapshot_date", "total_volumes", "renseignes", "cle_valide"],
     )
 
-    assert sorted(tuple(r) for r in s["deficits_prefixe"]) == _par_spark(
+    deficits = sorted(tuple(r) for r in s["deficits_prefixe"])
+    assert deficits, "aucun préfixe à une disparue : le test ne prouverait rien"
+    assert deficits == _par_spark(
         spark,
         "gold.completude_par_prefixe",
         ["prefixe", "snapshot_date", "delta_abs", "disparues", "nouvelles"],
-        "disparues >= 5",
+        "disparues >= 1",
     )
