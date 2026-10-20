@@ -146,6 +146,48 @@ def test_par_defaut_l_encodage_en_service(banc, encodeur_doublure):
     assert (r["corpus_id"], r["encodage_id"], tete(r, "Q001")) == ("v2", e2, "serie:1")
 
 
+def test_l_encodage_en_service_d_un_autre_corpus_arrete_la_mesure(
+    banc, encodeur_doublure
+):
+    """La mesure lit le v2 (`--corpus v2`), l'encodage en service est celui du v1 :
+    la mesure par le sens s'arrête — désigner l'encodage ; la lexicale, elle, lit le
+    v2 sans vecteurs."""
+    dsn, config, _ = banc
+    ajouter_v2(dsn)
+    e1 = encodage_v1(dsn)
+    with psycopg.connect(dsn) as cx:
+        cx.execute(
+            "INSERT INTO bench.promotions (decision, encodage_id, motif, decide_par)"
+            " VALUES ('promu', %s, 'essai', 'essai')",
+            (e1,),
+        )
+    ctx = executer.ouvrir(dsn, config, corpus_id="v2")
+    assert executer.mesurer(ctx, 3)["corpus_id"] == "v2"
+    with pytest.raises(RuntimeError, match=f"encodage {e1} : corpus v1, la mesure lit"):
+        executer.mesurer(ctx, 1)
+
+
+def test_un_encodage_d_un_autre_modele_ou_non_termine_refuse(banc):
+    dsn, _, _ = banc
+    e1 = encodage_v1(dsn)
+    with psycopg.connect(dsn) as cx:
+        with pytest.raises(RuntimeError, match="la mesure attend google/"):
+            executer.encodage_designe(cx, "google/embeddinggemma-300m", e1)
+        (en_cours,) = cx.execute(
+            "INSERT INTO bench.encodages (modele, revision, dimension,"
+            " precision_calcul, prefixe_document, prefixe_requete, outil,"
+            " outil_version, image, image_digest, taille_lot) SELECT modele, %s,"
+            " dimension, precision_calcul, prefixe_document, prefixe_requete, outil,"
+            " outil_version, image, image_digest, taille_lot FROM bench.encodages"
+            " WHERE encodage_id = %s RETURNING encodage_id",
+            ("d" * 40, e1),
+        ).fetchone()
+        with pytest.raises(RuntimeError, match=f"encodage {en_cours} : non terminé"):
+            executer.encodage_designe(cx, "BAAI/bge-m3", en_cours)
+        # Sans désignation, un encodage en cours n'est jamais choisi.
+        assert executer.encodage_designe(cx, "BAAI/bge-m3")["encodage_id"] == e1
+
+
 # --------------------------------------------------------------------------- #
 #  Le service confronté au registre
 # --------------------------------------------------------------------------- #
@@ -203,6 +245,25 @@ def test_un_service_conforme_au_registre_est_admis(service_simule):
     d = executer.Designation("embeddinggemma", service_simule)
     _, params = executer.encodeur_du_service(d)
     assert params["service_revision"] == service_simule["revision"]
+
+
+def test_l_encodeur_rendu_encode_la_question_au_role_requete(
+    service_simule, monkeypatch
+):
+    """Une question, un appel au service, rôle « requete » : son vecteur."""
+    from service_embedding.client import ClientService
+
+    recus = []
+
+    def encoder(self, textes, role):
+        recus.append((list(textes), role))
+        return [[0.6, 0.8]]
+
+    monkeypatch.setattr(ClientService, "encoder", encoder)
+    d = executer.Designation("embeddinggemma", service_simule)
+    encoder_question, _ = executer.encodeur_du_service(d)
+    assert encoder_question("un manga de pirates") == [0.6, 0.8]
+    assert recus == [(["un manga de pirates"], "requete")]
 
 
 def test_un_ecart_avec_le_registre_arrete(service_simule):

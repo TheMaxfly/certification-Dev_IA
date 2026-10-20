@@ -10,12 +10,15 @@ Le banc et la doublure sont dans `conftest.py`.
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import subprocess
 
+import numpy as np
 import psycopg
 import pytest
 
-from mesures_recherche import diagnostic, executer, jeu, recherche
+from mesures_recherche import configuration, diagnostic, executer, jeu, recherche
 
 
 def questions(resultat):
@@ -177,6 +180,54 @@ def test_un_arbre_sale_refuse_l_enregistrement(
     assert mlflow.get_experiment_by_name("essai_arbre_sale") is None
     with psycopg.connect(dsn) as cx:
         assert cx.execute("SELECT count(*) FROM bench.eval_runs").fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    "statut, propre", [("", "True"), (" M 10_mesures_recherche/src/x.py\n", "False")]
+)
+def test_etat_git_commit_et_proprete_du_seul_arbre_du_module(
+    statut, propre, monkeypatch
+):
+    """`etat_git` demande à git, depuis la racine du dépôt, le commit et l'état du
+    SEUL dossier du module — ici une doublure de git, qui répond comme lui."""
+    from mesures_recherche import enregistrement
+
+    appels = []
+
+    def git(commande, **options):
+        appels.append((commande, options["cwd"]))
+        sortie = {"status": statut, "rev-parse": "f" * 40 + "\n"}[commande[1]]
+        return subprocess.CompletedProcess(commande, 0, stdout=sortie, stderr="")
+
+    monkeypatch.setattr(enregistrement.subprocess, "run", git)
+    etat = enregistrement.etat_git()
+    assert etat == {"commit": "f" * 40, "arbre_module_propre": propre}
+    module = str(configuration.RACINE_MODULE)
+    assert appels == [
+        (["git", "status", "--porcelain", "--", module], configuration.RACINE_DEPOT),
+        (["git", "rev-parse", "HEAD"], configuration.RACINE_DEPOT),
+    ]
+    if propre == "True":
+        assert enregistrement.exiger_arbre_propre() == etat
+    else:
+        with pytest.raises(enregistrement.EnregistrementRefuse, match="f" * 12):
+            enregistrement.exiger_arbre_propre()
+
+
+def test_un_type_de_mesure_inconnu_arrete():
+    config = copy.deepcopy(configuration.charger())
+    config["mesures"].append({"numero": 104, "nom": "essai", "type": "oracle"})
+    ctx = executer.Contexte(None, config, [], None, "")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="type de mesure inconnu : oracle"):
+        executer.configuration_de(ctx, 104)
+    assert 104 not in ctx.caches
+
+
+def test_resultat_en_json_les_nombres_numpy_seulement():
+    assert executer._json(np.float32(0.5)) == 0.5
+    assert executer._json(np.int64(7)) == 7
+    with pytest.raises(TypeError):
+        executer._json(object())
 
 
 # --------------------------------------------------------------------------- #

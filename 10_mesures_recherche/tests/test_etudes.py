@@ -84,6 +84,24 @@ def test_resume_moyenne_et_etendue_par_valeur_sans_classement():
     assert "classement" not in r and "meilleur" not in str(r)
 
 
+def test_valeur_d_un_agregat_absent_rien():
+    agregats = [agregat("global", "hit_rate", 10, 0.5)]
+    assert etudes.valeur(agregats, "global", "hit_rate@10") == 0.5
+    assert etudes.valeur(agregats, "global", "ndcg@10") is None
+    assert etudes.valeur(agregats, "famille:F4", "hit_rate@10") is None
+
+
+def test_la_garde_lit_la_memoire_par_le_service(monkeypatch):
+    """Mémoire vive disponible et pages de swap écrites : lues par les relevés du
+    service d'embedding (`/proc`), ici des doublures."""
+    from service_embedding import mesures
+
+    monkeypatch.setattr(mesures, "meminfo", lambda: {"MemAvailable": 6 * 10**9})
+    monkeypatch.setattr(mesures, "pages_swap_ecrites", lambda: 42)
+    assert etudes.ram_disponible() == 6 * 10**9
+    assert etudes.pages_swap_ecrites() == 42
+
+
 ATTENDRE = [sys.executable, "-c", "import time; time.sleep(30)"]
 
 

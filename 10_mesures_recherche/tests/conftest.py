@@ -9,7 +9,10 @@ base — jamais de repli sur `apimanga`.
 from __future__ import annotations
 
 import copy
+import importlib
 import importlib.util
+import inspect
+import pkgutil
 import shutil
 import sys
 from pathlib import Path
@@ -18,7 +21,8 @@ import numpy as np
 import psycopg
 import pytest
 
-from mesures_recherche import configuration, executer, jeu
+import mesures_recherche
+from mesures_recherche import configuration, enregistrement, executer, jeu
 
 RACINE_DEPOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = RACINE_DEPOT / "database"
@@ -211,3 +215,71 @@ def stockage_mlflow(gabarit_mlflow, tmp_path) -> Path:
     dossier.mkdir()
     shutil.copyfile(gabarit_mlflow, dossier / "mlflow.db")
     return dossier
+
+
+# --------------------------------------------------------------------------- #
+#  Les commandes (`main`) : ce qu'elles prennent par défaut, remplacé
+# --------------------------------------------------------------------------- #
+
+#: L'état git que relève l'enregistrement, dans les tests des commandes : un arbre
+#: propre, à un commit fixé — le test ne dépend pas de l'état du dépôt où il tourne.
+ARBRE_PROPRE = {"commit": "c" * 40, "arbre_module_propre": "True"}
+
+
+def modules_du_paquet() -> list:
+    """Tous les modules de `mesures_recherche`, importés."""
+    return [
+        importlib.import_module(f"mesures_recherche.{m.name}")
+        for m in pkgutil.iter_modules(mesures_recherche.__path__)
+    ]
+
+
+@pytest.fixture
+def magasin_par_defaut(stockage_mlflow, monkeypatch) -> Path:
+    """Le magasin MLflow du test, à la place de celui du module (`mlflow/`), partout où
+    une commande le prend par défaut : la constante `STOCKAGE` de chaque module, et
+    les valeurs par défaut des fonctions, figées à leur définition (`uri_suivi()`,
+    `enregistrer`, `promotion.comparer`, `journal_promotions.decider`…). Une commande
+    lancée dans le test n'écrit ni ne lit jamais le magasin du module."""
+    reel = enregistrement.STOCKAGE
+
+    def remplacer(valeur):
+        return stockage_mlflow if valeur == reel else valeur
+
+    for module in modules_du_paquet():
+        if getattr(module, "STOCKAGE", None) == reel:
+            monkeypatch.setattr(module, "STOCKAGE", stockage_mlflow)
+        for f in vars(module).values():
+            if not inspect.isfunction(f) or f.__module__ != module.__name__:
+                continue
+            if f.__defaults__ and reel in f.__defaults__:
+                monkeypatch.setattr(
+                    f, "__defaults__", tuple(map(remplacer, f.__defaults__))
+                )
+            if f.__kwdefaults__ and reel in f.__kwdefaults__.values():
+                monkeypatch.setattr(
+                    f,
+                    "__kwdefaults__",
+                    {k: remplacer(v) for k, v in f.__kwdefaults__.items()},
+                )
+    return stockage_mlflow
+
+
+@pytest.fixture
+def arbre_propre(monkeypatch) -> dict[str, str]:
+    """L'état git relevé par l'enregistrement : `ARBRE_PROPRE`."""
+    monkeypatch.setattr(enregistrement, "etat_git", lambda: dict(ARBRE_PROPRE))
+    return ARBRE_PROPRE
+
+
+@pytest.fixture
+def commande(banc, magasin_par_defaut, arbre_propre, monkeypatch):
+    """Ce que voit une commande (`main`) lancée dans le test : DATABASE_URL = la base
+    jetable, la configuration du mini-jeu à la place de la versionnée, le magasin
+    MLflow du test, un arbre propre. Rend (dsn, config, magasin)."""
+    dsn, config, _ = banc
+    monkeypatch.setenv("DATABASE_URL", dsn)
+    monkeypatch.setattr(
+        configuration, "charger", lambda chemin=None: copy.deepcopy(config)
+    )
+    return dsn, config, magasin_par_defaut

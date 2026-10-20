@@ -103,6 +103,29 @@ def test_revenir_vers_un_encodage_jamais_servi_est_refuse_par_la_base(cas):
     assert vue(dsn) != e2
 
 
+def test_revenir_sans_encodage_en_service_est_refuse(banc):
+    """Une base où rien n'a encore été promu : rien à défaire, rien d'écrit."""
+    dsn, _, _ = banc
+    with pytest.raises(DecisionRefusee, match="aucun encodage en service"):
+        journal_promotions.revenir(dsn, motif="essai", par="Max")
+    with psycopg.connect(dsn) as cx:
+        assert cx.execute("SELECT count(*) FROM bench.promotions").fetchone()[0] == 0
+
+
+def test_seules_promouvoir_et_refuser_sont_des_decisions():
+    """Le retour arrière a sa commande (`revenir`) : `decider` le refuse, avant
+    toute lecture."""
+    with pytest.raises(ValueError, match="retour_arriere"):
+        journal_promotions.decider(
+            "base-jamais-lue",
+            decision="retour_arriere",
+            encodage_id=1,
+            run_id="0" * 32,
+            motif="essai",
+            par="Max",
+        )
+
+
 def test_une_decision_contraire_a_la_regle_exige_la_derogation(cas):
     dsn, stockage, regle, _, nouveau, e1, e2 = cas
     refus = {

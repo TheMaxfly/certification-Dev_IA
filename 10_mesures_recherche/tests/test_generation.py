@@ -254,6 +254,14 @@ def test_client_ollama_keep_alive_options_dechargement(ollama_doublure):
     assert Serveur.recus[-1] == ("/api/generate", {"model": "m", "keep_alive": 0})
     assert o.charge() == {"taille": 5, "taille_memoire_video": 5, "contexte": 8192}
     assert o.description()["modele_digest"] == "abc"
+    assert "format" not in corps, "sans schéma, la réponse est libre"
+
+
+def test_client_ollama_reponse_contrainte_par_un_schema(ollama_doublure):
+    schema = {"type": "object", "properties": {"mode": {"type": "string"}}}
+    ollama_doublure.discuter([{"role": "user", "content": "x"}], {}, schema)
+    chemin, corps = Serveur.recus[-1]
+    assert chemin == "/api/chat" and corps["format"] == schema
 
 
 def test_enregistrement_un_run_par_configuration_et_les_traces(
