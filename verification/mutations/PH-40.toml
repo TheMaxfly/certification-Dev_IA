@@ -1,0 +1,7 @@
+id = "PH-40"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : la phrase secrète en variable est admise"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''  [ -z "${PASSPHRASE:-}" ] && [ -z "${SIGN_PASSPHRASE:-}" ] ||'''
+apres = '''  true ||'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]

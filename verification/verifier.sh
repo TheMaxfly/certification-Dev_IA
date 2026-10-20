@@ -320,7 +320,8 @@ verifier_statique() {
     shellcheck -x -P .githooks .githooks/pre-commit .githooks/pre-push .githooks/cles-fournisseurs \
     .githooks/controler-texte \
     verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh \
-    verification/tester_verifier.sh verification/controler_workflows.sh
+    verification/tester_verifier.sh verification/controler_workflows.sh \
+    sauvegarde/sauvegarder.sh sauvegarde/tester_sauvegarde.sh
   # tester.sh : ses `eval '…'` sont voulus (SC2016), et ses variables ne servent que
   # dans ces chaînes (SC2034).
   controle "shellcheck de tester.sh" uvx --from "shellcheck-py==$SHELLCHECK" \
@@ -330,6 +331,7 @@ verifier_statique() {
   controle "cohérence MODULES, graphe, matrice" bash verification/verifier.sh coherence
   controle "règles des workflows" bash verification/controler_workflows.sh
   controle "essais du moteur de vérification" bash verification/tester_verifier.sh
+  controle "essais de la sauvegarde" bash sauvegarde/tester_sauvegarde.sh
   RESUME+=("$nom|ok|ok|$controles|0|0|0|$((SECONDS - debut))|-|ok")
 }
 

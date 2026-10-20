@@ -34,11 +34,11 @@ commande sur le poste et sur GitHub.
   vidé. **Jamais de DSN réel pour les tests, sauf l'étape « état d'`apimanga` » de
   `verify-poste`, en lecture seule sous `verif_ro`** (plus bas).
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
-  `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/` et de
-  `verification/`, les essais des hooks (`tester.sh`), du périmètre
-  (`verification/tester_perimetre.sh`) et du moteur de vérification
-  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
-  la cohérence `MODULES` ↔
+  `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
+  `verification/` et de `sauvegarde/`, les essais des hooks (`tester.sh`), du
+  périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
+  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…)
+  et de la sauvegarde (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
   graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
   exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
@@ -66,6 +66,19 @@ passage témoin sans mutation où la commande doit passer sans test sauté. La t
 `statique` contrôle, à chaque vérification, que chaque mutation se lit et vise un
 texte toujours présent une fois : un code qui bouge sans sa mutation se voit tout
 de suite. Une mutation écrite pour un correctif s'ajoute dans le même commit.
+
+### La sauvegarde
+
+`sauvegarde/sauvegarder.sh` sauvegarde ce qui vit hors du dépôt (bases, magasin
+MLflow, raw, rapports) : préparation locale avec manifeste, envoi chiffré
+(`duplicity`, phrase secrète au clavier, jamais en variable), relecture contre le
+manifeste, essai de restauration dans un PostgreSQL jetable. **Ce qui dépend du poste
+n'est pas dans le dépôt** : la liste des objets et les chemins se lisent dans
+`sauvegarde/.env`, ignoré par git (modèle : `sauvegarde/.env.example`, chemins relatifs
+au dossier personnel). Ses refus — configuration absente ou fautive, échec d'une
+commande, chaîne d'aspect jeton, instance du service en cours, phrase secrète en
+variable — sont éprouvés par `sauvegarde/tester_sauvegarde.sh`, sur une arborescence
+jetable et des doublures de PostgreSQL, Docker et duplicity.
 
 ### L'état d'`apimanga`, en lecture seule
 

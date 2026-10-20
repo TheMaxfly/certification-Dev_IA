@@ -1,0 +1,7 @@
+id = "PH-44"
+origine = "Harnais de tests, bloc D (2026-10-20) — sauvegarde : un échec n'arrête plus la sauvegarde"
+fichier = "sauvegarde/sauvegarder.sh"
+avant = '''set -Eeuo pipefail'''
+apres = '''set -uo pipefail'''
+dossier = "."
+commande = ["bash", "sauvegarde/tester_sauvegarde.sh"]
