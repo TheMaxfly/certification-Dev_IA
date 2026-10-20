@@ -2,10 +2,11 @@
 
     uv run python -m api_modele.memoire   # code 1 si la mémoire ne suffit pas
 
-Au démarrage, le chargement des vecteurs culmine à environ 1,5 Go, puis l'API rend
-au système ce qu'elle a libéré (`malloc_trim`) : environ 0,5 Go résidents. Le seuil
-de l'étape d'équivalence de `verify-poste` est celui du service d'embedding
-(module 09, inchangé) plus ce besoin (`config/reglages.toml`, [memoire]).
+Au démarrage, le chargement des vecteurs culmine à environ 1,5 Go (1,8 Go dans le
+test d'égalité avec le banc), puis l'API rend au système ce qu'elle a libéré
+(`malloc_trim`) : environ 0,5 Go résidents. Le seuil de l'étape d'équivalence de
+`verify-poste` est celui du service d'embedding (module 09, inchangé) plus ce besoin
+(`config/reglages.toml`, [memoire]).
 """
 
 from __future__ import annotations

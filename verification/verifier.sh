@@ -781,7 +781,7 @@ memoire_d_abord() {
   if ! etat="$(cd "$RACINE/11_api_modele" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire)"; then
     printf '%s\n' "$etat"
     echouer poste "mémoire sous le seuil du service et de l'API : rien n'a été lancé" \
-      "libérer de la mémoire (6,6 Go disponibles), puis make verify-poste"
+      "libérer de la mémoire (6,9 Go disponibles), puis make verify-poste"
   fi
   printf '%s\n' "$etat"
 }

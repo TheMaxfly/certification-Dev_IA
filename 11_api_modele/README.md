@@ -37,7 +37,7 @@ Au démarrage, l'API vérifie, et refuse de démarrer au moindre écart :
 - `/info` du service est conforme à cet encodage (`confronter` du module 09) ;
 - la borne de la question tient sous la longueur maximale du service ;
 - le classement du banc se charge : rattachement des fragments et vecteurs de
-  l'encodage en service seulement (77 006 en 17 s, pic de 1,5 Go, puis 0,5 Go
+  l'encodage en service seulement (77 006 en 17 s, pic de 1,5 à 1,8 Go, puis 0,5 Go
   résidents, mesurés le 2026-10-20).
 
 Ce qui est servi est ce qui a été mesuré : `tests/test_egalite_banc.py` rejoue les
