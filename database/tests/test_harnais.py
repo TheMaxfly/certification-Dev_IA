@@ -21,6 +21,7 @@ DEPOT = RACINE.parent
 CONFTESTS = [
     DEPOT / "database" / "tests" / "conftest.py",
     DEPOT / "05_nettoyage_agregation_bdd" / "tests" / "conftest.py",
+    DEPOT / "08_enrichissement_personnages" / "tests" / "conftest.py",
     DEPOT / "09_service_embedding" / "tests" / "conftest.py",
     DEPOT / "10_mesures_recherche" / "tests" / "conftest.py",
 ]

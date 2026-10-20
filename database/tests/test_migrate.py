@@ -1392,3 +1392,31 @@ def test_details_est_interrogeable_par_case(base_migree):
             "WHERE details->>'case' = 'review_k_sans_signal'"
         ).fetchall()
     assert trouve == [(2,)]
+
+
+# --------------------------------------------------------------------------- #
+#  Le SQL livré par 015 — les personnages, multi-sources
+# --------------------------------------------------------------------------- #
+
+
+def test_015_l_unicite_porte_sur_la_source_jamais_sur_le_nom(base_migree):
+    """Deux sources, deux lignes : un personnage Wikipédia coexiste avec son
+    homologue Kitsu, c'est la cascade qui les rapprochera plus tard. Une même
+    source ne porte jamais deux fois le même identifiant."""
+    with psycopg.connect(base_migree) as connexion:
+        (contrainte,) = connexion.execute(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+            "WHERE conname = 'characters_source_id_unique'"
+        ).fetchone()
+        assert contrainte == "UNIQUE (source, source_id)"
+        for source in ("kitsu", "wikipedia_fr"):
+            connexion.execute(
+                "INSERT INTO manga.characters (source, source_id, canonical_name)"
+                " VALUES (%s, '1', 'Monkey D. Luffy')",
+                (source,),
+            )
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            connexion.execute(
+                "INSERT INTO manga.characters (source, source_id, canonical_name)"
+                " VALUES ('kitsu', '1', 'Un autre nom')"
+            )

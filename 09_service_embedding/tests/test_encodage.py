@@ -222,8 +222,12 @@ def test_lot_reduit_a_la_reprise_est_note(base, doublure):
         assert cx.execute("SELECT taille_lot FROM bench.encodages").fetchone() == (1,)
 
 
+@pytest.mark.manuel
 def test_service_reel_bge_m3(base):
-    """Instance BGE-M3 réelle, si elle tourne : trois fragments, bout en bout."""
+    """Instance BGE-M3 réelle : trois fragments, bout en bout.
+
+    Manuel (`pytest -m manuel`, instance levée par `docker compose --profile
+    bge-m3 up -d`) : la vérification ne lance pas BGE-M3, qui occupe la carte."""
     instance = charger("bge-m3")
     client = ClientService(instance)
     if not client.sante():

@@ -23,7 +23,7 @@
 04	04_scraping_manga_sanctuary/
 05	05_nettoyage_agregation_bdd/ 06_benchmark_embeddings_llm/Bench_embedding.py database/
 07	07_databricks_manga_export/
-08	08_enrichissement_personnages/
+08	08_enrichissement_personnages/ database/
 09	09_service_embedding/ database/
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 database	database/

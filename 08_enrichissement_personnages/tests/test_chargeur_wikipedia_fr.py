@@ -2,22 +2,22 @@
 
 Si une deuxième source entre dans les mêmes tables par simple insertion, le
 choix des noms neutres et de la colonne `source` était juste.
-"""
 
-import os
+Les deux sources sont chargées par leurs commandes, sur une base jetable, à partir
+de raws factices (`conftest.py`) : les règles sont éprouvées partout, sans base
+réelle.
+"""
 
 import psycopg
 import pytest
+from conftest import NOM_COMMUN
 
 import chargeur_wikipedia_fr as cw
 
-DSN = os.environ.get("APIMANGA_DSN")
-besoin_base = pytest.mark.skipif(not DSN, reason="APIMANGA_DSN non defini")
-
 
 @pytest.fixture(scope="module")
-def connexion():
-    with psycopg.connect(DSN) as conn:
+def connexion(base_chargee):
+    with psycopg.connect(base_chargee) as conn:
         yield conn
 
 
@@ -50,7 +50,6 @@ class TestArticleEffectif:
         )
 
 
-@besoin_base
 class TestChargement:
     def test_la_langue_est_affirmee_jamais_inferee(self, connexion) -> None:
         """`fr` vient de la provenance, pas d'un classifieur.
@@ -77,6 +76,19 @@ class TestChargement:
             ).fetchall()
         }
         assert licences == {"CC BY-SA"}
+
+    def test_l_attribution_nomme_l_article_d_ou_vient_le_texte(self, connexion) -> None:
+        provenances = {
+            p
+            for (p,) in connexion.execute(
+                "SELECT provenance FROM manga.character_descriptions "
+                "WHERE source = 'wikipedia_fr'"
+            ).fetchall()
+        }
+        assert provenances == {
+            "L'Attaque des Titans (rev. 42)",
+            "Liste des personnages de One Piece (rev. 99)",
+        }
 
     def test_le_role_est_nul_partout_et_c_est_legitime(self, connexion) -> None:
         """Wikipédia ne porte aucun vocabulaire de rôles, seulement une
@@ -131,7 +143,6 @@ class TestChargement:
         assert couples["kitsu"] == "kitsu"
 
 
-@besoin_base
 class TestPariMultiSources:
     """Ce que cette deuxième source devait éprouver."""
 
@@ -152,17 +163,6 @@ class TestPariMultiSources:
                 f"{table} ne porte pas les deux sources"
             )
 
-    def test_aucune_migration_n_a_ete_necessaire(self, connexion) -> None:
-        """Le pari de la v2 : une source de plus est une insertion.
-
-        015 reste la dernière migration. Si une 016 était apparue pour
-        accueillir Wikipédia, le pari aurait échoué.
-        """
-        (derniere,) = connexion.execute(
-            "SELECT max(version) FROM schema_migrations"
-        ).fetchone()
-        assert derniere == "015"
-
     def test_aucune_deduplication_entre_sources(self, connexion) -> None:
         """Un personnage Kitsu et son homologue Wikipédia restent deux lignes."""
         (communs,) = connexion.execute(
@@ -174,6 +174,12 @@ class TestPariMultiSources:
             "  WHERE source = 'wikipedia_fr') x"
         ).fetchone()
         assert communs > 0, "aucun nom commun : le jeu de test serait vide"
+        (luffy,) = connexion.execute(
+            "SELECT count(DISTINCT character_uid) FROM manga.characters"
+            " WHERE canonical_name = %s",
+            (NOM_COMMUN,),
+        ).fetchone()
+        assert luffy == 2, "un personnage par source"
         (fusionnes,) = connexion.execute(
             "SELECT count(*) FROM manga.characters c1 "
             "JOIN manga.characters c2 ON lower(c1.canonical_name) = "

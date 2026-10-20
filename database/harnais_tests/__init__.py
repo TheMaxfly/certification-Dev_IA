@@ -1,4 +1,4 @@
-"""Harnais partagé des bases PostgreSQL JETABLES de test : database, 05, 09, 10.
+"""Harnais partagé des bases PostgreSQL JETABLES de test : database, 05, 08, 09, 10.
 
 - **Un conteneur par session**, lancé ici, sans durabilité (une base jetable n'a que
   faire de `fsync`) ; arrêté à la fin.
@@ -153,7 +153,10 @@ def conteneur(prefixe: str) -> Iterator[str]:
                 time.sleep(0.3)
         yield dsn
     finally:
-        subprocess.run(["docker", "rm", "-f", nom], capture_output=True, check=False)
+        # `-v` : le volume anonyme de l'image part avec le conteneur.
+        subprocess.run(
+            ["docker", "rm", "-f", "-v", nom], capture_output=True, check=False
+        )
 
 
 def dsn_de(admin: str, nom: str) -> str:

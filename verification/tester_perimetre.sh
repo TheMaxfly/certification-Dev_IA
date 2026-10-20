@@ -50,8 +50,8 @@ cas "l'atteignabilité du 05"           "05 10 demo statique"                   
 cas "Bench_embedding du 06"            "05 statique"                           06_benchmark_embeddings_llm/Bench_embedding.py
 cas "un autre fichier du 06"           "statique"                              06_benchmark_embeddings_llm/archive/autre.py
 cas "un fichier du 09"                 "09 10 statique"                        09_service_embedding/src/x.py
-cas "une migration"                    "02 05 09 10 database demo statique"    database/migrations/099_x.sql
-cas "un outil de database"             "05 09 10 database demo statique"       database/outils/x.sh
+cas "une migration"                    "02 05 08 09 10 database demo statique" database/migrations/099_x.sql
+cas "un outil de database"             "05 08 09 10 database demo statique"    database/outils/x.sh
 cas "un autre workflow"                "statique"                              .github/workflows/indicatif.yml
 cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 database demo statique" .github/workflows/verify.yml
 cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 database demo statique" verification/verifier.sh
