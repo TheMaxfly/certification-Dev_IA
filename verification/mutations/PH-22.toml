@@ -1,0 +1,7 @@
+id = "PH-22"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le pre-commit passe sans le fragment des clés"
+fichier = ".githooks/pre-commit"
+avant = '''[ -r .githooks/cles-fournisseurs ] ||'''
+apres = '''true ||'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

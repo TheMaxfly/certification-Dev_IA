@@ -14,7 +14,11 @@
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
 #                            harnais du poste seul : fidélité du schéma, état
 #                            d'apimanga en lecture seule, équivalence du service
-#                            d'embedding
+#                            d'embedding, ensemble de règles de GitHub
+#   make verify-mutations    les mutations versionnées (verification/mutations/),
+#                            rejouées dans un arbre jetable : chacune doit faire
+#                            rougir son test (poste, avant une demande vers main ;
+#                            MUTATIONS="ID …" pour quelques-unes)
 #
 # Le moteur est verification/verifier.sh ; les tests sautés admis, avec leur raison,
 # sont dans verification/sauts_attendus.tsv. Sorties (JUnit, couverture, résumé,
@@ -23,8 +27,9 @@
 MODULE ?=
 TOUT ?=
 FORCER ?=
+MUTATIONS ?=
 
-.PHONY: verify verify-indicatif verify-poste
+.PHONY: verify verify-indicatif verify-poste verify-mutations
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -34,3 +39,6 @@ verify-indicatif:
 
 verify-poste:
 	@FORCER=$(FORCER) bash verification/verifier.sh poste
+
+verify-mutations:
+	@uv run --no-project python -I verification/rejouer_mutations.py $(MUTATIONS)

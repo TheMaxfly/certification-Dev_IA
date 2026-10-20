@@ -1,0 +1,9 @@
+id = "E3B-04"
+origine = "E3 étape 1, bloc B (2026-10-09) — rattachement de l'atteignabilité sans filtre de corpus (05)"
+fichier = "05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py"
+avant = '''WHERE k.corpus_id = %(corpus)s
+'''
+apres = '''WHERE %(corpus)s IS NOT NULL
+'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_plusieurs_corpus_sans_service_il_faut_nommer"]

@@ -1,0 +1,9 @@
+id = "E3C-03"
+origine = "E3 étape 1, bloc C (2026-10-10) — phrase plus longue que le maximum : sa ponctuation interne est ignorée"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/phrases.py"
+avant = '''        if ponct:
+            coupe = ponct[-1]'''
+apres = '''        if False:
+            coupe = ponct[-1]'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_phrases.py", "-k", "(ponctuation) and not strategie"]

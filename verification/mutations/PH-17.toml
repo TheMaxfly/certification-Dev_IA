@@ -1,0 +1,7 @@
+id = "PH-17"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le nom des références poussées n'est plus contrôlé"
+fichier = ".githooks/pre-push"
+avant = '''        grep -qaiE "$MOTS" <<<"$ref" &&'''
+apres = '''        false &&'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

@@ -1,0 +1,7 @@
+id = "HK-13"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — le message de refus cite la valeur de la clé"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''du poste en clair dans $fichier")'''
+apres = '''du poste en clair dans $fichier : ${CLES_VALEURS[$variable]}")'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

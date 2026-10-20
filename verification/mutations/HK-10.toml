@@ -1,0 +1,7 @@
+id = "HK-10"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — aspect de clé Mistral rendu impossible"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''[MISTRAL_API_KEY]="[Mm]'''
+apres = '''[MISTRAL_API_KEY]="a^[Mm]'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

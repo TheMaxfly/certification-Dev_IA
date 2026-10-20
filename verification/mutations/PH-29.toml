@@ -1,0 +1,7 @@
+id = "PH-29"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — une suite sans test n'est plus signalée comme telle"
+fichier = "verification/verifier.sh"
+avant = '''    if [ "$total" -eq 0 ]; then'''
+apres = '''    if false; then'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

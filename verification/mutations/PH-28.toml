@@ -1,0 +1,7 @@
+id = "PH-28"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — le plafond de tests sautés n'est plus appliqué"
+fichier = "verification/verifier.sh"
+avant = '''    if [ "$sautes" != - ] && [ "$sautes" -gt "$plafond" ]; then'''
+apres = '''    if false; then'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

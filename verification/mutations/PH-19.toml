@@ -1,0 +1,7 @@
+id = "PH-19"
+origine = "Harnais de tests, bloc D (2026-10-20) — hooks — le pre-push lit ses listes dans l'arbre de travail"
+fichier = ".githooks/pre-push"
+avant = '''    git show "$1:.githooks/$2" 2>/dev/null |'''
+apres = '''    cat ".githooks/$2" 2>/dev/null |'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

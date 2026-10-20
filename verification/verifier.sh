@@ -308,10 +308,12 @@ verifier_statique() {
     fi
     controles=$((controles + 1))
   }
-  controle "Ruff du 06 et de docs/modeles" uvx "ruff@$RUFF" check --no-cache \
-    --output-format="$sortie_ruff" 06_benchmark_embeddings_llm docs/modeles
-  controle "format du 06 et de docs/modeles" uvx "ruff@$RUFF" format --check --no-cache \
-    06_benchmark_embeddings_llm docs/modeles
+  controle "Ruff du 06, de docs/modeles et de verification" uvx "ruff@$RUFF" check \
+    --no-cache --output-format="$sortie_ruff" 06_benchmark_embeddings_llm docs/modeles verification
+  controle "format du 06, de docs/modeles et de verification" uvx "ruff@$RUFF" format \
+    --check --no-cache 06_benchmark_embeddings_llm docs/modeles verification
+  controle "mutations versionnées : lisibles, texte visé présent une fois" \
+    uv run --no-project python -I verification/rejouer_mutations.py --controler
   controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \

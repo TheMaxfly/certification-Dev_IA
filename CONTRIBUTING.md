@@ -51,8 +51,21 @@ commande sur le poste et sur GitHub.
 - Les volumes Docker créés par la vérification, et eux seuls, sont supprimés.
 
 Avant une demande de fusion vers `develop` : `make verify` (les modules touchés). Vers
-`main` : `make verify-poste`, et une sauvegarde de ce qui vit hors du dépôt ; si le
-harnais a changé (`verification/`, `Makefile`, workflows), `make verify TOUT=1` d'abord.
+`main` : `make verify-poste`, `make verify-mutations`, et une sauvegarde de ce qui vit
+hors du dépôt ; si le harnais a changé (`verification/`, `Makefile`, workflows),
+`make verify TOUT=1` d'abord.
+
+### Les mutations versionnées
+
+Une mutation casse le code exprès pour prouver qu'un test le voit. Chacune est un
+fichier de `verification/mutations/` (TOML) : le fichier visé, le texte exact à
+remplacer (présent une seule fois), son remplaçant, et la commande qui doit échouer
+une fois la mutation posée. `make verify-mutations` les rejoue dans un arbre jetable
+(`git worktree`, au commit courant : l'arbre de travail doit être propre), après un
+passage témoin sans mutation où la commande doit passer sans test sauté. La tâche
+`statique` contrôle, à chaque vérification, que chaque mutation se lit et vise un
+texte toujours présent une fois : un code qui bouge sans sa mutation se voit tout
+de suite. Une mutation écrite pour un correctif s'ajoute dans le même commit.
 
 ### L'état d'`apimanga`, en lecture seule
 

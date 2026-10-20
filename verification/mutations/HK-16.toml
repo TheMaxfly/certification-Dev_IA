@@ -1,0 +1,7 @@
+id = "HK-16"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — grep des aspects sans -a : un texte non UTF-8 échappe au contrôle"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''grep -aE --'''
+apres = '''grep -E --'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

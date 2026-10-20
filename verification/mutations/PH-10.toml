@@ -1,0 +1,7 @@
+id = "PH-10"
+origine = "Harnais de tests, bloc D (2026-10-20) — 10 — la règle de promotion n'est plus confrontée au commit de la mesure"
+fichier = "10_mesures_recherche/src/mesures_recherche/promotion.py"
+avant = '''    if empreinte_au_commit(commit, regle["chemin"]) != regle["empreinte"]:'''
+apres = '''    if False:'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_promotion.py", "-k", "differe or commitee"]

@@ -1,0 +1,7 @@
+id = "P1-05"
+origine = "CI/CD palier 1, bloc D (2026-10-09, rejoué le 2026-10-19) — MaxFlavigny retiré de l'exception : la fusion de GitHub à son nom de profil est refusée"
+fichier = ".githooks/pre-push"
+avant = '''[ "$auteur" = "$AUTEUR" ] || [ "$auteur" = "$AUTEUR_PROFIL_GITHUB" ] ||'''
+apres = '''[ "$auteur" = "$AUTEUR" ] ||'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

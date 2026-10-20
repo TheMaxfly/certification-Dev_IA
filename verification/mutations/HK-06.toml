@@ -1,0 +1,7 @@
+id = "HK-06"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — comparaison à la valeur réelle des clés du poste retirée"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''if [ -n "${CLES_VALEURS[$variable]}" ]; then'''
+apres = '''if false; then'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

@@ -1,0 +1,7 @@
+id = "PH-37"
+origine = "Harnais de tests, bloc D (2026-10-20) — moteur — une permission en écriture passe"
+fichier = "verification/controler_workflows.sh"
+avant = '''  grep -qE ':[[:space:]]*write([[:space:]]|$)|write-all' "$w" &&'''
+apres = '''  false &&'''
+dossier = "."
+commande = ["bash", "verification/tester_verifier.sh"]

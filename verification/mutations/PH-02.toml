@@ -1,0 +1,7 @@
+id = "PH-02"
+origine = "Harnais de tests, bloc D (2026-10-20) — 09 — les contrôles d'après encodage lisent les encodages de tous les corpus"
+fichier = "09_service_embedding/src/service_embedding/verification.py"
+avant = '''ses_encodages = "SELECT encodage_id FROM bench.encodages WHERE corpus_id = %s"'''
+apres = '''ses_encodages = "SELECT encodage_id FROM bench.encodages WHERE %s IS NOT NULL"'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_verification.py", "-k", "encodages_du_corpus"]

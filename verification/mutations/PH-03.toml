@@ -1,0 +1,7 @@
+id = "PH-03"
+origine = "Harnais de tests, bloc D (2026-10-20) — 05 — une occurrence Kitsu non admise passe le contrôle des pseudonymes"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/construire_v2.py"
+avant = '''"kitsu_synopsis": connus("kitsu:", admis),'''
+apres = '''"kitsu_synopsis": de("kitsu_synopsis", trouves),'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_v2.py", "-k", "kitsu_non_admise"]

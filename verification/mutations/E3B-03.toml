@@ -1,0 +1,8 @@
+id = "E3B-03"
+origine = "E3 étape 1, bloc B (2026-10-09) — retrait des documents sans filtre de corpus : un rejeu du chargeur v1 toucherait le v2 (05)"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/ecriture.py"
+avant = '''WHERE d.corpus_id = %(corpus)s
+  AND NOT EXISTS (SELECT 1 FROM cible_docs'''
+apres = '''WHERE NOT EXISTS (SELECT 1 FROM cible_docs'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "test_un_rejeu_du_chargeur_v1_ne_touche_pas_au_v2"]

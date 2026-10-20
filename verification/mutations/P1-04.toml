@@ -1,0 +1,7 @@
+id = "P1-04"
+origine = "CI/CD palier 1, bloc D (2026-10-09, rejoué le 2026-10-19) — MaxFlavigny admis comme auteur de tout commit, pas seulement d'une fusion créée par GitHub"
+fichier = ".githooks/pre-push"
+avant = '''[ "$auteur" = "$AUTEUR" ] || echecs+=("$court : auteur « $auteur », attendu « $AUTEUR »")'''
+apres = '''[ "$auteur" = "$AUTEUR" ] || [ "$auteur" = "$AUTEUR_PROFIL_GITHUB" ] || echecs+=("$court : auteur « $auteur », attendu « $AUTEUR »")'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

@@ -1,0 +1,7 @@
+id = "P1-03"
+origine = "CI/CD palier 1, bloc D (2026-10-09, rejoué le 2026-10-19) — adresse exacte du validateur retirée (nom seul) : une fusion validée par un autre « GitHub » passe"
+fichier = ".githooks/pre-push"
+avant = '''[ "$committer <$adresse>" = "$VALIDATEUR_GITHUB" ]'''
+apres = '''[ "$committer" = GitHub ]'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

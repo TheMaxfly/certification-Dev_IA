@@ -1,0 +1,7 @@
+id = "P1-02"
+origine = "CI/CD palier 1, bloc D (2026-10-09, rejoué le 2026-10-19) — condition « deux parents » retirée : un commit ordinaire ou une fusion à trois parents validés par GitHub passent"
+fichier = ".githooks/pre-push"
+avant = '''[ "$(wc -w <<<"$parents")" -eq 2 ] && '''
+apres = ""
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

@@ -1,0 +1,7 @@
+id = "PH-12"
+origine = "Harnais de tests, bloc D (2026-10-20) — 10 — la mesure confronte le préfixe des documents, pas celui des requêtes"
+fichier = "10_mesures_recherche/src/mesures_recherche/executer.py"
+avant = '''    info = confronter(client, designation.encodage, "requete")'''
+apres = '''    info = confronter(client, designation.encodage, "document")'''
+dossier = "10_mesures_recherche"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_cohabitation.py", "-k", "prefixe_de_requete"]

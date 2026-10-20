@@ -1,0 +1,7 @@
+id = "HK-09"
+origine = "Hooks et clés des fournisseurs, bloc C (2026-10-19) — guillemets doubles du .env non ôtés de la valeur lue"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''\"*) v=${v#\"} && v=${v%%\"*} ;;'''
+apres = '''\"*) ;;'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

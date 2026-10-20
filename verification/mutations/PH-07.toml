@@ -1,0 +1,7 @@
+id = "PH-07"
+origine = "Harnais de tests, bloc D (2026-10-20) — 05 — l'erreur Kitsu n'est plus enveloppée en erreur de chargement"
+fichier = "05_nettoyage_agregation_bdd/src/corpus/construire_v2.py"
+avant = '''            raise ErreurChargement(f"Kitsu — {erreur}") from erreur'''
+apres = '''            raise'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_corpus_v2.py", "-k", "run_kitsu_altere"]
