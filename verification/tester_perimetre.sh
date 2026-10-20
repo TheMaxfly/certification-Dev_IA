@@ -44,6 +44,7 @@ echo "Essai du périmètre (statique tourne toujours)"
 cas "aucun changement"                 "statique"
 cas "documentation seule"              "statique"                              README.md CONTRIBUTING.md
 cas "hooks seuls"                      "statique"                              .githooks/pre-push .githooks/tester.sh
+cas "le script de sauvegarde"          "database statique"                     sauvegarde/sauvegarder.sh
 cas "un fichier du 01"                 "01 statique"                           01_scraping_manganews/x.py
 cas "un fichier du 05"                 "05 demo statique"                      05_nettoyage_agregation_bdd/src/corpus/x.py
 cas "l'atteignabilité du 05"           "05 10 demo statique"                   05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
