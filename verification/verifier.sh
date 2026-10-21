@@ -19,7 +19,8 @@
 #                                   modules à base jetable se correspondent ; REGLES=1
 #                                   (poste) : les contrôles obligatoires de l'ensemble
 #                                   de règles de GitHub aussi, relevés par gh
-#   verifier.sh equivalence         l'étape d'équivalence du service (poste) seule
+#   verifier.sh equivalence         l'étape d'équivalence (poste) seule : le service,
+#                                   puis l'API du modèle, sur la même instance
 #   verifier.sh preparer MODULE     uv sync --locked de ce module (et de database/
 #                                   s'il en dépend) : l'étape d'avant verify sur GitHub
 #   verifier.sh image               tire, par empreinte, l'image PostgreSQL que les
@@ -36,6 +37,9 @@
 #   - une ligne par module : passés, sautés, en échec, durée. Un test sauté n'est
 #     pas un test passé : il est compté, et au-delà du plafond de
 #     verification/sauts_attendus.tsv, c'est un échec ;
+#   - les exigences d'un module (9e champ de MODULES : Pyright strict, Bandit,
+#     pip-audit) sont bloquantes : un constat est un échec. Un module neuf les porte
+#     dès son premier commit ;
 #   - les volumes Docker créés pendant la vérification, et eux seuls, sont
 #     supprimés à la fin (les bases jetables des tests en laissent un chacune).
 set -uo pipefail
@@ -59,10 +63,15 @@ ENSEMBLE_REGLES=24783901
 RUFF="$(sed -n '/ruff-pre-commit/,/rev:/s/^ *rev: *v//p' "$RACINE/.pre-commit-config.yaml")"
 BANDIT=1.9.4
 PIP_AUDIT=2.10.1
+PYRIGHT=1.1.414       # paquet pyright[nodejs] : Node embarqué, sans dépendance au poste
 ACTIONLINT=1.7.12.25  # paquet actionlint-py : actionlint 1.7.12
 SHELLCHECK=0.11.0.1   # paquet shellcheck-py : shellcheck 0.11.0
 
-# nom | dossier Ruff | dossier du projet (verrou, tests) | lanceur | options uv | arguments | couverture | prérequis
+# nom | dossier Ruff | dossier du projet (verrou, tests) | lanceur | options uv | arguments | couverture | prérequis | exigences
+# Exigences (bloquantes, après les tests) : `pyright` (strict, configuré dans le
+# pyproject du module), `bandit` (sur src/), `pip-audit` (sur le verrou), séparées
+# par des virgules. Les modules d'avant E3 étape 2 n'en portent pas : leurs
+# constats restent indicatifs (`make verify-indicatif`).
 MODULES=(
   "01|01_scraping_manganews|01_scraping_manganews|pytest|--extra dev|tests|.|"
   "02|02_api_manga|02_api_manga|pytest|||.|"
@@ -73,6 +82,7 @@ MODULES=(
   "08|08_enrichissement_personnages|08_enrichissement_personnages|pytest|--extra dev|tests|.|"
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
+  "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
   "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,
@@ -132,19 +142,20 @@ volumes_fin() {
 # --------------------------------------------------------------------------- #
 resume() {
   [ ${#RESUME[@]} -gt 0 ] || return 0
-  printf '\n%-10s %-7s %-7s %8s %15s %8s %9s %8s  %s\n' \
-    module ruff format passés "sautés/plafond" échecs durée couv. verdict
+  printf '\n%-10s %-7s %-7s %8s %15s %8s %9s %8s %-10s %s\n' \
+    module ruff format passés "sautés/plafond" échecs durée couv. exigences verdict
   local l
+  # 11e champ, les exigences : absent des lignes qui n'en ont pas (« - »).
   for l in "${RESUME[@]}"; do
-    IFS='|' read -r m r f p s pl e d c v <<<"$l"
-    printf '%-10s %-7s %-7s %8s %15s %8s %8ss %8s  %s\n' "$m" "$r" "$f" "$p" "$s/$pl" "$e" "$d" "$c" "$v"
+    IFS='|' read -r m r f p s pl e d c v x <<<"$l"
+    printf '%-10s %-7s %-7s %8s %15s %8s %8ss %8s %-10s %s\n' "$m" "$r" "$f" "$p" "$s/$pl" "$e" "$d" "$c" "${x:--}" "$v"
   done
   {
-    echo "| module | Ruff | format | passés | sautés / plafond | en échec | durée | couverture | verdict |"
-    echo "|---|---|---|---:|---:|---:|---:|---:|---|"
+    echo "| module | Ruff | format | passés | sautés / plafond | en échec | durée | couverture | exigences | verdict |"
+    echo "|---|---|---|---:|---:|---:|---:|---:|---|---|"
     for l in "${RESUME[@]}"; do
-      IFS='|' read -r m r f p s pl e d c v <<<"$l"
-      echo "| $m | $r | $f | $p | $s / $pl | $e | $d s | $c | $v |"
+      IFS='|' read -r m r f p s pl e d c v x <<<"$l"
+      echo "| $m | $r | $f | $p | $s / $pl | $e | $d s | $c | ${x:--} | $v |"
     done
   } >"$SORTIES/resume.md"
   [ -n "${GITHUB_STEP_SUMMARY:-}" ] && cat "$SORTIES/resume.md" >>"$GITHUB_STEP_SUMMARY"
@@ -181,8 +192,8 @@ attribut_junit() {  # <fichier> <attribut> : sur le premier <testsuite>
 }
 
 verifier_module() {
-  local nom lint projet lanceur options args couv prerequis
-  IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$1"
+  local nom lint projet lanceur options args couv prerequis exigences
+  IFS='|' read -r nom lint projet lanceur options args couv prerequis exigences <<<"$1"
   if [ "$lanceur" = statique ]; then verifier_statique "$nom"; return; fi
   local sortie="$SORTIES/$nom" debut ruff=- format=- passes=- sautes=- echecs=- couverture=-
   mkdir -p "$sortie"
@@ -276,7 +287,71 @@ verifier_module() {
     RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
     echouer "$nom" "intégration Compose" "(02_api_manga/) docker compose -f compose.integration.yml run --rm --build smoke"
   fi
-  RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ok")
+  if [ "$nom" = 11 ] && ! integration_11; then
+    RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
+    echouer "$nom" "intégration Compose" "(11_api_modele/) docker compose ${COMPOSE_11[*]} run --rm -T --build essai"
+  fi
+  local exige=""
+  if [ -n "$exigences" ]; then
+    if ! exiger "$nom" "$projet" "$exigences"; then
+      RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC|$EXIGE")
+      echouer "$nom" "exigence $REFUS" "(${projet}/) $COMMANDE_REFUS"
+    fi
+    exige=$EXIGE
+  fi
+  RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ok|$exige")
+}
+
+# Les exigences d'un module (9e champ de MODULES), bloquantes, après ses tests :
+# l'environnement du module existe alors (`uv run --locked`, ou `preparer` sur
+# GitHub). Un constat, comme une panne d'outil, est un échec. Pour les essais du
+# moteur, VERIFY_DOUBLURE_PYRIGHT, _BANDIT et _PIP_AUDIT désignent un exécutable qui
+# remplace l'outil ; il reçoit le nom de l'exigence et le dossier du projet.
+EXIGE=""          # exigences tenues / déclarées, pour le résumé
+REFUS=""          # l'exigence refusée
+COMMANDE_REFUS="" # sa commande
+exiger() {  # exiger <nom> <projet> <exigences, séparées par des virgules>
+  local nom="$1" projet="$2" sortie="$SORTIES/$1" exigence doublure faites=0 rc
+  local -a liste cmd
+  IFS=',' read -ra liste <<<"$3"
+  : >"$sortie/exigences.log"
+  for exigence in "${liste[@]}"; do
+    doublure="VERIFY_DOUBLURE_${exigence^^}"
+    doublure="${doublure//-/_}"
+    case $exigence in
+      pyright) cmd=(uvx --from "pyright[nodejs]==$PYRIGHT" pyright
+        --pythonpath "$RACINE/$projet/.venv/bin/python" -p .) ;;
+      bandit) cmd=(uvx "bandit@$BANDIT" -q -c pyproject.toml -r src) ;;
+      pip-audit) cmd=(uvx "pip-audit@$PIP_AUDIT" -r "$sortie/verrou_exige.txt" --no-deps
+        --disable-pip --strict --progress-spinner off) ;;
+      *)
+        EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (inconnue)"
+        COMMANDE_REFUS="9e champ de MODULES (verification/verifier.sh) : pyright, bandit, pip-audit"
+        return 1 ;;
+    esac
+    [ -n "${!doublure:-}" ] && cmd=("${!doublure}" "$exigence" "$RACINE/$projet")
+    dire "$nom — exigence $exigence : ${cmd[*]}"
+    if [ "$exigence" = pip-audit ] && [ -z "${!doublure:-}" ]; then
+      # Le verrou d'abord, en requirements épinglés et hachés (paquets locaux exclus).
+      (cd "$RACINE/$projet" && "${PROPRE[@]}" uv export --locked --all-extras --all-groups \
+        --no-emit-project --no-emit-local --format requirements-txt \
+        -o "$sortie/verrou_exige.txt" >/dev/null) 2>&1 | tee -a "$sortie/exigences.log"
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ]; then
+        EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (export du verrou)"
+        COMMANDE_REFUS="uv export --locked …"
+        return 1
+      fi
+    fi
+    (cd "$RACINE/$projet" && "${PROPRE[@]}" "${cmd[@]}") 2>&1 | tee -a "$sortie/exigences.log"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+      EXIGE="$faites/${#liste[@]}"; REFUS="$exigence (code $rc)"; COMMANDE_REFUS="${cmd[*]}"
+      return 1
+    fi
+    faites=$((faites + 1))
+  done
+  EXIGE="$faites/${#liste[@]}"
 }
 
 # L'intégration du 02 : PostgreSQL jetable, schéma rejoué depuis database/migrations/,
@@ -287,6 +362,21 @@ integration_02() {
   # Entrée fermée : `run` lirait sinon celle de l'appelant.
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/02_api_manga" && "${PROPRE[@]}" docker compose -f compose.integration.yml down -v >/dev/null 2>&1)
+  return "$rc"
+}
+
+# L'intégration du 11 : le Compose du module, tel quel, et ce qu'un essai jetable change
+# (compose.integration.yml) — base jetable migrée, rôle modele_api par sa procédure,
+# jeu d'essai promu, doublure du service d'embedding (le modèle, à accès contrôlé, ne
+# tourne pas sur GitHub) ; l'API est la vraie (image construite, non root, réseau
+# interne, cohérence au démarrage), puis un essai HTTP. Sur le poste comme sur GitHub.
+# `--env-file /dev/null` : le `.env` du poste n'entre pas dans l'essai.
+COMPOSE_11=(--env-file /dev/null -f docker-compose.yml -f compose.integration.yml)
+integration_11() {
+  local cmd=(docker compose "${COMPOSE_11[@]}" run --rm -T --build essai) rc
+  dire "11 — (11_api_modele/) ${cmd[*]}"
+  (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
+  (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" docker compose "${COMPOSE_11[@]}" down -v >/dev/null 2>&1)
   return "$rc"
 }
 
@@ -314,6 +404,8 @@ verifier_statique() {
     --check --no-cache 06_benchmark_embeddings_llm docs/modeles verification
   controle "mutations versionnées : lisibles, texte visé présent une fois" \
     uv run --no-project python -I verification/rejouer_mutations.py --controler
+  controle "essais du contrôle des pseudonymes des passages de l'API" \
+    uv run --no-project python -I verification/tester_pseudonymes_passages.py
   controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \
@@ -619,9 +711,10 @@ PY
 #  Préparer : l'environnement d'un module depuis son verrou (sur GitHub, avant verify)
 # --------------------------------------------------------------------------- #
 preparer() {
-  local l nom lint projet lanceur options args couv prerequis
+  local l nom lint projet lanceur options args couv prerequis exigences
   l="$(choisir_modules "$1")" || exit 2
-  IFS='|' read -r nom lint projet lanceur options args couv prerequis <<<"$l"
+  # shellcheck disable=SC2034  # exigences : lue pour que prerequis reste un seul champ
+  IFS='|' read -r nom lint projet lanceur options args couv prerequis exigences <<<"$l"
   if [ "$prerequis" = database ]; then
     dire "$nom — prérequis database/ : uv sync --locked --inexact"
     (cd "$RACINE/database" && "${PROPRE[@]}" uv sync --locked --inexact) || exit 1
@@ -636,27 +729,63 @@ preparer() {
 #  Poste : verify, puis les harnais qui ne tournent que sur ce poste
 # --------------------------------------------------------------------------- #
 
-# Le test d'équivalence du service (E3, étape 1, bloc F) : l'instance EmbeddingGemma
-# réencode les échantillons exportés (09_…/mesures/equivalence/, hors dépôt) et les
-# compare à leurs encodages. Une vérification qui ne tourne pas est un échec : sans
-# échantillon, refus. Une seule instance à la fois : refus si une instance tourne déjà.
+# Le DSN d'une étape du poste, lu dans verification/.env (sans mot de passe : il est
+# dans ~/.pgpass) par cette étape seule.
+dsn_du_poste() {  # dsn_du_poste <clé>
+  local fichier="$RACINE/verification/.env"
+  [ -r "$fichier" ] || return 1
+  grep -E "^[[:space:]]*(export[[:space:]]+)?$1=" "$fichier" | tail -n 1 |
+    sed -E 's/^[^=]*=//; s/^[[:space:]]*//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
+}
+
+# L'étape d'équivalence, sur UNE instance EmbeddingGemma, levée puis arrêtée quoi
+# qu'il arrive :
+#   - le service (E3, étape 1, bloc F) : l'instance réencode les échantillons exportés
+#     (09_…/mesures/equivalence/, hors dépôt) et les compare à leurs encodages ;
+#   - l'API du modèle (E3, étape 2, bloc 03) : les 69 questions du jeu gelé, rejouées
+#     par l'API, rendent les dix premières séries du run de référence. Seconde
+#     exception de CONTRIBUTING.md : la base réelle, sous modele_api, en lecture
+#     seule ; le DSN (APIMANGA_MODELE_DSN de verification/.env) n'est passé qu'à ce
+#     test, qui échoue au lieu de sauter s'il ne peut pas comparer.
+# Une vérification qui ne tourne pas est un échec : sans échantillon ou sans DSN,
+# refus. Une seule instance à la fois : refus si une instance tourne déjà.
 equivalence_du_service() {
-  local module="$RACINE/09_service_embedding" rc
+  local module="$RACINE/09_service_embedding" api="$RACINE/11_api_modele" rc dsn
   compgen -G "$module/mesures/equivalence/encodage_*.json" >/dev/null ||
     echouer poste "équivalence du service : aucun échantillon exporté" \
       "(09_service_embedding/) uv run python -m service_embedding.equivalence exporter --encodage <n>"
+  dsn="$(dsn_du_poste APIMANGA_MODELE_DSN)"
+  [ -n "$dsn" ] ||
+    echouer poste "équivalence de l'API : APIMANGA_MODELE_DSN absent de verification/.env" \
+      "verification/.env.example"
   if docker ps --format '{{.Names}}' | grep -q '^tei-'; then
     echouer poste "équivalence du service" "une instance du service tourne déjà"
   fi
+  # Le bilan d'un passage précédent ne doit pas survivre : l'état d'apimanga relit les
+  # passages de CE passage-ci.
+  rm -f "$SORTIES/poste/egalite_api.json"
   (cd "$module" && "${PROPRE[@]}" uv run --locked python -m service_embedding.controles etat) ||
     echouer poste "équivalence du service" "mémoire sous les seuils"
+  (cd "$api" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire) ||
+    echouer poste "équivalence de l'API" "mémoire sous le seuil du service et de l'API"
   dire "poste — (09_service_embedding/) équivalence du service"
   (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma up -d >/dev/null) ||
     echouer poste "équivalence du service" "docker compose --profile embeddinggemma up -d"
   for _ in $(seq 1 90); do curl -sf 127.0.0.1:8082/health >/dev/null && break; sleep 2; done
   (cd "$module" && "${PROPRE[@]}" uv run --locked --extra dev pytest -q -p no:cacheprovider \
     tests/test_equivalence.py -k service_reel -rs); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    dire "poste — (11_api_modele/) équivalence de l'API : les 69 questions, sous modele_api"
+    mkdir -p "$SORTIES/poste"
+    (cd "$api" && "${PROPRE[@]}" API_MODELE_EGALITE_DSN="$dsn" API_MODELE_EGALITE_EXIGEE=1 \
+      API_MODELE_EGALITE_SORTIE="$SORTIES/poste/egalite_api.json" \
+      uv run --locked --extra dev pytest -q -p no:cacheprovider -s \
+      tests/test_egalite_banc.py -rs); rc=$?
+    [ "$rc" -eq 0 ] || rc=$((rc + 100))
+  fi
   (cd "$module" && "${PROPRE[@]}" docker compose --profile embeddinggemma down >/dev/null 2>&1)
+  [ "$rc" -lt 100 ] || echouer poste "équivalence de l'API (code $((rc - 100)))" \
+    "(11_api_modele/) pytest tests/test_egalite_banc.py"
   [ "$rc" -eq 0 ] || echouer poste "équivalence du service (code $rc)" "pytest tests/test_equivalence.py"
 }
 
@@ -669,6 +798,14 @@ memoire_d_abord() {
     printf '%s\n' "$etat"
     echouer poste "mémoire sous les seuils : rien n'a été lancé" \
       "libérer de la mémoire (5 Go disponibles, 4 Go de mémoire vidéo libre), puis make verify-poste"
+  fi
+  printf '%s\n' "$etat"
+  # L'API du modèle s'ajoute au service pendant l'équivalence : son pic de démarrage
+  # (11_api_modele/config/reglages.toml, [memoire]) s'ajoute au seuil du service.
+  if ! etat="$(cd "$RACINE/11_api_modele" && "${PROPRE[@]}" uv run --locked python -m api_modele.memoire)"; then
+    printf '%s\n' "$etat"
+    echouer poste "mémoire sous le seuil du service et de l'API : rien n'a été lancé" \
+      "libérer de la mémoire (6,9 Go disponibles), puis make verify-poste"
   fi
   printf '%s\n' "$etat"
 }
@@ -692,14 +829,16 @@ poste() {
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
-  # La seule étape qui lit la base réelle : sous verif_ro, en lecture seule.
+  # L'équivalence d'abord : l'état d'apimanga relit les passages que l'API y a rendus.
+  equivalence_du_service
+  # L'état de la base réelle, sous verif_ro, en lecture seule ; il confirme aussi que
+  # l'équivalence n'a rien changé.
   cmd=(bash verification/etat_apimanga.sh)
   dire "poste — ${cmd[*]}"
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
-  equivalence_du_service
   dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
   REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
-  dire "poste — harnais : fidelite.sh, état d'apimanga, équivalence du service, ensemble de règles passés"
+  dire "poste — harnais : fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages compris), ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #

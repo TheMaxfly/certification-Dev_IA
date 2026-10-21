@@ -1,0 +1,14 @@
+# Mode processeur — sur un poste sans carte graphique, ou pour préparer le serveur :
+#
+#   COMPOSE_FILE=docker-compose.yml:compose.cpu.yml     (réglage du `.env`)
+#
+# Le service d'embedding sur l'image processeur de la même version de Text Embeddings
+# Inference (1.9.4), épinglée par empreinte, sans réservation de carte. Même modèle,
+# même révision, même précision (float32) : la configuration reste celle du module 09.
+# L'équivalence processeur ↔ carte de ce service a été mesurée à l'étape 1 d'E3.
+# Plus lent : le premier démarrage charge les poids sur le processeur.
+
+services:
+  embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d
+    deploy: !reset {}

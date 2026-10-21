@@ -1,0 +1,16 @@
+# Environnements et artefacts Python
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets et adresses : seul `.env.example` est versionné.
+.env
+
+# Le pgpass monté dans le conteneur de l'API (Compose) : un secret.
+.pgpass.conteneur

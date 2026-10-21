@@ -1,0 +1,8 @@
+id = "API-04"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — 023 : aucun droit par défaut, un objet créé plus tard reste illisible"
+fichier = "database/migrations/023_role_modele.sql"
+avant = '''GRANT USAGE ON SCHEMA bench, manga TO modele_ro;'''
+apres = '''GRANT USAGE ON SCHEMA bench, manga TO modele_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA bench GRANT SELECT ON TABLES TO modele_ro;'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_role_modele.py", "-k", "objet_futur and bench"]

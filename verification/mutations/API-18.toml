@@ -1,0 +1,7 @@
+id = "API-18"
+origine = "E3 étape 2, suite de 03 (décision de Max, 2026-10-20) — le témoin du contrôle des pseudonymes retrouve chaque référence connue dans son document : muet, une liste vide ou fausse ferait passer le contrôle à vide"
+fichier = "verification/pseudonymes_passages.py"
+avant = '''    return sorted(set(references) - reunir(occurrences(fragments, pseudos, motif)))'''
+apres = '''    return []'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_pseudonymes_passages.py"]

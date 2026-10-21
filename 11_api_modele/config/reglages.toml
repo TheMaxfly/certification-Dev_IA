@@ -1,0 +1,76 @@
+# Réglages de l'API du modèle : défaut, bornes et motif de chacun.
+#
+# Versionné, lu et validé au démarrage par `api_modele.configuration`, seul lecteur ;
+# une valeur fautive, un motif absent : l'API refuse de démarrer. Les secrets et les
+# adresses vivent dans `.env` (hors dépôt, modèle : `.env.example`), qui peut aussi
+# surcharger les réglages d'exploitation marqués « surchargeable ».
+#
+# Les réglages de recherche (nombre de séries, passages, catalogue) et la longueur de
+# la question font partie du contrat `/v1/` : les changer est une rupture (règle de
+# versionnage, README). Ils ne se surchargent pas.
+
+[recherche.nombre_series]
+defaut = 10
+min = 1
+max = 50
+motif = "Dix séries : la profondeur que le banc a mesurée (mesure 8, k = 10). Cinquante au plus : au-delà, la liste ne sert plus une réponse, et le coût de la réponse croît avec elle."
+
+[recherche.passages_par_serie]
+defaut = 1
+min = 1
+max = 5
+motif = "Un passage : le meilleur fragment, celui qui fait le score de la série. Cinq au plus : de quoi justifier un classement sans recopier le corpus."
+
+[recherche.catalogue_seul]
+defaut = true
+motif = "Le classement mesuré est limité au catalogue (mesure 8) ; hors catalogue entrent des œuvres Kitsu sans série."
+
+[question]
+longueur_max = 500
+motif = "Dérivée de la limite du modèle : au plus 39 + 4 × 500 + 2 = 2 041 jetons pour 2 048 (39 : les octets du préfixe de question normalisé ; rapport de l'étape 2, B.3). Vérifiée au démarrage contre /info : une question admise n'est jamais refusée pour sa longueur."
+
+[corps]
+octets_max = 16384
+motif = "Une question de 500 caractères et ses réglages tiennent en moins de 3 Kio ; au-delà de 16 Kio, le corps est refusé avant d'être lu."
+
+[debit]
+par_minute = 60
+motif = "Une requête par seconde en moyenne, par clé : assez pour l'application et la démonstration, trop peu pour qu'une seule clé sature le service ou la base. Fenêtre glissante d'une minute, en mémoire du processus. Surchargeable : API_MODELE_DEBIT_PAR_MINUTE."
+
+[delais]
+service_s = 10.0
+base_s = 5.0
+chargement_s = 120.0
+motif = "Délais maximaux d'un appel au service d'embedding (le client du 09 attend 300 s par défaut, trop pour une API) et d'une requête en base (statement_timeout de la transaction). Dépassés : 503, code dédié. Le chargement des vecteurs au démarrage (77 006 en 17 s, mesuré le 2026-10-20) a le sien."
+
+[pool]
+min = 1
+max = 5
+attente_s = 5.0
+motif = "Cinq connexions au plus, sous la borne du rôle modele_api (CONNECTION LIMIT 10) ; attente d'une connexion libre : 5 s, puis 503. À l'ouverture, une base qui ne répond pas dans ce délai empêche le démarrage."
+
+[metriques]
+reseaux = ["127.0.0.1/32", "::1/128"]
+motif = "Prometheus tourne sur le poste : /metrics ne répond qu'au bouclage, 404 ailleurs. Surchargeable : API_MODELE_METRIQUES_RESEAUX (réseaux séparés par des virgules)."
+
+[journal]
+question_en_clair = false
+motif = "Le texte d'une question peut porter une donnée personnelle : absent du journal, sauf réglage explicite. Surchargeable : API_MODELE_JOURNAL_QUESTION (vrai ou faux)."
+
+[documentation]
+interactive = false
+motif = "La documentation interactive (Swagger UI, /v1/docs) charge deux fichiers d'un CDN tiers, à version exacte et sous empreinte d'intégrité : désactivée par défaut, on l'allume pour la démontrer ou pour essayer les routes. Le contrat, lui, est toujours servi (/v1/openapi.json). Surchargeable : API_MODELE_DOCUMENTATION (vrai ou faux)."
+
+[service]
+instance = "embeddinggemma"
+table = "bench.vecteurs_embeddinggemma"
+motif = "L'instance du module 09 qui sert l'encodage en service (encodage 3, EmbeddingGemma), et la table de ses vecteurs, celle de la mesure 8. Son hôte : celui du module 09, sauf CLIENT_HOTE."
+
+[memoire]
+besoin_octets = 1900000000
+motif = "Le pic de mémoire vive de l'API, mesuré le 2026-10-20 : 1 457 Mio au chargement seul des 77 006 vecteurs (lecture float32, puis matrice float64 de 451 Mio), 1,80 Go dans l'étape d'équivalence de verify-poste (le test qui rejoue les 69 questions) ; 0,5 Go résidents ensuite. Arrondi au-dessus, et ajouté au seuil du service d'embedding pour cette étape."
+
+[serveur]
+hote = "127.0.0.1"
+port = 8010
+motif = "L'API écoute sur le bouclage du poste ; 8010, libre, à côté des ports réservés à l'application et au monitorage (8000, 9090, 9100, 3000). Surchargeables : API_MODELE_HOTE, API_MODELE_PORT."

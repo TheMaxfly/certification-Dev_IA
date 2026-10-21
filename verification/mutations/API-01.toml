@@ -1,0 +1,7 @@
+id = "API-01"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — procédé P2 : un paquet mesures_recherche chargé d'ailleurs que du module 10 est refusé"
+fichier = "11_api_modele/src/api_modele/banc.py"
+avant = '''        if origine != PAQUET.resolve():'''
+apres = '''        if origine == origine.parent:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc.py", "-k", "autre_paquet"]

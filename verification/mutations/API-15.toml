@@ -1,0 +1,7 @@
+id = "API-15"
+origine = "E3 étape 2, bloc 03 (2026-10-20) — une question trop longue a son code dédié (422 question_trop_longue), avant tout appel au service"
+fichier = "11_api_modele/src/api_modele/erreurs.py"
+avant = '''            and erreur.get("type") == "string_too_long"'''
+apres = '''            and erreur.get("type") == "string_trop_long"'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "trop_longue_refusee_avant"]

@@ -1,0 +1,7 @@
+id = "API-05"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — la comparaison des clés parcourt tout le trousseau, sans s'arrêter à la clé trouvée (durée indépendante du rang)"
+fichier = "11_api_modele/src/api_modele/securite.py"
+avant = '''            trouve = cle.nom'''
+apres = '''            return cle.nom'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_securite.py", "-k", "sans_s_arreter"]
