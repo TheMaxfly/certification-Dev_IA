@@ -64,6 +64,8 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `019_famille_par_reference.sql` | **F11 « par référence »** au jeu d'évaluation : les CHECK de la famille (`eval_questions`) et de la portée d'une mesure (`eval_mesures`) s'ouvrent à F11 — la similarité à un titre connu, dont la référence n'est pas une réponse |
 | `020_vecteurs_pgvector.sql` | **pgvector dans la chaîne** (`CREATE EXTENSION vector`, **superutilisateur**) et l'encodage E2 : `bench.encodages` (ce qui a produit les vecteurs) et une table de vecteurs **par modèle**, `vecteurs_bge_m3` en `vector(1024)` et `vecteurs_embeddinggemma` en `vector(768)` — unitaires (CHECK), clé `chunk_id` vers `corpus_chunks` **sans cascade**, aucun index approximatif (cf. « Notes sur `020` ») |
 | `021_corpus_cohabitation.sql` | **Plusieurs corpus et plusieurs encodages côte à côte** (E3, étape 1) : `bench.corpus` (une ligne par version : règle, découpage, clôture) ; `corpus_id` sur les documents, les fragments, les encodages et les vecteurs, clé des documents `(corpus_id, doc_key)`, vecteurs identifiés par `(encodage_id, chunk_id)` et reliés à leur corpus par clés composites ; **journal des promotions** en ajout seul et vue `v_encodage_en_service` ; `eval_runs` (corpus et encodage d'un run) ; **un corpus clos refuse toute écriture**, sauf `bench.autoriser_extension` (insertion seule). Aucune élévation de privilège (cf. « Notes sur `021` ») |
+| `022_role_verification.sql` | **lecture de vérification** : rôle de groupe `verif_ro`, `SELECT` sur `manga`, `bench` et `public.schema_migrations` — l'étape « état d'apimanga » de `make verify-poste` (cf. « La lecture de vérification ») |
+| `023_role_modele.sql` | **lecture de l'API du modèle** (module 11) : rôle de groupe `modele_ro`, `SELECT` **énumérés** — six relations de `bench` (corpus, documents, fragments, registre des encodages, vecteurs EmbeddingGemma, encodage en service) et quatre colonnes de `manga` (rattachement et titre) ; aucun droit par défaut (cf. « La lecture de l'API du modèle ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -98,9 +100,11 @@ son seul emploi légitime, et il est réservé à ce cas.
 le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 `017` le 2026-09-29, `018` et `019` le 2026-09-30, `020` le 2026-10-07, `021` le
 2026-10-09 (22:03 UTC, après sauvegarde), `022` le 2026-10-19 (21:53 UTC, après
-sauvegarde) ; `000` y a été **marquée appliquée** le 2026-07-15, sans exécution.
-Le contrôle affiche **23 migrations appliquées et 0 en attente**, et `outils/fidelite.sh` rend un **diff vide**
-(1 986 lignes de part et d'autre, extensions et versions identiques, 2026-10-09).
+sauvegarde), `023` le 2026-10-20 (11:53 UTC, après sauvegarde, rôle de connexion
+`modele_api` créé par son script) ; `000` y a été **marquée appliquée** le 2026-07-15,
+sans exécution. Le contrôle affiche **24 migrations appliquées et 0 en attente**, et
+`outils/fidelite.sh` rend un **diff vide** (1 986 lignes de part et d'autre, extensions
+et versions identiques, 2026-10-20).
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
 (1 et 2 sur le v1, 3 sur le v2). Le journal des promotions a deux lignes : la reprise
@@ -330,6 +334,45 @@ VERIF_LECTURE_PASSWORD="$(openssl rand -hex 24)" \
   sh outils/creer_role_verification.sh 'postgresql://postgres@localhost:5432/apimanga'
 # puis ~/.pgpass : localhost:5432:apimanga:verif_lecture:<mot de passe>
 # et verification/.env, depuis verification/.env.example
+```
+
+### La lecture de l'API du modèle : `modele_ro` (`023`)
+
+L'API du modèle (module 11) lit, pour une question, les vecteurs de l'encodage en
+service, les fragments, leur rattachement au catalogue et le titre des séries — et
+rien d'autre. Ni `manga_ro` (hors de `bench`) ni `verif_ro` (tout `bench`, mesures et
+journal compris) ne conviennent : un troisième couple de rôles, au périmètre
+**énuméré**.
+
+| Rôle | Nature | Créé par | Porte un secret |
+| --- | --- | --- | --- |
+| `modele_ro` | groupe, `NOLOGIN` ; `SELECT` sur six relations de `bench` et quatre colonnes de `manga` | migration `023_role_modele.sql` | non |
+| `modele_api` | connexion, `LOGIN`, membre de `modele_ro`, sessions en lecture seule, 10 connexions au plus | `outils/creer_role_modele.sh` | oui |
+
+| Objet | Accordé à `modele_ro` |
+| --- | --- |
+| `bench.corpus`, `corpus_docs`, `corpus_chunks`, `encodages`, `vecteurs_embeddinggemma`, `v_encodage_en_service` | `SELECT` |
+| `manga.work_identity` | `SELECT (series_id, kitsu_id)` — le rattachement d'un synopsis Kitsu |
+| `manga.ms_series_enriched` | `SELECT (series_id, series_title)` — le titre |
+| `bench.promotions`, `eval_*`, `vecteurs_bge_m3`, le reste de `bench` et de `manga`, `staging`, `public.schema_migrations`, les séquences | **non** |
+| objets créés plus tard | **non** — aucun `ALTER DEFAULT PRIVILEGES` : une migration les accorde, ou personne |
+
+**Élévation déclarée** : la vue `bench.v_encodage_en_service` (021) n'est pas
+`security_invoker` ; elle lit `bench.promotions` avec les droits de son propriétaire.
+`modele_ro` y voit la dernière décision `promu` ou `retour_arriere`, jamais la table.
+
+`tests/test_role_modele.py` (31 tests) le vérifie relation par relation et colonne par
+colonne, sur un inventaire dérivé du catalogue sous sentinelles ; prouve que `023` ne
+change ni `verif_ro` ni `manga_ro` (base migrée jusqu'à `022`, puis `023`) ; crée le
+rôle de connexion par le script ; joue sous lui les lectures de l'API, dont le
+rattachement du module 05 lu dans son fichier ; et prouve six refus, la session forcée
+en écriture : `INSERT`, `UPDATE`, `DELETE` sur chaque table accordée, lecture de
+`promotions`, d'`eval_mesures`, de `vecteurs_bge_m3`.
+
+```bash
+MODELE_API_PASSWORD="$(openssl rand -hex 24)" \
+  sh outils/creer_role_modele.sh 'postgresql://postgres@localhost:5432/apimanga'
+# puis ~/.pgpass : localhost:5432:apimanga:modele_api:<mot de passe>
 ```
 
 ### Ce qui n'est volontairement pas fait

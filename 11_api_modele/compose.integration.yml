@@ -1,0 +1,168 @@
+# Essai d'intégration du Compose — dans `make verify MODULE=11`, sur le poste et sur
+# GitHub (comme celui du module 02) :
+#
+#   docker compose -f docker-compose.yml -f compose.integration.yml run --rm -T --build essai
+#   docker compose -f docker-compose.yml -f compose.integration.yml down -v
+#
+# Le Compose du module, tel quel, avec ce qu'un essai jetable doit changer :
+#   - une base PostgreSQL jetable (l'image du harnais partagé, épinglée), migrée par le
+#     runner du dépôt (`database/migrate.py`), le rôle `modele_api` créé par SA
+#     procédure (`database/outils/creer_role_modele.sh`), un jeu d'essai promu
+#     (`tests/integration/donnees.sql`) ;
+#   - à la place du modèle (accès contrôlé, carte graphique), une doublure du service,
+#     sous le même nom et avec la même configuration du module 09
+#     (`tests/integration/doublure_tei.py`) ;
+#   - le mot de passe du rôle, jetable, dans un pgpass écrit sur un volume (mode 600) ;
+#   - aucun port publié : l'essai passe par le réseau du Compose.
+# L'API est la vraie : image construite, non root, réseau interne vers le service,
+# contrôle de cohérence au démarrage, classement du banc, santé avant l'essai.
+#
+# Enchaînement : db (saine) → migrations → role → donnees ; embedding (sain) ;
+#                → api (saine) → essai.
+
+name: api-modele-integration
+
+services:
+  db:
+    image: pgvector/pgvector:0.6.0-pg16@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3
+    environment:
+      POSTGRES_DB: apimanga
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: integration-jetable
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d apimanga"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks: [sortie]
+
+  migrations:
+    image: api-modele-integration
+    build:
+      context: ..
+      dockerfile: 11_api_modele/Dockerfile
+    entrypoint: ["python", "/database/migrate.py", "up"]
+    environment:
+      DATABASE_URL: postgresql://postgres:integration-jetable@db:5432/apimanga
+    volumes:
+      - ../database:/database:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [sortie]
+
+  # La procédure d'accès du dépôt, sans variante ; puis le pgpass de l'API, lisible
+  # d'elle seule.
+  role:
+    image: pgvector/pgvector:0.6.0-pg16@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        sh /outils/creer_role_modele.sh "$$DSN_ADMIN" &&
+        printf 'db:5432:apimanga:modele_api:%s\n' "$$MODELE_API_PASSWORD" > /secret/pgpass &&
+        chown "$$PROPRIETAIRE" /secret/pgpass && chmod 600 /secret/pgpass
+    environment:
+      DSN_ADMIN: postgresql://postgres:integration-jetable@db:5432/apimanga
+      MODELE_API_PASSWORD: role-integration-jetable
+      PROPRIETAIRE: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    volumes:
+      - ../database/outils:/outils:ro
+      - secret:/secret
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    networks: [sortie]
+
+  # Chargé en `postgres` : `modele_api` ne peut pas écrire. Les caractéristiques du
+  # modèle viennent de la configuration du module 09.
+  donnees:
+    image: pgvector/pgvector:0.6.0-pg16@sha256:b740286128ce8e232fe0de3c8db2267d91aedc598dfbeaefb7ffb0b79ceef1b3
+    env_file: [../09_service_embedding/config/embeddinggemma.env]
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        psql "$$DSN_ADMIN" -X -q
+        -v modele="$$MODEL_ID" -v revision="$$REVISION" -v precision="$$DTYPE"
+        -v dimension="$$CLIENT_DIMENSION"
+        -v prefixe_document="$$CLIENT_PREFIXE_DOCUMENT"
+        -v prefixe_requete="$$CLIENT_PREFIXE_REQUETE"
+        -f /essai/donnees.sql
+    environment:
+      DSN_ADMIN: postgresql://postgres:integration-jetable@db:5432/apimanga
+    volumes:
+      - ./tests/integration:/essai:ro
+    depends_on:
+      role:
+        condition: service_completed_successfully
+    networks: [sortie]
+
+  embedding:
+    image: api-modele-integration
+    # Une doublure, pas une instance : hors du nom `tei-…` que surveillent les gardes.
+    container_name: api-modele-integration-doublure
+    command: ["python", "/essai/doublure_tei.py"]
+    volumes: !override
+      - ./tests/integration:/essai:ro
+    deploy: !reset {}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ['PORT'], timeout=2)
+      interval: 2s
+      start_period: 10s
+
+  api:
+    image: api-modele-integration
+    depends_on:
+      donnees:
+        condition: service_completed_successfully
+    environment:
+      API_MODELE_CLES: integration:cle-jetable-de-l-essai-0123456789abcdef
+      API_MODELE_DSN: postgresql://modele_api@db:5432/apimanga
+      PGPASSFILE: /secret/pgpass
+    secrets: !reset []
+    volumes:
+      - secret:/secret:ro
+    ports: !reset []
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8010/v1/sante', timeout=2)
+      interval: 2s
+      start_period: 60s
+
+  essai:
+    image: api-modele-integration
+    command: ["python", "/essai/essai_http.py"]
+    environment:
+      API_MODELE_URL: http://api:8010
+      API_MODELE_CLE: cle-jetable-de-l-essai-0123456789abcdef
+    volumes:
+      - ./tests/integration:/essai:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [sortie]
+
+networks:
+  # Sous-réseau automatique : l'essai ne heurte pas un Compose de production levé.
+  sortie: !override {}
+
+volumes:
+  secret: {}

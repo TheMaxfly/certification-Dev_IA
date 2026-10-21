@@ -27,7 +27,10 @@ def ean13_valide(valeur: str | None) -> bool:
     if valeur is None:
         return False
     chaine = valeur.strip()
-    if len(chaine) != 13 or not chaine.isdigit():
+    # Des chiffres ASCII, et eux seuls : `isdigit()` admet aussi les chiffres
+    # arabes, pleine chasse ou en exposant, que le CHECK `^[0-9]{13}$` refuserait
+    # (et sur lesquels `int()` lève parfois).
+    if len(chaine) != 13 or not (chaine.isascii() and chaine.isdigit()):
         return False
     # Poids alternés 1 et 3 sur les 12 premiers chiffres ; le 13e est la clé.
     total = sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(chaine[:12]))

@@ -1,0 +1,7 @@
+id = "API-06"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — débit : la 61e requête de la minute est refusée"
+fichier = "11_api_modele/src/api_modele/debit.py"
+avant = '''            if len(file) >= self._par_minute:'''
+apres = '''            if len(file) > self._par_minute:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_debit.py", "-k", "61e"]

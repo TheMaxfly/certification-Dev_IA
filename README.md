@@ -50,7 +50,8 @@ Le depot est organise par etapes numerotees.
 | `08_enrichissement_personnages/` | Personnages : collectes Wikipedia francais et AniList sur une ossature commune, chargeurs Kitsu et Wikipedia vers les tables `manga.character*`. | Charges : 34 293 personnages et 105 048 formes (Kitsu), 13 101 personnages et 21 398 formes (Wikipedia francais) ; 90 tests. |
 | `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus, test d'equivalence du service. | Trois encodages float32 dans `bench` (pgvector) : BGE-M3 (1 024 d) et EmbeddingGemma (768 d) sur le corpus `v1`, 66 290 vecteurs chacun (2026-10-07) ; EmbeddingGemma sur le corpus `v2`, 77 006 vecteurs (2026-10-10). Reprise et rejeu sans ecriture ; 72 tests. |
 | `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : 17 configurations en trois tours (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, TF-IDF, fusions, classement limite au catalogue, representation de l'oeuvre), metriques au grain entite, MLflow ; regle de promotion et journal des promotions. | 18 runs enregistres (MLflow local, `bench.eval_mesures`, 1 872 lignes) : les 17 mesures sur le corpus `v1`, puis la mesure 8 sur le corpus `v2`. Mesure 8 : 31 questions reussies sur 59, sur l'un comme sur l'autre. Encodage du `v2` en service depuis le 2026-10-10 ; 120 tests. |
-| `database/` | Migrations PostgreSQL partagees et versionnees. | 23 migrations (`000` a `022`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 234 tests sur base jetable. |
+| `11_api_modele/` | API REST du modele d'embedding : une question, les series du catalogue classees et les passages qui les justifient. FastAPI, une cle d'acces par application, debit par cle, contrat `/v1/` versionne, Compose avec le service d'embedding. | Version 1.0.0 : le classement du banc (mesure 8, encodage en service), egal au run de reference sur les 69 questions du jeu gele (69 / 69) ; lecture seule sous `modele_ro` (migration `023`) ; 206 tests, couverture 96 %, essai d'integration du Compose dans `make verify`. |
+| `database/` | Migrations PostgreSQL partagees et versionnees. | 24 migrations (`000` a `023`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 288 tests sur base jetable. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
 
 ## Sources de donnees
@@ -321,7 +322,10 @@ uv run python -m identity.etage1_exact --dry-run   # etage 1
 
 ## API
 
-L'API est dans `02_api_manga/`.
+L'API de donnees est dans `02_api_manga/`. L'API du modele, `11_api_modele/`, est une
+autre API : elle sert la recherche par le modele d'embedding (`POST /v1/recherche`, cle
+en en-tete `X-API-Key`), avec le classement mesure par le banc ; demarrage, securite et
+contrat dans son README.
 
 Demarrage local :
 
@@ -433,7 +437,7 @@ Une seule commande verifie le depot, sur le poste comme sur GitHub :
 ```bash
 make verify              # les modules touches depuis origin/develop et ceux qui en
                          # dependent, plus la tache statique ; TOUT=1 pour tout
-make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 10, database, demo, statique
+make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 11, database, demo, statique
 make verify-indicatif    # Bandit et pip-audit, jamais exiges
 make verify-poste        # la memoire d'abord ; make verify complet sauf arbre deja
                          # vert ; puis les harnais du poste seul
@@ -443,14 +447,15 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   un test passe : il est compte, et plafonne par module dans
   `verification/sauts_attendus.tsv`. Au-dela du plafond, la verification echoue.
 - Aucune suite ne recoit l'adresse de la base reelle : les tests qui ont besoin
-  de PostgreSQL lancent une base jetable par Docker. Seule exception, l'etape
-  « etat d'apimanga » de `make verify-poste`, en lecture seule sous `verif_ro`.
+  de PostgreSQL lancent une base jetable par Docker. Deux exceptions, deux etapes de
+  `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_ro`, et
+  l'equivalence de l'API du modele sous `modele_api`.
 - Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
-  `statique` (actionlint, shellcheck, essais des hooks) : 12 controles,
+  `statique` (actionlint, shellcheck, essais des hooks) : 13 controles,
   obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
   par les changements reussit sans rien faire.
 - `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture
-  seule et l'equivalence du service d'embedding.
+  seule et l'equivalence du service d'embedding, puis de l'API du modele.
 
 ## Demonstration
 

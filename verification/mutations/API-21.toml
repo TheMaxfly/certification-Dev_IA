@@ -1,0 +1,7 @@
+id = "API-21"
+origine = "E3 étape 2, bloc 04 (2026-10-20) — toute réponse porte Cache-Control: no-store (contrat, B.1) : un classement ou une erreur ne se met pas en cache"
+fichier = "11_api_modele/src/api_modele/enveloppe.py"
+avant = '''                entetes.setdefault("Cache-Control", "no-store")'''
+apres = '''                entetes.setdefault("Cache-Control", "max-age=60")'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_contrat_codes.py"]

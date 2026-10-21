@@ -64,3 +64,11 @@ def test_les_controles_ne_lisent_que_les_encodages_du_corpus(
         for nom, c in constats.items()
         if nom.startswith("bench.vecteurs_bge_m3") or nom.startswith("bench.encodages")
     )
+
+
+def test_une_ligne_attendue_absente_est_un_ecart_pas_une_exception(base):
+    """Sans la ligne du jeu dans bench.eval_jeux, le contrôle rapporte l'écart."""
+    constats = {c["controle"]: c for c in verification.verifier(base)}
+    jeu = constats[f"jeu {verification.JEU} : empreinte en base"]
+    assert jeu["constate"] is None
+    assert not jeu["conforme"]

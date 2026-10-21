@@ -26,24 +26,37 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
 | `make verify TOUT=1` | tous les modules |
-| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `10`, `database`, `demo`, `statique` |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `11`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | la mémoire d'abord (5 Go disponibles, 4 Go de mémoire vidéo libre) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, état d'`apimanga` en lecture seule, équivalence du service d'embedding (instance EmbeddingGemma lancée puis arrêtée, sur les échantillons exportés ; **sans échantillon, échec** : une vérification qui ne tourne pas est un échec), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
+| `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
-  vidé. **Jamais de DSN réel pour les tests, sauf l'étape « état d'`apimanga` » de
-  `verify-poste`, en lecture seule sous `verif_ro`** (plus bas).
+  vidé. **Jamais de DSN réel pour les tests, sauf deux étapes de `verify-poste`, en
+  lecture seule** (plus bas) : l'état d'`apimanga`, sous `verif_ro` ; l'équivalence de
+  l'API du modèle, sous `modele_ro`.
+- **Les exigences d'un module neuf sont bloquantes**, dès son premier commit : Pyright
+  strict sur `src/`, Bandit sur `src/`, pip-audit sur le verrou, après ses tests, dans
+  `make verify` ; un constat est un échec, et la couverture est mesurée. Elles se
+  déclarent dans le 9e champ de sa ligne de `MODULES` (`verification/verifier.sh`) ;
+  le module 11 (API du modèle) les porte. Pour les modules d'avant, Bandit et
+  pip-audit restent indicatifs.
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
   `verification/` et de `sauvegarde/`, les essais des hooks (`tester.sh`), du
   périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
-  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…)
-  et de la sauvegarde (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
+  (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
+  du contrôle des pseudonymes des passages de l'API
+  (`verification/tester_pseudonymes_passages.py`) et de la sauvegarde
+  (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
   graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
   exécuteurs figés, lecture seule, jeton non persistant, aucun échec avalé).
 - L'intégration Compose du 02 (PostgreSQL jetable, migrations, rôle de lecture, API
-  réelle, contrôles HTTP) fait partie de la vérification du 02.
+  réelle, contrôles HTTP) fait partie de la vérification du 02. Celle du 11 lève le
+  Compose du module avec `compose.integration.yml` : base jetable, migrations, rôle
+  `modele_api` par sa procédure, jeu d'essai promu, doublure du service d'embedding
+  (le modèle, à accès contrôlé, ne tourne pas sur GitHub), API réelle, essai HTTP ;
+  elle fait partie de la vérification du 11.
 - Arrêt au premier échec, avec le module et la commande ; une ligne par module :
   passés, sautés, en échec, durée.
 - **Un test sauté n'est pas un test passé** : il est compté. Au-delà du plafond écrit,
@@ -95,9 +108,35 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   service ; les migrations appliquées, égales aux fichiers. Puis le contrôle du module
   09, et les tests qui ne peuvent tourner que sur la base réelle (05, 08, `demo`) :
   ils doivent passer, aucun ne doit sauter.
+- **Les pseudonymes des passages rendus par l'API du modèle** : l'étape d'équivalence,
+  jouée juste avant, écrit les identifiants des fragments que l'API a rendus ;
+  `verification/pseudonymes_passages.py` relit leur texte et y cherche les
+  pseudonymes, par la méthode du corpus v2. Hors des occurrences connues
+  (`database/donnees/corpus_references_masquees.csv`, `corpus_homonymes_admis.csv`),
+  aucune n'est admise ; un témoin retrouve d'abord chaque référence connue dans son
+  document. Sans passages rendus, refus. La sortie ne porte que des nombres, des
+  identifiants et des empreintes.
 - **Une mesure, une promotion ou une migration change l'état** : relever la référence
   (`bash verification/etat_apimanga.sh --relever`) et la commiter avec ce qui l'a
   changée.
+
+### L'équivalence de l'API du modèle, en lecture seule
+
+Seconde exception à « jamais de DSN réel », accordée par le mainteneur le 2026-10-20
+(E3, étape 2) : ce que l'API sert doit être ce que le banc a mesuré, et seule la base
+réelle porte les vecteurs du corpus en service.
+
+- **Une étape de `verify-poste`** : l'équivalence de l'API, après celle du service, sur
+  la même et unique instance EmbeddingGemma. Les questions du jeu gelé, rejouées par
+  l'API, doivent rendre les mêmes dix premières séries que le run de référence du
+  banc. Sautée partout ailleurs, et comptée comme telle (`sauts_attendus.tsv`).
+- **Sous `modele_ro`** (migration `023`) : `SELECT` sur le corpus, les fragments, les
+  vecteurs EmbeddingGemma, le registre des encodages et l'encodage en service, le
+  rattachement et le titre des séries — rien d'autre. Le rôle de connexion
+  `modele_api` est créé par `database/outils/creer_role_modele.sh` ; ses sessions sont
+  en lecture seule.
+- **Le DSN n'est visible que de cette étape** : lu dans `verification/.env`, sans mot
+  de passe (il est dans `~/.pgpass`), et passé au seul test qu'elle nomme.
 
 **Documentation seule.** Pour un changement qui ne touche que des fichiers de
 documentation (`.md`), `make verify` complet n'est pas exigé sur le poste avant le
@@ -130,9 +169,11 @@ reste obligatoire.
   permissions en lecture seule.
 
 **Tout module neuf entre dans la matrice ET dans les contrôles obligatoires, dans la
-même étape** : sa ligne dans `verification/verifier.sh`, ses dépendances dans
-`verification/dependances.tsv`, son entrée dans la matrice de `verify.yml`, et son
-contrôle `verify <module>` dans l'ensemble de règles.
+même étape** : sa ligne dans `verification/verifier.sh`, avec ses exigences, ses
+dépendances dans `verification/dependances.tsv`, son plafond de tests sautés dans
+`verification/sauts_attendus.tsv` (0 s'il n'en saute aucun), son entrée dans la
+matrice de `verify.yml`, et son contrôle `verify <module>` dans l'ensemble de
+règles.
 
 ## Les protections de `main` et `develop`
 

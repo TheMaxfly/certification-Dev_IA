@@ -1,0 +1,7 @@
+id = "API-19"
+origine = "E3 étape 2, bloc 04 (2026-10-20) — la clé présentée est comparée en temps constant (secrets.compare_digest), jamais par une égalité qui s'arrête au premier octet différent"
+fichier = "11_api_modele/src/api_modele/securite.py"
+avant = '''        if secrets.compare_digest(presente, cle.secret.encode("utf-8")):'''
+apres = '''        if presente == cle.secret.encode("utf-8"):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_securite.py", "-k", "sans_s_arreter"]

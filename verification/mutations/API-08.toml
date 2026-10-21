@@ -1,0 +1,7 @@
+id = "API-08"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — un corps sans longueur annoncée est borné pendant sa lecture"
+fichier = "11_api_modele/src/api_modele/enveloppe.py"
+avant = '''            if taille > self.corps_max:'''
+apres = '''            if taille > 10 * self.corps_max:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_erreurs.py", "-k", "sans_longueur_annoncee"]

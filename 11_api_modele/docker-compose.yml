@@ -1,0 +1,105 @@
+# L'API du modèle et son service d'embedding, conteneurisés (E3, étape 2, bloc 05).
+#
+#   cp .env.example .env              # clés, DSN du conteneur, pgpass (README)
+#   docker compose up -d --build      # le service d'embedding, PUIS l'API, une fois
+#                                     # le service sain
+#   docker compose down
+#
+# Mode processeur (poste sans carte graphique, serveur) — un réglage du `.env` :
+#   COMPOSE_FILE=docker-compose.yml:compose.cpu.yml
+#
+# Deux services, un réseau interne :
+#   - `embedding` : Text Embeddings Inference 1.9.4, image épinglée par empreinte (celle
+#     des encodages et de l'équivalence), configurée par le fichier du module 09
+#     (`config/embeddinggemma.env` : modèle, révision, précision, port). Aucun port
+#     publié, aucun accès sortant : les poids sont lus dans le cache Hugging Face de
+#     l'hôte, monté (`HF_HUB_OFFLINE`) ;
+#   - `api` : l'image du module (`Dockerfile`, construite depuis la racine du dépôt),
+#     non root. Elle attend le service sain, puis contrôle sa cohérence au démarrage
+#     (base, encodage en service, `/info` du service) et refuse de démarrer au moindre
+#     écart. Elle lit la base de l'hôte sous `modele_api` ; le mot de passe est dans un
+#     fichier pgpass monté en secret, jamais dans le DSN. SEUL port publié : 8010, sur
+#     l'adresse locale par défaut.
+#
+# Une seule instance du service d'embedding à la fois sur le poste : ne pas lever ce
+# Compose pendant un encodage ou une équivalence du module 09 (même carte, même mémoire).
+
+name: api-modele
+
+services:
+  embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:86-1.9.4@sha256:bee0bdb887096229add91b6fdfcf95258c12eb9180e90dc86f3b4b25b86fc613
+    # Nommé `tei-…` comme les instances du 09 : les gardes « une instance à la fois »
+    # (équivalence de verify-poste, sauvegarde) le voient.
+    container_name: tei-api-modele
+    env_file: [../09_service_embedding/config/embeddinggemma.env]
+    environment:
+      # Les poids viennent du cache monté : le service ne sort pas du réseau interne.
+      HF_HUB_OFFLINE: "1"
+    # L'utilisateur de l'hôte, propriétaire du cache (comme le Compose du 09).
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    volumes:
+      - ${HF_HUB_CACHE_HOTE:-~/.cache/huggingface/hub}:/data
+    shm_size: 1g
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks: [interne]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:$${PORT}/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 180s
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: 11_api_modele/Dockerfile
+    image: api-modele:1.0.0
+    depends_on:
+      embedding:
+        condition: service_healthy
+    environment:
+      # Vide : l'API refuse de démarrer (le refus lui appartient, en un seul endroit).
+      API_MODELE_CLES: ${API_MODELE_CLES:-}
+      # Sans mot de passe : il est dans le pgpass monté.
+      API_MODELE_DSN: ${API_MODELE_DSN_CONTENEUR:-postgresql://modele_api@host.docker.internal:5432/apimanga}
+      PGPASSFILE: /run/secrets/pgpass
+      # Le service, par son nom sur le réseau interne ; son port est celui du module 09.
+      CLIENT_HOTE: embedding
+      # Surcharges d'exploitation : vides, les défauts de config/reglages.toml.
+      API_MODELE_DEBIT_PAR_MINUTE: ${API_MODELE_DEBIT_PAR_MINUTE:-}
+      API_MODELE_JOURNAL_QUESTION: ${API_MODELE_JOURNAL_QUESTION:-}
+      API_MODELE_METRIQUES_RESEAUX: ${API_MODELE_METRIQUES_RESEAUX:-}
+      API_MODELE_DOCUMENTATION: ${API_MODELE_DOCUMENTATION:-}
+    secrets: [pgpass]
+    # Non root : l'utilisateur de l'hôte, seul lecteur du pgpass (mode 600).
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [interne, sortie]
+    ports:
+      - "${API_MODELE_ADRESSE_PUBLIEE:-127.0.0.1}:${API_MODELE_PORT_PUBLIE:-8010}:8010"
+    restart: "no"
+
+networks:
+  # Le service d'embedding n'est joignable que de l'API, et ne joint rien d'autre.
+  interne:
+    internal: true
+  # La base de l'hôte et le port publié de l'API. Sous-réseau fixe : le serveur
+  # PostgreSQL de l'hôte doit admettre `modele_api` depuis lui, et lui seul (une ligne
+  # de pg_hba.conf, README « Démarrer avec le Compose »).
+  sortie:
+    ipam:
+      config:
+        - subnet: 172.30.11.0/24
+
+secrets:
+  pgpass:
+    file: ${API_MODELE_PGPASS:-./.pgpass.conteneur}

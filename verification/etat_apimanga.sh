@@ -20,6 +20,10 @@
 # Puis le contrôle du module 09 (`service_embedding.verification`), et les 11 tests qui
 # sautent ailleurs faute de base : 4 du 05, 3 du 08, 4 de `demo`. Ils doivent passer,
 # aucun ne doit sauter.
+# Enfin les pseudonymes des passages que l'API du modèle a rendus dans l'étape
+# d'équivalence, qui précède celle-ci dans verify-poste (règle 3.1 de l'étape 1 :
+# hors des occurrences connues, aucune) — `verification/pseudonymes_passages.py`. Sans
+# ces passages, refus : le contrôle ne peut pas conclure.
 #
 # Une nouvelle mesure, une promotion ou une migration change l'état : on relève la
 # référence (--relever) et on la commite avec ce qui l'a changée.
@@ -172,4 +176,15 @@ lancer 05_nettoyage_agregation_bdd APIMANGA_DSN "${#TESTS_05[@]}" "${TESTS_05[@]
 lancer 08_enrichissement_personnages APIMANGA_DSN "${#TESTS_08[@]}" "${TESTS_08[@]}"
 lancer demo DATABASE_URL "$ATTENDUS_DEMO" "${TESTS_DEMO[@]}"
 
-dire "conforme : état égal à la référence, contrôle du 09, 11 tests sur la base réelle"
+# --------------------------------------------------------------------------- #
+#  Les pseudonymes des passages rendus par l'API (règle 3.1 de l'étape 1)
+# --------------------------------------------------------------------------- #
+BILAN_API="$SORTIES/egalite_api.json"
+dire "pseudonymes des passages rendus par l'API (étape d'équivalence)"
+[ -r "$BILAN_API" ] || echouer "passages rendus par l'API absents" \
+  "(${BILAN_API#"$RACINE"/}) : l'étape d'équivalence d'abord (verification/verifier.sh equivalence)"
+(cd "$RACINE/database" && "${PROPRE[@]}" APIMANGA_VERIF_DSN="$DSN" \
+  uv run --locked python "$RACINE/verification/pseudonymes_passages.py" "$BILAN_API") ||
+  echouer "pseudonymes des passages rendus par l'API : occurrence hors de la liste connue, ou contrôle impossible"
+
+dire "conforme : état égal à la référence, contrôle du 09, 11 tests sur la base réelle, pseudonymes des passages de l'API"

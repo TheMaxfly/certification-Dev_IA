@@ -14,6 +14,9 @@
 #   09     ← `database/` (bases jetables, jeu d'évaluation)
 #   10     ← `database/`, le module 09 (dépendance par chemin), `atteignabilite.py` du 05
 #            (chargé par son chemin)
+#   11     ← `database/`, le module 09 (dépendance par chemin), le paquet du 10 et son
+#            verrou (chargé par son chemin ; versions du calcul comparées), et
+#            `atteignabilite.py` du 05, que le 10 charge
 #   demo   ← 04, 05, 07 (états et actions), `database/`
 #
 # module	chemins
@@ -26,7 +29,8 @@
 08	08_enrichissement_personnages/ database/
 09	09_service_embedding/ database/
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
-database	database/
+11	11_api_modele/ database/ 09_service_embedding/ 10_mesures_recherche/src/ 10_mesures_recherche/uv.lock 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+database	database/ sauvegarde/sauvegarder.sh
 demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
 statique	(toujours)
 *	verification/ Makefile ruff.toml .pre-commit-config.yaml .github/workflows/verify.yml pyproject.toml

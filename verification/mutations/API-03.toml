@@ -1,0 +1,7 @@
+id = "API-03"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — creer_role_modele.sh : les sessions de modele_api sont en lecture seule"
+fichier = "database/outils/creer_role_modele.sh"
+avant = '''ALTER ROLE modele_api SET default_transaction_read_only = on;'''
+apres = '''-- verrou de session retiré'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_role_modele.py", "-k", "lit_ce_que_l_api_lit"]

@@ -1,0 +1,7 @@
+id = "PH-50"
+origine = "Correctif (2026-10-20) — 05 : des chiffres non ASCII redeviennent des chiffres d'EAN"
+fichier = "05_nettoyage_agregation_bdd/src/identity/ean.py"
+avant = '''    if len(chaine) != 13 or not (chaine.isascii() and chaine.isdigit()):'''
+apres = '''    if len(chaine) != 13 or not chaine.isdigit():'''
+dossier = "05_nettoyage_agregation_bdd"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_ean.py", "-k", "non_ascii"]

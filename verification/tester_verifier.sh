@@ -8,8 +8,11 @@
 #   - arrêt au premier échec, avec le module et la commande en cause ;
 #   - plafond de tests sautés : au-delà, échec ; à hauteur, vert ;
 #   - aucun test collecté : échec ;
+#   - exigences d'un module (Pyright, Bandit, pip-audit, par doublures) : bloquantes,
+#     dans l'ordre déclaré, arrêt à la première refusée ; inconnue : échec ; aucune
+#     lancée pour un module qui n'en déclare pas, ni après des tests en échec ;
 #   - volumes Docker créés pendant la vérification : supprimés (si Docker répond) ;
-#   - équivalence du service sans échantillon : échec (verify-poste) ;
+#   - équivalence du service sans échantillon, de l'API sans DSN : échec (verify-poste) ;
 #   - cohérence MODULES ↔ graphe ↔ matrice de verify.yml ;
 #   - règles des workflows (controler_workflows.sh), chaque écart provoqué.
 set -uo pipefail
@@ -129,6 +132,55 @@ rc=$?
 constat "aucun test collecté : échec" [ "$rc" -ne 0 ]
 constat "aucun test collecté : le dit" dit "aucun test collecté"
 
+# --- Exigences bloquantes (9e champ de MODULES) -------------------------------- #
+# Doublures des outils : chacune note l'exigence reçue, puis rend le code voulu.
+doublure() {  # doublure <nom> <code de sortie>
+  # shellcheck disable=SC2016  # « $1 » : celui de la doublure, écrit tel quel
+  printf '#!/bin/sh\necho "$1" >>"%s/appels"\nexit %s\n' "$T" "$2" >"$T/$1"
+  chmod +x "$T/$1"
+}
+doublure passe 0
+doublure refuse 1
+ligne_exigee() { printf '%s|%s|%s|unittest|||||%s\n' "$1" "$1" "$1" "$2"; }
+exiger() {  # exiger <doublure pyright> <bandit> <pip-audit> <fichier MODULES> <module>
+  : >"$T/appels"
+  VERIFY_DOUBLURE_PYRIGHT="$T/$1" VERIFY_DOUBLURE_BANDIT="$T/$2" \
+    VERIFY_DOUBLURE_PIP_AUDIT="$T/$3" verifier "$4" verify "$5"
+}
+appels() { paste -sd' ' "$T/appels"; }
+
+ligne_exigee vert "pyright,bandit,pip-audit" >"$T/m_exige"
+exiger passe passe passe "$T/m_exige" vert
+rc=$?
+constat "exigences tenues : vert" [ "$rc" -eq 0 ]
+constat "exigences tenues : les trois lancées, dans l'ordre déclaré" \
+  [ "$(appels)" = "pyright bandit pip-audit" ]
+constat "exigences tenues : le résumé le dit" dit "3/3"
+exiger refuse passe passe "$T/m_exige" vert
+rc=$?
+constat "Pyright refuse : échec" [ "$rc" -ne 0 ]
+constat "Pyright refuse : l'exigence nommée" dit "ÉCHEC — module vert : exigence pyright"
+constat "Pyright refuse : arrêt, les suivantes ne sont pas lancées" [ "$(appels)" = "pyright" ]
+exiger passe refuse passe "$T/m_exige" vert
+rc=$?
+constat "Bandit refuse : échec, nommé" bash -c "[ $rc -ne 0 ] && grep -qF 'exigence bandit' '$T/sortie'"
+exiger passe passe refuse "$T/m_exige" vert
+rc=$?
+constat "pip-audit refuse : échec, nommé" bash -c "[ $rc -ne 0 ] && grep -qF 'exigence pip-audit' '$T/sortie'"
+ligne_exigee vert "pyright,mypy" >"$T/m_inconnue"
+exiger passe passe passe "$T/m_inconnue" vert
+rc=$?
+constat "exigence inconnue : échec" [ "$rc" -ne 0 ]
+constat "exigence inconnue : le dit" dit "mypy (inconnue)"
+ligne vert >"$T/m_sans"
+exiger refuse refuse refuse "$T/m_sans" vert
+rc=$?
+constat "module sans exigence : vert, aucun outil lancé" bash -c "[ $rc -eq 0 ] && [ ! -s '$T/appels' ]"
+ligne_exigee rouge "pyright,bandit,pip-audit" >"$T/m_rouge"
+exiger passe passe passe "$T/m_rouge" rouge
+rc=$?
+constat "tests en échec : les exigences ne sont pas lancées" bash -c "[ $rc -ne 0 ] && [ ! -s '$T/appels' ]"
+
 # --- Volumes Docker ------------------------------------------------------------ #
 if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
   VOLUME="essai-verificateur-$$"
@@ -156,6 +208,14 @@ verifier "$T/m_env" equivalence
 rc=$?
 constat "équivalence sans échantillon : échec" [ "$rc" -ne 0 ]
 constat "équivalence sans échantillon : le dit" dit "aucun échantillon"
+mkdir -p "$D/09_service_embedding/mesures/equivalence"
+: >"$D/09_service_embedding/mesures/equivalence/encodage_1.json"
+verifier "$T/m_env" equivalence
+rc=$?
+constat "équivalence de l'API sans DSN : échec" [ "$rc" -ne 0 ]
+constat "équivalence de l'API sans DSN : le dit, avant tout lancement" \
+  bash -c "grep -qF 'APIMANGA_MODELE_DSN absent' '$T/sortie' && ! grep -qF 'docker compose' '$T/sortie'"
+rm -rf "$D/09_service_embedding"
 
 # --- Cohérence MODULES ↔ graphe ↔ matrice ------------------------------------- #
 { ligne vert; ligne rouge; } >"$T/m_coherence"

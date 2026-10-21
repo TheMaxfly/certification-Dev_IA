@@ -120,7 +120,7 @@ WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_sch
 
 # Empreintes de contenu des tables du banc (apimanga), par clé primaire.
 SQL_EMPREINTES="$SESSION_FIXE
-SELECT 'bench.corpus_docs' || chr(9) || md5(string_agg(md5(t::text), '' ORDER BY doc_key COLLATE \"C\")) FROM bench.corpus_docs t;
+SELECT 'bench.corpus_docs' || chr(9) || md5(string_agg(md5(t::text), '' ORDER BY corpus_id COLLATE \"C\", doc_key COLLATE \"C\")) FROM bench.corpus_docs t;
 SELECT 'bench.corpus_chunks' || chr(9) || md5(string_agg(md5(t::text), '' ORDER BY chunk_id)) FROM bench.corpus_chunks t;
 SELECT 'bench.vecteurs_bge_m3' || chr(9) || md5(string_agg(md5(t::text), '' ORDER BY chunk_id)) FROM bench.vecteurs_bge_m3 t;
 SELECT 'bench.vecteurs_embeddinggemma' || chr(9) || md5(string_agg(md5(t::text), '' ORDER BY chunk_id)) FROM bench.vecteurs_embeddinggemma t;

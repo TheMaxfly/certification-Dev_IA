@@ -1,0 +1,7 @@
+id = "API-07"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — démarrage : /info du service est confronté à l'encodage en service (confronter du module 09)"
+fichier = "11_api_modele/src/api_modele/demarrage.py"
+avant = '''        info = service.confronter_au_registre(client, encodage)'''
+apres = '''        info = client.info()'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_demarrage.py", "-k", "revision_differente"]

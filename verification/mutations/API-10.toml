@@ -1,0 +1,7 @@
+id = "API-10"
+origine = "E3 étape 2, bloc 02 (2026-10-20) — démarrage : la borne de la question doit tenir sous la longueur maximale annoncée par /info"
+fichier = "11_api_modele/src/api_modele/demarrage.py"
+avant = '''    if not isinstance(limite, int) or pire > limite:'''
+apres = '''    if not isinstance(limite, int):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_demarrage.py", "-k", "trop_courte"]
