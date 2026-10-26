@@ -131,6 +131,61 @@ class Question(BaseModel):
     longueur_max_caracteres: int
 
 
+class BorneReelle(BaseModel):
+    defaut: float
+    min: float
+    max: float
+
+
+class ModeDecrit(BaseModel):
+    defaut: str
+    valeurs: list[str]
+
+
+class HistoriqueDecrit(BaseModel):
+    tours_max: int
+    caracteres_max: int
+
+
+class ReglagesReponse(BaseModel):
+    """Les réglages de la route de réponse : défauts et bornes (`reglages.toml`)."""
+
+    temperature: BorneReelle
+    longueur_max: BorneEntiere
+    mode: ModeDecrit
+    historique: HistoriqueDecrit
+    reformuler: BorneBooleenne
+    nombre_series: BorneEntiere
+    passages_par_serie: BorneEntiere
+    catalogue_seul: BorneBooleenne
+
+
+class ProfilDecrit(BaseModel):
+    nom: str
+    fournisseur: str
+    modele: str = Field(description="L'identifiant du modèle chez le fournisseur.")
+    statut: Literal["stable", "apercu"]
+    disponible: bool = Field(
+        description="La clé du profil est présente (et, si le contrôle d'exploitation"
+        " a tourné au démarrage, le modèle figure chez le fournisseur)."
+    )
+    reglages_absents: list[str] = Field(
+        description="Les réglages que ce profil n'expose pas : les demander est refusé."
+    )
+    variable_cle: str = Field(
+        description="Le NOM de la variable d'environnement de la clé, jamais sa valeur."
+    )
+
+
+class ModeleLangage(BaseModel):
+    """Le modèle de langage : le profil qui rédige, les profils déclarés, les
+    réglages de la réponse. Distinct de `modele`, le modèle d'embedding."""
+
+    profil_actif: str
+    profils: list[ProfilDecrit]
+    reglages_reponse: ReglagesReponse
+
+
 class Info(BaseModel):
     """Ce que l'API sert : modèle, encodage, corpus, réglages et leurs bornes."""
 
@@ -147,3 +202,4 @@ class Info(BaseModel):
     reglages: ReglagesRecherche
     question: Question
     debit_par_minute: int
+    modele_langage: ModeleLangage

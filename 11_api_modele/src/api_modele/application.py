@@ -34,7 +34,7 @@ from api_modele import (
     service,
 )
 from api_modele.classement import Classeur
-from api_modele.configuration import Reglages
+from api_modele.configuration import Borne, Reglages
 from api_modele.debit import Limiteur
 from api_modele.enveloppe import Enveloppe
 from api_modele.erreurs import Erreur, ErreurApi
@@ -44,10 +44,16 @@ from api_modele.metriques import Metriques, autorisee
 from api_modele.modeles import (
     BorneBooleenne,
     BorneEntiere,
+    BorneReelle,
+    HistoriqueDecrit,
     Info,
+    ModeDecrit,
+    ModeleLangage,
+    ProfilDecrit,
     Question,
     Recherche,
     ReglagesRecherche,
+    ReglagesReponse,
     Resultat,
     Sante,
 )
@@ -323,6 +329,49 @@ def sonder(etat: EtatApi) -> Sante:
     )
 
 
+def _borne(borne: Borne) -> BorneEntiere:
+    return BorneEntiere(defaut=borne.defaut, min=borne.min, max=borne.max)
+
+
+def decrire_modele_langage(etat: EtatApi) -> ModeleLangage:
+    """Le profil actif, les profils tels que la couche les sert (disponibilité
+    effective), les réglages de la réponse ; le nom des variables, jamais une clé."""
+    ml = etat.reglages.modele_langage
+    r = ml.reponse
+    return ModeleLangage(
+        profil_actif=etat.fournisseurs.profil_actif,
+        profils=[
+            ProfilDecrit(
+                nom=p.nom,
+                fournisseur=p.fournisseur,
+                modele=p.modele,
+                statut="apercu" if p.statut == "apercu" else "stable",
+                disponible=p.disponible,
+                reglages_absents=list(p.reglages_absents),
+                variable_cle=p.variable_cle,
+            )
+            for p in etat.fournisseurs.profils.values()
+        ],
+        reglages_reponse=ReglagesReponse(
+            temperature=BorneReelle(
+                defaut=r.temperature.defaut,
+                min=r.temperature.min,
+                max=r.temperature.max,
+            ),
+            longueur_max=_borne(r.longueur_max),
+            mode=ModeDecrit(defaut=r.mode_defaut, valeurs=list(r.modes)),
+            historique=HistoriqueDecrit(
+                tours_max=r.historique_tours_max,
+                caracteres_max=r.historique_caracteres_max,
+            ),
+            reformuler=BorneBooleenne(defaut=r.reformuler),
+            nombre_series=_borne(r.nombre_series),
+            passages_par_serie=_borne(r.passages_par_serie),
+            catalogue_seul=BorneBooleenne(defaut=r.catalogue_seul),
+        ),
+    )
+
+
 def decrire(etat: EtatApi) -> Info:
     r = etat.reglages
     c = etat.coherence
@@ -353,4 +402,5 @@ def decrire(etat: EtatApi) -> Info:
         ),
         question=Question(longueur_max_caracteres=r.longueur_question_max),
         debit_par_minute=r.debit_par_minute,
+        modele_langage=decrire_modele_langage(etat),
     )

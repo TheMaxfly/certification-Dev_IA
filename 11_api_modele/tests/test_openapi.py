@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from openapi_spec_validator import OpenAPIV31SpecValidator
 
@@ -10,6 +11,8 @@ import api_modele
 from api_modele.contrat import DESTINATION, contrat, exporter, serialiser
 
 ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche"}
+#: Le contrat publié à la livraison 1.0.0 (étiquette `api-modele`), figé.
+REFERENCE_1_0_0 = Path(__file__).parent / "references" / "openapi_v1_1.0.0.json"
 ROUTES_OUVERTES = {"/v1/sante", "/v1/openapi.json"}
 
 
@@ -108,3 +111,49 @@ def test_exporter_ecrit_le_contrat(tmp_path):
     fichier = exporter(tmp_path / "openapi_v1.json")
 
     assert fichier.read_text(encoding="utf-8") == serialiser(contrat())
+
+
+def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
+    """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seul `Info`
+    gagne un champ (`modele_langage`), et de nouveaux schémas s'ajoutent."""
+    avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
+    apres = contrat()
+
+    assert apres["info"] == avant["info"]  # 1.0.0 jusqu'à la route de réponse
+    assert (
+        apres["components"]["securitySchemes"]
+        == (avant["components"]["securitySchemes"])
+    )
+    for chemin, operations in avant["paths"].items():
+        assert apres["paths"][chemin] == operations, chemin
+    schemas = apres["components"]["schemas"]
+    for nom, schema in avant["components"]["schemas"].items():
+        if nom != "Info":
+            assert schemas[nom] == schema, nom
+            continue
+        info = schemas["Info"]
+        assert set(info["properties"]) - set(schema["properties"]) == {"modele_langage"}
+        for champ, forme in schema["properties"].items():
+            assert info["properties"][champ] == forme, champ
+        assert set(schema["required"]) <= set(info["required"])
+        reste = {k: v for k, v in info.items() if k not in ("properties", "required")}
+        assert reste == {
+            k: v for k, v in schema.items() if k not in ("properties", "required")
+        }
+    nouveaux = set(schemas) - set(avant["components"]["schemas"])
+    assert nouveaux == {
+        "BorneReelle",
+        "HistoriqueDecrit",
+        "ModeDecrit",
+        "ModeleLangage",
+        "ProfilDecrit",
+        "ReglagesReponse",
+    }
+
+
+def test_la_reference_1_0_0_est_le_contrat_livre():
+    """Le figé ne bouge pas : son empreinte est celle du fichier livré à 1.0.0."""
+    import hashlib
+
+    empreinte = hashlib.sha256(REFERENCE_1_0_0.read_bytes()).hexdigest()
+    assert empreinte.startswith("b3ee377d1492e7e2")

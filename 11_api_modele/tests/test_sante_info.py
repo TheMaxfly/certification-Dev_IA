@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 import psycopg
-from conftest import BaseApi, Doublure, entetes, inscrire_encodage, promouvoir
+from conftest import (
+    CLE_FOURNISSEUR,
+    BaseApi,
+    Doublure,
+    entetes,
+    inscrire_encodage,
+    promouvoir,
+)
 
 import api_modele
 
@@ -95,4 +102,41 @@ def test_info_dit_ce_qui_est_servi(api, base_api: BaseApi, service_doublure):
         },
         "question": {"longueur_max_caracteres": 500},
         "debit_par_minute": 60,
+        "modele_langage": MODELE_LANGAGE,
     }
+    assert CLE_FOURNISSEUR not in r.text
+
+
+def profil(nom, fournisseur, statut, disponible, variable):
+    return {
+        "nom": nom,
+        "fournisseur": fournisseur,
+        "modele": nom,
+        "statut": statut,
+        "disponible": disponible,
+        "reglages_absents": [],
+        "variable_cle": variable,
+    }
+
+
+#: Le harnais n'a que la clé (factice) du profil actif : les profils OpenAI sont
+#: indisponibles, sans que l'API refuse de démarrer.
+MODELE_LANGAGE = {
+    "profil_actif": "mistral-large-2512",
+    "profils": [
+        profil("mistral-large-2512", "mistral", "stable", True, "MISTRAL_API_KEY"),
+        profil("mistral-large-4", "mistral", "apercu", True, "MISTRAL_API_KEY"),
+        profil("gpt-6-luna", "openai", "stable", False, "OPENAI_API_KEY"),
+        profil("gpt-6-sol", "openai", "stable", False, "OPENAI_API_KEY"),
+    ],
+    "reglages_reponse": {
+        "temperature": {"defaut": 0.0, "min": 0.0, "max": 1.0},
+        "longueur_max": {"defaut": 400, "min": 50, "max": 1000},
+        "mode": {"defaut": "strict", "valeurs": ["strict"]},
+        "historique": {"tours_max": 10, "caracteres_max": 4000},
+        "reformuler": {"defaut": True},
+        "nombre_series": {"defaut": 5, "min": 1, "max": 50},
+        "passages_par_serie": {"defaut": 2, "min": 1, "max": 5},
+        "catalogue_seul": {"defaut": True},
+    },
+}

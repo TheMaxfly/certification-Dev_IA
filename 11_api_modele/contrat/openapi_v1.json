@@ -37,6 +37,29 @@
         "title": "BorneEntiere",
         "type": "object"
       },
+      "BorneReelle": {
+        "properties": {
+          "defaut": {
+            "title": "Defaut",
+            "type": "number"
+          },
+          "max": {
+            "title": "Max",
+            "type": "number"
+          },
+          "min": {
+            "title": "Min",
+            "type": "number"
+          }
+        },
+        "required": [
+          "defaut",
+          "min",
+          "max"
+        ],
+        "title": "BorneReelle",
+        "type": "object"
+      },
       "Contexte": {
         "properties": {
           "corpus_id": {
@@ -126,6 +149,24 @@
         "title": "Erreur",
         "type": "object"
       },
+      "HistoriqueDecrit": {
+        "properties": {
+          "caracteres_max": {
+            "title": "Caracteres Max",
+            "type": "integer"
+          },
+          "tours_max": {
+            "title": "Tours Max",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tours_max",
+          "caracteres_max"
+        ],
+        "title": "HistoriqueDecrit",
+        "type": "object"
+      },
       "Info": {
         "description": "Ce que l'API sert : modèle, encodage, corpus, réglages et leurs bornes.",
         "properties": {
@@ -148,6 +189,9 @@
           "modele": {
             "title": "Modele",
             "type": "string"
+          },
+          "modele_langage": {
+            "$ref": "#/components/schemas/ModeleLangage"
           },
           "nb_fragments": {
             "title": "Nb Fragments",
@@ -193,9 +237,57 @@
           "nb_fragments",
           "reglages",
           "question",
-          "debit_par_minute"
+          "debit_par_minute",
+          "modele_langage"
         ],
         "title": "Info",
+        "type": "object"
+      },
+      "ModeDecrit": {
+        "properties": {
+          "defaut": {
+            "title": "Defaut",
+            "type": "string"
+          },
+          "valeurs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Valeurs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "defaut",
+          "valeurs"
+        ],
+        "title": "ModeDecrit",
+        "type": "object"
+      },
+      "ModeleLangage": {
+        "description": "Le modèle de langage : le profil qui rédige, les profils déclarés, les\nréglages de la réponse. Distinct de `modele`, le modèle d'embedding.",
+        "properties": {
+          "profil_actif": {
+            "title": "Profil Actif",
+            "type": "string"
+          },
+          "profils": {
+            "items": {
+              "$ref": "#/components/schemas/ProfilDecrit"
+            },
+            "title": "Profils",
+            "type": "array"
+          },
+          "reglages_reponse": {
+            "$ref": "#/components/schemas/ReglagesReponse"
+          }
+        },
+        "required": [
+          "profil_actif",
+          "profils",
+          "reglages_reponse"
+        ],
+        "title": "ModeleLangage",
         "type": "object"
       },
       "Passage": {
@@ -234,6 +326,60 @@
           "extrait"
         ],
         "title": "Passage",
+        "type": "object"
+      },
+      "ProfilDecrit": {
+        "properties": {
+          "disponible": {
+            "description": "La clé du profil est présente (et, si le contrôle d'exploitation a tourné au démarrage, le modèle figure chez le fournisseur).",
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "fournisseur": {
+            "title": "Fournisseur",
+            "type": "string"
+          },
+          "modele": {
+            "description": "L'identifiant du modèle chez le fournisseur.",
+            "title": "Modele",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "reglages_absents": {
+            "description": "Les réglages que ce profil n'expose pas : les demander est refusé.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reglages Absents",
+            "type": "array"
+          },
+          "statut": {
+            "enum": [
+              "stable",
+              "apercu"
+            ],
+            "title": "Statut",
+            "type": "string"
+          },
+          "variable_cle": {
+            "description": "Le NOM de la variable d'environnement de la clé, jamais sa valeur.",
+            "title": "Variable Cle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "fournisseur",
+          "modele",
+          "statut",
+          "disponible",
+          "reglages_absents",
+          "variable_cle"
+        ],
+        "title": "ProfilDecrit",
         "type": "object"
       },
       "Question": {
@@ -342,6 +488,47 @@
           "catalogue_seul"
         ],
         "title": "ReglagesRecherche",
+        "type": "object"
+      },
+      "ReglagesReponse": {
+        "description": "Les réglages de la route de réponse : défauts et bornes (`reglages.toml`).",
+        "properties": {
+          "catalogue_seul": {
+            "$ref": "#/components/schemas/BorneBooleenne"
+          },
+          "historique": {
+            "$ref": "#/components/schemas/HistoriqueDecrit"
+          },
+          "longueur_max": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ModeDecrit"
+          },
+          "nombre_series": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "passages_par_serie": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "reformuler": {
+            "$ref": "#/components/schemas/BorneBooleenne"
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/BorneReelle"
+          }
+        },
+        "required": [
+          "temperature",
+          "longueur_max",
+          "mode",
+          "historique",
+          "reformuler",
+          "nombre_series",
+          "passages_par_serie",
+          "catalogue_seul"
+        ],
+        "title": "ReglagesReponse",
         "type": "object"
       },
       "Resultat": {
