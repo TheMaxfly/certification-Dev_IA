@@ -12,6 +12,7 @@ from api_modele.configuration import Reglages
 from api_modele.debit import Limiteur
 from api_modele.demarrage import Coherence
 from api_modele.erreurs import ErreurApi
+from api_modele.fournisseurs import Fournisseurs
 from api_modele.metriques import Metriques
 from api_modele.service import ClientService
 
@@ -25,6 +26,7 @@ class EtatApi:
     classeur: Classeur
     limiteur: Limiteur
     metriques: Metriques
+    fournisseurs: Fournisseurs
 
 
 def etat_de(request: Request) -> EtatApi:

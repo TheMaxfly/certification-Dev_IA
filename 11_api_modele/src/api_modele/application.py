@@ -2,15 +2,18 @@
 
 Au démarrage, le pool est ouvert, la cohérence vérifiée (`demarrage.verifier`) et
 le classement du banc chargé (rattachement et vecteurs de l'encodage en service) ;
-un écart, et l'API ne démarre pas. Routes : `/v1/recherche` et `/v1/info` (avec
-clé), `/v1/sante` (sans clé), `/metrics` (réseau interne), `/v1/openapi.json` (le
-contrat) et, sur réglage, `/v1/docs` (Swagger UI).
+puis la couche des fournisseurs du modèle de langage est posée (son contrôle
+d'exploitation, s'il est demandé : `/v1/models`) ; un écart, et l'API ne démarre pas.
+Routes : `/v1/recherche` et `/v1/info` (avec clé), `/v1/sante` (sans clé), `/metrics`
+(réseau interne), `/v1/openapi.json` (le contrat) et, sur réglage, `/v1/docs`
+(Swagger UI).
 """
 
 from __future__ import annotations
 
+import os
 import time
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -36,6 +39,7 @@ from api_modele.debit import Limiteur
 from api_modele.enveloppe import Enveloppe
 from api_modele.erreurs import Erreur, ErreurApi
 from api_modele.etat import EtatApi, etat_de
+from api_modele.fournisseurs import ErreurFournisseur, Fournisseurs
 from api_modele.metriques import Metriques, autorisee
 from api_modele.modeles import (
     BorneBooleenne,
@@ -121,8 +125,12 @@ def creer_application(
     *,
     instance: Instance | None = None,
     horloge: Callable[[], float] = time.monotonic,
+    environ: Mapping[str, str] | None = None,
 ) -> FastAPI:
-    """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie."""
+    """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
+
+    `environ` : où la couche des fournisseurs lit les clés au moment de l'appel
+    (l'environnement du processus par défaut)."""
     metriques = Metriques()
     contexte: dict[str, object] = {}
 
@@ -131,6 +139,11 @@ def creer_application(
         inst = instance or service.charger_instance(reglages.instance)
         client = service.client(inst, reglages)
         pool = base.creer_pool(reglages)
+        fournisseurs = Fournisseurs(
+            reglages.modele_langage,
+            os.environ if environ is None else environ,
+            metriques,
+        )
         try:
             try:
                 pool.open(wait=True, timeout=reglages.pool_attente_s)
@@ -141,9 +154,14 @@ def creer_application(
                 ) from exc
             coherence = demarrage.verifier(pool, client, inst, reglages)
             classeur = charger_classement(pool, reglages, coherence)
+            try:
+                await fournisseurs.demarrer()
+            except ErreurFournisseur as exc:
+                raise demarrage.DemarrageRefuse(exc.message) from exc
         except demarrage.DemarrageRefuse as exc:
             journal.evenement("demarrage_refuse", {"raison": str(exc)}, 40)
             pool.close()
+            await fournisseurs.fermer()
             raise
         encodage = coherence.encodage
         app.state.etat = EtatApi(
@@ -154,6 +172,7 @@ def creer_application(
             classeur=classeur,
             limiteur=Limiteur(reglages.debit_par_minute, horloge),
             metriques=metriques,
+            fournisseurs=fournisseurs,
         )
         contexte.update(corpus_id=encodage.corpus_id, encodage_id=encodage.encodage_id)
         metriques.encodage.labels(
@@ -168,12 +187,17 @@ def creer_application(
                 "corpus_id": encodage.corpus_id,
                 "encodage_id": encodage.encodage_id,
                 "service": client.url,
+                "profil_actif": fournisseurs.profil_actif,
+                "profils_disponibles": [
+                    nom for nom, p in fournisseurs.profils.items() if p.disponible
+                ],
             },
         )
         try:
             yield
         finally:
             pool.close()
+            await fournisseurs.fermer()
             journal.evenement("arret", {})
 
     app = FastAPI(

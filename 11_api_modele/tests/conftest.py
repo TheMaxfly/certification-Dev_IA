@@ -15,6 +15,11 @@ service réel.
 Le contrat est gardé sur toute la suite : une réponse de l'API, dans n'importe quel
 test, sur une opération du contrat versionné, doit avoir un statut que le contrat
 déclare pour elle (`aucun_statut_hors_contrat`).
+
+Les fournisseurs du modèle de langage sont des doublures sur le bouclage (deux
+serveurs, deux profils factices) ; sur toute la suite, une requête de la couche des
+fournisseurs vers un hôte hors du bouclage n'est pas envoyée et fait échouer le test
+(`aucun_appel_hors_du_bouclage`) : aucun test n'atteint un fournisseur réel.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, ClassVar
 
+import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
@@ -40,7 +46,7 @@ from service_embedding.configuration import Instance
 from service_embedding.configuration import charger as charger_instance
 
 from api_modele.application import creer_application
-from api_modele.configuration import Reglages, charger
+from api_modele.configuration import FICHIER_REGLAGES, Reglages, charger
 from api_modele.contrat import DESTINATION
 
 RACINE_MODULE = Path(__file__).resolve().parents[1]
@@ -112,6 +118,33 @@ def aucun_statut_hors_contrat() -> Iterator[Reponses]:
         journal.setLevel(niveau)
     hors = statuts_hors_contrat(capteur.vues)
     assert not hors, f"statuts que le contrat ne déclare pas : {hors}"
+
+
+#: Les hôtes qu'un test peut joindre par la couche des fournisseurs.
+BOUCLAGE = ("127.0.0.1", "localhost", "::1")
+
+
+@pytest.fixture(autouse=True)
+def aucun_appel_hors_du_bouclage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[list[str]]:
+    """Règle du cadre : aucun test n'appelle un fournisseur réel. Une requête du
+    client asynchrone de httpx (celui de la couche des fournisseurs) vers un hôte
+    hors du bouclage n'est pas envoyée, et fait échouer le test."""
+    hors: list[str] = []
+    envoyer = httpx.AsyncClient.send
+
+    async def garder(
+        client: httpx.AsyncClient, requete: httpx.Request, **options: Any
+    ) -> httpx.Response:
+        if requete.url.host not in BOUCLAGE:
+            hors.append(requete.url.host)
+            raise AssertionError(f"appel hors du bouclage : {requete.url.host}")
+        return await envoyer(client, requete, **options)
+
+    monkeypatch.setattr(httpx.AsyncClient, "send", garder)
+    yield hors
+    assert not hors, f"appels hors du bouclage : {hors}"
 
 
 def statuts_hors_contrat(
@@ -474,7 +507,10 @@ def api(
 ) -> Iterator[TestClient]:
     """L'API démarrée, vue depuis le bouclage (adresse admise pour `/metrics`)."""
     application = creer_application(
-        reglages, instance=service_doublure.instance, horloge=horloge
+        reglages,
+        instance=service_doublure.instance,
+        horloge=horloge,
+        environ={"MISTRAL_API_KEY": CLE_FOURNISSEUR},
     )
     with TestClient(application, client=("127.0.0.1", 50000)) as client:
         yield client
@@ -482,3 +518,196 @@ def api(
 
 def entetes(cle: str = CLE_APPLICATION) -> dict[str, str]:
     return {"X-API-Key": cle}
+
+
+# --------------------------------------------------------------------------- #
+#  Les doublures des fournisseurs du modèle de langage, et deux profils factices
+# --------------------------------------------------------------------------- #
+#: Les clés factices des deux profils : aucune n'a la forme d'une clé réelle.
+CLE_A = "factice-cle-a-0f1e2d3c4b5a6978"
+CLE_B = "factice-cle-b-8796a5b4c3d2e1f0"
+CLES_FACTICES = {"CLE_FACTICE_A": CLE_A, "CLE_FACTICE_B": CLE_B}
+#: Délais des profils factices : courts, pour éprouver les dépassements vite.
+CONNEXION_FACTICE_S = 0.2
+DELAI_FACTICE_S = 0.5
+
+
+class DoublureFournisseur(BaseHTTPRequestHandler):
+    """Un fournisseur simulé, sur le bouclage : `POST /v1/chat/completions` et
+    `GET /v1/models`. Statut, corps, `usage`, modèle rendu, retard et envoi goutte à
+    goutte réglables ; chaque requête reçue est gardée (port, chemin, en-tête
+    d'autorisation, corps)."""
+
+    statut: ClassVar[int] = 200
+    corps_brut: ClassVar[bytes | None] = None
+    contenu: ClassVar[str] = '{"refus": false}'
+    usage: ClassVar[dict[str, Any] | None] = None
+    modele_rendu: ClassVar[str | None] = None
+    retard_s: ClassVar[float] = 0.0
+    goutte_s: ClassVar[float] = 0.0
+    statut_modeles: ClassVar[int] = 200
+    modeles: ClassVar[list[str]] = []
+    recus: ClassVar[list[dict[str, Any]]] = []
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+    def _noter(self, corps: object) -> None:
+        DoublureFournisseur.recus.append(
+            {
+                "port": self.server.server_address[1],
+                "chemin": self.path,
+                "autorisation": self.headers.get("Authorization"),
+                "corps": corps,
+            }
+        )
+
+    def _envoyer(self, statut: int, donnees: bytes) -> None:
+        self.send_response(statut)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(donnees)))
+        self.end_headers()
+        if not DoublureFournisseur.goutte_s:
+            self.wfile.write(donnees)
+            return
+        quart = max(len(donnees) // 4, 1)
+        for debut in range(0, len(donnees), quart):
+            self.wfile.write(donnees[debut : debut + quart])
+            self.wfile.flush()
+            time.sleep(DoublureFournisseur.goutte_s)
+
+    def do_GET(self) -> None:  # noqa: N802
+        self._noter(None)
+        if self.path != "/v1/models":
+            self._envoyer(404, b"{}")
+            return
+        corps = {"object": "list", "data": [{"id": m} for m in self.modeles]}
+        self._envoyer(DoublureFournisseur.statut_modeles, json.dumps(corps).encode())
+
+    def do_POST(self) -> None:  # noqa: N802
+        corps = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self._noter(corps)
+        if DoublureFournisseur.retard_s:
+            time.sleep(DoublureFournisseur.retard_s)
+        if DoublureFournisseur.corps_brut is not None:
+            self._envoyer(DoublureFournisseur.statut, DoublureFournisseur.corps_brut)
+            return
+        reponse: dict[str, Any] = {
+            "id": "cmpl-essai",
+            "model": DoublureFournisseur.modele_rendu or corps["model"],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": DoublureFournisseur.contenu,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+        if DoublureFournisseur.usage is not None:
+            reponse["usage"] = DoublureFournisseur.usage
+        self._envoyer(DoublureFournisseur.statut, json.dumps(reponse).encode())
+
+
+@dataclass
+class Doublures:
+    """Deux fournisseurs simulés, à deux adresses distinctes."""
+
+    serveurs: tuple[HTTPServer, HTTPServer]
+
+    @property
+    def port_a(self) -> int:
+        return self.serveurs[0].server_address[1]
+
+    @property
+    def port_b(self) -> int:
+        return self.serveurs[1].server_address[1]
+
+    def recus(self, port: int | None = None) -> list[dict[str, Any]]:
+        return [
+            r for r in DoublureFournisseur.recus if port is None or r["port"] == port
+        ]
+
+
+@pytest.fixture
+def doublures() -> Iterator[Doublures]:
+    DoublureFournisseur.statut = 200
+    DoublureFournisseur.corps_brut = None
+    DoublureFournisseur.contenu = '{"refus": false}'
+    DoublureFournisseur.usage = None
+    DoublureFournisseur.modele_rendu = None
+    DoublureFournisseur.retard_s = 0.0
+    DoublureFournisseur.goutte_s = 0.0
+    DoublureFournisseur.statut_modeles = 200
+    DoublureFournisseur.modeles = []
+    DoublureFournisseur.recus = []
+    serveurs = (
+        ServeurDoublure(("127.0.0.1", 0), DoublureFournisseur),
+        ServeurDoublure(("127.0.0.1", 0), DoublureFournisseur),
+    )
+    for serveur in serveurs:
+        threading.Thread(
+            target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        ).start()
+    yield Doublures(serveurs)
+    for serveur in serveurs:
+        serveur.shutdown()
+        serveur.server_close()
+
+
+def profils_factices(port_a: int, port_b: int) -> str:
+    """Deux profils factices : `factice-a` (forme Mistral) et `factice-b` (forme
+    OpenAI, `temperature` déclarée absente), chacun sur sa doublure."""
+    return f"""
+[modele_langage.profils.factice-a]
+fournisseur = "mistral"
+modele = "modele-a"
+adresse = "http://127.0.0.1:{port_a}/v1/chat/completions"
+variable_cle = "CLE_FACTICE_A"
+reglages_fixes = {{ top_p = 1.0 }}
+reglages_absents = []
+prix_usd_par_million = {{ entree = 2.0, sortie = 8.0 }}
+delai_s = {DELAI_FACTICE_S}
+statut = "stable"
+motif = "Profil factice des tests, sur une doublure du bouclage."
+
+[modele_langage.profils.factice-b]
+fournisseur = "openai"
+modele = "modele-b"
+adresse = "http://127.0.0.1:{port_b}/v1/chat/completions"
+variable_cle = "CLE_FACTICE_B"
+reglages_fixes = {{ top_p = 1.0, reasoning_effort = "none" }}
+reglages_absents = ["temperature"]
+prix_usd_par_million = {{ entree = 1.0, sortie = 4.0 }}
+delai_s = {DELAI_FACTICE_S}
+statut = "apercu"
+motif = "Profil factice des tests, sur une doublure du bouclage."
+"""
+
+
+def reglages_factices(tmp_path: Path, doublures: Doublures) -> Path:
+    """Le fichier versionné, ses quatre profils remplacés par les deux factices
+    (`factice-a` actif) et un délai de connexion court."""
+    texte = FICHIER_REGLAGES.read_text(encoding="utf-8")
+    texte = texte[: texte.index("[modele_langage.profils.")]
+    for avant, apres in (
+        ('profil_actif = "mistral-large-2512"', 'profil_actif = "factice-a"'),
+        ("connexion_s = 5.0", f"connexion_s = {CONNEXION_FACTICE_S}"),
+    ):
+        assert texte.count(avant) == 1
+        texte = texte.replace(avant, apres)
+    fichier = tmp_path / "reglages_factices.toml"
+    fichier.write_text(
+        texte + profils_factices(doublures.port_a, doublures.port_b), encoding="utf-8"
+    )
+    return fichier
+
+
+#: Un environnement complet pour `charger`, sans base : les tests de la couche.
+ENVIRONNEMENT_FACTICE = {
+    "API_MODELE_CLES": f"application:{CLE_APPLICATION}",
+    "API_MODELE_DSN": "postgresql://modele_api@localhost/apimanga",
+    **CLES_FACTICES,
+}

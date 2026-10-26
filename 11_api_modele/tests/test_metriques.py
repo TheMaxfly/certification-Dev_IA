@@ -35,6 +35,11 @@ def test_metriques_du_bouclage(api, base_api):
         "api_modele_encodage_en_service"
         f'{{corpus_id="v7",encodage_id="{base_api.encodage_id}"}} 1.0' in texte
     )
+    # Le profil actif, publié au démarrage (exigence 2.10) ; un profil sans clé : 0.
+    assert 'api_modele_profil_actif{profil="mistral-large-2512"} 1.0' in texte
+    assert 'api_modele_profil_actif{profil="gpt-6-sol"} 0.0' in texte
+    assert 'api_modele_profil_disponible{profil="mistral-large-4"} 1.0' in texte
+    assert 'api_modele_profil_disponible{profil="gpt-6-luna"} 0.0' in texte
 
 
 def test_metriques_refusees_hors_du_reseau_interne_comme_une_route_inconnue(api):
