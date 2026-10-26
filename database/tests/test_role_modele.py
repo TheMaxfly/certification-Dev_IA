@@ -2,7 +2,8 @@
 connexion `modele_api`.
 
 En une phrase : `modele_ro` lit six relations de `bench` et quatre colonnes de `manga`,
-énumérées, et rien d'autre ; aucun droit par défaut ; `manga_ro` et `verif_ro` n'en
+énumérées, et rien d'autre — plus, depuis 024, la vue des pseudonymes
+(`test_vue_pseudonymes.py`) ; aucun droit par défaut ; `manga_ro` et `verif_ro` n'en
 sont pas changés. Le rôle de connexion, créé par `outils/creer_role_modele.sh`,
 hérite de `modele_ro`, n'ouvre que des sessions en lecture seule et ne prend pas plus
 de dix connexions.
@@ -52,6 +53,8 @@ COLONNES_MANGA = {
     "manga.work_identity": ("series_id", "kitsu_id"),
     "manga.ms_series_enriched": ("series_id", "series_title"),
 }
+#: Accordée par 024 (la vue des pseudonymes), éprouvée par `test_vue_pseudonymes.py`.
+VUES_024 = ("manga.v_pseudonymes",)
 #: Les tables du périmètre : là où les écritures doivent être refusées.
 TABLES_ACCORDEES = (
     *(r for r in RELATIONS_BENCH if r != "bench.v_encodage_en_service"),
@@ -201,7 +204,7 @@ def test_modele_ro_lit_ses_quatre_colonnes_de_manga_et_elles_seules(base_migree)
 
 
 def test_rien_d_autre_n_est_lisible(base_migree):
-    perimetre = set(RELATIONS_BENCH) | set(COLONNES_MANGA)
+    perimetre = set(RELATIONS_BENCH) | set(COLONNES_MANGA) | set(VUES_024)
     with psycopg.connect(base_migree) as connexion:
         hors = [r for r in tout_l_inventaire(connexion) if r not in perimetre]
         lisibles = [
@@ -317,17 +320,19 @@ ORDER BY 1, 2, 3
 
 @pytest.mark.parametrize("role", ("verif_ro", "manga_ro"))
 def test_023_ne_change_pas_les_autres_roles_de_lecture(base, role):
+    """Jusqu'à 023 exactement : la vue de 024 leur est lisible par leurs droits par
+    défaut (012, 022), ce que `test_vue_pseudonymes.py` éprouve à part."""
     harnais.migrer(base, "022")
     with psycopg.connect(base) as connexion:
         avant = connexion.execute(DROITS_DU_ROLE, {"role": role}).fetchall()
-    harnais.migrer(base)
+    harnais.migrer(base, "023")
     with psycopg.connect(base) as connexion:
         (version,) = connexion.execute(
             "SELECT max(version) FROM public.schema_migrations"
         ).fetchone()
         apres = connexion.execute(DROITS_DU_ROLE, {"role": role}).fetchall()
 
-    assert version >= "023"
+    assert version == "023"
     assert avant, f"{role} n'a aucun droit avant 023 : le test ne prouverait rien"
     assert apres == avant
 
