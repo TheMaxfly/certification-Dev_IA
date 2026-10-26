@@ -1,0 +1,7 @@
+id = "API-26"
+origine = "E3 étape 3, spec 02 (2026-10-26) — le contrôle d'exploitation (/v1/models) appelé au démarrage même quand le réglage est à 0"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''        if self._ml.verifier_modeles:'''
+apres = '''        if True:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "sans_le_reglage_aucun_controle"]

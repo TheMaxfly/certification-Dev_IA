@@ -1,0 +1,7 @@
+id = "API-24"
+origine = "E3 étape 3, spec 02 (2026-10-26) — la valeur de la clé écrite dans la trace d'un appel, à la place du nom de sa variable"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''                variable_cle=profil.variable_cle,'''
+apres = '''                variable_cle=cle,'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "cle_n_apparait_nulle_part"]

@@ -1,0 +1,7 @@
+id = "API-25"
+origine = "E3 étape 3, spec 02 (2026-10-26) — le coût estimé sans les jetons de raisonnement"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''    return (entree * prix.entree + (sortie + raisonnement) * prix.sortie) / 1_000_000'''
+apres = '''    return (entree * prix.entree + sortie * prix.sortie) / 1_000_000'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "usage_et_raisonnement"]
