@@ -21,10 +21,12 @@ from api_modele.application import creer_application
 from api_modele.configuration import RACINE_MODULE, VERSIONS_SERVIES, charger
 
 DESTINATION = RACINE_MODULE / "contrat" / f"openapi_{VERSIONS_SERVIES[0]}.json"
-#: Des réglages de contrat : aucune valeur réelle.
+#: Des réglages de contrat : aucune valeur réelle (la clé du profil actif est exigée
+#: pour que la configuration tienne ; aucun fournisseur n'est appelé).
 ENVIRONNEMENT_DU_CONTRAT = {
     "API_MODELE_CLES": "contrat:" + "c" * 32,
     "API_MODELE_DSN": "postgresql://contrat@localhost/contrat",
+    "MISTRAL_API_KEY": "contrat-factice",
 }
 
 

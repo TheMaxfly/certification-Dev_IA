@@ -106,6 +106,18 @@ def test_l_api_lit_la_base_sans_mot_de_passe_dans_le_dsn(compose):
     assert environnement["CLIENT_HOTE"] == "embedding"
 
 
+def test_les_cles_des_fournisseurs_ne_sont_lues_que_dans_le_env(compose):
+    """Aucune valeur écrite dans le Compose ; l'essai jetable n'a qu'une clé
+    factice, celle qui laisse démarrer le profil actif (il n'appelle personne)."""
+    environnement = compose["services"]["api"]["environment"]
+    for variable in ("MISTRAL_API_KEY", "OPENAI_API_KEY"):
+        assert environnement[variable] == f"${{{variable}:-}}", variable
+    essai = lire(COMPOSE_INTEGRATION)["services"]["api"]["environment"]
+    cles = {v for v in essai if v.endswith("_API_KEY")}
+    assert cles == {"MISTRAL_API_KEY"}
+    assert essai["MISTRAL_API_KEY"].startswith("cle-factice-")
+
+
 def test_les_conteneurs_ne_tournent_pas_en_root(compose):
     for nom in ("api", "embedding"):
         assert par_defaut(compose["services"][nom]["user"]) == "1000:1000", nom

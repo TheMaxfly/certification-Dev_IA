@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from conftest import CLE_APPLICATION
+from conftest import CLE_APPLICATION, CLE_FOURNISSEUR
 
 from api_modele import __main__ as principal
 from api_modele import journal
@@ -33,6 +33,8 @@ def test_une_configuration_valide_lance_le_serveur_sur_le_bouclage(monkeypatch):
     lances: list[dict[str, object]] = []
     monkeypatch.setenv("API_MODELE_CLES", f"application:{CLE_APPLICATION}")
     monkeypatch.setenv("API_MODELE_DSN", "postgresql://modele_api@localhost/apimanga")
+    monkeypatch.setenv("MISTRAL_API_KEY", CLE_FOURNISSEUR)
+    monkeypatch.delenv("API_MODELE_PROFIL_ACTIF", raising=False)
     monkeypatch.setattr(principal.uvicorn, "run", lambda app, **k: lances.append(k))
 
     assert principal.principal() == 0

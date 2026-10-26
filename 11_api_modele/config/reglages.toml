@@ -74,3 +74,113 @@ motif = "Le pic de mémoire vive de l'API, mesuré le 2026-10-20 : 1 457 Mio au 
 hote = "127.0.0.1"
 port = 8010
 motif = "L'API écoute sur le bouclage du poste ; 8010, libre, à côté des ports réservés à l'application et au monitorage (8000, 9090, 9100, 3000). Surchargeables : API_MODELE_HOTE, API_MODELE_PORT."
+
+# --------------------------------------------------------------------------------- #
+#  Le modèle de langage (E3, étape 3) : le profil qui rédige, les réglages de la route
+#  de réponse, et les profils déclarés. La clé d'un profil n'est jamais ici : seul le
+#  NOM de sa variable d'environnement (`variable_cle`) ; un profil dont la variable est
+#  absente ou vide est indisponible, et le profil actif doit être disponible, sinon
+#  l'API refuse de démarrer.
+# --------------------------------------------------------------------------------- #
+
+[modele_langage]
+profil_actif = "mistral-large-2512"
+motif = "Un seul réglage désigne le profil qui rédige ; en changer est un geste de configuration (décision 3 de l'étape 3), jamais une bascule automatique (règle 2.10). Surchargeable : API_MODELE_PROFIL_ACTIF."
+
+[modele_langage.temperature]
+defaut = 0.0
+min = 0.0
+max = 1.0
+motif = "0 : la même réponse deux fois, ce qu'un conseil sourcé veut ; 0,7 varie (geste de démonstration) ; au-delà de 1 la réponse se dégrade (borne d'usage). top_p est fixé à 1 par profil : Mistral conseille de régler l'un ou l'autre."
+
+[modele_langage.longueur_max]
+defaut = 400
+min = 50
+max = 1000
+motif = "Jetons de sortie au plus (max_tokens) : lisibilité au comptoir et coût ; base de l'estimation de coût."
+
+[modele_langage.mode]
+defaut = "strict"
+valeurs = ["strict"]
+motif = "Réponse tirée des seuls passages, refus compris. « enrichi » s'ajoutera par une spec ultérieure, après mesure à part (ajout compatible à une énumération d'entrée)."
+
+[modele_langage.historique]
+tours_max = 10
+caracteres_max = 4000
+tour_caracteres_max = 2000
+motif = "Cinq questions-réponses par conversation (10 tours), borne franche ; 4 000 caractères ≈ 1 150 jetons, sous la borne du corps (16 Kio) et du coût. L'historique n'est ni gardé ni journalisé : seuls son nombre de tours et sa taille entrent au journal."
+
+[modele_langage.reformuler]
+defaut = true
+motif = "Avec un historique, un premier appel écrit une question autonome qui part seule dans la recherche (les suites de comptoir ne retrouvent rien seules) ; désactivable pour la démonstration « avec et sans »."
+
+[modele_langage.recherche]
+nombre_series = 5
+passages_par_serie = 2
+catalogue_seul = true
+motif = "Défauts de la route de réponse (décision 6) : 5 séries × 2 passages, de quoi choisir sans recopier le corpus ; ceux de /v1/recherche (10 × 1) ne changent pas. Bornes : celles de la recherche."
+
+[modele_langage.estimation]
+caracteres_par_jeton = 3.5
+motif = "Estimation déclarée : un jeton ≈ 3,5 caractères de français (≈ 4 d'anglais, surestimé). Recalée sur usage de la réponse du fournisseur après les premiers appels réels (rapport de 06)."
+
+[modele_langage.cout]
+plafond_run_usd = 0.50
+motif = "Plafond d'un run de mesure : le banc estime le coût avant tout appel réel et s'arrête s'il serait dépassé. 3,5 fois le run le plus cher de la mesure réduite (0,141 $ au pire cas) : absorbe ± 30 % d'incertitude de l'estimation avant son recalage. Surchargeable : COUT_PLAFOND_RUN."
+
+[modele_langage.delais]
+connexion_s = 5.0
+reponse_s = 30.0
+motif = "Délai de connexion et délai de réponse par défaut vers un fournisseur ; dépassés : 503 fournisseur_injoignable / fournisseur_delai. Un profil peut porter son propre delai_s."
+
+[modele_langage.verification_demarrage]
+appeler_fournisseurs = false
+motif = "Au démarrage, la disponibilité d'un profil est la présence de sa clé ; aucun appel réseau à un fournisseur (jamais dans make verify ni dans un test). À vrai, l'API interroge /v1/models de chaque fournisseur disponible et marque absent un identifiant retiré : geste d'exploitation, jamais par défaut. Surchargeable : API_MODELE_VERIFIER_MODELES."
+
+[modele_langage.profils.mistral-large-2512]
+fournisseur = "mistral"
+modele = "mistral-large-2512"
+adresse = "https://api.mistral.ai/v1/chat/completions"
+variable_cle = "MISTRAL_API_KEY"
+reglages_fixes = { top_p = 1.0 }
+reglages_absents = []
+prix_usd_par_million = { entree = 0.50, sortie = 1.50 }
+delai_s = 30.0
+statut = "stable"
+motif = "Profil actif de référence : identifiant daté (GA v25.12), mesure rejouable, hébergement en Union européenne (décision 3). Prix relevés le 2026-10-26 (document de décisions, § 2)."
+
+[modele_langage.profils.mistral-large-4]
+fournisseur = "mistral"
+modele = "mistral-large-4"
+adresse = "https://api.mistral.ai/v1/chat/completions"
+variable_cle = "MISTRAL_API_KEY"
+reglages_fixes = { top_p = 1.0 }
+reglages_absents = []
+prix_usd_par_million = { entree = 1.36, sortie = 4.18 }
+delai_s = 30.0
+statut = "apercu"
+motif = "Le modèle de pointe, en aperçu public (v26.10) : identifiant non daté, modèle mouvant ; chaque mesure porte la mention « aperçu ». Prix plein depuis la fin de la remise de lancement."
+
+[modele_langage.profils.gpt-6-luna]
+fournisseur = "openai"
+modele = "gpt-6-luna"
+adresse = "https://api.openai.com/v1/chat/completions"
+variable_cle = "OPENAI_API_KEY"
+reglages_fixes = { top_p = 1.0, reasoning_effort = "none" }
+reglages_absents = []
+prix_usd_par_million = { entree = 0.10, sortie = 0.50 }
+delai_s = 30.0
+statut = "stable"
+motif = "Repli hors Union européenne, le moins cher. reasoning_effort = none figé (pas de jetons de raisonnement). Si l'appel d'essai (06) refuse temperature, elle passe dans reglages_absents (règle 2.10). Aucun instantané daté chez OpenAI."
+
+[modele_langage.profils.gpt-6-sol]
+fournisseur = "openai"
+modele = "gpt-6-sol"
+adresse = "https://api.openai.com/v1/chat/completions"
+variable_cle = "OPENAI_API_KEY"
+reglages_fixes = { top_p = 1.0, reasoning_effort = "none" }
+reglages_absents = []
+prix_usd_par_million = { entree = 2.00, sortie = 10.00 }
+delai_s = 45.0
+statut = "stable"
+motif = "Repli hors Union européenne, le plus capable des deux. Mêmes réserves que gpt-6-luna ; délai plus long (modèle plus gros)."

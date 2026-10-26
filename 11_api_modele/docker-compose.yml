@@ -78,6 +78,14 @@ services:
       API_MODELE_JOURNAL_QUESTION: ${API_MODELE_JOURNAL_QUESTION:-}
       API_MODELE_METRIQUES_RESEAUX: ${API_MODELE_METRIQUES_RESEAUX:-}
       API_MODELE_DOCUMENTATION: ${API_MODELE_DOCUMENTATION:-}
+      # Les clés des fournisseurs du modèle de langage, lues dans le `.env` : celle du
+      # profil actif est exigée au démarrage (le refus appartient à l'API). Aucune
+      # valeur n'est écrite ici.
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      API_MODELE_PROFIL_ACTIF: ${API_MODELE_PROFIL_ACTIF:-}
+      COUT_PLAFOND_RUN: ${COUT_PLAFOND_RUN:-}
+      API_MODELE_VERIFIER_MODELES: ${API_MODELE_VERIFIER_MODELES:-}
     secrets: [pgpass]
     # Non root : l'utilisateur de l'hôte, seul lecteur du pgpass (mode 600).
     user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"

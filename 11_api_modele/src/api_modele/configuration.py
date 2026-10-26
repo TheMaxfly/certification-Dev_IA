@@ -8,6 +8,12 @@ Deux sources, et seulement deux :
 
 Toute valeur est validée ici ; au moindre écart, `ConfigurationInvalide` les nomme
 tous, et l'API ne démarre pas. Aucune valeur de réglage n'est écrite ailleurs.
+
+Le modèle de langage : des profils déclarés dans le fichier, dont chacun nomme la
+variable d'environnement de sa clé. Ce module ne lit que la PRÉSENCE de la variable
+(un profil sans clé est indisponible, sans être fatal) ; sa valeur n'est lue qu'au
+moment de l'appel, par la couche des fournisseurs (`fournisseurs.py`). Le profil
+actif doit être disponible : sinon l'API ne démarre pas.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 from psycopg import ProgrammingError, conninfo
 
@@ -36,6 +43,34 @@ TABLE_VECTEURS = re.compile(r"^bench\.vecteurs_[a-z0-9_]+$")
 HOTE = re.compile(r"^[A-Za-z0-9.:-]+$")
 VRAI = ("1", "vrai", "true", "oui")
 FAUX = ("0", "faux", "false", "non")
+
+#: Les fournisseurs dont la couche d'appel connaît la forme (`fournisseurs.py`).
+FOURNISSEURS = ("mistral", "openai")
+STATUTS_PROFIL = ("stable", "apercu")
+#: Les réglages de la route qu'un profil peut déclarer absents (règle 2.10).
+REGLAGES_EXPOSES = ("temperature", "longueur_max")
+#: Les efforts de raisonnement documentés par l'un ou l'autre fournisseur (2026-10-26).
+EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+NOM_PROFIL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+NOM_VARIABLE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+#: La forme commune des fournisseurs : l'adresse d'un profil finit par ce chemin.
+CHEMIN_APPEL = "/v1/chat/completions"
+#: La clé part dans un en-tête : https, ou http vers le bouclage seul (doublures).
+BOUCLAGE = ("127.0.0.1", "localhost", "::1")
+CHAMPS_PROFIL = frozenset(
+    {
+        "fournisseur",
+        "modele",
+        "adresse",
+        "variable_cle",
+        "reglages_fixes",
+        "reglages_absents",
+        "prix_usd_par_million",
+        "delai_s",
+        "statut",
+        "motif",
+    }
+)
 
 type Reseau = ipaddress.IPv4Network | ipaddress.IPv6Network
 
@@ -65,6 +100,75 @@ class Borne:
     defaut: int
     min: int
     max: int
+
+
+@dataclass(frozen=True, slots=True)
+class BorneReelle:
+    """Un réglage réel : son défaut et ses bornes, incluses."""
+
+    defaut: float
+    min: float
+    max: float
+
+
+@dataclass(frozen=True, slots=True)
+class Prix:
+    """Le prix déclaré d'un profil, en dollars par million de jetons."""
+
+    entree: float
+    sortie: float
+
+
+@dataclass(frozen=True, slots=True)
+class Profil:
+    """Un profil de modèle de langage. `variable_cle` est le NOM de la variable de sa
+    clé, jamais sa valeur ; `disponible` : la variable est présente et non vide."""
+
+    nom: str
+    fournisseur: str
+    modele: str
+    adresse: str
+    variable_cle: str
+    top_p: float | None
+    reasoning_effort: str | None
+    reglages_absents: tuple[str, ...]
+    prix: Prix | None
+    delai_s: float
+    statut: str
+    disponible: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReglagesReponse:
+    """Les réglages de la route de réponse : défauts et bornes (décision 4)."""
+
+    temperature: BorneReelle
+    longueur_max: Borne
+    mode_defaut: str
+    modes: tuple[str, ...]
+    historique_tours_max: int
+    historique_caracteres_max: int
+    historique_tour_caracteres_max: int
+    reformuler: bool
+    nombre_series: Borne
+    passages_par_serie: Borne
+    catalogue_seul: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ModeleLangage:
+    """Le profil actif, les profils déclarés, les réglages de la route et de l'appel."""
+
+    profil_actif: str
+    profils: tuple[Profil, ...]
+    reponse: ReglagesReponse
+    caracteres_par_jeton: float
+    plafond_run_usd: float
+    connexion_s: float
+    verifier_modeles: bool
+
+    def profil(self, nom: str) -> Profil | None:
+        return next((p for p in self.profils if p.nom == nom), None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +207,7 @@ class Reglages:
     client_hote: str | None
     hote: str
     port: int
+    modele_langage: ModeleLangage
 
     @property
     def contrat(self) -> Contrat:
@@ -121,19 +226,37 @@ class _Lecteur:
         self.contenu = contenu
         self.ecarts = ecarts
 
-    def table(self, chemin: str) -> dict[str, Any]:
+    def _noeud(self, chemin: str) -> dict[str, Any] | None:
         noeud: dict[str, Any] | None = self.contenu
         for partie in chemin.split("."):
             suivant: object = noeud.get(partie) if noeud is not None else None
             noeud = cast(dict[str, Any], suivant) if isinstance(suivant, dict) else None
         if noeud is None:
             self.ecarts.append(f"reglages.toml : table [{chemin}] absente")
-            return {}
-        table = noeud
+        return noeud
+
+    def motif(self, table: dict[str, Any], chemin: str) -> None:
         motif = table.get("motif")
         if not isinstance(motif, str) or not motif.strip():
             self.ecarts.append(f"reglages.toml : [{chemin}] sans motif")
+
+    def table(self, chemin: str) -> dict[str, Any]:
+        table = self._noeud(chemin)
+        if table is None:
+            return {}
+        self.motif(table, chemin)
         return table
+
+    def sous_tables(self, chemin: str) -> dict[str, dict[str, Any]]:
+        """Les tables filles d'une table de regroupement (sans motif propre)."""
+        noeud = self._noeud(chemin) or {}
+        tables: dict[str, dict[str, Any]] = {}
+        for nom, valeur in noeud.items():
+            if isinstance(valeur, dict):
+                tables[nom] = cast(dict[str, Any], valeur)
+            else:
+                self.ecarts.append(f"reglages.toml : [{chemin}] {nom} : une table")
+        return tables
 
     def entier(self, table: dict[str, Any], chemin: str, cle: str, min_: int) -> int:
         valeur = table.get(cle)
@@ -151,6 +274,17 @@ class _Lecteur:
             self.ecarts.append(f"reglages.toml : [{chemin}] {cle} : nombre > 0")
         return float(valeur)
 
+    def reel(self, table: dict[str, Any], chemin: str, cle: str) -> float:
+        valeur = table.get(cle)
+        if (
+            isinstance(valeur, bool)
+            or not isinstance(valeur, int | float)
+            or valeur < 0
+        ):
+            self.ecarts.append(f"reglages.toml : [{chemin}] {cle} : nombre ≥ 0")
+            return 0.0
+        return float(valeur)
+
     def booleen(self, table: dict[str, Any], chemin: str, cle: str) -> bool:
         valeur = table.get(cle)
         if not isinstance(valeur, bool):
@@ -164,6 +298,20 @@ class _Lecteur:
             self.ecarts.append(f"reglages.toml : [{chemin}] {cle} : texte non vide")
             return ""
         return valeur
+
+    def textes(
+        self, table: dict[str, Any], chemin: str, cle: str, *, vide_admis: bool = False
+    ) -> tuple[str, ...]:
+        valeur = table.get(cle)
+        elements = cast(list[object], valeur) if isinstance(valeur, list) else None
+        if (
+            elements is None
+            or not all(isinstance(e, str) and e.strip() for e in elements)
+            or (not elements and not vide_admis)
+        ):
+            self.ecarts.append(f"reglages.toml : [{chemin}] {cle} : liste de textes")
+            return ()
+        return tuple(cast(list[str], elements))
 
     def borne(self, chemin: str) -> Borne:
         t = self.table(chemin)
@@ -278,6 +426,22 @@ def _surcharge_booleenne(
     return defaut
 
 
+def _surcharge_reelle(
+    environ: Mapping[str, str], nom: str, defaut: float, ecarts: list[str]
+) -> float:
+    valeur = environ.get(nom)
+    if valeur is None or valeur == "":
+        return defaut
+    try:
+        reel = float(valeur)
+    except ValueError:
+        ecarts.append(f"{nom} : nombre attendu")
+        return defaut
+    if not reel > 0:
+        ecarts.append(f"{nom} : nombre > 0")
+    return reel
+
+
 def _hote(valeur: str | None, nom: str, ecarts: list[str]) -> str | None:
     if valeur is None or valeur == "":
         return None
@@ -303,6 +467,243 @@ def _contrat(lecteur: _Lecteur) -> Contrat:
     t = lecteur.table("question")
     longueur = lecteur.entier(t, "question", "longueur_max", 1)
     return Contrat(nombre_series, passages, catalogue_seul, longueur)
+
+
+def _borne_de_route(
+    lecteur: _Lecteur, table: dict[str, Any], chemin: str, cle: str, bornes: Borne
+) -> Borne:
+    """Un défaut propre à la route de réponse, sous les bornes de la recherche."""
+    defaut = lecteur.entier(table, chemin, cle, 1)
+    if not bornes.min <= defaut <= bornes.max:
+        lecteur.ecarts.append(
+            f"reglages.toml : [{chemin}] {cle} {defaut} hors de"
+            f" [{bornes.min}, {bornes.max}] (bornes de la recherche)"
+        )
+    return Borne(defaut=defaut, min=bornes.min, max=bornes.max)
+
+
+def _reglages_reponse(lecteur: _Lecteur, contrat: Contrat) -> ReglagesReponse:
+    chemin = "modele_langage.temperature"
+    t = lecteur.table(chemin)
+    temperature = BorneReelle(
+        defaut=lecteur.reel(t, chemin, "defaut"),
+        min=lecteur.reel(t, chemin, "min"),
+        max=lecteur.reel(t, chemin, "max"),
+    )
+    if not temperature.min <= temperature.defaut <= temperature.max:
+        lecteur.ecarts.append(
+            f"reglages.toml : [{chemin}] défaut {temperature.defaut} hors de"
+            f" [{temperature.min}, {temperature.max}]"
+        )
+    longueur = lecteur.borne("modele_langage.longueur_max")
+    chemin = "modele_langage.mode"
+    t = lecteur.table(chemin)
+    mode_defaut = lecteur.texte(t, chemin, "defaut")
+    modes = lecteur.textes(t, chemin, "valeurs")
+    if modes and mode_defaut not in modes:
+        lecteur.ecarts.append(f"reglages.toml : [{chemin}] défaut hors des valeurs")
+    chemin = "modele_langage.historique"
+    t = lecteur.table(chemin)
+    tours = lecteur.entier(t, chemin, "tours_max", 1)
+    caracteres = lecteur.entier(t, chemin, "caracteres_max", 1)
+    tour_caracteres = lecteur.entier(t, chemin, "tour_caracteres_max", 1)
+    chemin = "modele_langage.reformuler"
+    t = lecteur.table(chemin)
+    reformuler = lecteur.booleen(t, chemin, "defaut")
+    chemin = "modele_langage.recherche"
+    t = lecteur.table(chemin)
+    return ReglagesReponse(
+        temperature=temperature,
+        longueur_max=longueur,
+        mode_defaut=mode_defaut,
+        modes=modes,
+        historique_tours_max=tours,
+        historique_caracteres_max=caracteres,
+        historique_tour_caracteres_max=tour_caracteres,
+        reformuler=reformuler,
+        nombre_series=_borne_de_route(
+            lecteur, t, chemin, "nombre_series", contrat.nombre_series
+        ),
+        passages_par_serie=_borne_de_route(
+            lecteur, t, chemin, "passages_par_serie", contrat.passages_par_serie
+        ),
+        catalogue_seul=lecteur.booleen(t, chemin, "catalogue_seul"),
+    )
+
+
+def _adresse(adresse: str, chemin: str, ecarts: list[str]) -> None:
+    morceaux = urlsplit(adresse)
+    if not morceaux.path.endswith(CHEMIN_APPEL) or morceaux.query or morceaux.fragment:
+        ecarts.append(f"reglages.toml : [{chemin}] adresse : …{CHEMIN_APPEL} attendu")
+    locale = morceaux.scheme == "http" and morceaux.hostname in BOUCLAGE
+    if morceaux.scheme != "https" and not locale:
+        ecarts.append(
+            f"reglages.toml : [{chemin}] adresse : https exigé (la clé part dans un"
+            " en-tête) ; http sur le bouclage seul"
+        )
+
+
+def _reglages_fixes(
+    lecteur: _Lecteur, table: dict[str, Any], chemin: str
+) -> tuple[float | None, str | None]:
+    """`top_p` et `reasoning_effort` fixés par le profil, jamais exposés."""
+    valeur = table.get("reglages_fixes")
+    if not isinstance(valeur, dict):
+        lecteur.ecarts.append(f"reglages.toml : [{chemin}] reglages_fixes : une table")
+        return None, None
+    fixes = cast(dict[str, Any], valeur)
+    inconnus = sorted(set(fixes) - {"top_p", "reasoning_effort"})
+    if inconnus:
+        lecteur.ecarts.append(
+            f"reglages.toml : [{chemin}] reglages_fixes : inconnus"
+            f" {', '.join(inconnus)}"
+        )
+    top_p: float | None = None
+    if "top_p" in fixes:
+        top_p = lecteur.reel(fixes, chemin, "top_p")
+        if top_p > 1:
+            lecteur.ecarts.append(f"reglages.toml : [{chemin}] top_p : entre 0 et 1")
+    effort: str | None = None
+    if "reasoning_effort" in fixes:
+        effort = lecteur.texte(fixes, chemin, "reasoning_effort")
+        if effort and effort not in EFFORTS:
+            lecteur.ecarts.append(
+                f"reglages.toml : [{chemin}] reasoning_effort : l'un de"
+                f" {', '.join(EFFORTS)}"
+            )
+    return top_p, effort
+
+
+def _prix(lecteur: _Lecteur, table: dict[str, Any], chemin: str) -> Prix | None:
+    """Un prix absent est permis : le coût sera nul, « prix non déclaré »."""
+    if "prix_usd_par_million" not in table:
+        return None
+    valeur = table["prix_usd_par_million"]
+    if not isinstance(valeur, dict):
+        lecteur.ecarts.append(
+            f"reglages.toml : [{chemin}] prix_usd_par_million : une table"
+        )
+        return None
+    prix = cast(dict[str, Any], valeur)
+    return Prix(
+        entree=lecteur.reel(prix, chemin, "entree"),
+        sortie=lecteur.reel(prix, chemin, "sortie"),
+    )
+
+
+def _profil(
+    lecteur: _Lecteur,
+    nom: str,
+    table: dict[str, Any],
+    environ: Mapping[str, str],
+    reponse_s: float,
+) -> Profil:
+    chemin = f"modele_langage.profils.{nom}"
+    ecarts = lecteur.ecarts
+    lecteur.motif(table, chemin)
+    if not NOM_PROFIL.fullmatch(nom):
+        ecarts.append(f"reglages.toml : [{chemin}] nom de profil invalide")
+    inconnus = sorted(set(table) - CHAMPS_PROFIL)
+    if inconnus:
+        ecarts.append(
+            f"reglages.toml : [{chemin}] champs inconnus : {', '.join(inconnus)}"
+        )
+    fournisseur = lecteur.texte(table, chemin, "fournisseur")
+    if fournisseur and fournisseur not in FOURNISSEURS:
+        ecarts.append(
+            f"reglages.toml : [{chemin}] fournisseur : l'un de"
+            f" {', '.join(FOURNISSEURS)}"
+        )
+    modele = lecteur.texte(table, chemin, "modele")
+    adresse = lecteur.texte(table, chemin, "adresse")
+    if adresse:
+        _adresse(adresse, chemin, ecarts)
+    variable = lecteur.texte(table, chemin, "variable_cle")
+    if variable and not NOM_VARIABLE.fullmatch(variable):
+        ecarts.append(f"reglages.toml : [{chemin}] variable_cle : un nom de variable")
+    top_p, effort = _reglages_fixes(lecteur, table, chemin)
+    absents = lecteur.textes(table, chemin, "reglages_absents", vide_admis=True)
+    hors = [a for a in absents if a not in REGLAGES_EXPOSES]
+    if hors:
+        ecarts.append(
+            f"reglages.toml : [{chemin}] reglages_absents : {', '.join(hors)} n'est pas"
+            f" un réglage exposé ({', '.join(REGLAGES_EXPOSES)})"
+        )
+    statut = lecteur.texte(table, chemin, "statut")
+    if statut and statut not in STATUTS_PROFIL:
+        ecarts.append(
+            f"reglages.toml : [{chemin}] statut : l'un de {', '.join(STATUTS_PROFIL)}"
+        )
+    return Profil(
+        nom=nom,
+        fournisseur=fournisseur,
+        modele=modele,
+        adresse=adresse,
+        variable_cle=variable,
+        top_p=top_p,
+        reasoning_effort=effort,
+        reglages_absents=absents,
+        prix=_prix(lecteur, table, chemin),
+        delai_s=(
+            lecteur.nombre(table, chemin, "delai_s")
+            if "delai_s" in table
+            else reponse_s
+        ),
+        statut=statut,
+        # La présence de la variable, jamais sa valeur.
+        disponible=bool(variable) and bool(environ.get(variable, "").strip()),
+    )
+
+
+def _modele_langage(
+    lecteur: _Lecteur, contrat: Contrat, environ: Mapping[str, str]
+) -> ModeleLangage:
+    ecarts = lecteur.ecarts
+    t = lecteur.table("modele_langage")
+    actif_fichier = lecteur.texte(t, "modele_langage", "profil_actif")
+    reponse = _reglages_reponse(lecteur, contrat)
+    chemin = "modele_langage.estimation"
+    t = lecteur.table(chemin)
+    caracteres_par_jeton = lecteur.nombre(t, chemin, "caracteres_par_jeton")
+    chemin = "modele_langage.cout"
+    t = lecteur.table(chemin)
+    plafond = lecteur.nombre(t, chemin, "plafond_run_usd")
+    chemin = "modele_langage.delais"
+    t = lecteur.table(chemin)
+    connexion_s = lecteur.nombre(t, chemin, "connexion_s")
+    reponse_s = lecteur.nombre(t, chemin, "reponse_s")
+    chemin = "modele_langage.verification_demarrage"
+    t = lecteur.table(chemin)
+    verifier = lecteur.booleen(t, chemin, "appeler_fournisseurs")
+    profils = tuple(
+        _profil(lecteur, nom, table, environ, reponse_s)
+        for nom, table in lecteur.sous_tables("modele_langage.profils").items()
+    )
+    noms = [p.nom for p in profils]
+    if not profils:
+        ecarts.append("reglages.toml : [modele_langage.profils] aucun profil déclaré")
+    actif = environ.get("API_MODELE_PROFIL_ACTIF") or actif_fichier
+    profil = next((p for p in profils if p.nom == actif), None)
+    if profil is None:
+        ecarts.append(
+            f"profil actif « {actif} » : pas un profil déclaré ({', '.join(noms)})"
+        )
+    elif not profil.disponible:
+        ecarts.append(
+            f"profil actif « {actif} » : variable {profil.variable_cle} absente ou"
+            " vide — la clé du profil actif est exigée"
+        )
+    return ModeleLangage(
+        profil_actif=actif,
+        profils=profils,
+        reponse=reponse,
+        caracteres_par_jeton=caracteres_par_jeton,
+        plafond_run_usd=_surcharge_reelle(environ, "COUT_PLAFOND_RUN", plafond, ecarts),
+        connexion_s=connexion_s,
+        verifier_modeles=_surcharge_booleenne(
+            environ, "API_MODELE_VERIFIER_MODELES", verifier, ecarts
+        ),
+    )
 
 
 def lire_contrat(fichier: Path = FICHIER_REGLAGES) -> Contrat:
@@ -367,6 +768,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     t = lecteur.table("serveur")
     hote_fichier = lecteur.texte(t, "serveur", "hote")
     port_fichier = lecteur.entier(t, "serveur", "port", 1)
+    modele_langage = _modele_langage(lecteur, contrat, environ)
 
     version = environ.get("API_MODELE_VERSION") or VERSIONS_SERVIES[0]
     if version not in VERSIONS_SERVIES:
@@ -416,6 +818,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         port=_surcharge_entiere(
             environ, "API_MODELE_PORT", port_fichier, 1, 65_535, ecarts
         ),
+        modele_langage=modele_langage,
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

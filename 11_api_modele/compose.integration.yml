@@ -130,6 +130,9 @@ services:
       API_MODELE_CLES: integration:cle-jetable-de-l-essai-0123456789abcdef
       API_MODELE_DSN: postgresql://modele_api@db:5432/apimanga
       PGPASSFILE: /secret/pgpass
+      # Une valeur factice : le profil actif doit avoir sa clé pour démarrer ; l'essai
+      # n'appelle aucun fournisseur.
+      MISTRAL_API_KEY: cle-factice-de-l-essai
     secrets: !reset []
     volumes:
       - secret:/secret:ro

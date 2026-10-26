@@ -12,9 +12,11 @@ requires-python = ">=3.12"
 # Épinglées. numpy, pgvector, psycopg et typer : les versions du verrou du module 10,
 # dont le classement est chargé par son chemin (tests/test_verrous.py compare les
 # deux verrous). FastAPI, Starlette, Pydantic, Uvicorn, psycopg-pool : celles du
-# module 02.
+# module 02. httpx : le client HTTP des fournisseurs du modèle de langage (requête
+# directe, aucun paquet client de fournisseur), à la version déjà au verrou.
 dependencies = [
     "fastapi==0.139.0",
+    "httpx==0.28.1",
     "numpy==2.5.3",
     "pgvector==0.5.0",
     "prometheus-client==0.26.0",
@@ -29,7 +31,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "httpx==0.28.1",
     # La version du verrou (dépendance d'openapi-spec-validator), déclarée parce que
     # les tests valident les réponses contre le contrat (tests/test_contrat_codes.py).
     "jsonschema==4.26.0",

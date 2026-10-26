@@ -48,6 +48,8 @@ RACINE_DEPOT = RACINE_MODULE.parent
 
 CLE_APPLICATION = "a" * 40
 CLE_DEMONSTRATION = "d" * 40
+#: La clé du profil actif, factice : aucun test n'appelle un fournisseur réel.
+CLE_FOURNISSEUR = "factice-cle-du-harnais"
 ROLE_API = "essai_api_modele"
 
 
@@ -442,6 +444,7 @@ def environnement(dsn: str) -> dict[str, str]:
             f"application:{CLE_APPLICATION},demonstration:{CLE_DEMONSTRATION}"
         ),
         "API_MODELE_DSN": dsn,
+        "MISTRAL_API_KEY": CLE_FOURNISSEUR,
     }
 
 
