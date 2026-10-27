@@ -13,12 +13,17 @@
 #     sous le même nom et avec la même configuration du module 09
 #     (`tests/integration/doublure_tei.py`) ;
 #   - le mot de passe du rôle, jetable, dans un pgpass écrit sur un volume (mode 600) ;
+#   - à la place d'un fournisseur du modèle de langage, une doublure
+#     (`tests/integration/doublure_fournisseur.py`), sur le bouclage du conteneur de
+#     l'API (elle partage son espace réseau), et un profil d'essai qui la vise
+#     (`tests/integration/profil_essai.toml`, ajouté à la configuration de l'image par
+#     le service `configuration`, sur un volume) : aucun fournisseur réel n'est joint ;
 #   - aucun port publié : l'essai passe par le réseau du Compose.
 # L'API est la vraie : image construite, non root, réseau interne vers le service,
 # contrôle de cohérence au démarrage, classement du banc, santé avant l'essai.
 #
 # Enchaînement : db (saine) → migrations → role → donnees ; embedding (sain) ;
-#                → api (saine) → essai.
+#                configuration → api (saine) → fournisseur (sain) → essai.
 
 name: api-modele-integration
 
@@ -121,21 +126,44 @@ services:
       interval: 2s
       start_period: 10s
 
+  # La configuration de l'image, plus le profil d'essai, sur un volume que l'API lit.
+  # Copie seule, puis le conteneur s'arrête ; aucun réseau.
+  configuration:
+    image: api-modele-integration
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        cp -R /app/11_api_modele/config/. /config/ &&
+        cat /essai/profil_essai.toml >> /config/reglages.toml
+    user: "0:0"
+    volumes:
+      - ./tests/integration:/essai:ro
+      - config:/config
+    network_mode: none
+    healthcheck:
+      disable: true
+
   api:
     image: api-modele-integration
     depends_on:
       donnees:
         condition: service_completed_successfully
+      configuration:
+        condition: service_completed_successfully
     environment:
       API_MODELE_CLES: integration:cle-jetable-de-l-essai-0123456789abcdef
       API_MODELE_DSN: postgresql://modele_api@db:5432/apimanga
       PGPASSFILE: /secret/pgpass
-      # Une valeur factice : le profil actif doit avoir sa clé pour démarrer ; l'essai
-      # n'appelle aucun fournisseur.
+      # Le profil de l'essai, qui vise la doublure ; des clés factices : aucune n'ouvre
+      # un fournisseur réel (le profil versionné garde la sienne pour /v1/info).
+      API_MODELE_PROFIL_ACTIF: ${API_MODELE_PROFIL_ACTIF_ESSAI:-essai-local}
+      ESSAI_API_KEY: cle-factice-de-l-essai
       MISTRAL_API_KEY: cle-factice-de-l-essai
     secrets: !reset []
     volumes:
       - secret:/secret:ro
+      - config:/app/11_api_modele/config:ro
     ports: !reset []
     healthcheck:
       test:
@@ -147,6 +175,28 @@ services:
           urllib.request.urlopen('http://127.0.0.1:8010/v1/sante', timeout=2)
       interval: 2s
       start_period: 60s
+
+  # La doublure du fournisseur : dans l'espace réseau de l'API, sur son bouclage
+  # (l'adresse d'un profil n'admet `http` que là).
+  fournisseur:
+    image: api-modele-integration
+    command: ["python", "/essai/doublure_fournisseur.py"]
+    network_mode: "service:api"
+    volumes:
+      - ./tests/integration:/essai:ro
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8099/health', timeout=2)
+      interval: 2s
+      start_period: 10s
 
   essai:
     image: api-modele-integration
@@ -161,6 +211,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      fournisseur:
+        condition: service_healthy
     networks: [sortie]
 
 networks:
@@ -169,3 +221,4 @@ networks:
 
 volumes:
   secret: {}
+  config: {}

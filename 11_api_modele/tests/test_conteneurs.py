@@ -114,8 +114,27 @@ def test_les_cles_des_fournisseurs_ne_sont_lues_que_dans_le_env(compose):
         assert environnement[variable] == f"${{{variable}:-}}", variable
     essai = lire(COMPOSE_INTEGRATION)["services"]["api"]["environment"]
     cles = {v for v in essai if v.endswith("_API_KEY")}
-    assert cles == {"MISTRAL_API_KEY"}
-    assert essai["MISTRAL_API_KEY"].startswith("cle-factice-")
+    assert cles == {"MISTRAL_API_KEY", "ESSAI_API_KEY"}
+    assert all(essai[v].startswith("cle-factice-") for v in cles)
+
+
+def test_l_essai_vise_une_doublure_du_fournisseur_sur_le_bouclage_de_l_api(compose):
+    """L'essai d'intégration joue `/v1/reponse` sans joindre un fournisseur réel : une
+    doublure dans l'espace réseau de l'API, un profil d'essai qui la vise ; ni l'une
+    ni l'autre n'existe dans le Compose du module."""
+    essai = lire(COMPOSE_INTEGRATION)["services"]
+    profil = (RACINE_MODULE / "tests" / "integration" / "profil_essai.toml").read_text(
+        encoding="utf-8"
+    )
+
+    assert essai["fournisseur"]["network_mode"] == "service:api"
+    assert par_defaut(essai["api"]["environment"]["API_MODELE_PROFIL_ACTIF"]) == (
+        "essai-local"
+    )
+    assert "config:/app/11_api_modele/config:ro" in essai["api"]["volumes"]
+    assert essai["configuration"]["network_mode"] == "none"
+    assert 'adresse = "http://127.0.0.1:8099/v1/chat/completions"' in profil
+    assert {"fournisseur", "configuration"}.isdisjoint(compose["services"])
 
 
 def test_les_conteneurs_ne_tournent_pas_en_root(compose):

@@ -1,0 +1,18 @@
+
+# --------------------------------------------------------------------------------- #
+#  Essai d'intégration du Compose seulement (`compose.integration.yml`) : ajouté au
+#  `reglages.toml` de l'image par le service `configuration`, jamais versionné dans la
+#  configuration du module. Une doublure du fournisseur, sur le bouclage du conteneur.
+# --------------------------------------------------------------------------------- #
+
+[modele_langage.profils.essai-local]
+fournisseur = "mistral"
+modele = "doublure-essai"
+adresse = "http://127.0.0.1:8099/v1/chat/completions"
+variable_cle = "ESSAI_API_KEY"
+reglages_fixes = { top_p = 1.0 }
+reglages_absents = []
+prix_usd_par_million = { entree = 1.0, sortie = 1.0 }
+delai_s = 10.0
+statut = "stable"
+motif = "Profil de l'essai d'intégration : la doublure du fournisseur, sur le bouclage du conteneur de l'API ; aucun fournisseur réel n'est joint."
