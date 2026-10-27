@@ -1,0 +1,14 @@
+id = "API-34"
+origine = "E3 étape 3, spec 03 (2026-10-27) — passages_par_serie non transmis à la recherche : le contexte n'aurait plus qu'un passage par série"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''            nombre_series=corps.nombre_series,
+            passages_par_serie=corps.passages_par_serie,
+            catalogue_seul=corps.catalogue_seul,
+        ),
+        identifiant,'''
+apres = '''            nombre_series=corps.nombre_series,
+            catalogue_seul=corps.catalogue_seul,
+        ),
+        identifiant,'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "contexte_envoye_au_modele"]
