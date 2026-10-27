@@ -10,7 +10,7 @@ from openapi_spec_validator import OpenAPIV31SpecValidator
 import api_modele
 from api_modele.contrat import DESTINATION, contrat, exporter, serialiser
 
-ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche"}
+ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche", "/v1/reponse"}
 #: Le contrat publié à la livraison 1.0.0 (étiquette `api-modele`), figé.
 REFERENCE_1_0_0 = Path(__file__).parent / "references" / "openapi_v1_1.0.0.json"
 ROUTES_OUVERTES = {"/v1/sante", "/v1/openapi.json"}
@@ -35,7 +35,7 @@ def test_le_contrat_est_un_openapi_3_1_valide():
 def test_les_routes_du_contrat_sont_sous_v1():
     chemins = set(contrat()["paths"])
 
-    assert chemins == {"/v1/sante", "/v1/info", "/v1/recherche"}
+    assert chemins == {"/v1/sante", "/v1/info", "/v1/recherche", "/v1/reponse"}
     assert all(c.startswith("/v1/") for c in chemins)
 
 
@@ -61,6 +61,7 @@ def test_les_erreurs_des_routes_protegees_sont_declarees():
     attendus = {
         ("/v1/info", "get"): ("401", "429"),
         ("/v1/recherche", "post"): ("401", "413", "422", "429", "503"),
+        ("/v1/reponse", "post"): ("401", "413", "422", "429", "503"),
     }
     for (chemin, methode), statuts in attendus.items():
         reponses = chemins[chemin][methode]["responses"]
@@ -115,17 +116,21 @@ def test_exporter_ecrit_le_contrat(tmp_path):
 
 def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seul `Info`
-    gagne un champ (`modele_langage`), et de nouveaux schémas s'ajoutent."""
+    gagne un champ (`modele_langage`) ; la route de réponse et ses schémas
+    s'ajoutent ; la version passe à 1.1.0 (mineure)."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert apres["info"] == avant["info"]  # 1.0.0 jusqu'à la route de réponse
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.1.0")
+    assert apres["info"]["title"] == avant["info"]["title"]
+    assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (
         apres["components"]["securitySchemes"]
         == (avant["components"]["securitySchemes"])
     )
     for chemin, operations in avant["paths"].items():
         assert apres["paths"][chemin] == operations, chemin
+    assert set(apres["paths"]) - set(avant["paths"]) == {"/v1/reponse"}
     schemas = apres["components"]["schemas"]
     for nom, schema in avant["components"]["schemas"].items():
         if nom != "Info":
@@ -142,12 +147,20 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
         }
     nouveaux = set(schemas) - set(avant["components"]["schemas"])
     assert nouveaux == {
+        "AppelModele",
         "BorneReelle",
+        "ContexteReponse",
+        "DemandeReponse",
         "HistoriqueDecrit",
+        "Latences",
         "ModeDecrit",
         "ModeleLangage",
         "ProfilDecrit",
         "ReglagesReponse",
+        "ReglagesReponseAppliques",
+        "Reponse",
+        "SerieCitee",
+        "Tour",
     }
 
 

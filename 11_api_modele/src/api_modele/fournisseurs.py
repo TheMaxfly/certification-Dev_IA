@@ -366,7 +366,7 @@ class Fournisseurs:
                     f"Le profil « {profil.nom} » n'expose pas « {reglage} ».",
                     {"reglage": reglage, "profil": profil.nom},
                 )
-        appliques = self._appliques(profil, demandes)
+        appliques = self.appliques(profil, demandes)
         corps = self._corps(profil, appliques, messages, schema)
         estimation = estimer_cout(
             profil,
@@ -405,7 +405,7 @@ class Fournisseurs:
                 variable_cle=profil.variable_cle,
             )
 
-    def _appliques(self, profil: Profil, demandes: Demandes) -> Appliques:
+    def appliques(self, profil: Profil, demandes: Demandes) -> Appliques:
         """Le réglage demandé, sinon le défaut du fichier ; rien pour un réglage que
         le profil déclare absent (il n'est pas envoyé)."""
         reponse = self._ml.reponse

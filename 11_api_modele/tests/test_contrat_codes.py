@@ -102,6 +102,45 @@ def recherche_503(api: TestClient, service: ServiceDoublure) -> httpx.Response:
     return rechercher(api, headers=entetes())
 
 
+# La route de réponse : sur l'API à profils factices (`api_reponse`), doublures du
+# bouclage seulement.
+def repondre(
+    api: TestClient, corps: object = None, **options: object
+) -> httpx.Response:
+    corps = {"question": QUESTION} if corps is None else corps
+    return api.post("/v1/reponse", json=corps, **options)  # type: ignore[arg-type]
+
+
+def reponse_200(api: TestClient, _: ServiceDoublure) -> httpx.Response:
+    return repondre(api, headers=entetes())
+
+
+def reponse_401(api: TestClient, _: ServiceDoublure) -> httpx.Response:
+    return repondre(api)
+
+
+def reponse_413(api: TestClient, _: ServiceDoublure) -> httpx.Response:
+    return api.post(
+        "/v1/reponse",
+        content=b'{"question": "' + b"x" * 16400 + b'"}',
+        headers=entetes() | {"Content-Type": "application/json"},
+    )
+
+
+def reponse_422(api: TestClient, _: ServiceDoublure) -> httpx.Response:
+    return repondre(api, {"question": QUESTION, "temperature": 1.5}, headers=entetes())
+
+
+def reponse_429(api: TestClient, _: ServiceDoublure) -> httpx.Response:
+    epuiser_le_debit(api)
+    return repondre(api, headers=entetes())
+
+
+def reponse_503(api: TestClient, service: ServiceDoublure) -> httpx.Response:
+    service.arreter()
+    return repondre(api, headers=entetes())
+
+
 SCENARIOS: dict[tuple[str, str, int], tuple[Scenario, str | None]] = {
     # (route, méthode, statut) → (scénario, code d'erreur attendu)
     ("/v1/sante", "GET", 200): (sante_200, None),
@@ -115,6 +154,12 @@ SCENARIOS: dict[tuple[str, str, int], tuple[Scenario, str | None]] = {
     ("/v1/recherche", "POST", 422): (recherche_422, "entree_invalide"),
     ("/v1/recherche", "POST", 429): (recherche_429, "debit_depasse"),
     ("/v1/recherche", "POST", 503): (recherche_503, "service_embedding_indisponible"),
+    ("/v1/reponse", "POST", 200): (reponse_200, None),
+    ("/v1/reponse", "POST", 401): (reponse_401, "cle_invalide"),
+    ("/v1/reponse", "POST", 413): (reponse_413, "corps_trop_volumineux"),
+    ("/v1/reponse", "POST", 422): (reponse_422, "entree_invalide"),
+    ("/v1/reponse", "POST", 429): (reponse_429, "debit_depasse"),
+    ("/v1/reponse", "POST", 503): (reponse_503, "service_embedding_indisponible"),
 }
 
 
@@ -127,13 +172,14 @@ def test_chaque_statut_declare_a_son_scenario():
     assert sorted(SCENARIOS) == DECLARES
 
 
-def test_le_contrat_declare_onze_statuts_sur_trois_routes():
+def test_le_contrat_declare_dix_sept_statuts_sur_quatre_routes():
     """Garde-fou de lecture : le contrat versionné n'a pas perdu d'opération."""
-    assert len(DECLARES) == 11
+    assert len(DECLARES) == 17
     assert {(c, m) for c, m, _ in DECLARES} == {
         ("/v1/sante", "GET"),
         ("/v1/info", "GET"),
         ("/v1/recherche", "POST"),
+        ("/v1/reponse", "POST"),
     }
 
 
@@ -151,13 +197,15 @@ def test_le_garde_fou_signale_un_statut_hors_contrat_et_lui_seul():
 
 @pytest.mark.parametrize(("chemin", "methode", "statut"), DECLARES)
 def test_chaque_statut_declare_est_produit_dans_sa_forme(
-    api: TestClient,
+    request: pytest.FixtureRequest,
     service_doublure: ServiceDoublure,
     chemin: str,
     methode: str,
     statut: int,
 ):
     scenario, code = SCENARIOS[chemin, methode, statut]
+    # La route de réponse sur les profils factices ; les autres, sur l'API versionnée.
+    api = request.getfixturevalue("api_reponse" if chemin == "/v1/reponse" else "api")
     r = scenario(api, service_doublure)
 
     assert r.status_code == statut, r.text

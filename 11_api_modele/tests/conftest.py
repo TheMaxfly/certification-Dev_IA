@@ -541,15 +541,30 @@ CONNEXION_FACTICE_S = 0.2
 DELAI_FACTICE_S = 0.5
 
 
+#: Une sortie conforme au schéma de la route de réponse : la série 1, son fragment 702.
+SORTIE_VALIDE = json.dumps(
+    {
+        "refus": False,
+        "motif_refus": None,
+        "reponse": "Une aventure de pirates, d'après une critique [S:1].",
+        "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+    }
+)
+#: La sortie de la reformulation : la question d'essai, autonome.
+REFORMULATION_VALIDE = json.dumps({"question": QUESTION})
+
+
 class DoublureFournisseur(BaseHTTPRequestHandler):
     """Un fournisseur simulé, sur le bouclage : `POST /v1/chat/completions` et
     `GET /v1/models`. Statut, corps, `usage`, modèle rendu, retard et envoi goutte à
-    goutte réglables ; chaque requête reçue est gardée (port, chemin, en-tête
+    goutte réglables ; le contenu rendu dépend du schéma demandé (reformulation ou
+    réponse) ; chaque requête reçue est gardée (port, chemin, en-tête
     d'autorisation, corps)."""
 
     statut: ClassVar[int] = 200
     corps_brut: ClassVar[bytes | None] = None
-    contenu: ClassVar[str] = '{"refus": false}'
+    contenu: ClassVar[str] = SORTIE_VALIDE
+    contenu_reformulation: ClassVar[str] = REFORMULATION_VALIDE
     usage: ClassVar[dict[str, Any] | None] = None
     modele_rendu: ClassVar[str | None] = None
     retard_s: ClassVar[float] = 0.0
@@ -601,16 +616,19 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
         if DoublureFournisseur.corps_brut is not None:
             self._envoyer(DoublureFournisseur.statut, DoublureFournisseur.corps_brut)
             return
+        schema = corps.get("response_format", {}).get("json_schema", {}).get("schema")
+        contenu = (
+            DoublureFournisseur.contenu_reformulation
+            if isinstance(schema, dict) and schema.get("required") == ["question"]
+            else DoublureFournisseur.contenu
+        )
         reponse: dict[str, Any] = {
             "id": "cmpl-essai",
             "model": DoublureFournisseur.modele_rendu or corps["model"],
             "choices": [
                 {
                     "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": DoublureFournisseur.contenu,
-                    },
+                    "message": {"role": "assistant", "content": contenu},
                     "finish_reason": "stop",
                 }
             ],
@@ -644,7 +662,8 @@ class Doublures:
 def doublures() -> Iterator[Doublures]:
     DoublureFournisseur.statut = 200
     DoublureFournisseur.corps_brut = None
-    DoublureFournisseur.contenu = '{"refus": false}'
+    DoublureFournisseur.contenu = SORTIE_VALIDE
+    DoublureFournisseur.contenu_reformulation = REFORMULATION_VALIDE
     DoublureFournisseur.usage = None
     DoublureFournisseur.modele_rendu = None
     DoublureFournisseur.retard_s = 0.0
@@ -720,3 +739,25 @@ ENVIRONNEMENT_FACTICE = {
     "API_MODELE_DSN": "postgresql://modele_api@localhost/apimanga",
     **CLES_FACTICES,
 }
+
+
+@pytest.fixture
+def api_reponse(
+    base_api: BaseApi,
+    pgpass: Path,
+    service_doublure: ServiceDoublure,
+    doublures: Doublures,
+    horloge: Horloge,
+    tmp_path: Path,
+) -> Iterator[TestClient]:
+    """L'API démarrée sur les deux profils factices (`factice-a` actif), chacun sur sa
+    doublure : la route de réponse ne joint que le bouclage."""
+    env = environnement(dsn_du_role(base_api.dsn_admin)) | CLES_FACTICES
+    reglages = replace(
+        charger(env, reglages_factices(tmp_path, doublures)), pool_attente_s=2.0
+    )
+    application = creer_application(
+        reglages, instance=service_doublure.instance, horloge=horloge, environ=env
+    )
+    with TestClient(application, client=("127.0.0.1", 50000)) as client:
+        yield client

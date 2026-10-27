@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "api-modele"
 # Version de l'API, sémantique : la majeure est le segment de l'adresse (`/v1/`).
-version = "1.0.0"
+version = "1.1.0"
 description = "API du modèle : une question, les séries classées par le modèle d'embedding en service, avec leurs passages"
 readme = "README.md"
 requires-python = ">=3.12"

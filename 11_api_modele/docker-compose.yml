@@ -61,7 +61,7 @@ services:
     build:
       context: ..
       dockerfile: 11_api_modele/Dockerfile
-    image: api-modele:1.0.0
+    image: api-modele:1.1.0
     depends_on:
       embedding:
         condition: service_healthy

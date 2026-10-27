@@ -36,6 +36,7 @@ from api_modele import (
     recherche,
     service,
 )
+from api_modele import reponse as route_reponse
 from api_modele.classement import Classeur
 from api_modele.configuration import Borne, Reglages
 from api_modele.debit import Limiteur
@@ -48,6 +49,7 @@ from api_modele.modeles import (
     BorneBooleenne,
     BorneEntiere,
     BorneReelle,
+    DemandeReponse,
     HistoriqueDecrit,
     Info,
     ModeDecrit,
@@ -57,6 +59,7 @@ from api_modele.modeles import (
     Recherche,
     ReglagesRecherche,
     ReglagesReponse,
+    Reponse,
     Resultat,
     Sante,
 )
@@ -70,6 +73,10 @@ Le classement est celui que le banc de mesure a mesuré.
 
 Toutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).
 `/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.
+
+Depuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en
+français une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse
+porte ses sources, le profil, les réglages, les jetons, le coût et les latences.
 """
 
 REPONSES_CLE: dict[int | str, dict[str, object]] = {
@@ -92,6 +99,26 @@ REPONSES_RECHERCHE: dict[int | str, dict[str, object]] = {
     },
 }
 
+REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
+    **REPONSES_CLE,
+    413: {"model": Erreur, "description": "Corps de requête trop volumineux."},
+    422: {
+        "model": Erreur,
+        "description": "Entrée invalide (`entree_invalide`), question trop longue"
+        " (`question_trop_longue`), historique invalide (`historique_invalide`),"
+        " profil inconnu ou indisponible (`profil_inconnu`, `profil_indisponible`),"
+        " réglage que le profil n'expose pas (`reglage_non_expose`). Aucun appel au"
+        " modèle n'a eu lieu.",
+    },
+    503: {
+        "model": Erreur,
+        "description": "La recherche ne répond pas (service d'embedding, base,"
+        " encodage en service changé) ; le fournisseur du modèle est injoignable"
+        " (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse"
+        " l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le"
+        " contrat (`sortie_modele_invalide`, son motif dans `details`).",
+    },
+}
 CleExigee = Annotated[str, Depends(exiger_cle)]
 
 
@@ -233,6 +260,14 @@ def creer_application(
             reglages.passages_par_serie.max,
         ),
         "question": (1, reglages.longueur_question_max),
+        "temperature": (
+            reglages.modele_langage.reponse.temperature.min,
+            reglages.modele_langage.reponse.temperature.max,
+        ),
+        "longueur_max": (
+            reglages.modele_langage.reponse.longueur_max.min,
+            reglages.modele_langage.reponse.longueur_max.max,
+        ),
     }
     app.add_middleware(
         Enveloppe,
@@ -262,6 +297,37 @@ def creer_application(
         if etat.reglages.journal_question:
             request.state.question = corps.question
         return recherche.rechercher(etat, corps, erreurs.identifiant(request), debut)
+
+    @app.post(
+        f"{prefixe}/reponse",
+        response_model=Reponse,
+        responses=REPONSES_REPONSE,
+        tags=["reponse"],
+        summary="Une réponse rédigée par le modèle de langage, des seuls passages",
+    )
+    async def repondre(
+        request: Request, corps: DemandeReponse, _cle: CleExigee
+    ) -> Reponse:
+        debut = time.perf_counter()
+        etat = etat_de(request)
+        if corps.identite is not None:
+            request.state.identite = corps.identite
+        request.state.reglages = {
+            "nombre_series": corps.nombre_series,
+            "passages_par_serie": corps.passages_par_serie,
+            "catalogue_seul": corps.catalogue_seul,
+            "temperature": corps.temperature,
+            "longueur_max": corps.longueur_max,
+            "mode": corps.mode,
+        }
+        if etat.reglages.journal_question:
+            request.state.question = corps.question
+        # Des nombres et des codes : jamais un texte (journal de la requête).
+        suivi: dict[str, object] = {}
+        request.state.reponse = suivi
+        return await route_reponse.repondre(
+            etat, corps, erreurs.identifiant(request), debut, suivi
+        )
 
     @app.get(
         f"{prefixe}/sante",

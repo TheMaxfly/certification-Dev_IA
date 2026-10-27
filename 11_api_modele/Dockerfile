@@ -1,6 +1,6 @@
 # L'image de l'API du modèle — construite depuis la RACINE du dépôt :
 #
-#   docker build -f 11_api_modele/Dockerfile -t api-modele:1.0.0 .
+#   docker build -f 11_api_modele/Dockerfile -t api-modele:1.1.0 .
 #
 # (le Compose du module la construit ainsi). La racine, parce que l'API exécute aussi
 # le code de trois autres modules, sans le recopier : le client du service d'embedding

@@ -716,6 +716,17 @@ def lire_contrat(fichier: Path = FICHIER_REGLAGES) -> Contrat:
     return contrat
 
 
+def lire_reglages_reponse(fichier: Path = FICHIER_REGLAGES) -> ReglagesReponse:
+    """Les réglages de la route de réponse, sans l'environnement : les formes de
+    `/v1/reponse` en dérivent (défauts et bornes publiés au contrat)."""
+    ecarts: list[str] = []
+    lecteur = _lecteur(fichier, ecarts)
+    reponse = _reglages_reponse(lecteur, _contrat(lecteur))
+    if ecarts:
+        raise ConfigurationInvalide(ecarts)
+    return reponse
+
+
 def besoin_memoire(fichier: Path = FICHIER_REGLAGES) -> int:
     """Le pic de mémoire vive de l'API, en octets (seuils de `verify-poste`)."""
     ecarts: list[str] = []
