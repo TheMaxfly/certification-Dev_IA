@@ -155,8 +155,13 @@ def test_le_contexte_de_construction_est_une_liste_blanche():
 
     assert lignes[0] == "*"
     admis = [ligne[1:] for ligne in lignes if ligne.startswith("!")]
+    # Une seule donnée : les homonymes admis (des empreintes, aucun nom), nommée.
+    donnees = [a for a in admis if a.startswith("database/")]
+    assert donnees == ["database/donnees/corpus_homonymes_admis.csv"]
     assert all(
-        a.startswith(("05_", "09_", "10_", "11_")) and "data" not in a for a in admis
+        a.startswith(("05_", "09_", "10_", "11_")) and "data" not in a
+        for a in admis
+        if a not in donnees
     )
     assert not any(".env" in a and "embeddinggemma" not in a for a in admis)
 

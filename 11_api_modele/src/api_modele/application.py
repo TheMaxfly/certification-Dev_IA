@@ -2,7 +2,8 @@
 
 Au démarrage, le pool est ouvert, la cohérence vérifiée (`demarrage.verifier`) et
 le classement du banc chargé (rattachement et vecteurs de l'encodage en service) ;
-puis la couche des fournisseurs du modèle de langage est posée (son contrôle
+puis la liste des pseudonymes est lue (`manga.v_pseudonymes`, gardée en mémoire) et
+la couche des fournisseurs du modèle de langage est posée (son contrôle
 d'exploitation, s'il est demandé : `/v1/models`) ; un écart, et l'API ne démarre pas.
 Routes : `/v1/recherche` et `/v1/info` (avec clé), `/v1/sante` (sans clé), `/metrics`
 (réseau interne), `/v1/openapi.json` (le contrat) et, sur réglage, `/v1/docs`
@@ -15,6 +16,7 @@ import os
 import time
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
@@ -30,6 +32,7 @@ from api_modele import (
     erreurs,
     journal,
     memoire,
+    pseudonymes,
     recherche,
     service,
 )
@@ -132,11 +135,13 @@ def creer_application(
     instance: Instance | None = None,
     horloge: Callable[[], float] = time.monotonic,
     environ: Mapping[str, str] | None = None,
+    homonymes: Path = pseudonymes.FICHIER_HOMONYMES,
 ) -> FastAPI:
     """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
 
     `environ` : où la couche des fournisseurs lit les clés au moment de l'appel
-    (l'environnement du processus par défaut)."""
+    (l'environnement du processus par défaut) ; `homonymes` : la liste des
+    homonymes admis (celle de l'étape 1 par défaut)."""
     metriques = Metriques()
     contexte: dict[str, object] = {}
 
@@ -160,6 +165,7 @@ def creer_application(
                 ) from exc
             coherence = demarrage.verifier(pool, client, inst, reglages)
             classeur = charger_classement(pool, reglages, coherence)
+            noms = pseudonymes.charger(pool, reglages, homonymes)
             try:
                 await fournisseurs.demarrer()
             except ErreurFournisseur as exc:
@@ -179,6 +185,7 @@ def creer_application(
             limiteur=Limiteur(reglages.debit_par_minute, horloge),
             metriques=metriques,
             fournisseurs=fournisseurs,
+            pseudonymes=noms,
         )
         contexte.update(corpus_id=encodage.corpus_id, encodage_id=encodage.encodage_id)
         metriques.encodage.labels(
@@ -197,6 +204,9 @@ def creer_application(
                 "profils_disponibles": [
                     nom for nom, p in fournisseurs.profils.items() if p.disponible
                 ],
+                # Des nombres seulement : jamais un nom.
+                "pseudonymes": noms.nb_noms,
+                "homonymes_admis": noms.nb_admis,
             },
         )
         try:

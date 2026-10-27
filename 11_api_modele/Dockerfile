@@ -4,9 +4,10 @@
 #
 # (le Compose du module la construit ainsi). La racine, parce que l'API exécute aussi
 # le code de trois autres modules, sans le recopier : le client du service d'embedding
-# (09, dépendance locale), le classement du banc (10, chargé par son chemin) et le
-# rattachement (05, chargé par le 10). Seuls ces fichiers entrent dans le contexte
-# (`Dockerfile.dockerignore`, liste blanche).
+# (09, dépendance locale), le classement du banc (10, chargé par son chemin), le
+# rattachement (05, chargé par le 10) et la méthode des pseudonymes (05, chargée par
+# son chemin), avec la liste des homonymes admis (`database/donnees/`). Seuls ces
+# fichiers entrent dans le contexte (`Dockerfile.dockerignore`, liste blanche).
 #
 # Dépendances : celles du verrou (`uv sync --locked`, sans les extras de
 # développement), par uv à version fixe. Images de base épinglées par empreinte.
@@ -31,6 +32,8 @@ RUN cd 11_api_modele && uv sync --locked --no-install-project
 COPY 09_service_embedding/config 09_service_embedding/config
 COPY 10_mesures_recherche/src/mesures_recherche 10_mesures_recherche/src/mesures_recherche
 COPY 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py 05_nettoyage_agregation_bdd/src/evaluation/
+COPY 05_nettoyage_agregation_bdd/src/corpus/pseudonymes.py 05_nettoyage_agregation_bdd/src/corpus/
+COPY database/donnees/corpus_homonymes_admis.csv database/donnees/
 COPY 11_api_modele/config 11_api_modele/config
 COPY 11_api_modele/src 11_api_modele/src
 RUN cd 11_api_modele && uv sync --locked

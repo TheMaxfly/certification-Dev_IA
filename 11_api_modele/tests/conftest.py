@@ -346,6 +346,9 @@ def service_doublure() -> Iterator[ServiceDoublure]:
 #  Une base garnie : un corpus clos, son encodage EmbeddingGemma, promu
 # --------------------------------------------------------------------------- #
 CORPUS = "v7"
+#: Les auteurs de critiques de la base de test, factices : la vue des pseudonymes (024)
+#: les rend à l'API, qui refuse de démarrer si elle est vide.
+AUTEURS = ("Lecteurfactice", "Membrefictif")
 DOCUMENTS = {
     "ms_review:1": ("ms_review", 1, None, "Série 1"),
     "kitsu:50": ("kitsu_synopsis", None, 50, "Kitsu Cinquante"),
@@ -429,6 +432,12 @@ def garnir(dsn: str, instance: Instance, *, clore: bool = True) -> int:
         cx.execute(
             "INSERT INTO manga.work_identity (series_id, kitsu_id) VALUES (2, '50')"
         )
+        for auteur in AUTEURS:
+            cx.execute(
+                "INSERT INTO manga.ms_reviews_all (series_id, review_author)"
+                " VALUES (1, %s)",
+                (auteur,),
+            )
         cx.execute(
             "INSERT INTO bench.corpus (corpus_id, regle, chunking_id)"
             " SELECT %s, 'essai', chunking_id FROM bench.chunking_strategies"
