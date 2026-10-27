@@ -1425,6 +1425,12 @@
           "503": {
             "content": {
               "application/json": {
+                "example": {
+                  "base": "injoignable",
+                  "encodage": "inconnu",
+                  "service_embedding": "ok",
+                  "statut": "degrade"
+                },
                 "schema": {
                   "$ref": "#/components/schemas/Sante"
                 }

@@ -119,6 +119,14 @@ REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
         " contrat (`sortie_modele_invalide`, son motif dans `details`).",
     },
 }
+#: L'exemple exact du 503 de `/v1/sante` (dette de l'étape 2, soldée à l'étape 3).
+EXEMPLE_SANTE_503 = {
+    "statut": "degrade",
+    "base": "injoignable",
+    "service_embedding": "ok",
+    "encodage": "inconnu",
+}
+
 CleExigee = Annotated[str, Depends(exiger_cle)]
 
 
@@ -332,7 +340,13 @@ def creer_application(
     @app.get(
         f"{prefixe}/sante",
         response_model=Sante,
-        responses={503: {"model": Sante, "description": "Un composant ne répond pas."}},
+        responses={
+            503: {
+                "model": Sante,
+                "description": "Un composant ne répond pas.",
+                "content": {"application/json": {"example": EXEMPLE_SANTE_503}},
+            }
+        },
         tags=["exploitation"],
         summary="Vivant ; base, service et encodage en service cohérents",
     )

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
 from openapi_spec_validator import OpenAPIV31SpecValidator
 
 import api_modele
@@ -97,6 +99,23 @@ def test_la_sante_declare_son_503():
     assert set(reponses) == {"200", "503"}
 
 
+def test_l_exemple_du_503_de_la_sante_est_un_vrai_503(api):
+    """Dette de l'étape 2 soldée : l'exemple de `/v1/docs` est celui que l'API rend
+    quand la base ne répond pas — valide contre le schéma `Sante`, et égal."""
+    document = contrat()
+    reponse = document["paths"]["/v1/sante"]["get"]["responses"]["503"]
+    exemple = reponse["content"]["application/json"]["example"]
+    Draft202012Validator(
+        {"$ref": "#/components/schemas/Sante", "components": document["components"]}
+    ).validate(exemple)
+    api.app.state.etat.pool.close()  # type: ignore[attr-defined]
+
+    r = api.get("/v1/sante")
+
+    assert r.status_code == 503
+    assert r.json() == exemple
+
+
 def test_la_version_du_contrat_est_celle_du_paquet():
     assert contrat()["info"]["version"] == api_modele.__version__
 
@@ -116,8 +135,8 @@ def test_exporter_ecrit_le_contrat(tmp_path):
 
 def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seul `Info`
-    gagne un champ (`modele_langage`) ; la route de réponse et ses schémas
-    s'ajoutent ; la version passe à 1.1.0 (mineure)."""
+    gagne un champ (`modele_langage`) ; la route de réponse, ses schémas et l'exemple
+    du 503 de `/v1/sante` s'ajoutent ; la version passe à 1.1.0 (mineure)."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
@@ -129,7 +148,11 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
         == (avant["components"]["securitySchemes"])
     )
     for chemin, operations in avant["paths"].items():
-        assert apres["paths"][chemin] == operations, chemin
+        actuelles = copy.deepcopy(apres["paths"][chemin])
+        if chemin == "/v1/sante":  # l'exemple ajouté au 503, rien d'autre
+            contenu = actuelles["get"]["responses"]["503"]["content"]
+            assert contenu["application/json"].pop("example")["statut"] == "degrade"
+        assert actuelles == operations, chemin
     assert set(apres["paths"]) - set(avant["paths"]) == {"/v1/reponse"}
     schemas = apres["components"]["schemas"]
     for nom, schema in avant["components"]["schemas"].items():
