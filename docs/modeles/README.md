@@ -5,10 +5,10 @@ de la base `apimanga` : aucune table, aucune colonne, aucune cle etrangere n'y
 est saisie a la main.
 
 **Dette connue** : les planches et `schema_reel.md` sont au niveau de la
-migration `014`. Les migrations `015` a `023` (personnages multi-sources, jeu
+migration `014`. Les migrations `015` a `024` (personnages multi-sources, jeu
 d'evaluation, vecteurs pgvector, cohabitation des corpus, roles `verif_ro` et
-`modele_ro`) n'y figurent pas encore ; la regeneration est reportee a une
-etape a part, apres E3.
+`modele_ro`, vue `manga.v_pseudonymes`) n'y figurent pas encore ; la
+regeneration est reportee a une etape a part, apres E3.
 
 ## Fichiers
 
