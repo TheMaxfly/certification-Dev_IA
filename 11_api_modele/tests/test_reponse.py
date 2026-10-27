@@ -727,3 +727,26 @@ def test_un_historique_vide_vaut_sans_historique(api_reponse, doublures):
 
     assert len(appels(doublures)) == 1
     assert corps["contexte"]["question_reformulee"] is None
+
+
+def test_le_texte_de_la_question_au_journal_sur_reglage_seulement(
+    base_api: BaseApi, pgpass, service_doublure, doublures, tmp_path, caplog
+):
+    caplog.set_level(logging.INFO, logger="api_modele.requetes")
+    env = environnement(dsn_du_role(base_api.dsn_admin)) | CLES_FACTICES
+    env["API_MODELE_JOURNAL_QUESTION"] = "vrai"
+    reglages = replace(
+        charger(env, reglages_factices(tmp_path, doublures)), pool_attente_s=2.0
+    )
+    app = creer_application(reglages, instance=service_doublure.instance, environ=env)
+    with TestClient(app) as api:
+        assert repondre(api).status_code == 200
+
+    (ligne,) = [
+        json.loads(FormatJson().format(e))
+        for e in caplog.records
+        if getattr(e, "champs", {}).get("route") == "/v1/reponse"
+    ]
+    assert ligne["question"] == QUESTION
+    # La réponse du modèle, elle, n'y entre jamais.
+    assert "Une aventure de pirates [S:1]" not in json.dumps(ligne, ensure_ascii=False)

@@ -70,8 +70,10 @@ def test_v1_repond(api):
         ("GET", "/v2/sante"),
         ("GET", "/v2/info"),
         ("POST", "/v2/recherche"),
+        ("POST", "/v2/reponse"),
         ("GET", "/v2/openapi.json"),
         ("POST", "/recherche"),
+        ("POST", "/reponse"),
     ],
 )
 def test_v2_et_l_adresse_sans_version_n_existent_pas(api, methode, chemin):
@@ -117,7 +119,23 @@ def test_un_champ_ajoute_ne_casse_pas_un_client_qui_ignore_les_champs_inconnus(a
 
 @pytest.mark.parametrize(
     "nom",
-    ["Resultat", "Serie", "Passage", "Contexte", "ReglagesAppliques", "Info", "Sante"],
+    [
+        "Resultat",
+        "Serie",
+        "Passage",
+        "Contexte",
+        "ReglagesAppliques",
+        "Info",
+        "Sante",
+        "Reponse",
+        "ContexteReponse",
+        "SerieCitee",
+        "AppelModele",
+        "Latences",
+        "ReglagesReponseAppliques",
+        "ModeleLangage",
+        "ProfilDecrit",
+    ],
 )
 def test_les_sorties_du_contrat_ne_ferment_pas_leurs_champs(nom):
     assert SCHEMAS[nom].get("additionalProperties") is not False
@@ -134,3 +152,58 @@ def test_l_entree_reste_fermee(api):
     assert r.json()["details"]["champs"] == [
         {"champ": "encodage_id", "raison": "inconnu"}
     ]
+
+
+# Un client écrit sur le contrat 1.1.0 de la route de réponse.
+class ClientCitee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    serie_id: int
+    titre: str
+
+
+class ClientContexteReponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    profil: str
+    modele_langage: str
+    cout_estime_usd: float | None
+
+
+class ClientReponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    refus: bool
+    reponse: str
+    series_citees: list[ClientCitee]
+    contexte: ClientContexteReponse
+
+
+def test_la_reponse_reste_lisible_par_un_client_qui_ignore_les_champs_inconnus(
+    api_reponse,
+):
+    r = api_reponse.post("/v1/reponse", json={"question": QUESTION}, headers=entetes())
+    assert r.status_code == 200
+    reponse = r.json()
+    enrichie = copy.deepcopy(reponse)
+    enrichie["suggestions"] = ["un champ ajouté"]
+    enrichie["series_citees"][0]["confiance"] = 0.9
+    enrichie["contexte"]["mode_enrichi"] = None
+
+    schema = {
+        "$ref": "#/components/schemas/Reponse",
+        "components": CONTRAT["components"],
+    }
+    Draft202012Validator(schema).validate(enrichie)
+    assert ClientReponse.model_validate(enrichie) == ClientReponse.model_validate(
+        reponse
+    )
+
+
+@pytest.mark.parametrize("nom", ["DemandeReponse", "Tour"])
+def test_l_entree_de_la_reponse_reste_fermee(api_reponse, nom):
+    assert SCHEMAS[nom]["additionalProperties"] is False
+    r = api_reponse.post(
+        "/v1/reponse",
+        json={"question": QUESTION, "historique": [], "seed": 7},
+        headers=entetes(),
+    )
+    assert r.status_code == 422
+    assert r.json()["details"]["champs"] == [{"champ": "seed", "raison": "inconnu"}]

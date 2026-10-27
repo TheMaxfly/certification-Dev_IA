@@ -14,7 +14,12 @@ from conftest import (
     RACINE_MODULE,
 )
 
-from api_modele.configuration import FICHIER_REGLAGES, ConfigurationInvalide, charger
+from api_modele.configuration import (
+    FICHIER_REGLAGES,
+    ConfigurationInvalide,
+    charger,
+    lire_reglages_reponse,
+)
 
 DSN = "postgresql://modele_api@localhost:5432/apimanga"
 VALIDE = {
@@ -507,3 +512,13 @@ def test_un_profil_avec_temperature_absente_est_admis(tmp_path):
     luna = charger(VALIDE, fichier).modele_langage.profil("gpt-6-luna")
 
     assert luna is not None and luna.reglages_absents == ("temperature",)
+
+
+def test_les_reglages_de_la_reponse_se_lisent_sans_l_environnement(tmp_path):
+    """Les formes de `/v1/reponse` en dérivent à l'import : un fichier fautif les
+    refuse, comme la configuration complète."""
+    assert lire_reglages_reponse().nombre_series.defaut == 5
+    fichier = ecrire(tmp_path, ("nombre_series = 5\n", "nombre_series = 60\n"))
+
+    with pytest.raises(ConfigurationInvalide, match="nombre_series 60"):
+        lire_reglages_reponse(fichier)

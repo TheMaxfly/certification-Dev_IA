@@ -14,7 +14,8 @@ service réel.
 
 Le contrat est gardé sur toute la suite : une réponse de l'API, dans n'importe quel
 test, sur une opération du contrat versionné, doit avoir un statut que le contrat
-déclare pour elle (`aucun_statut_hors_contrat`).
+déclare pour elle, et, quand la description de ce statut énumère ses codes d'erreur
+(entre accents graves), l'un de ces codes (`aucun_statut_hors_contrat`).
 
 Les fournisseurs du modèle de langage sont des doublures sur le bouclage (deux
 serveurs, deux profils factices) ; sur toute la suite, une requête de la couche des
@@ -27,6 +28,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import re
 import secrets
 import sys
 import threading
@@ -77,27 +79,51 @@ harnais = _charger_harnais()
 # --------------------------------------------------------------------------- #
 #  Le contrat, gardé sur toute la suite : aucun statut qu'il ne déclare pas
 # --------------------------------------------------------------------------- #
+CONTRAT_VERSIONNE = json.loads(DESTINATION.read_text(encoding="utf-8"))
 #: (gabarit de route, méthode) → statuts déclarés, lus dans le contrat versionné.
 OPERATIONS: dict[tuple[str, str], set[int]] = {
     (chemin, methode.upper()): {int(statut) for statut in operation["responses"]}
-    for chemin, operations in json.loads(DESTINATION.read_text(encoding="utf-8"))[
-        "paths"
-    ].items()
+    for chemin, operations in CONTRAT_VERSIONNE["paths"].items()
     for methode, operation in operations.items()
 }
 
 
+def codes_declares(description: str) -> set[str]:
+    """Les codes d'erreur qu'une description de réponse énumère (accents graves)."""
+    return set(re.findall(r"`([a-z_]+)`", description))
+
+
+#: (route, méthode, statut) → codes d'erreur énumérés par le contrat (vide : aucun).
+CODES: dict[tuple[str, str, int], set[str]] = {
+    (chemin, methode.upper(), int(statut)): codes_declares(
+        reponse.get("description", "")
+    )
+    for chemin, operations in CONTRAT_VERSIONNE["paths"].items()
+    for methode, operation in operations.items()
+    for statut, reponse in operation["responses"].items()
+}
+
+
+type Vue = tuple[str, str, int, str | None]  # route, méthode, statut, code
+
+
 class Reponses(logging.Handler):
-    """Recueille (route, méthode, statut) de chaque ligne « requete » du journal."""
+    """Recueille (route, méthode, statut, code) de chaque ligne « requete » du
+    journal."""
 
     def __init__(self) -> None:
         super().__init__(logging.INFO)
-        self.vues: list[tuple[str, str, int]] = []
+        self.vues: list[Vue] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         champs = getattr(record, "champs", None)
         if record.getMessage() == "requete" and isinstance(champs, dict):
-            vue = (champs.get("route"), champs.get("methode"), champs.get("statut"))
+            vue = (
+                champs.get("route"),
+                champs.get("methode"),
+                champs.get("statut"),
+                champs.get("code"),
+            )
             self.vues.append(vue)  # type: ignore[arg-type]
 
 
@@ -117,7 +143,7 @@ def aucun_statut_hors_contrat() -> Iterator[Reponses]:
         journal.removeHandler(capteur)
         journal.setLevel(niveau)
     hors = statuts_hors_contrat(capteur.vues)
-    assert not hors, f"statuts que le contrat ne déclare pas : {hors}"
+    assert not hors, f"statuts ou codes que le contrat ne déclare pas : {hors}"
 
 
 #: Les hôtes qu'un test peut joindre par la couche des fournisseurs.
@@ -147,15 +173,17 @@ def aucun_appel_hors_du_bouclage(
     assert not hors, f"appels hors du bouclage : {hors}"
 
 
-def statuts_hors_contrat(
-    vues: list[tuple[str, str, int]],
-) -> list[tuple[str, str, int]]:
-    """Les réponses d'une opération du contrat dont le statut n'y est pas déclaré."""
-    return [
-        (route, methode, statut)
-        for route, methode, statut in vues
-        if (route, methode) in OPERATIONS and statut not in OPERATIONS[route, methode]
-    ]
+def statuts_hors_contrat(vues: list[Vue]) -> list[Vue]:
+    """Les réponses d'une opération du contrat dont le statut n'y est pas déclaré, ou
+    dont le code n'est pas parmi ceux que le contrat énumère pour ce statut."""
+    hors: list[Vue] = []
+    for route, methode, statut, code in vues:
+        if (route, methode) not in OPERATIONS:
+            continue
+        codes = CODES.get((route, methode, statut), set())
+        if statut not in OPERATIONS[route, methode] or (codes and code not in codes):
+            hors.append((route, methode, statut, code))
+    return hors
 
 
 @pytest.fixture(scope="session")

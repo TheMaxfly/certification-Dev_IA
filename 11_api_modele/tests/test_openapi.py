@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 
 from jsonschema import Draft202012Validator
 from openapi_spec_validator import OpenAPIV31SpecValidator
@@ -13,8 +12,9 @@ import api_modele
 from api_modele.contrat import DESTINATION, contrat, exporter, serialiser
 
 ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche", "/v1/reponse"}
-#: Le contrat publié à la livraison 1.0.0 (étiquette `api-modele`), figé.
-REFERENCE_1_0_0 = Path(__file__).parent / "references" / "openapi_v1_1.0.0.json"
+#: Le contrat publié à la livraison 1.0.0 (étiquette `api-modele`), figé à côté du
+#: contrat courant.
+REFERENCE_1_0_0 = DESTINATION.parent / "openapi_v1.0.0.json"
 ROUTES_OUVERTES = {"/v1/sante", "/v1/openapi.json"}
 
 
@@ -193,3 +193,49 @@ def test_la_reference_1_0_0_est_le_contrat_livre():
 
     empreinte = hashlib.sha256(REFERENCE_1_0_0.read_bytes()).hexdigest()
     assert empreinte.startswith("b3ee377d1492e7e2")
+
+
+def resoudre(document: dict, noeud: dict) -> dict:
+    """Un schéma, ses `$ref` locaux (`#/components/…`) suivis depuis la racine."""
+    while "$ref" in noeud:
+        cible = noeud["$ref"]
+        noeud = document
+        for partie in cible.removeprefix("#/").split("/"):
+            noeud = noeud[partie]
+    return noeud
+
+
+def test_compatibilite_avec_le_contrat_1_0_0():
+    """Pour chaque route de 1.0.0 : mêmes codes, mêmes champs d'entrée, et tous les
+    champs de sortie de 1.0.0 présents, avec leur forme (spec 04, A.1)."""
+    avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
+    apres = contrat()
+
+    for chemin, operations in avant["paths"].items():
+        for methode, operation in operations.items():
+            courante = apres["paths"][chemin][methode]
+            assert set(courante["responses"]) == set(operation["responses"]), chemin
+            if "requestBody" in operation:
+                entree_avant = resoudre(
+                    avant,
+                    operation["requestBody"]["content"]["application/json"]["schema"],
+                )
+                entree = resoudre(
+                    apres,
+                    courante["requestBody"]["content"]["application/json"]["schema"],
+                )
+                assert entree["properties"] == entree_avant["properties"], chemin
+                assert entree.get("required") == entree_avant.get("required")
+            for statut, reponse in operation["responses"].items():
+                sortie_avant = resoudre(
+                    avant, reponse["content"]["application/json"]["schema"]
+                )
+                sortie = resoudre(
+                    apres,
+                    courante["responses"][statut]["content"]["application/json"][
+                        "schema"
+                    ],
+                )
+                for champ, forme in sortie_avant.get("properties", {}).items():
+                    assert champ in sortie["properties"], (chemin, statut, champ)
+                    assert sortie["properties"][champ] == forme, (chemin, champ)

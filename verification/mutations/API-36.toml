@@ -1,0 +1,7 @@
+id = "API-36"
+origine = "E3 étape 3, spec 04 (2026-10-27) — reformulation_ignoree jamais posé : une reformulation abandonnée ne se verrait pas dans le contexte"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''            reformulation_ignoree="trop_longue" if ignoree else None,'''
+apres = '''            reformulation_ignoree=None,'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "reformulation_trop_longue_est_ignoree"]

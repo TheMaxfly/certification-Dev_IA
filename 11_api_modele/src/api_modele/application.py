@@ -112,11 +112,14 @@ REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
     },
     503: {
         "model": Erreur,
-        "description": "La recherche ne répond pas (service d'embedding, base,"
-        " encodage en service changé) ; le fournisseur du modèle est injoignable"
+        "description": "La recherche ne répond pas : service d'embedding"
+        " indisponible (`service_embedding_indisponible`) ou incohérent"
+        " (`service_embedding_incoherent`), base indisponible"
+        " (`base_indisponible`), encodage en service changé depuis le démarrage"
+        " (`encodage_en_service_change`) ; le fournisseur du modèle est injoignable"
         " (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse"
         " l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le"
-        " contrat (`sortie_modele_invalide`, son motif dans `details`).",
+        " contrat (`sortie_modele_invalide`, son motif dans les détails).",
     },
 }
 #: L'exemple exact du 503 de `/v1/sante` (dette de l'étape 2, soldée à l'étape 3).
