@@ -1,7 +1,7 @@
 # État de référence d'apimanga, relevé par verification/etat_apimanga.sh --relever.
 # Contrôlé par l'étape « état d'apimanga » de make verify-poste. Une mesure, une
 # promotion ou une migration le change : relever, puis commiter avec elle.
-# Relevé le 2026-10-20T11:54:30Z.
+# Relevé le 2026-10-27T00:23:50Z.
 # portée	objet	valeurs
 v1	docs	48090	3a34c78565230d13a13366336a863c01
 v1	fragments	66290	d1b0692681459910e7a067b71224c657
@@ -21,5 +21,5 @@ v2	encodages	1	5c3255081ce689b6f74f48e36145e8f6
 -	encodage_en_service	3	v2
 -	jeu	v1	07a3f4f8e43350c7389a2b18f223b3e60652e475e63ae459f7478b8149f424a3
 -	jeu	v2	31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30
--	migrations	24	72430d2b64d544b124b75363ba465120b8644cbec59e465b875caed21d664613
+-	migrations	25	2599a392032cb7adc6d10730d24b612798411f075474f60c3e35703a89d5414d
 -	migrations_egales_aux_fichiers	oui
