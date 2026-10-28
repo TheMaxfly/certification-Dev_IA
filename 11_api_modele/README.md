@@ -672,6 +672,48 @@ coût = (jetons d'entrée × prix d'entrée + (jetons de sortie + jetons de rais
   requête sur le plafond ; elle écrit l'estimation avant appel dans la trace de chaque
   appel.
 
+## Le banc de mesure de la réponse
+
+Le seul chemin d'un appel réel hors du service : à la main, commande par commande
+(`src/api_modele/banc_reponse/`). Aucun test ne l'emploie contre un fournisseur.
+
+```bash
+B="uv run --env-file .env python -m api_modele.banc_reponse"
+$B estimer mistral-large-2512 famille:F7,issue:hors_catalogue   # aucun appel
+$B essai mistral-large-2512 "<question inventée>" [--temperature 0.7]
+DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
+  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
+DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
+```
+
+- **Où il tourne** : l'API dans le processus (comme les tests et l'étape d'équivalence
+  de `verify-poste`), sur la base réelle sous `modele_api`, avec le service
+  d'embedding réel levé à part ; une clé de consommateur tirée pour le seul
+  lancement ; `API_MODELE_VERIFIER_MODELES` doit valoir faux.
+- **Le jeu** : le jeu gelé v2, désigné **par famille ou par issue**, jamais question
+  par question ; empreinte `31712b0d…` vérifiée avant tout run.
+- **Gardes** : arbre propre et `HEAD` poussé avant `mesurer` et `scenarios` ;
+  estimation avant le premier appel (formule de « Coût », sortie au maximum), arrêt
+  si elle dépasse `COUT_PLAFOND_RUN` ; coût réel cumulé (depuis `usage`, appels
+  rejetés compris) après chaque question, arrêt au plafond (run `interrompu`, ce qui
+  est mesuré est gardé) ; arrêt aussi si un fournisseur refuse ou ne répond pas.
+- **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse`, magasin du
+  module 10, écrit par l'interpréteur du module 10 : le module 11 n'installe pas
+  MLflow) ; ses pièces ne portent que des identifiants et des nombres. La ligne
+  `bench.eval_runs` du run, sous le rôle qui l'écrit pour le module 10
+  (`DATABASE_URL`, `postgres`, mot de passe dans `~/.pgpass`). Les **textes** des
+  réponses, contrôlés (aucun nom de membre), dans
+  `05_nettoyage_agregation_bdd/data/rapports/mesures_reponse/<run>/reponses.md`, hors
+  dépôt et hors MLflow, pour la lecture humaine.
+- **Critère, écrit avant la mesure** (`banc_reponse/mesure.py`, `CRITERE`), par
+  profil : refus correct ≥ 4 / 5 sur F7 ; refus, ou mention « pas au catalogue »,
+  ≥ 4 / 5 sur les cinq questions hors catalogue ; **zéro** série inventée ; **zéro**
+  sortie invalide pour un nom de membre. Pas de seuil sur le recouvrement (suites de
+  8 mots de la réponse présentes telles quelles dans un passage) ni sur F9 / F10 : à
+  la première mesure, on écrit le chiffre.
+- **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
+  mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
+
 ## Les traces
 
 - **Journal** : une ligne JSON par requête (identifiant, route, statut, code, durée,
