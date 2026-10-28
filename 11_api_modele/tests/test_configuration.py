@@ -301,7 +301,7 @@ def test_le_fichier_versionne_declare_les_quatre_profils_et_la_route():
     assert (r.passages_par_serie.defaut, r.passages_par_serie.max) == (2, 5)
     assert r.catalogue_seul is True
     assert (ml.caracteres_par_jeton, ml.plafond_run_usd, ml.connexion_s) == (
-        3.5,
+        3.8,
         0.5,
         5.0,
     )

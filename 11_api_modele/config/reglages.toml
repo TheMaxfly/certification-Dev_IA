@@ -121,8 +121,8 @@ catalogue_seul = true
 motif = "Défauts de la route de réponse (décision 6) : 5 séries × 2 passages, de quoi choisir sans recopier le corpus ; ceux de /v1/recherche (10 × 1) ne changent pas. Bornes : celles de la recherche."
 
 [modele_langage.estimation]
-caracteres_par_jeton = 3.5
-motif = "Estimation déclarée : un jeton ≈ 3,5 caractères de français (≈ 4 d'anglais, surestimé). Recalée sur usage de la réponse du fournisseur après les premiers appels réels (rapport de 06)."
+caracteres_par_jeton = 3.8
+motif = "Recalée sur usage des quatre appels d'essai du 2026-10-28 (UTC) : 3,86 à 4,02 caractères par jeton d'entrée facturé selon le profil, 3,97 sur l'ensemble (3,5 déclaré avant : +13 % de jetons estimés). 3,8 = la plus basse arrondie au dixième inférieur : l'estimation reste un majorant pour chaque profil."
 
 [modele_langage.cout]
 plafond_run_usd = 0.50

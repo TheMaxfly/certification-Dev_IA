@@ -309,7 +309,7 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 | `historique` | vide | 10 tours, 4 000 caractères (2 000 par tour) | — | cinq questions-réponses, borne franche ; ni gardé ni journalisé |
 | `reformuler` | vrai | — | — (champ de la requête) | les suites de comptoir ne retrouvent rien seules ; désactivable pour la démonstration |
 | recherche de la route | 5 séries × 2 passages, catalogue seul | bornes de la recherche | — (champs de la requête) | de quoi choisir sans recopier le corpus ; ceux de `/v1/recherche` (10 × 1) ne changent pas |
-| `caracteres_par_jeton` | 3,5 | > 0 | — | estimation déclarée des jetons, sans `usage` du fournisseur ; recalée après les premiers appels réels |
+| `caracteres_par_jeton` | 3,8 | > 0 | — | estimation des jetons, sans `usage` du fournisseur ; recalée sur les quatre appels d'essai (3,86 à 4,02 selon le profil) : un majorant pour chacun |
 | `plafond_run_usd` | 0,50 $ | > 0 | `COUT_PLAFOND_RUN` | plafond d'un run de mesure (le banc s'arrête avant de le dépasser) |
 | délais | connexion 5 s, réponse 30 s (45 s pour Sol) | > 0 | — | au-delà : 503 `fournisseur_injoignable` / `fournisseur_delai` ; l'appel entier est borné |
 | `appeler_fournisseurs` (démarrage) | faux | — | `API_MODELE_VERIFIER_MODELES` | contrôle d'exploitation, jamais par défaut, jamais dans `make verify` ni un test |
@@ -661,8 +661,8 @@ coût = (jetons d'entrée × prix d'entrée + (jetons de sortie + jetons de rais
 - les prix sont ceux du profil (« Les profils »), relevés le 2026-10-26 ; un prix absent
   rend un coût `null` (« prix non déclaré ») ;
 - les jetons sont ceux que rend le fournisseur (`usage`) ; sans `usage`, ils sont
-  **estimés** par caractères (3,5 caractères par jeton, `estimes: true`) — une
-  estimation déclarée, à ± 30 % près, recalée sur les premiers appels réels ;
+  **estimés** par caractères (3,8 caractères par jeton, `estimes: true`) — recalée
+  sur les quatre appels d'essai, de 2 % à 6 % au-dessus des jetons facturés ;
 - une réponse coûte deux appels quand il y a reformulation ; `contexte.cout_estime_usd`
   les somme, et la métrique `api_modele_llm_cout_usd_total{profil}` les cumule ;
 - ordre de grandeur, pour le pire cas de la route (≈ 3 500 jetons d'entrée, 400 de

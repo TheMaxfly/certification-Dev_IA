@@ -296,8 +296,8 @@ def test_une_sortie_mistral_sans_raisonnement_documente(tmp_path, doublures):
 def test_sans_usage_les_jetons_sont_estimes_par_caracteres(tmp_path, doublures):
     sortie = jouer(modele_langage(tmp_path, doublures), appeler("factice-a"))
 
-    entree = math.ceil(len(MESSAGES.systeme + MESSAGES.utilisateur) / 3.5)
-    sortie_ = math.ceil(len(DoublureFournisseur.contenu) / 3.5)
+    entree = math.ceil(len(MESSAGES.systeme + MESSAGES.utilisateur) / 3.8)
+    sortie_ = math.ceil(len(DoublureFournisseur.contenu) / 3.8)
     j = sortie.jetons
     assert (j.entree, j.sortie, j.raisonnement, j.estimes) == (entree, sortie_, 0, True)
 
@@ -545,7 +545,7 @@ def test_la_trace_d_un_appel(tmp_path, doublures, caplog):
         "jetons_estimes": False,
         "cout_estime_usd": pytest.approx((10 * 2 + 5 * 8) / 1e6),
         "cout_estime_avant_usd": pytest.approx(
-            (estimer_jetons(MESSAGES.systeme + MESSAGES.utilisateur, 3.5) * 2 + 400 * 8)
+            (estimer_jetons(MESSAGES.systeme + MESSAGES.utilisateur, 3.8) * 2 + 400 * 8)
             / 1e6
         ),
         "variable_cle": "CLE_FACTICE_A",
