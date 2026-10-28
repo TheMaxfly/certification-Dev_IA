@@ -1,0 +1,7 @@
+id = "API-38"
+origine = "E3 étape 3, spec 06 (2026-10-28) — le contexte sans l'identifiant des passages : le modèle ne pourrait citer aucun fragment qu'il a lu"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''        f"{entete(s)} — {LIBELLES[p.type_document]} [F:{p.fragment_id}]\n{p.extrait}"'''
+apres = '''        f"{entete(s)} — {LIBELLES[p.type_document]}\n{p.extrait}"'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "fragments_cites_sont_ceux_que_le_contexte_montre"]

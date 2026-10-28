@@ -580,18 +580,40 @@ SORTIE_VALIDE = json.dumps(
 )
 #: La sortie de la reformulation : la question d'essai, autonome.
 REFORMULATION_VALIDE = json.dumps({"question": QUESTION})
+#: Une ligne d'en-tête de passage : la série, et l'identifiant du passage s'il est
+#: montré.
+EN_TETE_DE_PASSAGE = re.compile(r"^\[S:(\d+)\] .*?(?: \[F:(\d+)\])?$", re.MULTILINE)
+
+
+def sortie_lue_du_contexte(message: str) -> str:
+    """La sortie d'un modèle qui suit l'invite : la première série du contexte, avec
+    les identifiants de passages qu'il y lit — aucun s'il n'en montre pas."""
+    lus: dict[int, list[int]] = {}
+    for serie, fragment in EN_TETE_DE_PASSAGE.findall(message):
+        lus.setdefault(int(serie), []).extend([int(fragment)] if fragment else [])
+    serie_id, fragment_ids = next(iter(lus.items()))
+    return json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": f"Une aventure de pirates [S:{serie_id}].",
+            "series_citees": [{"serie_id": serie_id, "fragment_ids": fragment_ids}],
+        }
+    )
 
 
 class DoublureFournisseur(BaseHTTPRequestHandler):
     """Un fournisseur simulé, sur le bouclage : `POST /v1/chat/completions` et
     `GET /v1/models`. Statut, corps, `usage`, modèle rendu, retard et envoi goutte à
     goutte réglables ; le contenu rendu dépend du schéma demandé (reformulation ou
-    réponse) ; chaque requête reçue est gardée (port, chemin, en-tête
+    réponse), et la réponse peut être lue dans le contexte reçu
+    (`lire_le_contexte`) ; chaque requête reçue est gardée (port, chemin, en-tête
     d'autorisation, corps)."""
 
     statut: ClassVar[int] = 200
     corps_brut: ClassVar[bytes | None] = None
     contenu: ClassVar[str] = SORTIE_VALIDE
+    lire_le_contexte: ClassVar[bool] = False
     contenu_reformulation: ClassVar[str] = REFORMULATION_VALIDE
     usage: ClassVar[dict[str, Any] | None] = None
     modele_rendu: ClassVar[str | None] = None
@@ -645,11 +667,12 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
             self._envoyer(DoublureFournisseur.statut, DoublureFournisseur.corps_brut)
             return
         schema = corps.get("response_format", {}).get("json_schema", {}).get("schema")
-        contenu = (
-            DoublureFournisseur.contenu_reformulation
-            if isinstance(schema, dict) and schema.get("required") == ["question"]
-            else DoublureFournisseur.contenu
-        )
+        if isinstance(schema, dict) and schema.get("required") == ["question"]:
+            contenu = DoublureFournisseur.contenu_reformulation
+        elif DoublureFournisseur.lire_le_contexte:
+            contenu = sortie_lue_du_contexte(corps["messages"][-1]["content"])
+        else:
+            contenu = DoublureFournisseur.contenu
         reponse: dict[str, Any] = {
             "id": "cmpl-essai",
             "model": DoublureFournisseur.modele_rendu or corps["model"],
@@ -691,6 +714,7 @@ def doublures() -> Iterator[Doublures]:
     DoublureFournisseur.statut = 200
     DoublureFournisseur.corps_brut = None
     DoublureFournisseur.contenu = SORTIE_VALIDE
+    DoublureFournisseur.lire_le_contexte = False
     DoublureFournisseur.contenu_reformulation = REFORMULATION_VALIDE
     DoublureFournisseur.usage = None
     DoublureFournisseur.modele_rendu = None

@@ -110,9 +110,10 @@ def entete(serie: Serie) -> str:
 
 
 def contexte_des_passages(series: list[Serie]) -> str:
-    """Les passages, série par série dans l'ordre du classement, textes tels quels."""
+    """Les passages, série par série dans l'ordre du classement, textes tels quels ;
+    chacun porte son identifiant `[F:<fragment_id>]`, que la sortie cite."""
     return "\n\n".join(
-        f"{entete(s)} — {LIBELLES[p.type_document]}\n{p.extrait}"
+        f"{entete(s)} — {LIBELLES[p.type_document]} [F:{p.fragment_id}]\n{p.extrait}"
         for s in series
         for p in s.passages
     )

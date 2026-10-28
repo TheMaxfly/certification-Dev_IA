@@ -143,12 +143,26 @@ def test_le_contexte_envoye_au_modele_est_celui_de_la_recherche(api_reponse, dou
     assert utilisateur == f"Question : {QUESTION}\n\nPASSAGES :\n\n{attendu}"
     lignes = [ligne for ligne in attendu.splitlines() if ligne.startswith("[")]
     assert lignes == [
-        "[S:1] Série 1 — critique de tome",
-        "[S:1] Série 1 — critique de tome",
-        "[S:2] Série 2 — synopsis",
+        "[S:1] Série 1 — critique de tome [F:702]",
+        "[S:1] Série 1 — critique de tome [F:701]",
+        "[S:2] Série 2 — synopsis [F:703]",
     ]
     textes = [p["extrait"] for s in corps["series"] for p in s["passages"]]
     assert all(t in utilisateur for t in textes)
+
+
+def test_les_fragments_cites_sont_ceux_que_le_contexte_montre(api_reponse, doublures):
+    # La doublure lit le contexte comme le modèle : elle ne rend que les identifiants
+    # qu'il montre. Un contexte sans identifiants ne lui laisse rien à citer, et le
+    # modèle réel en inventait (`fragment_inconnu`).
+    DoublureFournisseur.lire_le_contexte = True
+
+    corps = conforme(repondre(api_reponse))
+
+    (citee,) = corps["series_citees"]
+    (serie,) = (s for s in corps["series"] if s["serie_id"] == citee["serie_id"])
+    envoyes = [p["fragment_id"] for p in serie["passages"]]
+    assert envoyes and citee["fragment_ids"] == envoyes
 
 
 def test_les_reglages_demandes_arrivent_tels_quels(api_reponse, doublures):

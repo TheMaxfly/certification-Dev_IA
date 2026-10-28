@@ -32,8 +32,9 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
 **La réponse rédigée** :
 
 - **mode strict** : la réponse n'affirme que ce que disent les passages rendus par la
-  recherche, et ne cite que des séries de cette recherche. Ce que les passages ne disent
-  pas, la réponse le dit ;
+  recherche, et ne cite que des séries de cette recherche et leurs passages — chacun lui
+  est montré avec son identifiant, `[F:<fragment_id>]`, qu'il recopie dans
+  `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit ;
 - **le refus est une réponse normale** (200, `refus: true`) : aucun passage ne répond
   (`aucun_passage`), l'œuvre n'est pas au catalogue (`hors_catalogue`), ou le modèle ne
   peut pas trancher (`inconnu`). Quand la recherche ne rend aucun passage, la route
