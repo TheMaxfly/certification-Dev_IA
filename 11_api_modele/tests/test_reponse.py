@@ -257,7 +257,7 @@ def test_deux_profils_factices_deux_doublures(api_reponse, doublures):
     ("champ", "valides", "invalides"),
     [
         ("temperature", (0.0, 1.0), (-0.1, 1.1)),
-        ("longueur_max", (50, 1000), (49, 1001)),
+        ("longueur_max", (50, 4000), (49, 4001)),
         ("nombre_series", (1, 50), (0, 51)),
         ("passages_par_serie", (1, 5), (0, 6)),
     ],

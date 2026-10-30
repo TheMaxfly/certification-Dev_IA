@@ -285,7 +285,7 @@ def test_le_fichier_versionne_declare_les_quatre_profils_et_la_route():
     assert (r.longueur_max.defaut, r.longueur_max.min, r.longueur_max.max) == (
         400,
         50,
-        1000,
+        4000,
     )
     assert (r.mode_defaut, r.modes) == ("strict", ("strict",))
     assert (

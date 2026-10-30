@@ -96,8 +96,8 @@ motif = "0 : la même réponse deux fois, ce qu'un conseil sourcé veut ; 0,7 va
 [modele_langage.longueur_max]
 defaut = 400
 min = 50
-max = 1000
-motif = "Jetons de sortie au plus (max_tokens) : lisibilité au comptoir et coût ; base de l'estimation de coût."
+max = 4000
+motif = "Jetons de sortie au plus (max_tokens) : lisibilité au comptoir et coût ; base de l'estimation de coût. 1 000 était la borne d'usage ; 4 000 admet les profils qui raisonnent, mesurés avant tout usage."
 
 [modele_langage.mode]
 defaut = "strict"

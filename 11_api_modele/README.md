@@ -309,7 +309,7 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 |---|---|---|---|---|
 | `profil_actif` | `mistral-large-2512` | un profil déclaré, disponible | `API_MODELE_PROFIL_ACTIF` | un seul réglage désigne le modèle qui rédige ; en changer est un geste de configuration |
 | `temperature` | 0 | 0 à 1 | — (champ de la requête) | 0 rend la même réponse deux fois, ce qu'un conseil sourcé veut ; 0,7 varie ; au-delà de 1 la réponse se dégrade |
-| `longueur_max` | 400 jetons | 50 à 1 000 | — (champ de la requête) | lisibilité au comptoir et coût ; base de l'estimation |
+| `longueur_max` | 400 jetons | 50 à 4 000 | — (champ de la requête) | lisibilité au comptoir et coût ; base de l'estimation ; 1 000 était la borne d'usage, 4 000 admet les profils qui raisonnent, mesurés avant tout usage |
 | `mode` | `strict` | `strict` seul | — | la réponse tirée des seuls passages ; `enrichi` viendra après une mesure à part |
 | `historique` | vide | 10 tours, 4 000 caractères (2 000 par tour) | — | cinq questions-réponses, borne franche ; ni gardé ni journalisé |
 | `reformuler` | vrai | — | — (champ de la requête) | les suites de comptoir ne retrouvent rien seules ; désactivable pour la démonstration |
@@ -486,7 +486,7 @@ X-Identifiant-Requete: 6f1c…
 | `reformuler` | vrai | — | sans effet sans historique |
 | `profil` | le profil actif | un profil déclaré, disponible | le modèle qui rédige |
 | `temperature` | 0 | 0 à 1 | variété de la réponse ; refusé si le profil ne l'expose pas |
-| `longueur_max` | 400 | 50 à 1 000 | jetons de sortie au plus |
+| `longueur_max` | 400 | 50 à 4 000 | jetons de sortie au plus |
 | `mode` | `strict` | `strict` seul | — |
 | `nombre_series`, `passages_par_serie`, `catalogue_seul` | 5, 2, vrai | bornes de la recherche | transmis à la recherche |
 | `identite` | absent | 1 à 64, `[A-Za-z0-9._@:-]` | recopiée dans le journal |
@@ -542,7 +542,7 @@ passage) :
       "statut": "stable", "disponible": false, "reglages_absents": [], "variable_cle": "OPENAI_API_KEY"},
      "…"],
    "reglages_reponse": {"temperature": {"defaut": 0.0, "min": 0.0, "max": 1.0},
-                        "longueur_max": {"defaut": 400, "min": 50, "max": 1000},
+                        "longueur_max": {"defaut": 400, "min": 50, "max": 4000},
                         "mode": {"defaut": "strict", "valeurs": ["strict"]},
                         "historique": {"tours_max": 10, "caracteres_max": 4000},
                         "reformuler": {"defaut": true},

@@ -343,7 +343,7 @@
           "longueur_max": {
             "default": 400,
             "description": "Jetons de sortie au plus.",
-            "maximum": 1000.0,
+            "maximum": 4000.0,
             "minimum": 50.0,
             "title": "Longueur Max",
             "type": "integer"
