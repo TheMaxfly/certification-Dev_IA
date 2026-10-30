@@ -35,6 +35,11 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
   recherche, et ne cite que des séries de cette recherche et leurs passages — chacun lui
   est montré avec son identifiant, `[F:<fragment_id>]`, qu'il recopie dans
   `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit ;
+- **chaque série citée porte son titre** : l'invite demande le titre devant
+  `[S:<serie_id>]` ; quand le modèle l'omet (ni juste avant ni juste après la marque,
+  casse, espaces, emphase, guillemets et ponctuation ignorés), la route insère le titre
+  du catalogue devant elle, après les contrôles de sortie — le modèle propose, une
+  règle dispose ;
 - **le refus est une réponse normale** (200, `refus: true`) : aucun passage ne répond
   (`aucun_passage`), l'œuvre n'est pas au catalogue (`hors_catalogue`), ou le modèle ne
   peut pas trancher (`inconnu`). Quand la recherche ne rend aucun passage, la route
@@ -711,7 +716,9 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   ≥ 4 / 5 sur les cinq questions hors catalogue ; **zéro** série inventée ; **zéro**
   sortie invalide pour un nom de membre. Pas de seuil sur le recouvrement (suites de
   8 mots de la réponse présentes telles quelles dans un passage) ni sur F9 / F10 : à
-  la première mesure, on écrit le chiffre.
+  la première mesure, on écrit le chiffre. `titre_present` : part des séries citées
+  dont le titre figure dans le texte **du modèle**, avant l'insertion de la route (ce
+  que le modèle fait seul ; le texte du modèle reste en mémoire, jamais écrit).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
 

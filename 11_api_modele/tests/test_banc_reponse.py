@@ -175,6 +175,7 @@ def ligne(**champs: object) -> dict[str, object]:
         "latence_modele_ms": 1000.0,
         "latence_totale_ms": 1200.0,
         "nb_series_citees": 2,
+        "titres_presents": 1,
         "longueur_reponse": 300,
         "recouvrement_8": 0.1,
     }
@@ -216,6 +217,12 @@ def test_les_metriques_et_le_critere():
     assert m["recouvrement_8_max"] == 0.5
     assert m["latence_modele_ms_mediane"] == 1000.0
     assert m["cout_usd"] == 0.0123
+    # Sur les douze réponses rendues : un titre écrit sur deux séries citées.
+    assert (m["titres_presents"], m["titres_cites"], m["titre_present"]) == (
+        12,
+        24,
+        0.5,
+    )
     v = verdict(m)
     assert v == {
         "F7": True,
@@ -463,7 +470,8 @@ def test_l_essai_ses_chiffres_et_son_texte(banc_: Banc, doublures: Doublures):
     DoublureFournisseur.usage = {"prompt_tokens": 1000, "completion_tokens": 50}
     chiffres, texte = essai(banc_, banc_.profil("factice-a"), QUESTION)
     assert chiffres["statut"] == 200 and chiffres["pseudonymes"] == 0
-    assert texte is not None and texte == json.loads(SORTIE_VALIDE)["reponse"]
+    ecrit = json.loads(SORTIE_VALIDE)["reponse"]
+    assert texte is not None and texte == ecrit.replace("[S:1]", "Série 1 [S:1]")
     (appel,) = chiffres["appels"]
     assert appel["parametres_envoyes"] == {
         "temperature": 0.0,
@@ -507,7 +515,12 @@ def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):
     (x,) = run.par_question
     assert (x["refus"], x["series_citees"], x["citee_attendue_1"]) == (False, [1], True)
     assert x["hit_rate_10"] is True
-    assert run.textes == {"Q": json.loads(SORTIE_VALIDE)["reponse"]}
+    # Le texte lu par Max est celui de la route, titre inséré ; `titres_presents`
+    # compte ce que le modèle a écrit seul.
+    ecrit = json.loads(SORTIE_VALIDE)["reponse"]
+    assert run.textes == {"Q": ecrit.replace("[S:1]", "Série 1 [S:1]")}
+    assert x["titres_presents"] == 0
+    assert banc_.espion.releves[-1].texte_modele == ecrit
     assert run.contexte["corpus_id"] == "v7"
 
 
@@ -617,17 +630,16 @@ def test_les_scenarios_contre_les_doublures(
     assert (m["tours"], m["tours_avec_historique"]) == (10, 5)
     assert m["reformulation_meme_serie"] == 5
     assert m["reformulation_serie_attendue"] == 0
-    # Le second tour porte l'historique : la vraie réponse du premier.
+    # Le second tour porte l'historique : la vraie réponse du premier, telle que la
+    # route l'a rendue (titre inséré).
+    rendue = json.loads(SORTIE_VALIDE)["reponse"].replace("[S:1]", "Série 1 [S:1]")
     seconds = [
         r["corps"]
         for r in doublures.recus()
         if len(r["corps"]["messages"][1]["content"])
         and "Libraire" in r["corps"]["messages"][1]["content"]
     ]
-    assert (
-        seconds
-        and json.loads(SORTIE_VALIDE)["reponse"] in seconds[0]["messages"][1]["content"]
-    )
+    assert seconds and rendue in seconds[0]["messages"][1]["content"]
     assert run.textes and all("-" in cle for cle in run.textes)
 
 
@@ -751,3 +763,5 @@ def test_les_metriques_sans_reponse_rendue():
     assert "latence_modele_ms_mediane" not in m and "recouvrement_8_moyen" not in m
     run.par_question = [ligne()]
     assert metriques(run)["latence_totale_ms_p95"] == 1200.0
+    run.par_question = [ligne(titres_presents=None)]
+    assert "titre_present" not in metriques(run)

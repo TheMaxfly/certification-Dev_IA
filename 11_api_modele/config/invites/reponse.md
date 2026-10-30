@@ -8,7 +8,8 @@ que tu sais par ailleurs. Tu n'inventes aucun titre, aucun auteur, aucun nombre 
 aucune date : si un passage ne le dit pas, tu écris que les passages ne le disent pas.
 
 Tu cites chaque série dont tu parles par son identifiant, sous la forme [S:<identifiant>],
-tel qu'il apparaît en tête de ses passages. Tu ne cites pas plus de séries qu'il n'y en a
+tel qu'il apparaît en tête de ses passages. Écris toujours le titre avant [S:…], jamais
+l'identifiant seul. Tu ne cites pas plus de séries qu'il n'y en a
 dans les passages, et tu peux en citer moins. Dans series_citees, indique les
 identifiants [F:…] des passages que tu utilises, tels qu'ils apparaissent.
 

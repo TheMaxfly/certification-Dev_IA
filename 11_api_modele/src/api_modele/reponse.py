@@ -10,15 +10,17 @@
 3. Recherche : la fonction interne de `/v1/recherche`, mêmes réglages, même classement.
 4. Aucun passage : 200, refus `aucun_passage`, SANS appel au modèle (déterministe,
    gratuit, et c'est ce que le mode strict dirait).
-5. Contexte : par série, dans l'ordre du classement, `[S:<serie_id>] <titre> — <type>`
-   puis le texte du passage tel quel ; la question, l'historique plié. Appel de
-   réponse, sortie contrainte par un schéma JSON strict.
+5. Contexte : par série, dans l'ordre du classement, `[S:<serie_id>] <titre> — <type>
+   [F:<fragment_id>]` puis le texte du passage tel quel ; la question, l'historique
+   plié. Appel de réponse, sortie contrainte par un schéma JSON strict.
 6. Contrôles de sortie, dans cet ordre — `schema`, `serie_inconnue`,
    `fragment_inconnu`, `refus_incoherent`, `pseudonyme` — chacun : 503
    `sortie_modele_invalide`, son motif, son compteur ; la sortie fautive n'est ni
    rendue ni journalisée ; pas de second essai.
 7. Réponse : les séries citées complétées par leur titre et leur rang (pris dans la
-   recherche, jamais chez le modèle), les séries de la recherche, le `contexte`.
+   recherche, jamais chez le modèle), les séries de la recherche, le `contexte`. Dans
+   le texte, chaque `[S:<serie_id>]` sans le titre du catalogue juste avant ni juste
+   après le reçoit devant lui (le modèle propose, une règle dispose).
 
 L'historique, la question, la question reformulée et la réponse n'entrent jamais au
 journal ; seuls leurs nombres et les codes, par la ligne de la requête.
@@ -26,6 +28,7 @@ journal ; seuls leurs nombres et les codes, par la ligne de la requête.
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -117,6 +120,37 @@ def contexte_des_passages(series: list[Serie]) -> str:
         for s in series
         for p in s.passages
     )
+
+
+MARQUE_SERIE = re.compile(r"\[S:(\d+)\]")
+
+
+def plat(texte: str) -> str:
+    """Le texte sans casse ni rien d'autre que lettres et chiffres : un titre se
+    retrouve ainsi malgré espaces, emphase, guillemets et ponctuation."""
+    return re.sub(r"\W+", "", texte.casefold())
+
+
+def titre_figure(titre: str, texte: str) -> bool:
+    return plat(titre) in plat(texte)
+
+
+def titrer(texte: str, series: list[Serie]) -> str:
+    """Le titre du catalogue devant chaque `[S:<serie_id>]` qui ne l'a ni juste avant
+    ni juste après ; une marque hors des séries rendues reste telle quelle."""
+    titres = {s.serie_id: s.titre for s in series if s.serie_id is not None}
+
+    def completer(m: re.Match[str]) -> str:
+        titre = titres.get(int(m.group(1)))
+        if titre is None:
+            return m.group(0)
+        cle = plat(titre)
+        avant, apres = plat(m.string[: m.start()]), plat(m.string[m.end() :])
+        if avant.endswith(cle) or apres.startswith(cle):
+            return m.group(0)
+        return f"{titre} {m.group(0)}"
+
+    return MARQUE_SERIE.sub(completer, texte)
 
 
 def message_de_reponse(historique: str, question: str, series: list[Serie]) -> str:
@@ -374,7 +408,8 @@ async def repondre(
         except ValidationError:
             raise sortie_invalide(etat, "schema", "reponse") from None
         citees = controler(etat, modele, series)
-        refus, motif, texte = modele.refus, modele.motif_refus, modele.reponse
+        refus, motif = modele.refus, modele.motif_refus
+        texte = titrer(modele.reponse, series)
 
     cout = deroulement.cout()
     suivi.update(refus=refus, nb_series_citees=len(citees), cout_estime_usd=cout)

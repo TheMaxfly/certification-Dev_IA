@@ -11,7 +11,9 @@ fournisseurs, et lui seul dans ce processus) le temps d'un `with`. Il ne garde q
 des nombres et des noms : les paramètres envoyés hors des messages, la taille des
 messages en caractères, le statut, le modèle rendu, l'arbre numérique de `usage`, la
 raison de fin, et pour un refus le code et le message d'erreur du fournisseur
-(tronqué). Jamais un message, un passage, une sortie, ni un en-tête.
+(tronqué). Jamais un message, un passage, ni un en-tête ; le texte d'une sortie de
+réponse (`texte_modele`, celui du modèle, avant que la route n'y insère les titres)
+reste en mémoire le temps d'en compter les titres, et n'est jamais écrit.
 """
 
 from __future__ import annotations
@@ -70,6 +72,8 @@ class Releve:
     usage: dict[str, object] = field(default_factory=dict[str, object])
     fin: str | None = None
     erreur: dict[str, str] | None = None
+    #: Le champ `reponse` de la sortie du modèle : en mémoire seulement.
+    texte_modele: str | None = field(default=None, repr=False)
 
     def entier(self, *chemin: str) -> int | None:
         valeur: object = self.usage
@@ -112,6 +116,17 @@ def _role(corps: dict[str, object]) -> str:
     format_ = objet(objet(corps.get("response_format")).get("json_schema"))
     requis = objet(format_.get("schema")).get("required")
     return "reformulation" if requis == ["question"] else "reponse"
+
+
+def _texte_modele(choix: object) -> str | None:
+    contenu = objet(objet(choix).get("message")).get("content")
+    if not isinstance(contenu, str):
+        return None
+    try:
+        texte = objet(json.loads(contenu)).get("reponse")
+    except ValueError:
+        return None
+    return texte if isinstance(texte, str) else None
 
 
 def _caracteres(corps: dict[str, object]) -> int:
@@ -186,6 +201,7 @@ class Espion:
                 premier = cast(list[object], choix)[0]
                 fin = objet(premier).get("finish_reason")
                 releve.fin = fin if isinstance(fin, str) else None
+                releve.texte_modele = _texte_modele(premier)
             return reponse
 
         setattr(httpx.AsyncClient, "send", relever)  # noqa: B010

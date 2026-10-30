@@ -165,6 +165,31 @@ def test_les_fragments_cites_sont_ceux_que_le_contexte_montre(api_reponse, doubl
     assert envoyes and citee["fragment_ids"] == envoyes
 
 
+@pytest.mark.parametrize(
+    ("ecrit", "rendu"),
+    [
+        ("Une aventure [S:1].", "Une aventure Série 1 [S:1]."),
+        ("Une aventure, Série 1 [S:1].", None),
+        ("Une aventure, « *série 1* » [S:1].", None),
+        ("Une aventure [S:1] *Série 1*.", None),
+        ("Série 1 fait rire. [S:1]", "Série 1 fait rire. Série 1 [S:1]"),
+        (
+            "[S:1] puis [S:2], pas [S:99].",
+            "Série 1 [S:1] puis Série 2 [S:2], pas [S:99].",
+        ),
+    ],
+)
+def test_le_titre_du_catalogue_accompagne_chaque_marque(
+    api_reponse, doublures, ecrit, rendu
+):
+    # Ni juste avant ni juste après (casse, espaces, emphase, guillemets et
+    # ponctuation ignorés) : la route l'insère devant ; une marque hors des séries
+    # rendues reste telle quelle.
+    DoublureFournisseur.contenu = sortie(reponse=ecrit)
+
+    assert conforme(repondre(api_reponse))["reponse"] == (rendu or ecrit)
+
+
 def test_les_reglages_demandes_arrivent_tels_quels(api_reponse, doublures):
     conforme(repondre(api_reponse, temperature=0.7, longueur_max=120))
     conforme(repondre(api_reponse, profil="factice-b"))

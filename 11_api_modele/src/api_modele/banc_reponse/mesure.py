@@ -38,6 +38,7 @@ from api_modele.reponse import (
     INVITE_REPONSE,
     LONGUEUR_REFORMULATION,
     message_de_reponse,
+    titre_figure,
 )
 
 CRITERE = {
@@ -184,6 +185,8 @@ class Appel:
     corps: dict[str, Any]
     releves: list[Releve]
     texte: str | None = None
+    #: Le texte du modèle avant l'insertion des titres par la route (mémoire seule).
+    texte_modele: str | None = None
     pseudonymes: int = 0
     passages: list[str] = field(default_factory=list[str])
 
@@ -219,7 +222,12 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     appel.pseudonymes = banc_.pseudonymes.fautifs(texte, envoyes) + (
         banc_.pseudonymes.fautifs(reformulee, []) if isinstance(reformulee, str) else 0
     )
-    appel.texte = texte if appel.pseudonymes == 0 else None
+    if appel.pseudonymes == 0:
+        appel.texte = texte
+        appel.texte_modele = next(
+            (r.texte_modele for r in reversed(appel.releves) if r.role == "reponse"),
+            None,
+        )
     return appel
 
 
@@ -410,6 +418,14 @@ def ligne_reponse(banc_: Banc, q: Question, appel: Appel) -> dict[str, object]:
         else recouvrement(texte, appel.passages),
         "latence_modele_ms": latences["modele"],
         "latence_totale_ms": latences["totale"],
+        # Ce que le modèle fait seul : sur son texte, avant l'insertion des titres.
+        "titres_presents": None
+        if appel.texte_modele is None
+        else sum(
+            1
+            for s in corps["series_citees"]
+            if titre_figure(cast(str, s["titre"]), appel.texte_modele)
+        ),
     }
     if q.attend_une_serie:
         top = banc_.rechercher(q.texte)
@@ -475,6 +491,13 @@ def metriques(run: Run) -> dict[str, float]:
         m["citee_attendue_1"] = sum(1 for x in de_rang if x["citee_attendue_1"])
         m["hit_rate_10"] = sum(1 for x in de_rang if x["hit_rate_10"])
         m["questions_de_rang"] = len(de_rang)
+    titrees = [x for x in rendues if x.get("titres_presents") is not None]
+    titres_cites = sum(cast(int, x["nb_series_citees"]) for x in titrees)
+    if titres_cites:
+        presents = sum(cast(int, x["titres_presents"]) for x in titrees)
+        m["titres_presents"] = presents
+        m["titres_cites"] = titres_cites
+        m["titre_present"] = round(presents / titres_cites, 4)
     recouvrements = _nombres(rendues, "recouvrement_8")
     if recouvrements:
         m["recouvrement_8_moyen"] = round(statistics.fmean(recouvrements), 4)
