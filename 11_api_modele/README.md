@@ -224,7 +224,7 @@ motif ; **un seul réglage désigne le profil actif** (`profil_actif`, surcharge
 | Profil | Fournisseur | Modèle | Statut | Hébergement | Prix (entrée / sortie, $ par million de jetons, relevés le 2026-10-26) | Réglages fixés | Réglages absents |
 |---|---|---|---|---|---|---|---|
 | `mistral-large-2512` (**actif**) | Mistral | `mistral-large-2512` (Large 3, daté) | stable | Union européenne | 0,50 / 1,50 | `top_p = 1` | aucun |
-| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = low` (sans effort fixé, le raisonnement épuisait la borne de sortie à l'appel d'essai ; `none` refusé par Mistral) | aucun |
+| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = low` (sans effort fixé, le raisonnement épuisait la borne de sortie à l'appel d'essai ; `none` refusé par Mistral) ; `longueur_max` 2 000 (1 101 jetons de raisonnement mesurés le 31 octobre) | aucun |
 | `gpt-6-luna` | OpenAI | `gpt-6-luna` | stable | hors Union européenne par défaut | 0,10 / 0,50 | `top_p = 1`, `reasoning_effort = none` | aucun (à confirmer à l'appel d'essai) |
 | `gpt-6-sol` | OpenAI | `gpt-6-sol` | stable | hors Union européenne par défaut | 2,00 / 10,00 | `top_p = 1`, `reasoning_effort = none` ; délai 45 s | aucun (à confirmer à l'appel d'essai) |
 
@@ -309,7 +309,7 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 |---|---|---|---|---|
 | `profil_actif` | `mistral-large-2512` | un profil déclaré, disponible | `API_MODELE_PROFIL_ACTIF` | un seul réglage désigne le modèle qui rédige ; en changer est un geste de configuration |
 | `temperature` | 0 | 0 à 1 | — (champ de la requête) | 0 rend la même réponse deux fois, ce qu'un conseil sourcé veut ; 0,7 varie ; au-delà de 1 la réponse se dégrade |
-| `longueur_max` | 400 jetons | 50 à 4 000 | — (champ de la requête) | lisibilité au comptoir et coût ; base de l'estimation ; 1 000 était la borne d'usage, 4 000 admet les profils qui raisonnent, mesurés avant tout usage |
+| `longueur_max` | 400 jetons, ou celle du profil (`longueur_max` du profil : 2 000 pour `mistral-large-4`, 400 pour les autres) | 50 à 4 000 | — (champ de la requête) | lisibilité au comptoir et coût ; base de l'estimation ; 1 000 était la borne d'usage, 4 000 admet les profils qui raisonnent, mesurés avant tout usage ; une longueur demandée l'emporte sur celle du profil |
 | `mode` | `strict` | `strict` seul | — | la réponse tirée des seuls passages ; `enrichi` viendra après une mesure à part |
 | `historique` | vide | 10 tours, 4 000 caractères (2 000 par tour) | — | cinq questions-réponses, borne franche ; ni gardé ni journalisé |
 | `reformuler` | vrai | — | — (champ de la requête) | les suites de comptoir ne retrouvent rien seules ; désactivable pour la démonstration |

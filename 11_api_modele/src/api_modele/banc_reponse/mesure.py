@@ -144,15 +144,24 @@ def caracteres_du_contexte(banc_: Banc, question: str) -> int:
     return len(INVITE_REPONSE) + len(message_de_reponse("", question, series))
 
 
+def longueur_par_defaut(banc_: Banc, profil: Profil) -> int:
+    """La `longueur_max` d'un appel sans demande : celle du profil, sinon celle de
+    la route — la règle de la couche des fournisseurs."""
+    if profil.longueur_max is not None:
+        return profil.longueur_max
+    return banc_.modele_langage.reponse.longueur_max.defaut
+
+
 def estimer(
     banc_: Banc, profil: Profil, textes: Iterable[str], longueur: int | None = None
 ) -> Estimation:
     """Le coût au plus d'une série d'appels de réponse : jetons d'entrée comptés
-    par caractères, sortie au maximum (`longueur_max` demandée, celle par défaut
-    sinon), sans raisonnement — la formule de la couche des fournisseurs
-    (`estimer_cout`)."""
+    par caractères, sortie au maximum (`longueur_max` demandée, sinon celle du
+    profil, sinon celle par défaut), sans raisonnement — la formule de la couche des
+    fournisseurs (`estimer_cout`)."""
     ml = banc_.modele_langage
-    longueur = ml.reponse.longueur_max.defaut if longueur is None else longueur
+    if longueur is None:
+        longueur = longueur_par_defaut(banc_, profil)
     questions = appels = jetons = 0
     cout = 0.0
     for texte in textes:
@@ -734,7 +743,7 @@ def estimer_scenarios(banc_: Banc, profil: Profil, tours: Sequence[Tour]) -> Est
     avec historique, l'appel de reformulation (historique et question, 150 jetons
     de sortie)."""
     ml = banc_.modele_langage
-    longueur = ml.reponse.longueur_max.defaut
+    longueur = longueur_par_defaut(banc_, profil)
     cpj = ml.caracteres_par_jeton
     appels = jetons = 0
     cout = 0.0

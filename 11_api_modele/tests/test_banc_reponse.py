@@ -476,6 +476,11 @@ def test_l_estimation_est_la_formule(banc_: Banc):
     e = estimer(banc_, p, [QUESTION, QUESTION])
     assert (e.questions, e.appels, e.jetons_entree) == (2, 2, 2 * entree)
     assert e.cout_usd == pytest.approx(2 * attendu)
+    # La longueur du profil, s'il en déclare une, borne l'estimation.
+    long_ = replace(p, longueur_max=2000)
+    assert estimer(banc_, long_, [QUESTION]).cout_usd == pytest.approx(
+        cout_usd(long_, entree, 2000, 0)
+    )
 
 
 def test_l_essai_ses_chiffres_et_son_texte(banc_: Banc, doublures: Doublures):

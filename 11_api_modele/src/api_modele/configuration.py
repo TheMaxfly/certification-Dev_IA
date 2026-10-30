@@ -67,6 +67,7 @@ CHAMPS_PROFIL = frozenset(
         "reglages_absents",
         "prix_usd_par_million",
         "delai_s",
+        "longueur_max",
         "statut",
         "motif",
     }
@@ -136,6 +137,8 @@ class Profil:
     delai_s: float
     statut: str
     disponible: bool
+    #: Le défaut de `longueur_max` pour ce profil ; None : celui de la route.
+    longueur_max: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -652,6 +655,11 @@ def _profil(
         statut=statut,
         # La présence de la variable, jamais sa valeur.
         disponible=bool(variable) and bool(environ.get(variable, "").strip()),
+        longueur_max=(
+            lecteur.entier(table, chemin, "longueur_max", 1)
+            if "longueur_max" in table
+            else None
+        ),
     )
 
 
@@ -680,6 +688,16 @@ def _modele_langage(
         for nom, table in lecteur.sous_tables("modele_langage.profils").items()
     )
     noms = [p.nom for p in profils]
+    bornes = reponse.longueur_max
+    for p in profils:
+        if (
+            p.longueur_max is not None
+            and not bornes.min <= p.longueur_max <= bornes.max
+        ):
+            ecarts.append(
+                f"reglages.toml : [modele_langage.profils.{p.nom}] longueur_max"
+                f" {p.longueur_max} hors de [{bornes.min}, {bornes.max}]"
+            )
     if not profils:
         ecarts.append("reglages.toml : [modele_langage.profils] aucun profil déclaré")
     actif = environ.get("API_MODELE_PROFIL_ACTIF") or actif_fichier

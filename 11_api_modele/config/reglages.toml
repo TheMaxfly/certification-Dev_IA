@@ -146,6 +146,7 @@ reglages_fixes = { top_p = 1.0 }
 reglages_absents = []
 prix_usd_par_million = { entree = 0.50, sortie = 1.50 }
 delai_s = 30.0
+longueur_max = 400
 statut = "stable"
 motif = "Profil actif de référence : identifiant daté (GA v25.12), mesure rejouable, hébergement en Union européenne (décision 3). Prix relevés le 2026-10-26 (document de décisions, § 2)."
 
@@ -158,8 +159,9 @@ reglages_fixes = { top_p = 1.0, reasoning_effort = "low" }
 reglages_absents = []
 prix_usd_par_million = { entree = 1.36, sortie = 4.18 }
 delai_s = 30.0
+longueur_max = 2000
 statut = "apercu"
-motif = "Le modèle de pointe, en aperçu public (v26.10) : identifiant non daté, modèle mouvant ; chaque mesure porte la mention « aperçu ». Prix plein depuis la fin de la remise de lancement. Sans effort fixé, le modèle raisonnait (399 des 400 jetons de sortie, essai du 2026-10-28) et ne rendait pas le JSON ; none refusé par Mistral le 2026-10-30 (400, valeurs admises : low, medium, high) : reasoning_effort = low, la plus basse admise."
+motif = "Le modèle de pointe, en aperçu public (v26.10) : identifiant non daté, modèle mouvant ; chaque mesure porte la mention « aperçu ». Prix plein depuis la fin de la remise de lancement. Sans effort fixé, le modèle raisonnait (399 des 400 jetons de sortie, essai du 2026-10-28) et ne rendait pas le JSON ; none refusé par Mistral le 2026-10-30 (400, valeurs admises : low, medium, high) : reasoning_effort = low, la plus basse admise. longueur_max = 2 000 : 1 101 jetons de raisonnement mesurés le 31 octobre."
 
 [modele_langage.profils.gpt-6-luna]
 fournisseur = "openai"
@@ -170,6 +172,7 @@ reglages_fixes = { top_p = 1.0, reasoning_effort = "none" }
 reglages_absents = []
 prix_usd_par_million = { entree = 0.10, sortie = 0.50 }
 delai_s = 30.0
+longueur_max = 400
 statut = "stable"
 motif = "Repli hors Union européenne, le moins cher. reasoning_effort = none figé (pas de jetons de raisonnement). Si l'appel d'essai (06) refuse temperature, elle passe dans reglages_absents (règle 2.10). Aucun instantané daté chez OpenAI."
 
@@ -182,5 +185,6 @@ reglages_fixes = { top_p = 1.0, reasoning_effort = "none" }
 reglages_absents = []
 prix_usd_par_million = { entree = 2.00, sortie = 10.00 }
 delai_s = 45.0
+longueur_max = 400
 statut = "stable"
 motif = "Repli hors Union européenne, le plus capable des deux. Mêmes réserves que gpt-6-luna ; délai plus long (modèle plus gros)."

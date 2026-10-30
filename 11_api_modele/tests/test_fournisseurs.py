@@ -215,6 +215,29 @@ def test_les_reglages_demandes_sont_envoyes_sinon_les_defauts(tmp_path, doublure
     assert (defaut.appliques.temperature, demande.appliques.longueur_max) == (0, 120)
 
 
+def test_la_longueur_par_defaut_est_celle_du_profil(tmp_path, doublures):
+    # Un profil qui déclare `longueur_max` (Large 4 : 2 000) : c'est son défaut ; une
+    # longueur demandée l'emporte toujours.
+    ml = modele_langage(tmp_path, doublures)
+    ml = replace(
+        ml,
+        profils=tuple(
+            replace(p, longueur_max=900) if p.nom == "factice-a" else p
+            for p in ml.profils
+        ),
+    )
+    jouer(ml, appeler("factice-a"))
+    jouer(ml, appeler("factice-a", Demandes(longueur_max=120)))
+    jouer(ml, appeler("factice-b"))
+
+    a, b, c = (r["corps"] for r in doublures.recus())
+    assert (a["max_tokens"], b["max_tokens"], c["max_completion_tokens"]) == (
+        900,
+        120,
+        400,
+    )
+
+
 # --------------------------------------------------------------------------- #
 #  Les écarts de forme vivent dans les adaptateurs, pas dans les invites
 # --------------------------------------------------------------------------- #

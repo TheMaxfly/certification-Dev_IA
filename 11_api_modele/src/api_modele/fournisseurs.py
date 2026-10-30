@@ -415,8 +415,9 @@ class Fournisseurs:
             )
 
     def appliques(self, profil: Profil, demandes: Demandes) -> Appliques:
-        """Le réglage demandé, sinon le défaut du fichier ; rien pour un réglage que
-        le profil déclare absent (il n'est pas envoyé)."""
+        """Le réglage demandé, sinon le défaut du fichier (pour `longueur_max`,
+        celui du profil s'il en déclare un) ; rien pour un réglage que le profil
+        déclare absent (il n'est pas envoyé)."""
         reponse = self._ml.reponse
         temperature = (
             None
@@ -433,6 +434,8 @@ class Fournisseurs:
             else (
                 demandes.longueur_max
                 if demandes.longueur_max is not None
+                else profil.longueur_max
+                if profil.longueur_max is not None
                 else reponse.longueur_max.defaut
             )
         )

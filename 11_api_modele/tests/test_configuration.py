@@ -280,6 +280,13 @@ def test_le_fichier_versionne_declare_les_quatre_profils_et_la_route():
     apercu = ml.profil("mistral-large-4")
     assert apercu is not None and apercu.statut == "apercu" and apercu.disponible
     assert apercu.reasoning_effort == "low"  # none refusé par Mistral
+    # Longueur par profil (2026-10-31) : Large 4 raisonne ; les autres au défaut.
+    assert {p.nom: p.longueur_max for p in ml.profils} == {
+        "mistral-large-2512": 400,
+        "mistral-large-4": 2000,
+        "gpt-6-luna": 400,
+        "gpt-6-sol": 400,
+    }
     r = ml.reponse
     assert (r.temperature.defaut, r.temperature.min, r.temperature.max) == (0, 0, 1)
     assert (r.longueur_max.defaut, r.longueur_max.min, r.longueur_max.max) == (
@@ -493,6 +500,18 @@ def ecrire_profil(tmp_path: Path, profil: str, avant: str, apres: str) -> Path:
             "[modele_langage.profils.gpt-6-sol]",
             "[modele_langage.profils.GPT_6]",
             "nom de profil invalide",
+        ),
+        (
+            "mistral-large-4",
+            "longueur_max = 2000",
+            "longueur_max = 4001",
+            "longueur_max 4001 hors de [50, 4000]",
+        ),
+        (
+            "mistral-large-4",
+            "longueur_max = 2000",
+            "longueur_max = 49",
+            "longueur_max 49 hors de [50, 4000]",
         ),
     ],
 )

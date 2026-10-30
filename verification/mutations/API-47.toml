@@ -1,0 +1,9 @@
+id = "API-47"
+origine = "E3 étape 3, spec 06 (2026-10-31) — la longueur du profil ignorée : mistral-large-4 partirait à 400 jetons, que son raisonnement épuise"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''                else profil.longueur_max
+                if profil.longueur_max is not None
+                else reponse.longueur_max.defaut'''
+apres = '''                else reponse.longueur_max.defaut'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "longueur_par_defaut_est_celle_du_profil"]
