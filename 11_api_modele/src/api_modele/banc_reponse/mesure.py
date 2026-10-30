@@ -142,12 +142,15 @@ def caracteres_du_contexte(banc_: Banc, question: str) -> int:
     return len(INVITE_REPONSE) + len(message_de_reponse("", question, series))
 
 
-def estimer(banc_: Banc, profil: Profil, textes: Iterable[str]) -> Estimation:
+def estimer(
+    banc_: Banc, profil: Profil, textes: Iterable[str], longueur: int | None = None
+) -> Estimation:
     """Le coût au plus d'une série d'appels de réponse : jetons d'entrée comptés
-    par caractères, sortie au maximum (`longueur_max` par défaut), sans
-    raisonnement — la formule de la couche des fournisseurs (`estimer_cout`)."""
+    par caractères, sortie au maximum (`longueur_max` demandée, celle par défaut
+    sinon), sans raisonnement — la formule de la couche des fournisseurs
+    (`estimer_cout`)."""
     ml = banc_.modele_langage
-    longueur = ml.reponse.longueur_max.defaut
+    longueur = ml.reponse.longueur_max.defaut if longueur is None else longueur
     questions = appels = jetons = 0
     cout = 0.0
     for texte in textes:
@@ -261,14 +264,20 @@ def releve_en_dict(r: Releve, profil: Profil, cpj: float) -> dict[str, object]:
 #  L'essai : un appel, ses chiffres
 # --------------------------------------------------------------------------- #
 def essai(
-    banc_: Banc, profil: Profil, question: str, temperature: float | None = None
+    banc_: Banc,
+    profil: Profil,
+    question: str,
+    temperature: float | None = None,
+    longueur_max: int | None = None,
 ) -> tuple[dict[str, object], str | None]:
     """Un appel de réponse sur un profil : (chiffres, texte contrôlé ou None)."""
     cpj = banc_.modele_langage.caracteres_par_jeton
-    estimation = estimer(banc_, profil, [question])
+    estimation = estimer(banc_, profil, [question], longueur_max)
     corps: dict[str, object] = {"question": question, "profil": profil.nom}
     if temperature is not None:
         corps["temperature"] = temperature
+    if longueur_max is not None:
+        corps["longueur_max"] = longueur_max
     appel = demander(banc_, corps)
     chiffres: dict[str, object] = {
         "profil": profil.nom,
@@ -276,6 +285,7 @@ def essai(
         "modele": profil.modele,
         "statut_profil": profil.statut,
         "temperature_demandee": temperature,
+        "longueur_max_demandee": longueur_max,
         "estimation": estimation.en_dict(),
         "statut": appel.statut,
         "code": appel.code,

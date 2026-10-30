@@ -501,6 +501,21 @@ def test_l_essai_ses_chiffres_et_son_texte(banc_: Banc, doublures: Doublures):
     )
     assert len(doublures.recus()) == 1
 
+    # Une longueur demandée part telle quelle et borne l'estimation.
+    p = banc_.profil("factice-a")
+    chiffres, _ = essai(banc_, p, QUESTION, longueur_max=1000)
+    (appel,) = chiffres["appels"]
+    assert (chiffres["statut"], appel["parametres_envoyes"]["max_tokens"]) == (
+        200,
+        1000,
+    )
+    assert chiffres["longueur_max_demandee"] == 1000
+    assert chiffres["estimation"] == estimer(banc_, p, [QUESTION], 1000).en_dict()
+    assert (
+        estimer(banc_, p, [QUESTION], 1000).cout_usd
+        > estimer(banc_, p, [QUESTION]).cout_usd
+    )
+
 
 def test_le_plafond_en_cours_de_run(banc_: Banc, doublures: Doublures):
     DoublureFournisseur.contenu = REFUS
@@ -628,6 +643,12 @@ def test_l_essai_et_l_estimation_par_la_ligne_de_commande(
     (dossier,) = (tmp_path / "essais").iterdir()
     assert (dossier / "essai.json").is_file() and (dossier / "reponses.md").is_file()
     assert "réponse (contrôlée" in capsys.readouterr().out
+    argv = ["essai", "factice-a", QUESTION, "--longueur-max", "1000"]
+    assert cli.principal(argv, {}, ouvreur) == 0
+    (long_,) = (d for d in (tmp_path / "essais").iterdir() if d.name.endswith("_l1000"))
+    assert (
+        json.loads((long_ / "essai.json").read_text())["longueur_max_demandee"] == 1000
+    )
     assert cli.principal(["essai", "inconnu", QUESTION], {}, ouvreur) == 2
 
 

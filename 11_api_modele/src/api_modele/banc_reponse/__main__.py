@@ -1,7 +1,7 @@
 """La ligne de commande du banc (voir `api_modele.banc_reponse`).
 
     B="uv run --env-file .env python -m api_modele.banc_reponse"
-    $B essai <profil> "<question>" [--temperature T]
+    $B essai <profil> "<question>" [--temperature T] [--longueur-max N]
     $B estimer <profil> <jeu>
     DATABASE_URL=… $B mesurer <profil> <jeu>
     DATABASE_URL=… $B scenarios <profil> <fichier.csv>
@@ -230,9 +230,12 @@ def enregistrer(
 
 def commande_essai(banc_: Banc, args: argparse.Namespace) -> int:
     profil = banc_.profil(args.profil)
-    chiffres, texte = essai(banc_, profil, args.question, args.temperature)
+    chiffres, texte = essai(
+        banc_, profil, args.question, args.temperature, args.longueur_max
+    )
     chiffres["git"] = enregistrement.etat_git()
     suffixe = "" if args.temperature is None else f"_t{args.temperature}"
+    suffixe += "" if args.longueur_max is None else f"_l{args.longueur_max}"
     dossier = enregistrement.dossier_du_run(
         f"{horodatage()}_{profil.nom}{suffixe}", enregistrement.SORTIES / "essais"
     )
@@ -365,6 +368,7 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("profil")
     p.add_argument("question")
     p.add_argument("--temperature", type=float, default=None)
+    p.add_argument("--longueur-max", type=int, default=None)
     for nom in ("estimer", "mesurer"):
         p = sous.add_parser(nom)
         p.add_argument("profil")

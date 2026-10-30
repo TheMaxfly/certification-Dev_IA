@@ -224,7 +224,7 @@ motif ; **un seul réglage désigne le profil actif** (`profil_actif`, surcharge
 | Profil | Fournisseur | Modèle | Statut | Hébergement | Prix (entrée / sortie, $ par million de jetons, relevés le 2026-10-26) | Réglages fixés | Réglages absents |
 |---|---|---|---|---|---|---|---|
 | `mistral-large-2512` (**actif**) | Mistral | `mistral-large-2512` (Large 3, daté) | stable | Union européenne | 0,50 / 1,50 | `top_p = 1` | aucun |
-| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = none` (sans lui, le raisonnement épuisait la borne de sortie à l'appel d'essai) | aucun |
+| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = low` (sans effort fixé, le raisonnement épuisait la borne de sortie à l'appel d'essai ; `none` refusé par Mistral) | aucun |
 | `gpt-6-luna` | OpenAI | `gpt-6-luna` | stable | hors Union européenne par défaut | 0,10 / 0,50 | `top_p = 1`, `reasoning_effort = none` | aucun (à confirmer à l'appel d'essai) |
 | `gpt-6-sol` | OpenAI | `gpt-6-sol` | stable | hors Union européenne par défaut | 2,00 / 10,00 | `top_p = 1`, `reasoning_effort = none` ; délai 45 s | aucun (à confirmer à l'appel d'essai) |
 
@@ -321,8 +321,8 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 
 **Non exposés**, fixés par profil ou par l'API, avec leur motif : `top_p` (fixé à 1 :
 Mistral conseille de régler l'un ou l'autre, et deux curseurs qui se compensent ne
-démontrent rien) ; l'effort de raisonnement (par profil : `none` chez OpenAI et pour
-`mistral-large-4`, pas de jetons de raisonnement) ; les pénalités de répétition (absentes chez Mistral) ; le
+démontrent rien) ; l'effort de raisonnement (par profil : `none` chez OpenAI, pas de
+jetons de raisonnement ; `low` pour `mistral-large-4`, qui refuse `none`) ; les pénalités de répétition (absentes chez Mistral) ; le
 format de sortie (le schéma JSON de la route) ; l'invite système (une seule, pour tous
 les profils) ; la graine aléatoire (`temperature = 0` donne déjà le rejeu, et la graine
 n'est pas garantie chez OpenAI). La reformulation tourne à température 0 et 150 jetons,
@@ -686,7 +686,7 @@ Le seul chemin d'un appel réel hors du service : à la main, commande par comma
 ```bash
 B="uv run --env-file .env python -m api_modele.banc_reponse"
 $B estimer mistral-large-2512 famille:F7,issue:hors_catalogue   # aucun appel
-$B essai mistral-large-2512 "<question inventée>" [--temperature 0.7]
+$B essai mistral-large-2512 "<question inventée>" [--temperature 0.7] [--longueur-max 1000]
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
   $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
 DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
