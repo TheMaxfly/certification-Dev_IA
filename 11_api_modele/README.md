@@ -636,8 +636,10 @@ cacherait un modèle qui dérape, ce que la mesure doit voir, et doublerait le c
   entier, casse ignorée). Un nom n'est admis que s'il figure dans un passage envoyé pour
   cette requête et que le couple (document, empreinte) est dans la liste des homonymes
   admis de l'étape 1 (`database/donnees/corpus_homonymes_admis.csv`, des empreintes,
-  aucun nom) : le modèle peut répéter un nom de personnage qu'on lui a donné, il ne peut
-  en produire aucun autre. La liste vit en mémoire ; seuls ses nombres sortent.
+  aucun nom), ou s'il figure dans la question de la requête et que son empreinte est
+  admise pour un document au moins : le modèle peut répéter un nom de personnage qu'on
+  lui a donné, dans un passage ou dans la question, il ne peut en produire aucun autre ;
+  tout autre nom est un 503. La liste vit en mémoire ; seuls ses nombres sortent.
 - **Ce qui part chez le fournisseur** : l'invite système, la question, l'historique et
   les passages de la recherche (le texte des critiques compris, tel qu'il est au corpus).
   **Ce qui n'en part pas** : l'identité (`identite`), la clé d'accès, rien de la base hors

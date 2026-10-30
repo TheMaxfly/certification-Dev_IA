@@ -255,8 +255,11 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     appel.passages = [e for _, e in envoyes]
     texte = cast(str, appel.corps["reponse"])
     reformulee = appel.corps["contexte"].get("question_reformulee")
-    appel.pseudonymes = banc_.pseudonymes.fautifs(texte, envoyes) + (
-        banc_.pseudonymes.fautifs(reformulee, []) if isinstance(reformulee, str) else 0
+    question = cast(str, corps["question"])
+    appel.pseudonymes = banc_.pseudonymes.fautifs(texte, envoyes, question) + (
+        banc_.pseudonymes.fautifs(reformulee, [], question)
+        if isinstance(reformulee, str)
+        else 0
     )
     if appel.pseudonymes == 0:
         appel.texte = texte

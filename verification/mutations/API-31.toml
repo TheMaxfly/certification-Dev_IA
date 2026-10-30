@@ -1,7 +1,7 @@
 id = "API-31"
 origine = "E3 étape 3, spec 03 (2026-10-27) — le contrôle des pseudonymes retiré sur la question reformulée"
 fichier = "11_api_modele/src/api_modele/reponse.py"
-avant = '''    if etat.pseudonymes.fautifs(question, []):'''
+avant = '''    if etat.pseudonymes.fautifs(question, [], corps.question):'''
 apres = '''    if False:'''
 dossier = "11_api_modele"
 commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "nom_de_membre_dans_la_question_reformulee"]

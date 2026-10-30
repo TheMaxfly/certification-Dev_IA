@@ -79,6 +79,22 @@ def test_un_nom_non_admis_present_dans_un_passage_est_refuse():
     assert ailleurs.fautifs(f"Le héros, {NOM}, grandit.", [PASSAGE]) == 1
 
 
+@pytest.mark.parametrize(
+    ("admis", "question", "fautifs"),
+    [
+        ((("kitsu:7", empreinte(NOM)),), f"Vous auriez l'histoire de {NOM} ?", 0),
+        ((), f"Vous auriez l'histoire de {NOM} ?", 1),  # non admis : 503
+        ((("kitsu:7", empreinte(NOM)),), "Une histoire de pirates ?", 1),
+    ],
+)
+def test_un_homonyme_admis_venu_de_la_question(admis, question, fautifs):
+    # Décision 7 bis amendée (2026-10-30) : un homonyme admis, pour un document au
+    # moins, peut venir de la question de la requête ; tout autre nom reste fautif.
+    texte = f"Je ne trouve rien sur {NOM}."
+    assert liste(*admis).fautifs(texte, [], question) == fautifs
+    assert liste(*admis).fautifs(f"{AUTRE} l'a aimé.", [], f"Et {AUTRE} ?") == 1
+
+
 def test_les_empreintes_trouvees_pour_le_banc():
     # Le diagnostic du banc dit quels noms, par leur empreinte, jamais par leur nom ;
     # il compte ce que compte le contrôle de la route.

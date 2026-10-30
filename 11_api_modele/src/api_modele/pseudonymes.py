@@ -14,8 +14,10 @@ listes versionnées), chargée par son chemin comme le fait
 
 Règle des homonymes : un nom trouvé dans une sortie du modèle n'est admis que s'il
 figure dans un passage envoyé POUR CETTE REQUÊTE et que le couple (document de ce
-passage, empreinte du nom) est dans la liste admise. Le modèle peut répéter un nom de
-personnage qu'on lui a donné ; il ne peut en produire aucun autre.
+passage, empreinte du nom) est dans la liste admise, ou — décision 7 bis amendée le
+30 octobre 2026 — s'il figure dans la question de la requête et que son empreinte est
+admise pour un document au moins. Le modèle peut répéter un nom de personnage qu'on
+lui a donné, dans un passage ou dans la question ; il ne peut en produire aucun autre.
 """
 
 from __future__ import annotations
@@ -83,11 +85,12 @@ class Pseudonymes:
     """Les noms (un motif par empreinte) et les homonymes admis. `repr` ne montre que
     des nombres ; le contrôle rend un nombre, jamais un nom."""
 
-    __slots__ = ("_admis", "_motifs")
+    __slots__ = ("_admis", "_empreintes_admises", "_motifs")
 
     def __init__(self, noms: Iterable[str], admis: Iterable[Couple]) -> None:
         self._motifs = {empreinte(n): motif(n) for n in noms}
         self._admis = frozenset(admis)
+        self._empreintes_admises = frozenset(e for _, e in self._admis)
 
     def __repr__(self) -> str:
         return f"Pseudonymes(noms={self.nb_noms}, homonymes_admis={self.nb_admis})"
@@ -107,17 +110,22 @@ class Pseudonymes:
 
     def homonyme_admis(self, h: str) -> bool:
         """L'empreinte est-elle admise comme homonyme, pour un document au moins ?"""
-        return any(e == h for _, e in self._admis)
+        return h in self._empreintes_admises
 
-    def fautifs(self, texte: str, passages: Iterable[tuple[str, str]]) -> int:
+    def fautifs(
+        self, texte: str, passages: Iterable[tuple[str, str]], question: str = ""
+    ) -> int:
         """Le nombre de noms présents dans `texte` et non admis. `passages` : les
-        passages envoyés pour cette requête, `(doc_key, texte)`."""
+        passages envoyés pour cette requête, `(doc_key, texte)` ; `question` : la
+        question de la requête."""
         envoyes = list(passages)
         n = 0
         for h, m in self._motifs.items():
             if m.search(texte) is None:
                 continue
             if any((doc, h) in self._admis and m.search(t) for doc, t in envoyes):
+                continue
+            if h in self._empreintes_admises and m.search(question):
                 continue
             n += 1
         return n

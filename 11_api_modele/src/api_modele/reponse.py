@@ -180,9 +180,10 @@ def sortie_invalide(etat: EtatApi, motif: str, role: Role) -> ErreurApi:
 
 
 def controler(
-    etat: EtatApi, modele: SortieModele, series: list[Serie]
+    etat: EtatApi, modele: SortieModele, series: list[Serie], question: str
 ) -> list[SerieCitee]:
-    """Les contrôles de sens, dans l'ordre ; les séries citées, complétées."""
+    """Les contrôles de sens, dans l'ordre ; les séries citées, complétées.
+    `question` : celle de la requête (un homonyme admis peut en venir)."""
     index = {s.serie_id: s for s in series if s.serie_id is not None}
     for citee in modele.series_citees:
         if citee.serie_id not in index:
@@ -198,7 +199,7 @@ def controler(
     if not coherent:
         raise sortie_invalide(etat, "refus_incoherent", "reponse")
     envoyes = [(p.doc_key, p.extrait) for s in series for p in s.passages]
-    if etat.pseudonymes.fautifs(modele.reponse, envoyes):
+    if etat.pseudonymes.fautifs(modele.reponse, envoyes, question):
         raise sortie_invalide(etat, "pseudonyme", "reponse")
     return [
         SerieCitee(
@@ -336,7 +337,7 @@ async def reformuler(
     if len(question) > REFORMULATION_MAX:
         deroulement.suivi["reformulation"] = "ignoree"
         return None, "trop_longue"
-    if etat.pseudonymes.fautifs(question, []):
+    if etat.pseudonymes.fautifs(question, [], corps.question):
         raise sortie_invalide(etat, "pseudonyme", "reformulation")
     deroulement.suivi["reformulation"] = "faite"
     return question, None
@@ -415,7 +416,7 @@ async def repondre(
             modele = SortieModele.model_validate_json(sortie.texte)
         except ValidationError:
             raise sortie_invalide(etat, "schema", "reponse") from None
-        citees = controler(etat, modele, series)
+        citees = controler(etat, modele, series, corps.question)
         refus, motif = modele.refus, modele.motif_refus
         texte = titrer(modele.reponse, series)
 

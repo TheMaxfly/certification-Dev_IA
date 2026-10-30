@@ -595,6 +595,25 @@ def test_le_meme_homonyme_absent_des_passages_de_la_requete(api_homonymes):
     assert r.json()["details"]["motif"] == "pseudonyme"
 
 
+def test_un_homonyme_admis_venu_de_la_question_de_la_requete(api_homonymes, doublures):
+    # Décision 7 bis amendée (2026-10-30) : le nom est dans la question, dans aucun
+    # passage ; admis pour un document au moins, il passe — dans la réponse comme dans
+    # la question reformulée.
+    DoublureFournisseur.contenu = AVEC_LE_NOM
+    DoublureFournisseur.contenu_reformulation = json.dumps(
+        {"question": f"Que deviens {NOM} dans cette série ?"}
+    )
+    question = f"Vous auriez l'histoire de {NOM} ?"
+    with api_homonymes(admis=True) as api:
+        assert repondre(api, question=question).status_code == 200
+        assert (
+            repondre(api, question=question, historique=CONVERSATION).status_code == 200
+        )
+    with api_homonymes(admis=False) as api:
+        r = repondre(api, question=question)
+    assert (r.status_code, r.json()["details"]["motif"]) == (503, "pseudonyme")
+
+
 def test_un_nom_non_admis_present_dans_un_passage(api_homonymes, nom_dans_un_passage):
     DoublureFournisseur.contenu = AVEC_LE_NOM
     with api_homonymes(admis=False) as api:
