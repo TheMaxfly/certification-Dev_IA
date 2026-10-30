@@ -43,7 +43,11 @@ from api_modele.contrat import DESTINATION
 from api_modele.journal import FormatJson
 from api_modele.modeles import Resultat
 from api_modele.pseudonymes import empreinte
-from api_modele.reponse import PHRASE_AUCUN_PASSAGE, contexte_des_passages
+from api_modele.reponse import (
+    PHRASE_AUCUN_PASSAGE,
+    contexte_des_passages,
+    titre_marque,
+)
 
 CONTRAT = json.loads(DESTINATION.read_text(encoding="utf-8"))
 NOM = AUTEURS[0]  # un nom de membre factice, lu par la vue des pseudonymes
@@ -188,6 +192,24 @@ def test_le_titre_du_catalogue_accompagne_chaque_marque(
     DoublureFournisseur.contenu = sortie(reponse=ecrit)
 
     assert conforme(repondre(api_reponse))["reponse"] == (rendu or ecrit)
+
+
+@pytest.mark.parametrize(
+    ("ecrit", "titre"),
+    [
+        ("Une aventure [S:1].", False),
+        ("Une aventure, « *série 1* » [S:1].", True),
+        ("Une aventure [S:1] *Série 1*.", True),
+        ("Série 1 fait rire. [S:1]", False),
+        ("Série 1 [S:1], puis encore [S:1].", False),
+        ("Série 1 fait rire, Série 2 [S:2].", None),
+    ],
+)
+def test_le_titre_se_juge_comme_il_s_insere(ecrit, titre):
+    # `titre_present` suit la règle de l'insertion : le titre juste avant ou juste
+    # après chaque marque de la série ; une série que le texte ne marque pas n'est
+    # pas jugée.
+    assert titre_marque(1, "Série 1", ecrit) is titre
 
 
 def test_les_reglages_demandes_arrivent_tels_quels(api_reponse, doublures):

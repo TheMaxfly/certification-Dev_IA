@@ -38,7 +38,7 @@ from api_modele.reponse import (
     INVITE_REPONSE,
     LONGUEUR_REFORMULATION,
     message_de_reponse,
-    titre_figure,
+    titre_marque,
 )
 
 CRITERE = {
@@ -405,6 +405,18 @@ def ligne_reponse(banc_: Banc, q: Question, appel: Appel) -> dict[str, object]:
     texte = cast(str, corps["reponse"])
     citees = [cast(int, s["serie_id"]) for s in corps["series_citees"]]
     latences = corps["contexte"]["latences_ms"]
+    # Ce que le modèle fait seul : sur son texte, avant l'insertion des titres, et
+    # selon la règle de l'insertion (titre juste avant ou juste après la marque).
+    titres = (
+        None
+        if appel.texte_modele is None
+        else [
+            titre_marque(
+                cast(int, s["serie_id"]), cast(str, s["titre"]), appel.texte_modele
+            )
+            for s in corps["series_citees"]
+        ]
+    )
     ligne: dict[str, object] = {
         "refus": corps["refus"],
         "motif_refus": corps["motif_refus"],
@@ -418,14 +430,10 @@ def ligne_reponse(banc_: Banc, q: Question, appel: Appel) -> dict[str, object]:
         else recouvrement(texte, appel.passages),
         "latence_modele_ms": latences["modele"],
         "latence_totale_ms": latences["totale"],
-        # Ce que le modèle fait seul : sur son texte, avant l'insertion des titres.
-        "titres_presents": None
-        if appel.texte_modele is None
-        else sum(
-            1
-            for s in corps["series_citees"]
-            if titre_figure(cast(str, s["titre"]), appel.texte_modele)
-        ),
+        "titres_presents": None if titres is None else titres.count(True),
+        "titres_marques": None
+        if titres is None
+        else sum(1 for t in titres if t is not None),
     }
     if q.attend_une_serie:
         top = banc_.rechercher(q.texte)
@@ -492,7 +500,12 @@ def metriques(run: Run) -> dict[str, float]:
         m["hit_rate_10"] = sum(1 for x in de_rang if x["hit_rate_10"])
         m["questions_de_rang"] = len(de_rang)
     titrees = [x for x in rendues if x.get("titres_presents") is not None]
-    titres_cites = sum(cast(int, x["nb_series_citees"]) for x in titrees)
+    # Sur les séries citées que le texte marque ; les autres sont comptées à part.
+    titres_cites = sum(cast(int, x["titres_marques"]) for x in titrees)
+    if titrees:
+        m["citees_sans_marque"] = (
+            sum(cast(int, x["nb_series_citees"]) for x in titrees) - titres_cites
+        )
     if titres_cites:
         presents = sum(cast(int, x["titres_presents"]) for x in titrees)
         m["titres_presents"] = presents

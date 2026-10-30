@@ -717,8 +717,10 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   sortie invalide pour un nom de membre. Pas de seuil sur le recouvrement (suites de
   8 mots de la réponse présentes telles quelles dans un passage) ni sur F9 / F10 : à
   la première mesure, on écrit le chiffre. `titre_present` : part des séries citées
-  dont le titre figure dans le texte **du modèle**, avant l'insertion de la route (ce
-  que le modèle fait seul ; le texte du modèle reste en mémoire, jamais écrit).
+  dont le titre est juste avant ou juste après chacune de leurs marques dans le texte
+  **du modèle**, avant l'insertion de la route — la règle de l'insertion, appliquée à
+  ce que le modèle fait seul (son texte reste en mémoire, jamais écrit) ; une série
+  citée que le texte ne marque pas est comptée à part (`citees_sans_marque`).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
 

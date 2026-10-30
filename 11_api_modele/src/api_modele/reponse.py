@@ -131,8 +131,20 @@ def plat(texte: str) -> str:
     return re.sub(r"\W+", "", texte.casefold())
 
 
-def titre_figure(titre: str, texte: str) -> bool:
-    return plat(titre) in plat(texte)
+def accole(titre: str, marque: re.Match[str]) -> bool:
+    """Le titre juste avant ou juste après la marque : la règle de `titrer`, que la
+    mesure applique aussi au texte du modèle."""
+    cle = plat(titre)
+    avant = plat(marque.string[: marque.start()])
+    apres = plat(marque.string[marque.end() :])
+    return avant.endswith(cle) or apres.startswith(cle)
+
+
+def titre_marque(serie_id: int, titre: str, texte: str) -> bool | None:
+    """Le titre accolé à chaque marque de la série ; `None` si le texte ne la marque
+    pas (rien à insérer, donc rien à juger)."""
+    marques = [m for m in MARQUE_SERIE.finditer(texte) if int(m.group(1)) == serie_id]
+    return all(accole(titre, m) for m in marques) if marques else None
 
 
 def titrer(texte: str, series: list[Serie]) -> str:
@@ -142,11 +154,7 @@ def titrer(texte: str, series: list[Serie]) -> str:
 
     def completer(m: re.Match[str]) -> str:
         titre = titres.get(int(m.group(1)))
-        if titre is None:
-            return m.group(0)
-        cle = plat(titre)
-        avant, apres = plat(m.string[: m.start()]), plat(m.string[m.end() :])
-        if avant.endswith(cle) or apres.startswith(cle):
+        if titre is None or accole(titre, m):
             return m.group(0)
         return f"{titre} {m.group(0)}"
 

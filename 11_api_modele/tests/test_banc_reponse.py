@@ -176,6 +176,7 @@ def ligne(**champs: object) -> dict[str, object]:
         "latence_totale_ms": 1200.0,
         "nb_series_citees": 2,
         "titres_presents": 1,
+        "titres_marques": 2,
         "longueur_reponse": 300,
         "recouvrement_8": 0.1,
     }
@@ -222,6 +223,15 @@ def test_les_metriques_et_le_critere():
         12,
         24,
         0.5,
+    )
+    assert m["citees_sans_marque"] == 0
+    # Une série citée sans marque n'entre pas dans `titre_present` : comptée à part.
+    run.par_question = [ligne(titres_marques=1)]
+    m1 = metriques(run)
+    assert (m1["titres_cites"], m1["titre_present"], m1["citees_sans_marque"]) == (
+        1,
+        1.0,
+        1,
     )
     v = verdict(m)
     assert v == {
@@ -519,7 +529,7 @@ def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):
     # compte ce que le modèle a écrit seul.
     ecrit = json.loads(SORTIE_VALIDE)["reponse"]
     assert run.textes == {"Q": ecrit.replace("[S:1]", "Série 1 [S:1]")}
-    assert x["titres_presents"] == 0
+    assert (x["titres_presents"], x["titres_marques"]) == (0, 1)
     assert banc_.espion.releves[-1].texte_modele == ecrit
     assert run.contexte["corpus_id"] == "v7"
 
