@@ -22,6 +22,7 @@ import httpx
 import psycopg
 import pytest
 from conftest import (
+    AUTEURS,
     CLE_APPLICATION,
     ENVIRONNEMENT_FACTICE,
     QUESTION,
@@ -51,6 +52,7 @@ from api_modele.banc_reponse.mesure import (
 from api_modele.configuration import Prix, Profil
 from api_modele.fournisseurs import cout_usd
 from api_modele.modeles import Serie
+from api_modele.pseudonymes import empreinte
 from api_modele.reponse import INVITE_REPONSE, message_de_reponse
 
 RUN1 = "famille:F7,issue:hors_catalogue,famille:F9,famille:F10"
@@ -532,6 +534,83 @@ def test_un_fournisseur_en_echec_interrompt_le_run(banc_: Banc, doublures: Doubl
     run = mesurer(banc_, banc_.profil("factice-a"), questions, 0.5)
     assert (run.statut, run.motif_interruption) == ("interrompu", "fournisseur_refus")
     assert len(run.par_question) == 1
+
+
+def test_une_sortie_coupee_par_la_borne_n_interrompt_pas_le_run(
+    banc_: Banc, doublures: Doublures
+):
+    # `longueur_atteinte` : une question en échec, comptée ; le run continue.
+    DoublureFournisseur.corps_brut = json.dumps(
+        {
+            "model": "x",
+            "choices": [
+                {
+                    "message": {"role": "assistant", "content": '{"refus": fa'},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 400},
+        }
+    ).encode()
+    questions, _ = jeu.lire(COURT)
+    run = mesurer(banc_, banc_.profil("factice-a"), questions, 0.5)
+    assert (run.statut, run.motif_interruption) == ("termine", None)
+    assert len(run.par_question) == len(questions) == len(doublures.recus())
+    assert {(x["code"], x["motif"]) for x in run.par_question} == {
+        ("fournisseur_refus", "longueur_atteinte")
+    }
+    assert metriques(run)["longueur_atteinte"] == len(questions)
+
+
+def test_une_sortie_refusee_et_ses_releves_sans_texte(
+    banc_: Banc, doublures: Doublures
+):
+    # Un nom de membre : la route refuse ; le banc relève son empreinte, s'il était
+    # dans le message envoyé, s'il est un homonyme admis, et la forme de la sortie.
+    nom = AUTEURS[0]
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": f"Selon {nom}, une aventure [S:1].",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F7", "inconnue", ())
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+    (x,) = run.par_question
+    assert (x["code"], x["motif"]) == ("sortie_modele_invalide", "pseudonyme")
+    assert x["forme_sortie"] == {
+        "refus": False,
+        "series_citees": 1,
+        "motif_refus": None,
+    }
+    assert x["noms_trouves"] == [
+        {
+            "empreinte": empreinte(nom),
+            "dans_le_message_envoye": False,
+            "homonyme_admis": False,
+        }
+    ]
+    assert nom not in json.dumps(run.par_question, ensure_ascii=False)
+
+    # Un refus qui cite une série : la forme dit quelle branche de la règle cède.
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": True,
+            "motif_refus": "inconnu",
+            "reponse": TEXTE_REFUS,
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+    (x,) = run.par_question
+    assert (x["motif"], x["forme_sortie"]) == (
+        "refus_incoherent",
+        {"refus": True, "series_citees": 1, "motif_refus": "inconnu"},
+    )
+    assert "noms_trouves" not in x and run.statut == "termine"
+    assert TEXTE_REFUS not in json.dumps(run.par_question, ensure_ascii=False)
 
 
 def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):

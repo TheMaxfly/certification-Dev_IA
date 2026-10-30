@@ -13,7 +13,10 @@ messages en caractères, le statut, le modèle rendu, l'arbre numérique de `usa
 raison de fin, et pour un refus le code et le message d'erreur du fournisseur
 (tronqué). Jamais un message, un passage, ni un en-tête ; le texte d'une sortie de
 réponse (`texte_modele`, celui du modèle, avant que la route n'y insère les titres)
-reste en mémoire le temps d'en compter les titres, et n'est jamais écrit.
+reste en mémoire le temps d'en compter les titres, et n'est jamais écrit ; de même le
+message envoyé (`message_envoye`, passages et question), le temps de dire si un nom
+trouvé dans une sortie refusée y figurait. De la sortie de réponse, il garde aussi
+sa forme (`forme` : refus, nombre de séries citées, motif de refus), sans texte.
 """
 
 from __future__ import annotations
@@ -40,6 +43,8 @@ PARAMETRES = (
     "reasoning_effort",
 )
 MESSAGE_ERREUR_MAX = 300
+#: Les motifs de refus du schéma de sortie ; toute autre valeur est relevée `autre`.
+MOTIFS_REFUS = ("aucun_passage", "hors_catalogue", "inconnu")
 
 
 def nombres(valeur: object) -> object:
@@ -74,6 +79,10 @@ class Releve:
     erreur: dict[str, str] | None = None
     #: Le champ `reponse` de la sortie du modèle : en mémoire seulement.
     texte_modele: str | None = field(default=None, repr=False)
+    #: La forme de la sortie de réponse, sans texte (`_forme`).
+    forme: dict[str, object] | None = None
+    #: Les messages envoyés hors de l'invite système : en mémoire seulement.
+    message_envoye: str = field(default="", repr=False)
 
     def entier(self, *chemin: str) -> int | None:
         valeur: object = self.usage
@@ -118,15 +127,49 @@ def _role(corps: dict[str, object]) -> str:
     return "reformulation" if requis == ["question"] else "reponse"
 
 
-def _texte_modele(choix: object) -> str | None:
+def _sortie(choix: object) -> dict[str, object] | None:
+    """La sortie JSON du modèle, ou `None` si elle ne se lit pas en objet."""
     contenu = objet(objet(choix).get("message")).get("content")
     if not isinstance(contenu, str):
         return None
     try:
-        texte = objet(json.loads(contenu)).get("reponse")
+        return objet(json.loads(contenu)) or None
     except ValueError:
         return None
+
+
+def _texte_modele(sortie: dict[str, object] | None) -> str | None:
+    texte = (sortie or {}).get("reponse")
     return texte if isinstance(texte, str) else None
+
+
+def _forme(sortie: dict[str, object] | None) -> dict[str, object] | None:
+    """Ce que la règle de cohérence du refus lit, en nombres et en valeurs du
+    schéma : refus, nombre de séries citées, motif de refus."""
+    if sortie is None:
+        return None
+    refus, citees, motif = (
+        sortie.get(k) for k in ("refus", "series_citees", "motif_refus")
+    )
+    return {
+        "refus": refus if isinstance(refus, bool) else None,
+        "series_citees": len(cast(list[object], citees))
+        if isinstance(citees, list)
+        else None,
+        "motif_refus": motif if motif is None or motif in MOTIFS_REFUS else "autre",
+    }
+
+
+def _message(corps: dict[str, object]) -> str:
+    messages = corps.get("messages")
+    if not isinstance(messages, list):
+        return ""
+    contenus = (
+        objet(m).get("content")
+        for m in cast(list[object], messages)
+        if objet(m).get("role") != "system"
+    )
+    return "\n".join(c for c in contenus if isinstance(c, str))
 
 
 def _caracteres(corps: dict[str, object]) -> int:
@@ -181,6 +224,7 @@ class Espion:
                 role=_role(corps),
                 parametres={k: corps[k] for k in PARAMETRES if k in corps},
                 caracteres_envoyes=_caracteres(corps),
+                message_envoye=_message(corps),
             )
             releves.append(releve)
             reponse = await envoyer(client, requete, **options)
@@ -201,7 +245,10 @@ class Espion:
                 premier = cast(list[object], choix)[0]
                 fin = objet(premier).get("finish_reason")
                 releve.fin = fin if isinstance(fin, str) else None
-                releve.texte_modele = _texte_modele(premier)
+                sortie = _sortie(premier)
+                releve.texte_modele = _texte_modele(sortie)
+                if releve.role == "reponse":
+                    releve.forme = _forme(sortie)
             return reponse
 
         setattr(httpx.AsyncClient, "send", relever)  # noqa: B010

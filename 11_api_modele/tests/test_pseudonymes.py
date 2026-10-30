@@ -79,6 +79,19 @@ def test_un_nom_non_admis_present_dans_un_passage_est_refuse():
     assert ailleurs.fautifs(f"Le héros, {NOM}, grandit.", [PASSAGE]) == 1
 
 
+def test_les_empreintes_trouvees_pour_le_banc():
+    # Le diagnostic du banc dit quels noms, par leur empreinte, jamais par leur nom ;
+    # il compte ce que compte le contrôle de la route.
+    noms = liste(("kitsu:7", empreinte(NOM)))
+    texte = f"Selon {NOM} et {AUTRE.lower()}, c'est drôle."
+
+    assert noms.empreintes_trouvees(texte) == [empreinte(NOM), empreinte(AUTRE)]
+    assert noms.empreintes_trouvees("Rien à signaler.") == []
+    assert noms.homonyme_admis(empreinte(NOM)) is True
+    assert noms.homonyme_admis(empreinte(AUTRE)) is False
+    assert noms.fautifs(texte, []) == len(noms.empreintes_trouvees(texte))
+
+
 def test_seuls_des_nombres_sortent():
     noms = liste(("kitsu:7", empreinte(NOM)))
 

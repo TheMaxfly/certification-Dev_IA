@@ -702,10 +702,15 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   estimation avant le premier appel (formule de « Coût », sortie au maximum), arrêt
   si elle dépasse `COUT_PLAFOND_RUN` ; coût réel cumulé (depuis `usage`, appels
   rejetés compris) après chaque question, arrêt au plafond (run `interrompu`, ce qui
-  est mesuré est gardé) ; arrêt aussi si un fournisseur refuse ou ne répond pas.
+  est mesuré est gardé) ; arrêt aussi si un fournisseur refuse ou ne répond pas. Une
+  sortie coupée par la borne de longueur (`longueur_atteinte`) n'est pas un
+  fournisseur en échec : la question compte en échec, le run continue.
 - **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse`, magasin du
   module 10, écrit par l'interpréteur du module 10 : le module 11 n'installe pas
-  MLflow) ; ses pièces ne portent que des identifiants et des nombres. La ligne
+  MLflow) ; ses pièces ne portent que des identifiants et des nombres — pour une
+  sortie refusée par la route, sa forme (refus, nombre de séries citées, motif de
+  refus) et, pour un nom de membre, ses **empreintes** (dans le message envoyé ou
+  non, homonyme admis ou non), jamais le nom ni le texte. La ligne
   `bench.eval_runs` du run, sous le rôle qui l'écrit pour le module 10
   (`DATABASE_URL`, `postgres`, mot de passe dans `~/.pgpass`). Les **textes** des
   réponses, contrôlés (aucun nom de membre), dans

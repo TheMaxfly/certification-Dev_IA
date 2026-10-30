@@ -41,6 +41,8 @@ from api_modele.reponse import (
     titre_marque,
 )
 
+#: Le motif d'une sortie coupée par la borne de longueur (`details.motif`).
+MOTIF_LONGUEUR = "longueur_atteinte"
 CRITERE = {
     "refus_correct_F7_min": 4,
     "refus_correct_hors_catalogue_min": 4,
@@ -205,6 +207,37 @@ class Appel:
     def cout(self, profil: Profil, caracteres_par_jeton: float) -> float:
         return sum(r.cout(profil, caracteres_par_jeton) for r in self.releves)
 
+    @property
+    def releve_de_reponse(self) -> Releve | None:
+        return next((r for r in reversed(self.releves) if r.role == "reponse"), None)
+
+    @property
+    def fournisseur_en_echec(self) -> bool:
+        """Un fournisseur injoignable, en délai ou en refus : le run s'arrête. Une
+        sortie coupée par la borne (`longueur_atteinte`) est une question en échec,
+        pas un fournisseur en échec : le run continue."""
+        return (self.code or "").startswith("fournisseur_") and (
+            self.motif != MOTIF_LONGUEUR
+        )
+
+
+def noms_trouves(banc_: Banc, releve: Releve | None) -> list[dict[str, object]]:
+    """Les noms de membres trouvés dans une sortie du modèle, par leur seule
+    empreinte : figuraient-ils dans le message envoyé (passages, question) ; sont-ils
+    admis comme homonymes, pour un document au moins ? Jamais un nom ni un texte."""
+    if releve is None or releve.texte_modele is None:
+        return []
+    p = banc_.pseudonymes
+    envoyes = set(p.empreintes_trouvees(releve.message_envoye))
+    return [
+        {
+            "empreinte": h,
+            "dans_le_message_envoye": h in envoyes,
+            "homonyme_admis": p.homonyme_admis(h),
+        }
+        for h in p.empreintes_trouvees(releve.texte_modele)
+    ]
+
 
 def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     """Une requête de réponse ; le texte n'est gardé qu'après le contrôle des noms
@@ -227,10 +260,8 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     )
     if appel.pseudonymes == 0:
         appel.texte = texte
-        appel.texte_modele = next(
-            (r.texte_modele for r in reversed(appel.releves) if r.role == "reponse"),
-            None,
-        )
+        releve = appel.releve_de_reponse
+        appel.texte_modele = None if releve is None else releve.texte_modele
     return appel
 
 
@@ -396,8 +427,15 @@ def mesurer(
             ligne |= ligne_reponse(banc_, q, appel)
             if appel.texte is not None:
                 run.textes[q.question_id] = appel.texte
+        elif appel.code == "sortie_modele_invalide":
+            # Ce que la route a refusé, sans son texte : la forme de la sortie et,
+            # pour un nom de membre, ses empreintes.
+            releve = appel.releve_de_reponse
+            ligne["forme_sortie"] = None if releve is None else releve.forme
+            if appel.motif == "pseudonyme":
+                ligne["noms_trouves"] = noms_trouves(banc_, releve)
         run.par_question.append(ligne)
-        if appel.code is not None and appel.code.startswith("fournisseur_"):
+        if appel.fournisseur_en_echec:
             run.statut, run.motif_interruption = "interrompu", appel.code
             break
         if run.cout_reel_usd > plafond:
@@ -504,6 +542,7 @@ def metriques(run: Run) -> dict[str, float]:
     m["sorties_invalides"] = sum(
         1 for x in lignes if x["code"] == "sortie_modele_invalide"
     )
+    m["longueur_atteinte"] = sum(1 for x in lignes if x["motif"] == MOTIF_LONGUEUR)
     de_rang = [x for x in rendues if "citee_attendue_1" in x]
     if de_rang:
         m["citee_attendue_1"] = sum(1 for x in de_rang if x["citee_attendue_1"])
@@ -652,7 +691,7 @@ def scenarios(
         historique.append(
             {"role": "assistant", "contenu": appel.texte or "(pas de réponse)"}
         )
-        if appel.statut != 200 and (appel.code or "").startswith("fournisseur_"):
+        if appel.fournisseur_en_echec:
             run.statut, run.motif_interruption = "interrompu", appel.code
             break
         if run.cout_reel_usd > plafond:

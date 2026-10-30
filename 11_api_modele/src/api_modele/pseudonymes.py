@@ -100,6 +100,15 @@ class Pseudonymes:
     def nb_admis(self) -> int:
         return len(self._admis)
 
+    def empreintes_trouvees(self, texte: str) -> list[str]:
+        """Les empreintes des noms présents dans `texte`, jamais les noms : le
+        diagnostic du banc de mesure (la route n'emploie que `fautifs`)."""
+        return [h for h, m in self._motifs.items() if m.search(texte)]
+
+    def homonyme_admis(self, h: str) -> bool:
+        """L'empreinte est-elle admise comme homonyme, pour un document au moins ?"""
+        return any(e == h for _, e in self._admis)
+
     def fautifs(self, texte: str, passages: Iterable[tuple[str, str]]) -> int:
         """Le nombre de noms présents dans `texte` et non admis. `passages` : les
         passages envoyés pour cette requête, `(doc_key, texte)`."""
