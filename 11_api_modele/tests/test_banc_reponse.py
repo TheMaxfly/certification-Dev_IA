@@ -536,6 +536,59 @@ def test_un_fournisseur_en_echec_interrompt_le_run(banc_: Banc, doublures: Doubl
     assert len(run.par_question) == 1
 
 
+def test_la_forme_du_contenu_et_la_latence_meme_en_echec(
+    banc_: Banc, doublures: Doublures
+):
+    # Une chaîne : sa taille ; une liste : le type et la taille de chaque morceau ;
+    # jamais le texte. La latence est relevée, même quand l'appel échoue.
+    essai(banc_, banc_.profil("factice-a"), QUESTION)
+    r = banc_.espion.releves[-1]
+    assert r.forme_contenu == {
+        "type": "chaine",
+        "caracteres": len(DoublureFournisseur.contenu),
+    }
+    assert r.latence_ms is not None and r.latence_ms >= 0
+
+    DoublureFournisseur.corps_brut = json.dumps(
+        {
+            "model": "x",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": [{"type": "text", "text": "abcd"}],
+                            },
+                            {"type": "text", "text": SORTIE_VALIDE},
+                        ],
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 300},
+        }
+    ).encode()
+    chiffres, texte = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    (appel,) = chiffres["appels"]
+    assert chiffres["statut"] == 200 and texte is not None
+    assert appel["forme_contenu"] == {
+        "type": "liste",
+        "morceaux": [
+            {"type": "thinking", "caracteres": 4},
+            {"type": "text", "caracteres": len(SORTIE_VALIDE)},
+        ],
+    }
+    assert "abcd" not in json.dumps(chiffres)
+
+    DoublureFournisseur.corps_brut = None
+    DoublureFournisseur.statut = 500
+    chiffres, _ = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    (appel,) = chiffres["appels"]
+    assert appel["statut"] == 500 and appel["latence_ms"] is not None
+
+
 def test_une_sortie_coupee_par_la_borne_n_interrompt_pas_le_run(
     banc_: Banc, doublures: Doublures
 ):

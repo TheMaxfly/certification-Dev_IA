@@ -71,6 +71,8 @@ class Adaptateur:
     chemin_raisonnement: tuple[str, ...] | None
     #: Les jetons de raisonnement sont-ils déjà comptés dans `completion_tokens` ?
     raisonnement_inclus: bool
+    #: La sortie peut-elle venir en morceaux typés (`content` en liste) ?
+    morceaux_types: bool = False
 
 
 #: Forme commune, chez les deux : `model`, `messages`, `temperature`, `top_p`,
@@ -88,10 +90,16 @@ ADAPTATEURS: dict[str, Adaptateur] = {
     # du 2026-10-28 (`mistral-large-4`, sans effort fixé) :
     # `usage.completion_tokens_details.reasoning_tokens`, compris dans
     # `completion_tokens` (400 = `max_tokens`, dont 399 de raisonnement).
+    # Lu le 2026-10-31 : page « Reasoning » (docs.mistral.ai/capabilities/reasoning,
+    # sans date affichée) : hors `reasoning_effort = none`, `message.content` est une
+    # liste de morceaux typés — `thinking` (le raisonnement, sous `thinking`) et
+    # `text` (la réponse, sous `text`) ; `mistral-large-4` admet `low`, `medium`,
+    # `high`. Vu à l'essai du 2026-10-31 (`low`, fin `stop`, `content` hors chaîne).
     "mistral": Adaptateur(
         champ_longueur="max_tokens",
         chemin_raisonnement=("completion_tokens_details", "reasoning_tokens"),
         raisonnement_inclus=True,
+        morceaux_types=True,
     ),
     # OpenAI — lu le 2026-10-26 : référence « Create chat completion »
     # (developers.openai.com/api/reference) : `max_tokens` « deprecated in favor of
@@ -540,6 +548,10 @@ class Fournisseurs:
                 details | {"motif": "longueur_atteinte"},
             )
         texte = _lire(premier, ("message", "content"))
+        if ADAPTATEURS[profil.fournisseur].morceaux_types and not isinstance(
+            texte, str
+        ):
+            texte = texte_des_morceaux(texte)
         if not isinstance(texte, str):
             raise ErreurFournisseur(
                 "fournisseur_refus",
@@ -648,6 +660,20 @@ class Fournisseurs:
                 "variable_cle": variable_cle,
             }
         )
+
+
+def texte_des_morceaux(contenu: object) -> str | None:
+    """Le texte d'un `content` en morceaux typés : les morceaux `text` mis bout à
+    bout, les morceaux de raisonnement (`thinking`) ignorés ; None sans morceau de
+    texte."""
+    if not isinstance(contenu, list):
+        return None
+    textes: list[str] = []
+    for morceau in cast(list[object], contenu):
+        texte = _lire(morceau, ("text",))
+        if _lire(morceau, ("type",)) == "text" and isinstance(texte, str):
+            textes.append(texte)
+    return "".join(textes) if textes else None
 
 
 def _premier_choix(donnees: object) -> object:

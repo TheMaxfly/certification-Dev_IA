@@ -409,6 +409,61 @@ def test_la_longueur_atteinte_est_dite(tmp_path, doublures, contenu):
     assert (exc.details["motif"], exc.details["statut"]) == ("longueur_atteinte", 200)
 
 
+def corps_en_morceaux(*morceaux: dict[str, Any]) -> bytes:
+    """Un corps de Mistral pour un modèle qui raisonne : `content` en morceaux."""
+    return json.dumps(
+        {
+            "model": "modele-a",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": list(morceaux)},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 300},
+        }
+    ).encode()
+
+
+RAISONNEMENT = {
+    "type": "thinking",
+    "thinking": [{"type": "text", "text": "Je pèse les passages { pas du JSON"}],
+}
+
+
+def test_mistral_en_morceaux_types_lit_le_texte_et_ignore_le_raisonnement(
+    tmp_path, doublures
+):
+    # Page « Reasoning » de Mistral (lue le 2026-10-31) : hors effort `none`,
+    # `content` est une liste de morceaux `thinking` et `text`.
+    moitie = len(DoublureFournisseur.contenu) // 2
+    DoublureFournisseur.corps_brut = corps_en_morceaux(
+        RAISONNEMENT,
+        {"type": "text", "text": DoublureFournisseur.contenu[:moitie]},
+        {"type": "text", "text": DoublureFournisseur.contenu[moitie:]},
+    )
+
+    sortie = jouer(modele_langage(tmp_path, doublures), appeler("factice-a"))
+
+    assert sortie.texte == DoublureFournisseur.contenu
+
+
+@pytest.mark.parametrize(
+    ("profil", "morceaux"),
+    [
+        ("factice-a", (RAISONNEMENT,)),  # Mistral, aucun morceau de texte
+        ("factice-b", ({"type": "text", "text": "{}"},)),  # OpenAI : jamais en liste
+    ],
+)
+def test_des_morceaux_sans_texte_ou_hors_mistral(tmp_path, doublures, profil, morceaux):
+    DoublureFournisseur.corps_brut = corps_en_morceaux(*morceaux)
+
+    exc = erreur(modele_langage(tmp_path, doublures), profil)
+
+    assert (exc.code, exc.details["motif"]) == ("fournisseur_refus", "corps_inattendu")
+
+
 def test_une_reponse_trop_lente_depasse_le_delai(tmp_path, doublures):
     DoublureFournisseur.retard_s = DELAI_FACTICE_S * 3
 

@@ -10,10 +10,12 @@ contrôles de la route.
 fournisseurs, et lui seul dans ce processus) le temps d'un `with`. Il ne garde que
 des nombres et des noms : les paramètres envoyés hors des messages, la taille des
 messages en caractères, le statut, le modèle rendu, l'arbre numérique de `usage`, la
-raison de fin, et pour un refus le code et le message d'erreur du fournisseur
-(tronqué). Jamais un message, un passage, ni un en-tête ; le texte d'une sortie de
-réponse (`texte_modele`, celui du modèle, avant que la route n'y insère les titres)
-reste en mémoire le temps d'en compter les titres, et n'est jamais écrit ; de même le
+raison de fin, la latence de l'appel (même en échec), la forme de
+`message.content` (son type ; en liste, le type et la taille en caractères de chaque
+morceau), et pour un refus le code et le message d'erreur du fournisseur (tronqué).
+Jamais un message, un passage, ni un en-tête ; le texte d'une sortie de réponse
+(`texte_modele`, celui du modèle, avant que la route n'y insère les titres) reste en
+mémoire le temps d'en compter les titres, et n'est jamais écrit ; de même le
 message envoyé (`message_envoye`, passages et question), le temps de dire si un nom
 trouvé dans une sortie refusée y figurait. De la sortie de réponse, il garde aussi
 sa forme (`forme` : refus, nombre de séries citées, motif de refus), sans texte.
@@ -23,6 +25,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -31,7 +34,7 @@ from typing import Any, cast
 import httpx
 
 from api_modele.configuration import Profil
-from api_modele.fournisseurs import ADAPTATEURS, cout_usd
+from api_modele.fournisseurs import ADAPTATEURS, cout_usd, texte_des_morceaux
 
 #: Les paramètres d'un corps d'appel relevés (aucun ne porte de texte).
 PARAMETRES = (
@@ -81,6 +84,10 @@ class Releve:
     texte_modele: str | None = field(default=None, repr=False)
     #: La forme de la sortie de réponse, sans texte (`_forme`).
     forme: dict[str, object] | None = None
+    #: La forme de `message.content`, sans texte (`_forme_contenu`).
+    forme_contenu: dict[str, object] | None = None
+    #: De l'envoi à la fin de la lecture du corps, en millisecondes ; échecs compris.
+    latence_ms: float | None = None
     #: Les messages envoyés hors de l'invite système : en mémoire seulement.
     message_envoye: str = field(default="", repr=False)
 
@@ -127,9 +134,49 @@ def _role(corps: dict[str, object]) -> str:
     return "reformulation" if requis == ["question"] else "reponse"
 
 
-def _sortie(choix: object) -> dict[str, object] | None:
-    """La sortie JSON du modèle, ou `None` si elle ne se lit pas en objet."""
+def _caracteres_du_morceau(valeur: object) -> int:
+    """Les caractères des textes d'un morceau, à toute profondeur (`type` exclu)."""
+    if isinstance(valeur, str):
+        return len(valeur)
+    if isinstance(valeur, list):
+        return sum(_caracteres_du_morceau(v) for v in cast(list[object], valeur))
+    if isinstance(valeur, dict):
+        return sum(
+            _caracteres_du_morceau(v)
+            for k, v in cast(dict[str, object], valeur).items()
+            if k != "type"
+        )
+    return 0
+
+
+def _forme_contenu(choix: object) -> dict[str, object]:
+    """La forme de `message.content` : son type et, en liste, le type et la taille
+    de chaque morceau ; jamais le texte."""
     contenu = objet(objet(choix).get("message")).get("content")
+    if isinstance(contenu, str):
+        return {"type": "chaine", "caracteres": len(contenu)}
+    if isinstance(contenu, list):
+        morceaux = cast(list[object], contenu)
+        return {
+            "type": "liste",
+            "morceaux": [
+                {
+                    "type": str(objet(m).get("type")),
+                    "caracteres": _caracteres_du_morceau(m),
+                }
+                for m in morceaux
+            ],
+        }
+    return {"type": "absent" if contenu is None else type(contenu).__name__}
+
+
+def _sortie(choix: object) -> dict[str, object] | None:
+    """La sortie JSON du modèle, ou `None` si elle ne se lit pas en objet ; un
+    `content` en morceaux typés est lu comme la couche des fournisseurs le lit."""
+    contenu = objet(objet(choix).get("message")).get("content")
+    morceaux = texte_des_morceaux(contenu)
+    if morceaux is not None:
+        contenu = morceaux
     if not isinstance(contenu, str):
         return None
     try:
@@ -227,8 +274,12 @@ class Espion:
                 message_envoye=_message(corps),
             )
             releves.append(releve)
-            reponse = await envoyer(client, requete, **options)
-            await reponse.aread()
+            debut = time.perf_counter()
+            try:
+                reponse = await envoyer(client, requete, **options)
+                await reponse.aread()
+            finally:
+                releve.latence_ms = round((time.perf_counter() - debut) * 1000, 1)
             releve.statut = reponse.status_code
             if not 200 <= reponse.status_code < 300:
                 releve.erreur = _erreur(reponse)
@@ -245,6 +296,7 @@ class Espion:
                 premier = cast(list[object], choix)[0]
                 fin = objet(premier).get("finish_reason")
                 releve.fin = fin if isinstance(fin, str) else None
+                releve.forme_contenu = _forme_contenu(premier)
                 sortie = _sortie(premier)
                 releve.texte_modele = _texte_modele(sortie)
                 if releve.role == "reponse":

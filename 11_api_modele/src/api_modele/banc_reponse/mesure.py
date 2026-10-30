@@ -279,6 +279,8 @@ def releve_en_dict(r: Releve, profil: Profil, cpj: float) -> dict[str, object]:
         "modele_rendu": r.modele_rendu,
         "usage": r.usage,
         "fin": r.fin,
+        "forme_contenu": r.forme_contenu,
+        "latence_ms": r.latence_ms,
         "erreur": r.erreur,
         "jetons": {
             "entree": entree,
@@ -422,6 +424,8 @@ def mesurer(
                         )
                     ),
                     "fin": r.fin,
+                    "latence_ms": r.latence_ms,
+                    "forme_contenu": r.forme_contenu,
                 }
                 for r in appel.releves
             ],

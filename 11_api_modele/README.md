@@ -709,7 +709,9 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   fournisseur en échec : la question compte en échec, le run continue.
 - **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse`, magasin du
   module 10, écrit par l'interpréteur du module 10 : le module 11 n'installe pas
-  MLflow) ; ses pièces ne portent que des identifiants et des nombres — pour une
+  MLflow) ; ses pièces ne portent que des identifiants et des nombres — par appel,
+  sa latence (échecs compris) et la forme de `message.content` (son type ; en liste,
+  le type et la taille de chaque morceau) ; pour une
   sortie refusée par la route, sa forme (refus, nombre de séries citées, motif de
   refus) et, pour un nom de membre, ses **empreintes** (dans le message envoyé ou
   non, homonyme admis ou non), jamais le nom ni le texte. La ligne
@@ -803,7 +805,10 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
 - dire le champ qui borne les jetons de sortie, où `usage` range les jetons de
   raisonnement, et s'ils sont comptés dans les jetons de sortie ;
 - rendre la sortie dans `choices[0].message.content`, et `usage.prompt_tokens`,
-  `usage.completion_tokens` ;
+  `usage.completion_tokens` ; chez Mistral, un modèle qui raisonne rend `content` en
+  **morceaux typés** (page « Reasoning », docs.mistral.ai/capabilities/reasoning, lue le
+  2026-10-31) : l'adaptateur met bout à bout les morceaux `text` et ignore les morceaux
+  `thinking` (le raisonnement) ;
 - authentifier par `Authorization: Bearer` ; lister ses modèles sur `/v1/models` (pour le
   contrôle d'exploitation).
 

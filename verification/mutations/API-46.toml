@@ -1,0 +1,10 @@
+id = "API-46"
+origine = "E3 étape 3, spec 06 (2026-10-31) — la sortie de Mistral en morceaux typés non lue : un modèle qui raisonne finit sa réponse et la route rend 503 corps_inattendu (essai 3 de mistral-large-4)"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''        raisonnement_inclus=True,
+        morceaux_types=True,
+    ),'''
+apres = '''        raisonnement_inclus=True,
+    ),'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "morceaux_types_lit_le_texte"]
