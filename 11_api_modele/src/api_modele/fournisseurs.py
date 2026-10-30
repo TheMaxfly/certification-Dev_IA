@@ -84,13 +84,14 @@ ADAPTATEURS: dict[str, Adaptateur] = {
     # `reasoning_effort`, `response_format` (type `json_schema`) ; l'enveloppe du
     # schéma (`json_schema` : `name`, `schema`, `strict`) : documentation du client
     # officiel (github.com/mistralai/client-python, docs/sdks/chat/README.md). Les
-    # jetons de raisonnement dans `usage` : NON DOCUMENTÉS (non établi, à lever à
-    # l'appel d'essai de la spec 06) — comptés 0, sans effet sur les profils actuels
-    # (aucun effort fixé).
+    # jetons de raisonnement dans `usage`, non documentés, relevés à l'appel d'essai
+    # du 2026-10-28 (`mistral-large-4`, sans effort fixé) :
+    # `usage.completion_tokens_details.reasoning_tokens`, compris dans
+    # `completion_tokens` (400 = `max_tokens`, dont 399 de raisonnement).
     "mistral": Adaptateur(
         champ_longueur="max_tokens",
-        chemin_raisonnement=None,
-        raisonnement_inclus=False,
+        chemin_raisonnement=("completion_tokens_details", "reasoning_tokens"),
+        raisonnement_inclus=True,
     ),
     # OpenAI — lu le 2026-10-26 : référence « Create chat completion »
     # (developers.openai.com/api/reference) : `max_tokens` « deprecated in favor of
@@ -528,7 +529,17 @@ class Fournisseurs:
             donnees: object = reponse.json()
         except ValueError:
             donnees = None
-        texte = _lire(_premier_choix(donnees), ("message", "content"))
+        premier = _premier_choix(donnees)
+        if _lire(premier, ("finish_reason",)) == "length":
+            # La borne de longueur atteinte (le raisonnement compris) : la sortie est
+            # coupée, rien n'en est lu.
+            raise ErreurFournisseur(
+                "fournisseur_refus",
+                "Le fournisseur a atteint la longueur maximale avant la fin de la"
+                " sortie.",
+                details | {"motif": "longueur_atteinte"},
+            )
+        texte = _lire(premier, ("message", "content"))
         if not isinstance(texte, str):
             raise ErreurFournisseur(
                 "fournisseur_refus",

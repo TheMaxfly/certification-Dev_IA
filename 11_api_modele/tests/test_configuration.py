@@ -279,6 +279,7 @@ def test_le_fichier_versionne_declare_les_quatre_profils_et_la_route():
     assert (sol.reasoning_effort, sol.delai_s, sol.disponible) == ("none", 45.0, False)
     apercu = ml.profil("mistral-large-4")
     assert apercu is not None and apercu.statut == "apercu" and apercu.disponible
+    assert apercu.reasoning_effort == "none"
     r = ml.reponse
     assert (r.temperature.defaut, r.temperature.min, r.temperature.max) == (0, 0, 1)
     assert (r.longueur_max.defaut, r.longueur_max.min, r.longueur_max.max) == (

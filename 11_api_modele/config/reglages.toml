@@ -154,12 +154,12 @@ fournisseur = "mistral"
 modele = "mistral-large-4"
 adresse = "https://api.mistral.ai/v1/chat/completions"
 variable_cle = "MISTRAL_API_KEY"
-reglages_fixes = { top_p = 1.0 }
+reglages_fixes = { top_p = 1.0, reasoning_effort = "none" }
 reglages_absents = []
 prix_usd_par_million = { entree = 1.36, sortie = 4.18 }
 delai_s = 30.0
 statut = "apercu"
-motif = "Le modèle de pointe, en aperçu public (v26.10) : identifiant non daté, modèle mouvant ; chaque mesure porte la mention « aperçu ». Prix plein depuis la fin de la remise de lancement."
+motif = "Le modèle de pointe, en aperçu public (v26.10) : identifiant non daté, modèle mouvant ; chaque mesure porte la mention « aperçu ». Prix plein depuis la fin de la remise de lancement. reasoning_effort = none figé après l'appel d'essai du 2026-10-28 : sans effort fixé, le modèle raisonnait (399 des 400 jetons de sortie) et ne rendait pas le JSON."
 
 [modele_langage.profils.gpt-6-luna]
 fournisseur = "openai"

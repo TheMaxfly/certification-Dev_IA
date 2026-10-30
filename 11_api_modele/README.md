@@ -224,7 +224,7 @@ motif ; **un seul réglage désigne le profil actif** (`profil_actif`, surcharge
 | Profil | Fournisseur | Modèle | Statut | Hébergement | Prix (entrée / sortie, $ par million de jetons, relevés le 2026-10-26) | Réglages fixés | Réglages absents |
 |---|---|---|---|---|---|---|---|
 | `mistral-large-2512` (**actif**) | Mistral | `mistral-large-2512` (Large 3, daté) | stable | Union européenne | 0,50 / 1,50 | `top_p = 1` | aucun |
-| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1` | aucun |
+| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = none` (sans lui, le raisonnement épuisait la borne de sortie à l'appel d'essai) | aucun |
 | `gpt-6-luna` | OpenAI | `gpt-6-luna` | stable | hors Union européenne par défaut | 0,10 / 0,50 | `top_p = 1`, `reasoning_effort = none` | aucun (à confirmer à l'appel d'essai) |
 | `gpt-6-sol` | OpenAI | `gpt-6-sol` | stable | hors Union européenne par défaut | 2,00 / 10,00 | `top_p = 1`, `reasoning_effort = none` ; délai 45 s | aucun (à confirmer à l'appel d'essai) |
 
@@ -321,8 +321,8 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 
 **Non exposés**, fixés par profil ou par l'API, avec leur motif : `top_p` (fixé à 1 :
 Mistral conseille de régler l'un ou l'autre, et deux curseurs qui se compensent ne
-démontrent rien) ; l'effort de raisonnement (par profil : `none` chez OpenAI, pas de
-jetons de raisonnement) ; les pénalités de répétition (absentes chez Mistral) ; le
+démontrent rien) ; l'effort de raisonnement (par profil : `none` chez OpenAI et pour
+`mistral-large-4`, pas de jetons de raisonnement) ; les pénalités de répétition (absentes chez Mistral) ; le
 format de sortie (le schéma JSON de la route) ; l'invite système (une seule, pour tous
 les profils) ; la graine aléatoire (`temperature = 0` donne déjà le rejeu, et la graine
 n'est pas garantie chez OpenAI). La reformulation tourne à température 0 et 150 jetons,
@@ -583,7 +583,7 @@ statut ; les tests en produisent chacun (« Vérifier »).
 | 503 | `encodage_en_service_change` | une promotion ou un retour arrière a eu lieu depuis le démarrage : redémarrer l'API | `{"charge": 3, "en_service": 4}` |
 | 503 | `fournisseur_injoignable` | (réponse) connexion refusée, trop lente ou coupée | `{"profil": "…", "role": "reponse"}` |
 | 503 | `fournisseur_delai` | (réponse) le fournisseur n'a pas répondu dans le délai du profil | `{"profil": "…", "role": "reponse"}` |
-| 503 | `fournisseur_refus` | (réponse) le fournisseur a refusé l'appel (statut hors 2xx, 429 compris), ou rendu un corps inattendu | `{"profil": "…", "role": "reponse", "statut": 429, "code_fournisseur": "rate_limited"}` — **jamais le corps** |
+| 503 | `fournisseur_refus` | (réponse) le fournisseur a refusé l'appel (statut hors 2xx, 429 compris), rendu un corps inattendu (`motif` : `corps_inattendu`), ou atteint la borne de longueur avant la fin de la sortie (`longueur_atteinte`) | `{"profil": "…", "role": "reponse", "statut": 429, "code_fournisseur": "rate_limited"}` — **jamais le corps** |
 | 503 | `sortie_modele_invalide` | (réponse) la sortie du modèle ne tient pas le contrat | `{"motif": "…", "role": "reponse"}` (ou `"reformulation"`) |
 | 500 | `erreur_interne` | imprévu ; la trace est au journal, sous l'identifiant | `null` |
 

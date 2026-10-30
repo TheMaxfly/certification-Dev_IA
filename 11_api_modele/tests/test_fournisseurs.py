@@ -282,13 +282,23 @@ def test_une_sortie_avec_usage_et_raisonnement(tmp_path, doublures):
     assert sortie.latence_ms >= 0
 
 
-def test_une_sortie_mistral_sans_raisonnement_documente(tmp_path, doublures):
-    DoublureFournisseur.usage = {"prompt_tokens": 1000, "completion_tokens": 300}
+@pytest.mark.parametrize(
+    ("details", "jetons"),
+    [({}, (1000, 300, 0)), ({"reasoning_tokens": 100}, (1000, 200, 100))],
+)
+def test_une_sortie_mistral_et_son_raisonnement(tmp_path, doublures, details, jetons):
+    # Relevé à l'appel d'essai : Mistral range le raisonnement comme OpenAI, compris
+    # dans `completion_tokens`. Le coût ne change pas : même prix pour les deux.
+    DoublureFournisseur.usage = {
+        "prompt_tokens": 1000,
+        "completion_tokens": 300,
+        "completion_tokens_details": details,
+    }
 
     sortie = jouer(modele_langage(tmp_path, doublures), appeler("factice-a"))
 
     j = sortie.jetons
-    assert (j.entree, j.sortie, j.raisonnement, j.estimes) == (1000, 300, 0, False)
+    assert (j.entree, j.sortie, j.raisonnement, j.estimes) == (*jetons, False)
     assert sortie.cout_estime_usd == pytest.approx((1000 * 2 + 300 * 8) / 1e6)
     assert sortie.modele_rendu is None  # le modèle rendu est celui demandé
 
@@ -374,6 +384,29 @@ def test_un_corps_inattendu_est_un_refus(tmp_path, doublures, corps):
     assert exc.code == "fournisseur_refus"
     assert exc.details["motif"] == "corps_inattendu"
     assert exc.details["statut"] == 200
+
+
+@pytest.mark.parametrize("contenu", ['{"refus": fal', None])
+def test_la_longueur_atteinte_est_dite(tmp_path, doublures, contenu):
+    # Sortie coupée à la borne (le raisonnement l'a épuisée, ou le texte) : le motif
+    # le dit, même quand un texte partiel est rendu.
+    DoublureFournisseur.corps_brut = json.dumps(
+        {
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": contenu},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 400},
+        }
+    ).encode()
+
+    exc = erreur(modele_langage(tmp_path, doublures), "factice-a")
+
+    assert exc.code == "fournisseur_refus"
+    assert (exc.details["motif"], exc.details["statut"]) == ("longueur_atteinte", 200)
 
 
 def test_une_reponse_trop_lente_depasse_le_delai(tmp_path, doublures):

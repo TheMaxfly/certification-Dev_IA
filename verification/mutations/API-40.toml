@@ -1,0 +1,7 @@
+id = "API-40"
+origine = "E3 étape 3, spec 06 (2026-10-30) — la longueur atteinte non reconnue : une sortie coupée par la borne passerait pour un corps inattendu"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''        if _lire(premier, ("finish_reason",)) == "length":'''
+apres = '''        if _lire(premier, ("finish_reason",)) == "longueur":'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "longueur_atteinte_est_dite"]

@@ -1,0 +1,13 @@
+id = "API-41"
+origine = "E3 étape 3, spec 06 (2026-10-30) — le raisonnement de Mistral ignoré : la trace le compterait en sortie visible"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''        chemin_raisonnement=("completion_tokens_details", "reasoning_tokens"),
+        raisonnement_inclus=True,
+    ),
+    # OpenAI'''
+apres = '''        chemin_raisonnement=None,
+        raisonnement_inclus=False,
+    ),
+    # OpenAI'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "sortie_mistral_et_son_raisonnement"]
