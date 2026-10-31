@@ -224,9 +224,9 @@ motif ; **un seul réglage désigne le profil actif** (`profil_actif`, surcharge
 | Profil | Fournisseur | Modèle | Statut | Hébergement | Prix (entrée / sortie, $ par million de jetons, relevés le 2026-10-26) | Réglages fixés | Réglages absents |
 |---|---|---|---|---|---|---|---|
 | `mistral-large-2512` (**actif**) | Mistral | `mistral-large-2512` (Large 3, daté) | stable | Union européenne | 0,50 / 1,50 | `top_p = 1` | aucun |
-| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = low` (sans effort fixé, le raisonnement épuisait la borne de sortie à l'appel d'essai ; `none` refusé par Mistral) ; `longueur_max` 2 000 (1 101 jetons de raisonnement mesurés le 31 octobre) | aucun |
-| `gpt-6-luna` | OpenAI | `gpt-6-luna` | stable | hors Union européenne par défaut | 0,10 / 0,50 | `top_p = 1`, `reasoning_effort = none` | aucun (à confirmer à l'appel d'essai) |
-| `gpt-6-sol` | OpenAI | `gpt-6-sol` | stable | hors Union européenne par défaut | 2,00 / 10,00 | `top_p = 1`, `reasoning_effort = none` ; délai 45 s | aucun (à confirmer à l'appel d'essai) |
+| `mistral-large-4` | Mistral | `mistral-large-4` | **aperçu** (modèle mouvant) | Union européenne | 1,36 / 4,18 | `top_p = 1`, `reasoning_effort = low` (sans effort fixé, le raisonnement épuisait la borne de sortie à l'appel d'essai ; `none` refusé par Mistral) ; `longueur_max` 2 000 (1 101 jetons de raisonnement mesurés le 31 octobre) ; sortie en morceaux typés (raisonnement, puis texte) | aucun |
+| `gpt-6-luna` | OpenAI | `gpt-6-luna` | stable | hors Union européenne par défaut | 0,10 / 0,50 | `top_p = 1`, `reasoning_effort = none` | aucun (`temperature` 0,7 acceptée à l'appel d'essai) |
+| `gpt-6-sol` | OpenAI | `gpt-6-sol` | stable | hors Union européenne par défaut | 2,00 / 10,00 | `top_p = 1`, `reasoning_effort = none` ; délai 45 s | aucun (`temperature` 0,7 acceptée à l'appel d'essai) |
 
 - **Ordre de repli, à la main** : Large 3 (actif) → Large 4 si l'on veut le modèle de
   pointe ou si Large 3 est muet → Luna ou Sol si Mistral entier est injoignable.
@@ -245,7 +245,8 @@ motif ; **un seul réglage désigne le profil actif** (`profil_actif`, surcharge
   appel (`fournisseur_refus`), ou par le contrôle d'exploitation lancé à la main
   (`API_MODELE_VERIFIER_MODELES=1` : `/v1/models` de chaque fournisseur, un identifiant
   absent rend son profil indisponible, le profil actif absent empêche le démarrage).
-- **Un profil ne sert en démonstration qu'après sa mesure** (étape 3, spec de mesure).
+- **Un profil ne sert en démonstration qu'après sa mesure** (étape 3, spec de mesure) :
+  les quatre profils sont mesurés et tiennent le critère (« Résultats de la mesure »).
 
 ## Changer de profil
 
@@ -266,7 +267,8 @@ son corpus d'essai et une doublure du fournisseur) : **2,1 à 2,2 s** du redéma
 l'API au contrôle (`/v1/info` et la métrique), procédure répétée trois fois dans chaque
 sens. En service, le redémarrage ajoute le chargement des vecteurs de l'encodage en
 service (77 006 en 17 s, mesuré le 2026-10-20) : compter une vingtaine de secondes. Le
-chronométrage avec un fournisseur réel se fera après le premier appel d'essai.
+chronométrage en service avec un fournisseur réel reste à faire : les runs de mesure
+tournent dans un processus de banc, sans changement de profil en service.
 
 **Revenir** : la même procédure, avec l'ancien profil (ou la variable retirée : le
 profil actif de `reglages.toml`). Une requête peut aussi, sans changer le profil actif,
@@ -732,6 +734,42 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   citée que le texte ne marque pas est comptée à part (`citees_sans_marque`).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
+
+## Résultats de la mesure (2026-10-30)
+
+Jeu v2 gelé (`31712b0d…`), réglages par défaut (`temperature` 0, strict, 5 séries ×
+2 passages, catalogue seul), sans historique ; un run MLflow par profil (expérience
+`E3-reponse`). Nombres entiers sur 5 : cinq questions par famille ne départagent pas,
+aucun test statistique n'est fait.
+
+| Profil | Questions | Refus corrects F7 | Hors catalogue | Séries inventées | Sorties invalides | Coût réel | Latence du modèle, médiane | Critère |
+|---|---|---|---|---|---|---|---|---|
+| `mistral-large-2512` | 26 (F7, hors catalogue, F9, F10) | **5 / 5** | **5 / 5** | 0 | 0 | 0,041 $ | 3,6 s | **tenu** |
+| `mistral-large-4` (aperçu ; `low`, 2 000 jetons) | 10 | **5 / 5** | **4 / 5** (une sortie coupée à la borne) | 0 | 0 | 0,081 $ | 7,8 s | **tenu** |
+| `gpt-6-luna` | 10 | **4 / 5** | **5 / 5** | 0 | 0 | 0,003 $ | 1,7 s | **tenu** |
+| `gpt-6-sol` | 10 | **5 / 5** | **5 / 5** | 0 | 0 | 0,058 $ | 1,5 s | **tenu** |
+
+- **F9 et F10** (profil actif, première mesure, sans seuil) : au moins une série
+  attendue parmi les citées pour 1 question sur 16 ; la recherche ne rend une série
+  attendue dans ses dix premières que pour 2 questions sur 16 (le chiffre de la
+  mesure 8, recalculé). Le titre du catalogue accompagne 32 des 34 séries citées dans
+  le texte du modèle, avant l'insertion par la route.
+- **Ce que la première mesure a corrigé** (profil actif, F7 à 2 / 5) : le modèle
+  refusait les cinq questions F7, mais trois refus citaient des séries, ou reprenaient
+  un nom de la question qui est aussi un pseudonyme. D'où trois corrections, chacune
+  motivée par un relevé : en cas de refus, `series_citees` reste vide ; un homonyme
+  admis peut venir de la question de la requête (« Sécurité et données ») ; deux ou
+  trois séries au plus, deux phrases par série. Remesuré ensuite : 5 / 5.
+- **Réglages confirmés par les appels d'essai** : `temperature` acceptée par les
+  quatre profils (0 partout, 0,7 essayée chez OpenAI) : aucun réglage absent ;
+  `reasoning_effort = none` **refusé** par Mistral pour `mistral-large-4` (admis :
+  `low`, `medium`, `high`), d'où `low` ; à `low`, ce modèle raisonne de 530 à plus de
+  2 000 jetons selon l'appel (1 101 puis 2 405 sur la même question), d'où sa
+  `longueur_max` de 2 000 et une sortie sur dix coupée à la borne ; sa sortie arrive
+  en morceaux typés. Chez Mistral comme chez OpenAI, les jetons de raisonnement sont
+  comptés dans `completion_tokens` (vérifié chez Mistral ; chez OpenAI, aucun jeton de
+  raisonnement à l'effort `none`).
+- **Coût de toute la mesure** (appels d'essai et runs) : 102 appels, 0,30 $.
 
 ## Les traces
 
