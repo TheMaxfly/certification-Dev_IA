@@ -20,7 +20,7 @@ import re
 import statistics
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
@@ -59,6 +59,12 @@ MENTION_HORS_CATALOGUE = re.compile(
 NGRAMME = 8
 #: Pause entre deux questions d'un run (débit des fournisseurs).
 PAUSE_S = 1.0
+#: Un refus de débit du fournisseur dans un scénario : le tour se rejoue après cette
+#: attente, `REPRISES_DEBIT` fois au plus. La route, elle, ne réessaie pas.
+STATUT_DEBIT = 429
+TYPE_DEBIT = "rate_limited"
+ATTENTE_DEBIT_S = 10.0
+REPRISES_DEBIT = 3
 
 
 class Client(Protocol):
@@ -654,15 +660,15 @@ def premiere_serie(banc_: Banc, question: str) -> int | None:
     return series[0].serie_id if series else None
 
 
-def serie_en_tete(appel: Appel) -> tuple[int, str] | None:
+def serie_en_tete(appel: Appel, titres: Mapping[int, str]) -> tuple[int, str] | None:
     """La série citée en tête d'une réponse rendue : sa première marque `[S:<id>]` et
-    son titre du catalogue ; `None` si le texte n'en porte aucune."""
+    son titre, lu dans `titres` (les séries rendues depuis le début du scénario : la
+    marque peut venir de l'historique) ; `None` si le texte n'en porte aucune."""
     marque = MARQUE_SERIE.search(appel.texte or "")
     if marque is None:
         return None
     serie_id = int(marque.group(1))
-    titres = {s["serie_id"]: s["titre"] for s in appel.corps["series"]}
-    return serie_id, cast(str, titres.get(serie_id, ""))
+    return serie_id, titres.get(serie_id, "")
 
 
 def nommee_par(reformulee: str, serie_id: int, titre: str) -> str | None:
@@ -682,6 +688,25 @@ def erreur_du_fournisseur(r: Releve) -> dict[str, str]:
     return {k: v for k, v in (r.erreur or {}).items() if k in ("code", "type")}
 
 
+def refus_de_debit(appel: Appel) -> bool:
+    """Le fournisseur a-t-il refusé pour débit : un 429 `rate_limited`, rien d'autre."""
+    return any(
+        r.statut == STATUT_DEBIT and (r.erreur or {}).get("type") == TYPE_DEBIT
+        for r in appel.releves
+    )
+
+
+def demander_le_tour(banc_: Banc, corps: dict[str, object]) -> list[Appel]:
+    """Les tentatives d'un tour, la dernière fait foi : la requête, rejouée après
+    `ATTENTE_DEBIT_S` tant que le fournisseur refuse pour débit, `REPRISES_DEBIT` fois
+    au plus. Rejouer refait la reformulation, payée à chaque tentative."""
+    tentatives = [demander(banc_, corps)]
+    while refus_de_debit(tentatives[-1]) and len(tentatives) <= REPRISES_DEBIT:
+        banc_.dormir(ATTENTE_DEBIT_S)
+        tentatives.append(demander(banc_, corps))
+    return tentatives
+
+
 def scenarios(
     banc_: Banc, profil: Profil, tours: Sequence[Tour], plafond: float
 ) -> Run:
@@ -694,16 +719,21 @@ def scenarios(
     run = Run(profil.nom)
     historiques: dict[str, list[dict[str, str]]] = {}
     tetes: dict[str, tuple[int, str] | None] = {}
+    titres: dict[str, dict[int, str]] = {}
     for numero, t in enumerate(tours):
         if numero:
             banc_.dormir(banc_.pause_s)
         historique = historiques.setdefault(t.scenario, [])
+        connus = titres.setdefault(t.scenario, {})
         corps: dict[str, object] = {"question": t.question, "profil": profil.nom}
         if historique:
             corps["historique"] = list(historique)
-        appel = demander(banc_, corps)
-        run.noter(appel)
-        run.cout_reel_usd += appel.cout(profil, cpj)
+        tentatives = demander_le_tour(banc_, corps)
+        appel = tentatives[-1]
+        cout = sum(a.cout(profil, cpj) for a in tentatives)
+        for a in tentatives:
+            run.noter(a)
+        run.cout_reel_usd += cout
         cle = f"{t.scenario}-{t.tour}"
         ligne: dict[str, object] = {
             "scenario": t.scenario,
@@ -713,17 +743,20 @@ def scenarios(
             "code": appel.code,
             "motif": appel.motif,
             "pseudonymes": appel.pseudonymes,
-            "cout_usd": round(appel.cout(profil, cpj), 6),
+            "cout_usd": round(cout, 6),
+            "tentatives": len(tentatives),
             "appels": [
-                a | {"erreur": erreur_du_fournisseur(r)}
-                for a, r in zip(
-                    appels_de(appel, profil, cpj), appel.releves, strict=True
+                ligne_appel | {"tentative": rang, "erreur": erreur_du_fournisseur(r)}
+                for rang, a in enumerate(tentatives, 1)
+                for ligne_appel, r in zip(
+                    appels_de(a, profil, cpj), a.releves, strict=True
                 )
             ],
         }
         if appel.statut == 200:
             c = appel.corps["contexte"]
             reformulee = c.get("question_reformulee")
+            connus.update({s["serie_id"]: s["titre"] for s in appel.corps["series"]})
             ligne["refus"] = appel.corps["refus"]
             ligne["reformulation_faite"] = isinstance(reformulee, str)
             if historique:
@@ -753,7 +786,7 @@ def scenarios(
                 if isinstance(reformulee, str):
                     run.textes[f"{cle} (question reformulée)"] = reformulee
         run.par_question.append(ligne)
-        tetes[t.scenario] = serie_en_tete(appel)
+        tetes[t.scenario] = serie_en_tete(appel, connus)
         historique.append({"role": "libraire", "contenu": t.question})
         historique.append(
             {"role": "assistant", "contenu": appel.texte or "(pas de réponse)"}

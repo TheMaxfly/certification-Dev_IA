@@ -34,12 +34,15 @@ from conftest import (
 from fastapi.testclient import TestClient
 
 from api_modele.banc_reponse import __main__ as cli
-from api_modele.banc_reponse import enregistrement, jeu, journal_mlflow
+from api_modele.banc_reponse import enregistrement, jeu, journal_mlflow, mesure
 from api_modele.banc_reponse.espion import Espion, Releve, nombres
 from api_modele.banc_reponse.mesure import (
+    ATTENTE_DEBIT_S,
+    Appel,
     Banc,
     PlafondDepasse,
     Run,
+    Tour,
     essai,
     estimer,
     garder_plafond,
@@ -914,18 +917,127 @@ def test_les_scenarios_gardent_le_refus_du_fournisseur(
 ):
     """Statut et code d'erreur de chaque appel ; jamais le message du fournisseur."""
     message = "le texte envoyé, repris par le fournisseur"
-    DoublureFournisseur.statut = 429
+    DoublureFournisseur.statut = 400
     DoublureFournisseur.corps_brut = json.dumps(
-        {"message": message, "type": "rate_limited", "param": None, "code": "1300"}
+        {"message": message, "type": "invalide", "param": None, "code": "3051"}
     ).encode()
     tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
     run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
     assert run.statut == "interrompu"
     (ligne,) = run.par_question
     (appel,) = cast(list[dict[str, object]], ligne["appels"])
-    assert (appel["role"], appel["statut"]) == ("reponse", 429)
-    assert appel["erreur"] == {"code": "1300", "type": "rate_limited"}
+    assert (appel["role"], appel["statut"]) == ("reponse", 400)
+    assert appel["erreur"] == {"code": "3051", "type": "invalide"}
     assert message not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def corps_de_refus(type_: str) -> bytes:
+    return json.dumps(
+        {"message": "m", "type": type_, "param": None, "code": "1300"}
+    ).encode()
+
+
+def test_un_refus_de_debit_rejoue_le_tour(banc_: Banc, doublures: Doublures, tmp_path):
+    """Un 429 `rate_limited`, puis le fournisseur rend : le tour se rejoue après
+    l'attente, le run continue, les deux tentatives restent au relevé."""
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    attentes: list[float] = []
+
+    def dormir(duree: float) -> None:
+        attentes.append(duree)
+        if duree == ATTENTE_DEBIT_S:
+            DoublureFournisseur.statut = 200
+            DoublureFournisseur.corps_brut = None
+
+    banc_.dormir = dormir
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "termine" and len(run.par_question) == 10
+    assert attentes.count(ATTENTE_DEBIT_S) == 1
+    premier = run.par_question[0]
+    assert (premier["statut"], premier["tentatives"]) == (200, 2)
+    appels = cast(list[dict[str, object]], premier["appels"])
+    assert [(a["tentative"], a["statut"]) for a in appels] == [(1, 429), (2, 200)]
+    assert appels[0]["erreur"] == {"code": "1300", "type": "rate_limited"}
+    assert run.par_question[1]["tentatives"] == 1
+
+
+def test_un_refus_de_debit_qui_dure_interrompt_le_run(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert (run.statut, run.motif_interruption) == ("interrompu", "fournisseur_refus")
+    (ligne,) = run.par_question
+    assert attentes == [ATTENTE_DEBIT_S] * 3
+    assert ligne["tentatives"] == 4
+    assert len(cast(list[object], ligne["appels"])) == 4
+    assert len(doublures.recus()) == 4
+
+
+@pytest.mark.parametrize(("statut", "type_"), [(429, "autre"), (500, "rate_limited")])
+def test_un_autre_refus_ne_rejoue_pas_le_tour(
+    banc_: Banc, doublures: Doublures, tmp_path, statut, type_
+):
+    DoublureFournisseur.statut = statut
+    DoublureFournisseur.corps_brut = corps_de_refus(type_)
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "interrompu" and attentes == []
+    assert run.par_question[0]["tentatives"] == 1
+
+
+def test_la_marque_venue_de_l_historique_se_compare_par_le_titre(
+    banc_: Banc, monkeypatch
+):
+    """La réponse du deuxième tour marque une série qu'elle n'a pas reçue : son titre
+    vient de ce que le scénario a rendu avant, et la reformulation le nomme."""
+
+    def rendu(texte: str, serie: tuple[int, str], reformulee: str | None) -> Appel:
+        contexte = dict.fromkeys(
+            ("reglages", "reglages_appliques", "corpus_id", "encodage_id"), "x"
+        ) | {
+            "version_api": "x",
+            "date_appel": "x",
+            "question_reformulee": reformulee,
+        }
+        corps = {
+            "refus": False,
+            "series": [{"serie_id": serie[0], "titre": serie[1]}],
+            "contexte": contexte,
+        }
+        return Appel(200, corps, [], texte=texte)
+
+    appels = iter(
+        [
+            rendu("Sorairo Kaigan [S:13588].", (13588, "Sorairo Kaigan"), None),
+            rendu(
+                "Sorairo Kaigan [S:13588], puis Shortcakes [S:2221].",
+                (2221, "Shortcakes"),
+                "Lequel ?",
+            ),
+            rendu(
+                "Shortcakes [S:2221].",
+                (2221, "Shortcakes"),
+                "Shortcakes est-il court, comme sorairo kaigan ?",
+            ),
+        ]
+    )
+    monkeypatch.setattr(mesure, "demander", lambda *_: next(appels))
+    monkeypatch.setattr(mesure, "premiere_serie", lambda *_: 2221)
+    tours = [Tour("S1", n, "q", "a", None) for n in (1, 2, 3)]
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    troisieme = run.par_question[2]
+    assert troisieme["serie_en_tete_precedente"] == 13588
+    assert troisieme["reformulation_fidele"] is True
+    assert troisieme["fidele_par"] == "titre"
 
 
 def test_les_scenarios_gardent_chaque_appel_rendu(
