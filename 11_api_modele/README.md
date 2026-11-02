@@ -48,7 +48,8 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
   mode strict dirait ;
 - **conversation courte** : l'historique (au plus 5 questions-réponses, 10 tours) vient
   avec chaque requête ; un premier appel au modèle en tire une question autonome, sans
-  critère absent de la conversation, qui part seule dans la recherche ;
+  critère absent de la conversation ni critère d'un tour précédent auquel le dernier tour
+  ne renvoie pas, qui part seule dans la recherche ;
 - **sorties contrôlées** : la sortie du modèle est contrainte par un schéma JSON, puis
   relue par l'API — séries et fragments cités, cohérence du refus, **aucun nom de
   membre**. Une sortie fautive n'est ni rendue ni journalisée.
@@ -787,7 +788,9 @@ aucun test statistique n'est fait.
 Deux phrases ajoutées aux invites après lecture des réponses : la réponse n'affirme
 aucune métadonnée que les passages n'écrivent pas ; la reformulation n'ajoute aucun
 critère absent de la conversation. **Seul le profil actif est remesuré : les trois profils
-de repli restent mesurés sur l'invite d'avant**, sans le nouvel essai de la route.
+de repli restent mesurés sur l'invite d'avant**, sans le nouvel essai de la route. Une
+phrase de plus, ajoutée à la reformulation après ce rejeu contre le report de critères
+d'un tour sur le suivant, n'est pas mesurée.
 
 | Profil | Questions | Refus corrects F7 | Hors catalogue | Séries inventées | Sorties invalides | Coût réel | Latence du modèle, médiane | Critère |
 |---|---|---|---|---|---|---|---|---|

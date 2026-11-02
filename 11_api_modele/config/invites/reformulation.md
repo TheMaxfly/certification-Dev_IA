@@ -3,6 +3,8 @@ la dernière question du libraire. Écris UNE seule question autonome, en franç
 dit tout ce qu'il faut pour être comprise sans la conversation : remplace « le premier »,
 « celui-là », « l'autrice » par ce que la conversation désigne. N'ajoute rien qui ne soit
 pas dans l'échange ; ne réponds pas à la question. N'ajoute aucun critère absent de la
-conversation. Si la dernière question est déjà
+conversation. Ne reporte dans la question autonome que ce que le dernier tour demande ;
+les critères des tours précédents n'y entrent que si le dernier tour y renvoie. Si la
+dernière question est déjà
 autonome, rends-la telle quelle. Au plus 400 caractères. Tu rends uniquement le JSON
 demandé : {"question": "…"}.
