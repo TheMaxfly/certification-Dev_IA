@@ -25,14 +25,23 @@
 --   que des libellés de page. `volume_publication_date` non plus, seule : elle date toutes
 --   les éditions, japonaises comprises.
 --
--- `nb_volumes`, `nb_volumes_source` : la définition d du jeu d'évaluation.
---   champ                   le plus grand « tomes parus » (`volume_tomes_published`) des
---                           volumes de la série ; 0 vaut absence ;
---   repli_volumes_distincts sinon, les numéros de volume distincts, un volume sans numéro
---                           comptant comme le volume 1. Il mêle les éditions : il surcompte
---                           les rééditions renumérotées et sous-compte une série dont le
---                           catalogue n'a qu'une partie des tomes.
---   Le champ ne dit pas de quelle édition il parle.
+-- `nb_volumes` : le plus grand de deux comptes, 0 valant absence pour le premier.
+--   le champ    le plus grand « tomes parus » (`volume_tomes_published`) des volumes de la
+--               série. Il ne dit pas de quelle édition il parle, et il est plus petit que
+--               les numéros sur 112 séries (Ippo : 30 pour 136 ; Black Lagoon : 1 pour 13) ;
+--   les numéros les numéros de volume distincts, un volume sans numéro comptant comme le
+--               volume 1. Ils mêlent les éditions (Akira : 31 pour un champ à 6), comptent
+--               un numéro qui est une année (Blue : 2018) et sous-comptent une série dont
+--               le catalogue n'a qu'une partie des tomes.
+--   Sur ces 112 séries, la vue s'écarte de la définition d du jeu d'évaluation (le champ,
+--   sinon les numéros), qui reste celle du jeu gelé.
+--
+-- `nb_volumes_source` : ce que vaut ce nombre.
+--   divergent               les deux comptes existent et s'écartent de plus de 20 % du
+--                           plus grand ;
+--   champ                   sinon, le champ est au moins égal aux numéros ;
+--   repli_volumes_distincts sinon : les numéros sont plus grands, ou le champ est absent.
+--   Toute source autre que `champ` se lit comme un minimum : « au moins N ».
 --
 -- `statut` :
 --   termine  le badge « Complète » de `series_statuses`, français ou non ; sinon, le statut
@@ -74,9 +83,12 @@ SELECT s.series_id,
                THEN 'seulement_au_japon'
            ELSE 'inconnue'
        END AS disponibilite,
-       coalesce(v.tomes_parus, v.numeros_distincts)::integer AS nb_volumes,
+       greatest(v.tomes_parus, v.numeros_distincts)::integer AS nb_volumes,
        CASE
-           WHEN v.tomes_parus IS NOT NULL THEN 'champ'
+           WHEN abs(v.tomes_parus - v.numeros_distincts)
+                > 0.2 * greatest(v.tomes_parus, v.numeros_distincts)
+               THEN 'divergent'
+           WHEN v.tomes_parus >= v.numeros_distincts THEN 'champ'
            WHEN v.numeros_distincts IS NOT NULL THEN 'repli_volumes_distincts'
        END AS nb_volumes_source,
        CASE
@@ -117,9 +129,11 @@ COMMENT ON VIEW manga.v_metadonnees_serie IS
     'disponibilite : edite_en_france si un volume porte un EAN français (9782, 97910) ou '
     'si la fiche porte le badge « français », seulement_au_japon pour un Manga à volumes '
     'sans cela, inconnue sinon ; édité ne veut pas dire en stock. '
-    'nb_volumes : le plus grand « tomes parus » (nb_volumes_source = champ), sinon les '
-    'numéros distincts, un volume sans numéro comptant pour le 1 '
-    '(repli_volumes_distincts, toutes éditions mêlées). '
+    'nb_volumes : le plus grand du champ « tomes parus » et des numéros distincts, un '
+    'volume sans numéro comptant pour le 1, toutes éditions mêlées. '
+    'nb_volumes_source : divergent si les deux existent et s''écartent de plus de 20 % du '
+    'plus grand, champ si le champ est au moins égal aux numéros, repli_volumes_distincts '
+    'sinon ; toute source autre que champ se lit comme un minimum, « au moins N ». '
     'statut : termine sur le badge « Complète » ou Kitsu finished, en_cours sur Kitsu '
     'current sans badge ; le catalogue n''écrit jamais « en cours ». '
     'demographie : series_category_clean, sinon series_category s''il porte une valeur de '

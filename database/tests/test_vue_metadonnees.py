@@ -118,12 +118,12 @@ def test_025_n_accorde_a_modele_ro_que_la_vue(base):
 def test_la_vue_se_lit_sous_le_role_de_l_api(base_migree, modele_api):  # noqa: F811
     with psycopg.connect(base_migree) as admin:
         serie(admin, categorie_propre="Seinen", badges=[BADGE_FR])
-        volume(admin, ean=EAN_FR, tomes=3, date="2015-06-01")
+        volume(admin, ean=EAN_FR, tomes=1, date="2015-06-01")
     with psycopg.connect(modele_api) as connexion:
         assert metadonnees(connexion) == {
             "series_id": 1,
             "disponibilite": "edite_en_france",
-            "nb_volumes": 3,
+            "nb_volumes": 1,
             "nb_volumes_source": "champ",
             "statut": "termine",
             "demographie": "Seinen",
@@ -174,7 +174,14 @@ def test_la_vue_a_ses_sept_colonnes_et_lit_avec_les_droits_de_son_proprietaire(
     assert lues == COLONNES
     # Élévation déclarée (comme 024) : pas `security_invoker`.
     assert not any("security_invoker" in o for o in options or [])
-    for regle in ("edite_en_france", "seulement_au_japon", "en stock", "Migration 025"):
+    for regle in (
+        "edite_en_france",
+        "seulement_au_japon",
+        "en stock",
+        "divergent",
+        "au moins N",
+        "Migration 025",
+    ):
         assert regle in commentaire, regle
 
 
@@ -294,16 +301,54 @@ def test_hors_manga_avec_edition_francaise_la_disponibilite_reste_connue(
         assert metadonnees(admin)["disponibilite"] == "edite_en_france"
 
 
-def test_tomes_le_champ_prend_le_plus_grand_et_passe_avant_le_repli(base_migree):
+def test_tomes_le_champ_est_le_plus_grand_des_lignes(base_migree):
     with psycopg.connect(base_migree) as admin:
         serie(admin)
-        volume(admin, url="a", numero=1, tomes=16)
-        volume(admin, url="b", numero=2, tomes=30)
+        volume(admin, url="a", numero=1, tomes=2)
+        volume(admin, url="b", numero=2, tomes=3)
         volume(admin, url="c", numero=3)
 
         lu = metadonnees(admin)
 
-    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (30, "champ")
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (3, "champ")
+
+
+@pytest.mark.parametrize(
+    ("champ", "numeros", "nb_volumes", "source"),
+    (
+        (3, 3, 3, "champ"),
+        (5, 4, 5, "champ"),  # écart de 20 % du plus grand : pas « plus de »
+        (4, 5, 5, "repli_volumes_distincts"),  # idem, de l'autre côté
+        (5, 3, 5, "divergent"),
+        (3, 4, 4, "divergent"),  # 1 sur 4 : juste au-dessus
+        (1, 13, 13, "divergent"),  # Black Lagoon
+        (31, 6, 31, "divergent"),
+    ),
+)
+def test_tomes_le_plus_grand_des_deux_et_ce_qu_il_vaut(
+    base_migree, champ, numeros, nb_volumes, source
+):
+    with psycopg.connect(base_migree) as admin:
+        serie(admin)
+        volume(admin, url="v1", numero=1, tomes=champ)
+        for numero in range(2, numeros + 1):
+            volume(admin, url=f"v{numero}", numero=numero)
+
+        lu = metadonnees(admin)
+
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (nb_volumes, source)
+
+
+def test_tomes_un_numero_qui_est_une_annee_compte_pour_un_de_plus(base_migree):
+    """Limite écrite : un seul tome, deux éditions dont l'une numérotée 2018."""
+    with psycopg.connect(base_migree) as admin:
+        serie(admin)
+        volume(admin, url="a", numero=None, tomes=1)
+        volume(admin, url="b", numero=2018, tomes=1)
+
+        lu = metadonnees(admin)
+
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (2, "divergent")
 
 
 @pytest.mark.parametrize("tomes", (None, 0))
