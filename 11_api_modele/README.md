@@ -34,7 +34,8 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
 - **mode strict** : la réponse n'affirme que ce que disent les passages rendus par la
   recherche, et ne cite que des séries de cette recherche et leurs passages — chacun lui
   est montré avec son identifiant, `[F:<fragment_id>]`, qu'il recopie dans
-  `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit ;
+  `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit, métadonnées
+  comprises : nombre de tomes, auteur, éditeur, année, disponibilité en France, édition ;
 - **chaque série citée porte son titre** : l'invite demande le titre devant
   `[S:<serie_id>]` ; quand le modèle l'omet (ni juste avant ni juste après la marque,
   casse, espaces, emphase, guillemets et ponctuation ignorés), la route insère le titre
@@ -46,8 +47,8 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
   refuse **sans appeler le modèle** : c'est gratuit, déterministe, et c'est ce que le
   mode strict dirait ;
 - **conversation courte** : l'historique (au plus 5 questions-réponses, 10 tours) vient
-  avec chaque requête ; un premier appel au modèle en tire une question autonome, qui
-  part seule dans la recherche ;
+  avec chaque requête ; un premier appel au modèle en tire une question autonome, sans
+  critère absent de la conversation, qui part seule dans la recherche ;
 - **sorties contrôlées** : la sortie du modèle est contrainte par un schéma JSON, puis
   relue par l'API — séries et fragments cités, cohérence du refus, **aucun nom de
   membre**. Une sortie fautive n'est ni rendue ni journalisée.
