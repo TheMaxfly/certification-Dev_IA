@@ -4,11 +4,13 @@ fichier = "11_api_modele/src/api_modele/fournisseurs.py"
 avant = '''        chemin_raisonnement=("completion_tokens_details", "reasoning_tokens"),
         raisonnement_inclus=True,
         morceaux_types=True,
+        type_debit="rate_limited",
     ),
     # OpenAI'''
 apres = '''        chemin_raisonnement=None,
         raisonnement_inclus=False,
         morceaux_types=True,
+        type_debit="rate_limited",
     ),
     # OpenAI'''
 dossier = "11_api_modele"

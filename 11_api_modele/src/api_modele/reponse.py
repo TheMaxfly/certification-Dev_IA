@@ -2,6 +2,10 @@
 
 1. Avant tout appel : le profil (déclaré, disponible) et les réglages qu'il n'expose
    pas (422) ; l'entrée elle-même est validée par sa forme (`DemandeReponse`).
+Sur un refus de débit du fournisseur (`rate_limited`), et rien d'autre : un seul nouvel
+essai de l'appel refusé, après `Retry-After` (sinon 2 s), tracé dans `appels` ; refusé
+encore, ou `Retry-After` au-delà de 10 s, le 503 `fournisseur_refus`.
+
 2. Reformulation, s'il y a un historique et que `reformuler` est vrai : un premier
    appel écrit une question autonome (température 0, 150 jetons, fixés). Plus de 500
    caractères : la recherche se fait sur la question d'origine
@@ -28,6 +32,7 @@ journal ; seuls leurs nombres et les codes, par la ligne de la requête.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from collections.abc import Mapping
@@ -79,6 +84,10 @@ TEMPERATURE_REFORMULATION = 0.0
 LONGUEUR_REFORMULATION = 150
 #: Au-delà, la question reformulée n'est pas envoyée à la recherche.
 REFORMULATION_MAX = 500
+#: Un refus de débit : le nouvel essai, après `Retry-After`, sinon après cette attente.
+ATTENTE_DEBIT_S = 2.0
+#: Au-delà, pas de nouvel essai : le 503, plutôt qu'une requête qui reste ouverte.
+ATTENTE_DEBIT_MAX_S = 10.0
 LIBELLES = {
     "critique": "critique de tome",
     "synopsis_kitsu": "synopsis",
@@ -218,12 +227,14 @@ class Deroulement:
 
     def __init__(self, suivi: dict[str, object]) -> None:
         self.sorties: list[tuple[Role, Sortie]] = []
+        self.traces: list[AppelModele] = []
         self.latence_reformulation: float | None = None
         self.latence_modele: float | None = None
         self.suivi = suivi
 
-    def appels(self) -> list[AppelModele]:
-        return [
+    def noter_sortie(self, role: Role, s: Sortie) -> None:
+        self.sorties.append((role, s))
+        self.traces.append(
             AppelModele(
                 role=role,
                 jetons_entree=s.jetons.entree,
@@ -232,14 +243,44 @@ class Deroulement:
                 estimes=s.jetons.estimes,
                 latence_ms=s.latence_ms,
             )
-            for role, s in self.sorties
-        ]
+        )
+
+    def noter_refus_de_debit(self, role: Role, latence_ms: float) -> None:
+        """Un appel refusé pour débit : aucun jeton, rien au coût."""
+        self.traces.append(
+            AppelModele(
+                role=role,
+                jetons_entree=0,
+                jetons_sortie=0,
+                jetons_raisonnement=0,
+                estimes=False,
+                latence_ms=latence_ms,
+                statut="refus_debit",
+            )
+        )
 
     def cout(self) -> float | None:
         couts = [s.cout_estime_usd for _, s in self.sorties]
         if any(c is None for c in couts):
             return None
         return sum((c for c in couts if c is not None), 0.0)
+
+
+async def dormir(secondes: float) -> None:
+    await asyncio.sleep(secondes)
+
+
+def attente_de_debit(exc: ErreurFournisseur) -> float | None:
+    """L'attente avant le nouvel essai ; None s'il n'y en a pas : un autre refus, ou
+    un `Retry-After` au-delà de `ATTENTE_DEBIT_MAX_S`."""
+    if not exc.refus_de_debit:
+        return None
+    attente = ATTENTE_DEBIT_S if exc.retry_after_s is None else exc.retry_after_s
+    return attente if attente <= ATTENTE_DEBIT_MAX_S else None
+
+
+def erreur_api(exc: ErreurFournisseur) -> ErreurApi:
+    return ErreurApi(STATUTS[exc.code], exc.code, exc.message, exc.details)
 
 
 async def appeler(
@@ -252,20 +293,31 @@ async def appeler(
     schema: Mapping[str, object],
     deroulement: Deroulement,
 ) -> Sortie:
-    """Un appel de la couche des fournisseurs ; son refus devient son code."""
+    """Un appel de la couche des fournisseurs ; son refus devient son code. Sur un
+    refus de débit, un seul nouvel essai, le refus tracé dans `appels`."""
+    couche = etat.fournisseurs
+    arguments = (profil.nom, identifiant, role, messages, demandes, schema)
     debut = time.perf_counter()
     try:
-        sortie = await etat.fournisseurs.appeler(
-            profil.nom, identifiant, role, messages, demandes, schema
-        )
+        sortie = await couche.appeler(*arguments)
     except ErreurFournisseur as exc:
-        raise ErreurApi(STATUTS[exc.code], exc.code, exc.message, exc.details) from exc
+        attente = attente_de_debit(exc)
+        if attente is None:
+            raise erreur_api(exc) from exc
+        latence_refus = round((time.perf_counter() - debut) * 1000, 1)
+        deroulement.noter_refus_de_debit(role, latence_refus)
+        await dormir(attente)
+        debut = time.perf_counter()
+        try:
+            sortie = await couche.appeler(*arguments)
+        except ErreurFournisseur as seconde:
+            raise erreur_api(seconde) from seconde
     latence = round((time.perf_counter() - debut) * 1000, 1)
     if role == "reformulation":
         deroulement.latence_reformulation = latence
     else:
         deroulement.latence_modele = latence
-    deroulement.sorties.append((role, sortie))
+    deroulement.noter_sortie(role, sortie)
     return sortie
 
 
@@ -459,7 +511,7 @@ async def repondre(
             reglages_absents=list(profil.reglages_absents),
             question_reformulee=reformulee,
             reformulation_ignoree="trop_longue" if ignoree else None,
-            appels=deroulement.appels(),
+            appels=deroulement.traces,
             cout_estime_usd=cout,
             latences_ms=Latences(
                 recherche=latence_recherche,

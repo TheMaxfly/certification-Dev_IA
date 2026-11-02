@@ -1,0 +1,7 @@
+id = "API-55"
+origine = "E3 étape 3, dette 34 (2026-11-02) — un Retry-After démesuré ne garde pas la requête ouverte : au-delà de la borne, le 503 sans nouvel essai"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    return attente if attente <= ATTENTE_DEBIT_MAX_S else None'''
+apres = '''    return attente'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "retry_after_trop_long"]

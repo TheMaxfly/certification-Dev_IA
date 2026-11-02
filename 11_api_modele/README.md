@@ -508,7 +508,8 @@ X-Identifiant-Requete: 6f1c…
   `reformulation_ignoree = "trop_longue"` : plus de 500 caractères, la recherche s'est
   faite sur la question d'origine ;
 - `appels` : un par appel qui a eu lieu (`reformulation`, `reponse`), avec ses jetons
-  (`estimes: true` quand le fournisseur ne les a pas rendus) et sa latence ;
+  (`estimes: true` quand le fournisseur ne les a pas rendus), sa latence et son `statut`
+  (`ok` ; `refus_debit` : refusé pour débit, aucun jeton, puis rejoué une fois) ;
 - `cout_estime_usd` : la somme des appels (formule plus bas), `null` si un prix n'est
   pas déclaré, 0 sans appel ;
 - `latences_ms` : la recherche, la reformulation, le modèle, le total, mesurés par l'API.
@@ -601,10 +602,18 @@ par `api_modele_sortie_invalide_total{motif}` :
 | `refus_incoherent` | un refus qui cite des séries ou sans motif, ou une réponse qui n'en cite aucune ou porte un motif |
 | `pseudonyme` | un nom de membre, dans la réponse ou la question reformulée (règle des homonymes : « Sécurité et données ») |
 
-**Pas de second essai**, ni sur une sortie invalide ni sur un refus du fournisseur (429
-compris) : un seul appel par rôle. L'erreur est visible et comptée ; un second essai
-cacherait un modèle qui dérape, ce que la mesure doit voir, et doublerait le coût d'un
-échec. La sortie fautive n'est ni rendue ni journalisée.
+**Pas de second essai**, ni sur une sortie invalide ni sur un refus du fournisseur : un
+seul appel par rôle. L'erreur est visible et comptée ; un second essai cacherait un modèle
+qui dérape, ce que la mesure doit voir, et doublerait le coût d'un échec. La sortie
+fautive n'est ni rendue ni journalisée.
+
+**Une seule exception, le refus de débit** : sur un 429 de type `rate_limited` (forme
+relevée chez Mistral ; aucune chez OpenAI à ce jour, ses 429 restent de simples refus),
+l'appel refusé est rejoué **une fois**, après `Retry-After`, sinon après 2 s, et tracé
+dans `appels`. Refusé encore, ou `Retry-After` au-delà de 10 s : le 503
+`fournisseur_refus` habituel. Un refus de débit n'est pas facturé et ne dit rien du
+modèle ; avec un historique, la route enchaîne deux appels, et le libraire ne doit pas
+voir une erreur pour si peu.
 
 `/v1/sante` rend 503 avec ses états (`degrade`), pas cette forme.
 
@@ -800,8 +809,9 @@ aucun test statistique n'est fait.
   mention « aperçu » et peuvent ne pas se rejouer.
 - **L'estimation de coût est à ± 30 %** tant qu'elle n'est pas recalée sur des appels
   réels.
-- **Les refus du fournisseur ne sont pas réessayés** (429 compris) : un seul appel par
-  rôle.
+- **Les refus du fournisseur ne sont pas réessayés**, sauf le refus de débit, une fois :
+  une limite qui dure rend donc encore un 503 au libraire. Le plafond du compte n'a pas
+  été lu.
 - **Le réseau sortant du conteneur de l'API n'est pas restreint aux deux
   fournisseurs** : l'API est sur le réseau `sortie` du Compose (non interne) pour joindre
   la base de l'hôte et les fournisseurs, et Docker Compose ne sait pas restreindre une

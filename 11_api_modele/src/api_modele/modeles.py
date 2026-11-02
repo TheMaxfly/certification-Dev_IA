@@ -340,6 +340,11 @@ class AppelModele(BaseModel):
     jetons_raisonnement: int
     estimes: bool = Field(description="Vrai : comptés par caractères (sans `usage`).")
     latence_ms: float
+    statut: Literal["ok", "refus_debit"] = Field(
+        default="ok",
+        description="`refus_debit` : refusé pour débit par le fournisseur (aucun jeton,"
+        " non facturé), puis rejoué une fois.",
+    )
 
 
 class ReglagesReponseAppliques(BaseModel):

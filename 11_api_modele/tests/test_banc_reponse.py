@@ -33,6 +33,7 @@ from conftest import (
 )
 from fastapi.testclient import TestClient
 
+from api_modele import reponse as route
 from api_modele.banc_reponse import __main__ as cli
 from api_modele.banc_reponse import enregistrement, jeu, journal_mlflow, mesure
 from api_modele.banc_reponse.espion import Espion, Releve, nombres
@@ -176,7 +177,10 @@ def ligne(**champs: object) -> dict[str, object]:
         "refus": False,
         "mention_hors_catalogue": False,
         "appels": [
-            {"jetons": {"entree": 1000, "sortie": 100, "raisonnement": 0}},
+            {
+                "statut": 200,
+                "jetons": {"entree": 1000, "sortie": 100, "raisonnement": 0},
+            },
         ],
         "latence_modele_ms": 1000.0,
         "latence_totale_ms": 1200.0,
@@ -206,7 +210,12 @@ def test_les_metriques_et_le_critere():
             statut=503,
             code="sortie_modele_invalide",
             motif="serie_inconnue",
-            appels=[{"jetons": {"entree": 900, "sortie": 50, "raisonnement": 0}}],
+            appels=[
+                {
+                    "statut": 200,
+                    "jetons": {"entree": 900, "sortie": 50, "raisonnement": 0},
+                }
+            ],
         ),
     ]
     m = metriques(run)
@@ -937,9 +946,54 @@ def corps_de_refus(type_: str) -> bytes:
     ).encode()
 
 
-def test_un_refus_de_debit_rejoue_le_tour(banc_: Banc, doublures: Doublures, tmp_path):
-    """Un 429 `rate_limited`, puis le fournisseur rend : le tour se rejoue après
-    l'attente, le run continue, les deux tentatives restent au relevé."""
+@pytest.fixture
+def route_sans_attente(monkeypatch) -> list[float]:
+    """Le nouvel essai de la route, sans son attente réelle ; les attentes vues."""
+    vues: list[float] = []
+
+    async def dormir(secondes: float) -> None:
+        vues.append(secondes)
+
+    monkeypatch.setattr(route, "dormir", dormir)
+    return vues
+
+
+def test_un_tour_sauve_par_la_route_ne_se_rejoue_pas(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch
+):
+    """Le 429 est au relevé, mais la requête a réussi : ni reprise, ni attente du banc,
+    et les jetons du run ne comptent que les appels rendus."""
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    DoublureFournisseur.usage = {"prompt_tokens": 100, "completion_tokens": 10}
+
+    async def dormir(_: float) -> None:
+        DoublureFournisseur.statut = 200
+        DoublureFournisseur.corps_brut = None
+
+    monkeypatch.setattr(route, "dormir", dormir)
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "termine" and ATTENTE_DEBIT_S not in attentes
+    premier = run.par_question[0]
+    assert (premier["statut"], premier["tentatives"]) == (200, 1)
+    appels = cast(list[dict[str, object]], premier["appels"])
+    assert [(a["tentative"], a["statut"]) for a in appels] == [(1, 429), (1, 200)]
+    questions, _ = jeu.lire(COURT)
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    un_run = mesurer(banc_, banc_.profil("factice-a"), questions[:1], 0.5)
+    assert metriques(un_run)["jetons_entree_somme"] == 100
+
+
+def test_un_refus_de_debit_rejoue_le_tour(
+    banc_: Banc, doublures: Doublures, tmp_path, route_sans_attente
+):
+    """Un 429 `rate_limited` qui résiste au nouvel essai de la route, puis le
+    fournisseur rend : le tour se rejoue après l'attente, le run continue, toutes les
+    tentatives restent au relevé."""
     DoublureFournisseur.statut = 429
     DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
     attentes: list[float] = []
@@ -958,13 +1012,17 @@ def test_un_refus_de_debit_rejoue_le_tour(banc_: Banc, doublures: Doublures, tmp
     premier = run.par_question[0]
     assert (premier["statut"], premier["tentatives"]) == (200, 2)
     appels = cast(list[dict[str, object]], premier["appels"])
-    assert [(a["tentative"], a["statut"]) for a in appels] == [(1, 429), (2, 200)]
+    assert [(a["tentative"], a["statut"]) for a in appels] == [
+        (1, 429),
+        (1, 429),
+        (2, 200),
+    ]
     assert appels[0]["erreur"] == {"code": "1300", "type": "rate_limited"}
     assert run.par_question[1]["tentatives"] == 1
 
 
 def test_un_refus_de_debit_qui_dure_interrompt_le_run(
-    banc_: Banc, doublures: Doublures, tmp_path
+    banc_: Banc, doublures: Doublures, tmp_path, route_sans_attente
 ):
     DoublureFournisseur.statut = 429
     DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
@@ -976,8 +1034,9 @@ def test_un_refus_de_debit_qui_dure_interrompt_le_run(
     (ligne,) = run.par_question
     assert attentes == [ATTENTE_DEBIT_S] * 3
     assert ligne["tentatives"] == 4
-    assert len(cast(list[object], ligne["appels"])) == 4
-    assert len(doublures.recus()) == 4
+    # Chaque tentative : l'appel, et le nouvel essai de la route.
+    assert len(cast(list[object], ligne["appels"])) == 8
+    assert len(doublures.recus()) == 8
 
 
 @pytest.mark.parametrize(("statut", "type_"), [(429, "autre"), (500, "rate_limited")])

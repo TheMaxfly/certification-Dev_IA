@@ -612,6 +612,7 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
 
     statut: ClassVar[int] = 200
     corps_brut: ClassVar[bytes | None] = None
+    en_tetes: ClassVar[dict[str, str]] = {}
     contenu: ClassVar[str] = SORTIE_VALIDE
     lire_le_contexte: ClassVar[bool] = False
     contenu_reformulation: ClassVar[str] = REFORMULATION_VALIDE
@@ -640,6 +641,8 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
         self.send_response(statut)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(donnees)))
+        for nom, valeur in DoublureFournisseur.en_tetes.items():
+            self.send_header(nom, valeur)
         self.end_headers()
         if not DoublureFournisseur.goutte_s:
             self.wfile.write(donnees)
@@ -713,6 +716,7 @@ class Doublures:
 def doublures() -> Iterator[Doublures]:
     DoublureFournisseur.statut = 200
     DoublureFournisseur.corps_brut = None
+    DoublureFournisseur.en_tetes = {}
     DoublureFournisseur.contenu = SORTIE_VALIDE
     DoublureFournisseur.lire_le_contexte = False
     DoublureFournisseur.contenu_reformulation = REFORMULATION_VALIDE

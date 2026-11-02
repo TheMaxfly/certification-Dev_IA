@@ -1,0 +1,7 @@
+id = "API-53"
+origine = "E3 étape 3, dette 34 (2026-11-02) — le nouvel essai ne vaut que pour un 429 : un autre statut portant le même type d'erreur serait rejoué"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''    if type_debit is None or reponse.status_code != STATUT_DEBIT:'''
+apres = '''    if type_debit is None:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "autre_refus_n_est_pas_rejoue"]

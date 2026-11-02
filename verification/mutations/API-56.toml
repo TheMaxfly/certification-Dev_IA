@@ -1,0 +1,7 @@
+id = "API-56"
+origine = "E3 étape 3, dette 34 (2026-11-02) — un tour que le nouvel essai de la route a sauvé ne se rejoue pas au banc : il serait payé deux fois et la mesure doublée"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    return appel.fournisseur_en_echec and any('''
+apres = '''    return any('''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "tour_sauve_par_la_route"]

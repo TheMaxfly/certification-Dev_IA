@@ -31,6 +31,16 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "statut": {
+            "default": "ok",
+            "description": "`refus_debit` : refusé pour débit par le fournisseur (aucun jeton, non facturé), puis rejoué une fois.",
+            "enum": [
+              "ok",
+              "refus_debit"
+            ],
+            "title": "Statut",
+            "type": "string"
           }
         },
         "required": [

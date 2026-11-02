@@ -15,8 +15,9 @@ absent — l'appel n'a pas lieu (`ErreurFournisseur`, que la route traduit en 42
 Pendant : connexion refusée ou trop lente → `fournisseur_injoignable` ; réponse trop
 lente → `fournisseur_delai` ; statut hors 2xx, corps illisible ou sans `choices` →
 `fournisseur_refus` (le statut, et le code d'erreur du fournisseur s'il est court ;
-jamais le corps). Un 429 du fournisseur est un refus comme un autre : pas de nouvel
-essai, pas de file d'attente.
+jamais le corps). Un refus de débit (`Adaptateur.type_debit`) le signale à la route,
+avec son `Retry-After`, hors de `details` : la couche ne réessaie pas, c'est la route
+qui décide. Tout autre 429 est un refus comme un autre.
 
 Coût estimé, en dollars : `entrée × prix.entree + (sortie + raisonnement) ×
 prix.sortie`, par million de jetons ; sans `usage`, les jetons sont estimés par
@@ -59,6 +60,7 @@ type CodeErreur = Literal[
 NOM_SCHEMA = "sortie"
 #: Un code d'erreur de fournisseur recopié dans `details` : court, sans donnée.
 CODE_COURT = re.compile(r"^[a-z0-9_.-]{1,64}$")
+STATUT_DEBIT = 429
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +75,8 @@ class Adaptateur:
     raisonnement_inclus: bool
     #: La sortie peut-elle venir en morceaux typés (`content` en liste) ?
     morceaux_types: bool = False
+    #: Le `type` d'erreur d'un refus de débit (statut 429) ; None : aucun de relevé.
+    type_debit: str | None = None
 
 
 #: Forme commune, chez les deux : `model`, `messages`, `temperature`, `top_p`,
@@ -95,11 +99,13 @@ ADAPTATEURS: dict[str, Adaptateur] = {
     # liste de morceaux typés — `thinking` (le raisonnement, sous `thinking`) et
     # `text` (la réponse, sous `text`) ; `mistral-large-4` admet `low`, `medium`,
     # `high`. Vu à l'essai du 2026-10-31 (`low`, fin `stop`, `content` hors chaîne).
+    # Relevé aux scénarios du 2026-11-02 : 429, `code` 1300, `type` `rate_limited`.
     "mistral": Adaptateur(
         champ_longueur="max_tokens",
         chemin_raisonnement=("completion_tokens_details", "reasoning_tokens"),
         raisonnement_inclus=True,
         morceaux_types=True,
+        type_debit="rate_limited",
     ),
     # OpenAI — lu le 2026-10-26 : référence « Create chat completion »
     # (developers.openai.com/api/reference) : `max_tokens` « deprecated in favor of
@@ -124,12 +130,21 @@ class ErreurFournisseur(Exception):
     jamais un corps de fournisseur, un texte envoyé ni une clé."""
 
     def __init__(
-        self, code: CodeErreur, message: str, details: Mapping[str, object]
+        self,
+        code: CodeErreur,
+        message: str,
+        details: Mapping[str, object],
+        *,
+        refus_de_debit: bool = False,
+        retry_after_s: float | None = None,
     ) -> None:
         super().__init__(message)
         self.code: CodeErreur = code
         self.message = message
         self.details = dict(details)
+        #: Hors de `details` : le 503 rendu au client ne change pas.
+        self.refus_de_debit = refus_de_debit
+        self.retry_after_s = retry_after_s
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +244,28 @@ def _code_fournisseur(reponse: httpx.Response) -> str | None:
         if isinstance(valeur, str) and CODE_COURT.fullmatch(valeur):
             return valeur
     return None
+
+
+def _est_refus_de_debit(profil: Profil, reponse: httpx.Response) -> bool:
+    """Un 429 dont le corps porte le `type` de refus de débit du fournisseur."""
+    type_debit = ADAPTATEURS[profil.fournisseur].type_debit
+    if type_debit is None or reponse.status_code != STATUT_DEBIT:
+        return False
+    try:
+        donnees: object = reponse.json()
+    except ValueError:
+        return False
+    return type_debit in (_lire(donnees, ("error", "type")), _lire(donnees, ("type",)))
+
+
+def _retry_after(reponse: httpx.Response) -> float | None:
+    """L'en-tête `Retry-After`, en secondes ; None s'il manque ou n'est pas un nombre
+    de secondes positif (sa forme en date n'est pas lue)."""
+    try:
+        secondes = float(reponse.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
+    return secondes if math.isfinite(secondes) and secondes >= 0 else None
 
 
 def adresse_modeles(adresse: str) -> str:
@@ -535,6 +572,8 @@ class Fournisseurs:
                 "fournisseur_refus",
                 f"Le fournisseur a refusé l'appel (statut {reponse.status_code}).",
                 details,
+                refus_de_debit=_est_refus_de_debit(profil, reponse),
+                retry_after_s=_retry_after(reponse),
             )
         try:
             donnees: object = reponse.json()

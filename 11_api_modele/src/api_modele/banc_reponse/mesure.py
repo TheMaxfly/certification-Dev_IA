@@ -59,8 +59,9 @@ MENTION_HORS_CATALOGUE = re.compile(
 NGRAMME = 8
 #: Pause entre deux questions d'un run (débit des fournisseurs).
 PAUSE_S = 1.0
-#: Un refus de débit du fournisseur dans un scénario : le tour se rejoue après cette
-#: attente, `REPRISES_DEBIT` fois au plus. La route, elle, ne réessaie pas.
+#: Un refus de débit du fournisseur dans un scénario : quand la requête échoue malgré
+#: le nouvel essai de la route, le tour se rejoue après cette attente, `REPRISES_DEBIT`
+#: fois au plus.
 STATUT_DEBIT = 429
 TYPE_DEBIT = "rate_limited"
 ATTENTE_DEBIT_S = 10.0
@@ -593,10 +594,12 @@ def metriques(run: Run) -> dict[str, float]:
         m["recouvrement_8_moyen"] = round(statistics.fmean(recouvrements), 4)
         m["recouvrement_8_max"] = round(max(recouvrements), 4)
     for type_ in ("entree", "sortie", "raisonnement"):
+        # Un appel refusé n'a pas de jetons : ceux de son relevé ne sont qu'estimés.
         valeurs = [
             cast(dict[str, int], a["jetons"])[type_]
             for x in lignes
             for a in cast(list[dict[str, object]], x["appels"])
+            if a["statut"] == 200
         ]
         m[f"jetons_{type_}_somme"] = sum(valeurs)
         if valeurs:
@@ -689,8 +692,9 @@ def erreur_du_fournisseur(r: Releve) -> dict[str, str]:
 
 
 def refus_de_debit(appel: Appel) -> bool:
-    """Le fournisseur a-t-il refusé pour débit : un 429 `rate_limited`, rien d'autre."""
-    return any(
+    """La requête a-t-elle échoué sur un refus de débit : un 429 `rate_limited`, rien
+    d'autre ? Un refus que le nouvel essai de la route a sauvé ne compte pas."""
+    return appel.fournisseur_en_echec and any(
         r.statut == STATUT_DEBIT and (r.erreur or {}).get("type") == TYPE_DEBIT
         for r in appel.releves
     )

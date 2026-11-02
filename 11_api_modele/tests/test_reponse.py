@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from api_modele import recherche
+from api_modele import reponse as route
 from api_modele.application import creer_application
 from api_modele.configuration import charger
 from api_modele.contrat import DESTINATION
@@ -621,6 +622,157 @@ def test_un_nom_non_admis_present_dans_un_passage(api_homonymes, nom_dans_un_pas
 
     assert r.status_code == 503
     assert r.json()["details"]["motif"] == "pseudonyme"
+
+
+# --------------------------------------------------------------------------- #
+#  Un refus de débit du fournisseur : un seul nouvel essai
+# --------------------------------------------------------------------------- #
+def refus_de_debit(type_: str = "rate_limited") -> bytes:
+    return json.dumps(
+        {
+            "object": "error",
+            "message": "m",
+            "type": type_,
+            "param": None,
+            "code": "1300",
+        }
+    ).encode()
+
+
+def suivre_les_attentes(monkeypatch, *, rendre: bool) -> list[float]:
+    """Les attentes de la route, sans attente réelle ; `rendre` : après elles, le
+    fournisseur répond de nouveau."""
+    vues: list[float] = []
+
+    async def dormir(secondes: float) -> None:
+        vues.append(secondes)
+        if rendre:
+            DoublureFournisseur.statut = 200
+            DoublureFournisseur.corps_brut = None
+
+    monkeypatch.setattr(route, "dormir", dormir)
+    return vues
+
+
+@pytest.fixture
+def attentes(monkeypatch) -> list[float]:
+    return suivre_les_attentes(monkeypatch, rendre=True)
+
+
+@pytest.fixture
+def attentes_sans_rendu(monkeypatch) -> list[float]:
+    return suivre_les_attentes(monkeypatch, rendre=False)
+
+
+def poser_le_refus(statut: int = 429, type_: str = "rate_limited") -> None:
+    DoublureFournisseur.statut = statut
+    DoublureFournisseur.corps_brut = refus_de_debit(type_)
+
+
+@pytest.mark.parametrize(
+    ("entete", "attendue"),
+    [
+        ("7", 7.0),
+        ("0", 0.0),
+        (None, 2.0),
+        ("illisible", 2.0),
+        ("-1", 2.0),
+        ("inf", 2.0),
+    ],
+)
+def test_un_refus_de_debit_est_rejoue_une_fois(
+    api_reponse, doublures, attentes, entete, attendue
+):
+    poser_le_refus()
+    if entete is not None:
+        DoublureFournisseur.en_tetes = {"Retry-After": entete}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 200
+    assert attentes == [attendue]
+    assert len(doublures.recus()) == 2
+    corps = conforme(r)
+    refuse, rendu = corps["contexte"]["appels"]
+    assert (refuse["role"], refuse["statut"]) == ("reponse", "refus_debit")
+    assert (refuse["jetons_entree"], refuse["jetons_sortie"]) == (0, 0)
+    assert (rendu["role"], rendu["statut"]) == ("reponse", "ok")
+    assert rendu["jetons_entree"] > 0
+
+
+def test_le_refus_de_debit_de_la_reformulation_est_rejoue_aussi(
+    api_reponse, doublures, attentes
+):
+    poser_le_refus()
+
+    r = repondre(
+        api_reponse,
+        historique=[
+            {"role": "libraire", "contenu": "Un manga ?"},
+            {"role": "assistant", "contenu": "Une série."},
+        ],
+    )
+
+    assert r.status_code == 200 and attentes == [2.0]
+    assert [(a["role"], a["statut"]) for a in conforme(r)["contexte"]["appels"]] == [
+        ("reformulation", "refus_debit"),
+        ("reformulation", "ok"),
+        ("reponse", "ok"),
+    ]
+
+
+def test_un_refus_de_debit_qui_dure_rend_le_503_existant(
+    api_reponse, doublures, attentes_sans_rendu
+):
+    poser_le_refus()
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503
+    assert attentes_sans_rendu == [2.0], "un seul nouvel essai"
+    assert len(doublures.recus()) == 2
+    assert conforme(r)["code"] == "fournisseur_refus"
+    assert r.json()["details"] == {
+        "profil": "factice-a",
+        "role": "reponse",
+        "statut": 429,
+        "code_fournisseur": "1300",
+    }
+
+
+def test_un_retry_after_trop_long_rend_le_503_sans_nouvel_essai(
+    api_reponse, doublures, attentes
+):
+    poser_le_refus()
+    DoublureFournisseur.en_tetes = {"Retry-After": "60"}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503 and attentes == []
+    assert len(doublures.recus()) == 1
+
+
+@pytest.mark.parametrize(
+    ("statut", "type_"), [(429, "autre"), (500, "rate_limited"), (400, "rate_limited")]
+)
+def test_un_autre_refus_n_est_pas_rejoue(
+    api_reponse, doublures, attentes, statut, type_
+):
+    poser_le_refus(statut, type_)
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503 and attentes == []
+    assert len(doublures.recus()) == 1
+
+
+def test_le_profil_sans_type_de_debit_ne_rejoue_pas(api_reponse, doublures, attentes):
+    poser_le_refus()
+
+    r = repondre(api_reponse, profil="factice-b")
+
+    assert r.status_code == 503 and attentes == []
+    assert len(doublures.recus()) == 1
 
 
 # --------------------------------------------------------------------------- #
