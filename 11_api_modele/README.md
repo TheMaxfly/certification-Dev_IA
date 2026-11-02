@@ -745,7 +745,7 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
 
-## Résultats de la mesure (2026-10-30)
+## Résultats de la mesure (2026-10-30 ; profil actif rejoué le 2026-11-02)
 
 Jeu v2 gelé (`31712b0d…`), réglages par défaut (`temperature` 0, strict, 5 séries ×
 2 passages, catalogue seul), sans historique ; un run MLflow par profil (expérience
@@ -779,7 +779,34 @@ aucun test statistique n'est fait.
   en morceaux typés. Chez Mistral comme chez OpenAI, les jetons de raisonnement sont
   comptés dans `completion_tokens` (vérifié chez Mistral ; chez OpenAI, aucun jeton de
   raisonnement à l'effort `none`).
-- **Coût de toute la mesure** (appels d'essai et runs) : 102 appels, 0,30 $.
+- **Coût de toute la mesure** (appels d'essai, runs, scénarios, rejeu) : 249 appels,
+  0,46 $.
+
+### Le rejeu du profil actif, et la conversation (2026-11-02)
+
+Deux phrases ajoutées aux invites après lecture des réponses : la réponse n'affirme
+aucune métadonnée que les passages n'écrivent pas ; la reformulation n'ajoute aucun
+critère absent de la conversation. **Seul le profil actif est remesuré : les trois profils
+de repli restent mesurés sur l'invite d'avant**, sans le nouvel essai de la route.
+
+| Profil | Questions | Refus corrects F7 | Hors catalogue | Séries inventées | Sorties invalides | Coût réel | Latence du modèle, médiane | Critère |
+|---|---|---|---|---|---|---|---|---|
+| `mistral-large-2512` | 26 (F7, hors catalogue, F9, F10) | **5 / 5** | **5 / 5** | 0 | 0 | 0,041 $ | 3,9 s | **tenu** |
+
+- **Conversation** (5 scénarios, 19 tours, première mesure, sans seuil) :
+  `reformulation_meme_serie` 6 / 14 ; `reformulation_fidele` 9 / 13 ; série attendue en tête
+  de la recherche 5 fois sur 12, contre 8 sur 12 sur la question autonome écrite à la main.
+  Des 7 échecs, 3 héritent d'une mauvaise série née au premier tour, fidèlement reprise par
+  la reformulation ; 4 viennent de la recherche elle-même : même la question autonome ne met
+  pas la série attendue en tête. Un seul run : à `temperature` 0, les réponses varient d'un
+  run à l'autre.
+- **Limites connues** : sur une série au catalogue sans édition française, une réponse
+  affirme encore une disponibilité en français : la disponibilité n'est pas construite, et
+  une consigne d'invite ne suffit pas à l'éviter. Une reformulation peut encore reporter un
+  critère d'un tour sur le suivant. Une réponse peut mal lire un passage qui écrit le bon
+  fait pour un autre volume. Les refus de débit de Mistral reviennent en conversation (5 sur
+  39 appels) : le nouvel essai de la route en a sauvé un, mais 2 requêtes sur 21 ont rendu
+  le 503 ; le plafond du compte n'a pas été lu.
 
 ## Les traces
 
