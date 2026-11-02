@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import psycopg
@@ -46,6 +46,7 @@ from api_modele.banc_reponse.mesure import (
     mesurer,
     metriques,
     metriques_scenarios,
+    nommee_par,
     scenarios,
     verdict,
 )
@@ -811,6 +812,58 @@ def test_les_scenarios_contre_les_doublures(
     assert run.textes and all("-" in cle for cle in run.textes)
 
 
+@pytest.mark.parametrize(
+    ("reformulee", "attendu"),
+    [
+        ("Combien de tomes compte Blue [S:1123] ?", "marque"),
+        ("Combien de tomes compte Blue [S:1123] et [S:9] ?", "marque"),
+        ("Combien de tomes compte *blue* ?", "titre"),
+        ("Combien de tomes compte Bluebird ?", None),
+        ("Combien de tomes compte [S:9] ?", None),
+        ("Combien de tomes ?", None),
+    ],
+)
+def test_la_question_reformulee_nomme_la_serie(reformulee, attendu):
+    assert nommee_par(reformulee, 1123, "Blue") == attendu
+    assert nommee_par(reformulee, 7, "") is None
+
+
+def test_les_scenarios_relevent_la_reformulation_fidele(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    # La réponse rendue cite « Série 1 [S:1] » en tête : le second tour la nomme.
+    DoublureFournisseur.contenu_reformulation = json.dumps(
+        {"question": "Et Série 1, elle est finie ?"}
+    )
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (5, 5)
+    premier, second = run.par_question[:2]
+    assert "reformulation_fidele" not in premier
+    assert second["serie_en_tete_precedente"] == 1
+    assert second["fidele_par"] == "titre"
+
+
+def test_les_scenarios_sans_la_serie_de_tete(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    DoublureFournisseur.contenu_reformulation = json.dumps(
+        {"question": "Et une autre, elle est finie ?"}
+    )
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (0, 5)
+    assert run.par_question[1]["reformulation_fidele"] is False
+    # Un refus ne porte pas de marque : le tour suivant n'a rien à comparer.
+    DoublureFournisseur.contenu = REFUS
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (0, 0)
+    assert "reformulation_fidele" not in run.par_question[1]
+
+
 def test_les_scenarios_par_la_ligne_de_commande(
     banc_: Banc, doublures: Doublures, base_api: BaseApi, tmp_path, monkeypatch, capsys
 ):
@@ -854,6 +907,39 @@ def test_les_scenarios_s_interrompent(
     tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
     run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
     assert run.statut == "interrompu" and len(run.par_question) == 1
+
+
+def test_les_scenarios_gardent_le_refus_du_fournisseur(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    """Statut et code d'erreur de chaque appel ; jamais le message du fournisseur."""
+    message = "le texte envoyé, repris par le fournisseur"
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = json.dumps(
+        {"message": message, "type": "rate_limited", "param": None, "code": "1300"}
+    ).encode()
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "interrompu"
+    (ligne,) = run.par_question
+    (appel,) = cast(list[dict[str, object]], ligne["appels"])
+    assert (appel["role"], appel["statut"]) == ("reponse", 429)
+    assert appel["erreur"] == {"code": "1300", "type": "rate_limited"}
+    assert message not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def test_les_scenarios_gardent_chaque_appel_rendu(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    premier, second = run.par_question[:2]
+    assert [a["role"] for a in cast(list[dict[str, object]], premier["appels"])] == [
+        "reponse"
+    ]
+    appels = cast(list[dict[str, object]], second["appels"])
+    assert [a["role"] for a in appels] == ["reformulation", "reponse"]
+    assert all(a["statut"] == 200 and a["erreur"] == {} for a in appels)
 
 
 def test_les_erreurs_des_fournisseurs_relevees(banc_: Banc, doublures: Doublures):

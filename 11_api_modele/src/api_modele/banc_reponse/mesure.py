@@ -37,6 +37,7 @@ from api_modele.reponse import (
     INVITE_REFORMULATION,
     INVITE_REPONSE,
     LONGUEUR_REFORMULATION,
+    MARQUE_SERIE,
     message_de_reponse,
     titre_marque,
 )
@@ -277,6 +278,28 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     return appel
 
 
+def appels_de(appel: Appel, profil: Profil, cpj: float) -> list[dict[str, object]]:
+    """Les appels aux fournisseurs d'une requête, en nombres et en noms."""
+    return [
+        {
+            "role": r.role,
+            "statut": r.statut,
+            "modele_rendu": r.modele_rendu,
+            "jetons": dict(
+                zip(
+                    ("entree", "sortie", "raisonnement", "estimes"),
+                    r.jetons(profil, cpj),
+                    strict=True,
+                )
+            ),
+            "fin": r.fin,
+            "latence_ms": r.latence_ms,
+            "forme_contenu": r.forme_contenu,
+        }
+        for r in appel.releves
+    ]
+
+
 def releve_en_dict(r: Releve, profil: Profil, cpj: float) -> dict[str, object]:
     entree, sortie, raisonnement, estimes = r.jetons(profil, cpj)
     prompt = r.entier("prompt_tokens")
@@ -420,24 +443,7 @@ def mesurer(
             "motif": appel.motif,
             "cout_usd": round(cout, 6),
             "pseudonymes": appel.pseudonymes,
-            "appels": [
-                {
-                    "role": r.role,
-                    "statut": r.statut,
-                    "modele_rendu": r.modele_rendu,
-                    "jetons": dict(
-                        zip(
-                            ("entree", "sortie", "raisonnement", "estimes"),
-                            r.jetons(profil, cpj),
-                            strict=True,
-                        )
-                    ),
-                    "fin": r.fin,
-                    "latence_ms": r.latence_ms,
-                    "forme_contenu": r.forme_contenu,
-                }
-                for r in appel.releves
-            ],
+            "appels": appels_de(appel, profil, cpj),
         }
         if appel.statut == 200:
             ligne |= ligne_reponse(banc_, q, appel)
@@ -648,16 +654,46 @@ def premiere_serie(banc_: Banc, question: str) -> int | None:
     return series[0].serie_id if series else None
 
 
+def serie_en_tete(appel: Appel) -> tuple[int, str] | None:
+    """La série citée en tête d'une réponse rendue : sa première marque `[S:<id>]` et
+    son titre du catalogue ; `None` si le texte n'en porte aucune."""
+    marque = MARQUE_SERIE.search(appel.texte or "")
+    if marque is None:
+        return None
+    serie_id = int(marque.group(1))
+    titres = {s["serie_id"]: s["titre"] for s in appel.corps["series"]}
+    return serie_id, cast(str, titres.get(serie_id, ""))
+
+
+def nommee_par(reformulee: str, serie_id: int, titre: str) -> str | None:
+    """Comment la question reformulée nomme la série : `marque` (son `[S:<id>]`),
+    `titre` (son titre du catalogue, en mots entiers, casse ignorée : une
+    reformulation n'écrit pas toujours la marque), sinon `None`."""
+    marques = (int(m.group(1)) for m in MARQUE_SERIE.finditer(reformulee))
+    if serie_id in marques:
+        return "marque"
+    motif = rf"(?<!\w){re.escape(titre)}(?!\w)"
+    return "titre" if titre and re.search(motif, reformulee, re.IGNORECASE) else None
+
+
+def erreur_du_fournisseur(r: Releve) -> dict[str, str]:
+    """Le code d'erreur d'un appel refusé : `code` et `type`, selon le fournisseur ;
+    jamais son message, qui peut reprendre ce qu'on lui a envoyé."""
+    return {k: v for k, v in (r.erreur or {}).items() if k in ("code", "type")}
+
+
 def scenarios(
     banc_: Banc, profil: Profil, tours: Sequence[Tour], plafond: float
 ) -> Run:
     """Chaque scénario, tour après tour ; l'historique reconstruit à partir des
     réponses réelles des tours précédents. Pour chaque tour avec historique : la
     première série de la recherche sur la question reformulée, comparée à celle de
-    la question autonome attendue (mêmes réglages)."""
+    la question autonome attendue (mêmes réglages), et la série citée en tête de la
+    réponse précédente, que la question reformulée nomme ou non."""
     cpj = banc_.modele_langage.caracteres_par_jeton
     run = Run(profil.nom)
     historiques: dict[str, list[dict[str, str]]] = {}
+    tetes: dict[str, tuple[int, str] | None] = {}
     for numero, t in enumerate(tours):
         if numero:
             banc_.dormir(banc_.pause_s)
@@ -678,6 +714,12 @@ def scenarios(
             "motif": appel.motif,
             "pseudonymes": appel.pseudonymes,
             "cout_usd": round(appel.cout(profil, cpj), 6),
+            "appels": [
+                a | {"erreur": erreur_du_fournisseur(r)}
+                for a, r in zip(
+                    appels_de(appel, profil, cpj), appel.releves, strict=True
+                )
+            ],
         }
         if appel.statut == 200:
             c = appel.corps["contexte"]
@@ -698,11 +740,20 @@ def scenarios(
                         and obtenue == t.serie_attendue_id
                     ),
                 }
+                tete = tetes.get(t.scenario)
+                if tete is not None and isinstance(reformulee, str):
+                    nommee = nommee_par(reformulee, *tete)
+                    ligne |= {
+                        "serie_en_tete_precedente": tete[0],
+                        "reformulation_fidele": nommee is not None,
+                        "fidele_par": nommee,
+                    }
             if appel.texte is not None:
                 run.textes[cle] = appel.texte
                 if isinstance(reformulee, str):
                     run.textes[f"{cle} (question reformulée)"] = reformulee
         run.par_question.append(ligne)
+        tetes[t.scenario] = serie_en_tete(appel)
         historique.append({"role": "libraire", "contenu": t.question})
         historique.append(
             {"role": "assistant", "contenu": appel.texte or "(pas de réponse)"}
@@ -722,6 +773,7 @@ def scenarios(
 def metriques_scenarios(run: Run) -> dict[str, float]:
     lignes = run.par_question
     avec = [x for x in lignes if x.get("avec_historique") and "meme_serie" in x]
+    fideles = [x for x in lignes if "reformulation_fidele" in x]
     return {
         "tours": len(lignes),
         "tours_avec_historique": sum(1 for x in lignes if x.get("avec_historique")),
@@ -729,6 +781,8 @@ def metriques_scenarios(run: Run) -> dict[str, float]:
         "reformulation_serie_attendue": sum(
             1 for x in avec if x["serie_attendue_premiere"]
         ),
+        "reformulation_fidele": sum(1 for x in fideles if x["reformulation_fidele"]),
+        "reformulation_fidele_sur": len(fideles),
         "pseudonymes_rendus": sum(cast(int, x["pseudonymes"]) for x in lignes),
         "sorties_invalides": sum(
             1 for x in lignes if x["code"] == "sortie_modele_invalide"
