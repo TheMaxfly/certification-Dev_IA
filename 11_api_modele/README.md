@@ -267,10 +267,11 @@ bascule automatique.
 **Durée mesurée** (2026-10-27, sur le poste, avec les doublures : l'essai du Compose,
 son corpus d'essai et une doublure du fournisseur) : **2,1 à 2,2 s** du redémarrage de
 l'API au contrôle (`/v1/info` et la métrique), procédure répétée trois fois dans chaque
-sens. En service, le redémarrage ajoute le chargement des vecteurs de l'encodage en
-service (77 006 en 17 s, mesuré le 2026-10-20) : compter une vingtaine de secondes. Le
-chronométrage en service avec un fournisseur réel reste à faire : les runs de mesure
-tournent dans un processus de banc, sans changement de profil en service.
+sens. **En service** (2026-11-02, Compose, corpus v2, encodage en service, clés réelles,
+`mistral-large-2512` vers `gpt-6-luna` et retour) : **15,9 s** à l'aller, **14,7 s** au
+retour, de `docker compose up -d api` au contrôle par `/v1/info` ; une mesure par sens,
+aucun appel au fournisseur. Le conteneur étant recréé, son journal repart de zéro :
+relever `docker compose logs api` avant de changer de profil si on veut le garder.
 
 **Revenir** : la même procédure, avec l'ancien profil (ou la variable retirée : le
 profil actif de `reglages.toml`). Une requête peut aussi, sans changer le profil actif,
