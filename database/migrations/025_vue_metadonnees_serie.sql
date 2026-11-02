@@ -28,13 +28,16 @@
 -- `nb_volumes` : le plus grand de deux comptes, 0 valant absence pour le premier.
 --   le champ    le plus grand « tomes parus » (`volume_tomes_published`) des volumes de la
 --               série. Il ne dit pas de quelle édition il parle, et il est plus petit que
---               les numéros sur 112 séries (Ippo : 30 pour 136 ; Black Lagoon : 1 pour 13) ;
+--               les numéros sur 112 séries, 95 une fois les années retirées (Ippo : 30 pour
+--               136 ; Black Lagoon : 1 pour 13) ;
 --   les numéros les numéros de volume distincts, un volume sans numéro comptant comme le
---               volume 1. Ils mêlent les éditions (Akira : 31 pour un champ à 6), comptent
---               un numéro qui est une année (Blue : 2018) et sous-comptent une série dont
---               le catalogue n'a qu'une partie des tomes.
---   Sur ces 112 séries, la vue s'écarte de la définition d du jeu d'évaluation (le champ,
---   sinon les numéros), qui reste celle du jeu gelé.
+--               volume 1. Ils mêlent les éditions (Akira : 31 pour un champ à 6) et
+--               sous-comptent une série dont le catalogue n'a qu'une partie des tomes.
+--   Un numéro entre 1900 et 2100 ne compte pas : la collecte prend pour numéro le premier
+--   nombre du titre, et celui-là est une année, pas un rang (42 séries ; Blue, un seul
+--   tome : 2018). Une série qui n'a que de tels numéros n'a que le champ, ou rien.
+--   La vue s'écarte ainsi de la définition d du jeu d'évaluation (le champ, sinon les
+--   numéros), qui reste celle du jeu gelé.
 --
 -- `nb_volumes_source` : ce que vaut ce nombre.
 --   divergent               les deux comptes existent et s'écartent de plus de 20 % du
@@ -88,7 +91,7 @@ SELECT s.series_id,
            WHEN abs(v.tomes_parus - v.numeros_distincts)
                 > 0.2 * greatest(v.tomes_parus, v.numeros_distincts)
                THEN 'divergent'
-           WHEN v.tomes_parus >= v.numeros_distincts THEN 'champ'
+           WHEN v.tomes_parus >= coalesce(v.numeros_distincts, 0) THEN 'champ'
            WHEN v.numeros_distincts IS NOT NULL THEN 'repli_volumes_distincts'
        END AS nb_volumes_source,
        CASE
@@ -113,7 +116,9 @@ SELECT s.series_id,
   LEFT JOIN LATERAL (
       SELECT count(*) AS lignes,
              nullif(max(vol.volume_tomes_published), 0) AS tomes_parus,
-             nullif(count(DISTINCT coalesce(vol.volume_number, 1)), 0) AS numeros_distincts,
+             nullif(count(DISTINCT coalesce(vol.volume_number, 1)) FILTER (
+                 WHERE coalesce(vol.volume_number, 1) NOT BETWEEN 1900 AND 2100
+             ), 0) AS numeros_distincts,
              coalesce(bool_or(vol.volume_ean ~ '^(9782|97910)'), false) AS ean_francais,
              extract(YEAR FROM min(vol.volume_publication_date)
                  FILTER (WHERE vol.volume_ean ~ '^(9782|97910)'))::integer AS annee_fr
@@ -130,7 +135,8 @@ COMMENT ON VIEW manga.v_metadonnees_serie IS
     'si la fiche porte le badge « français », seulement_au_japon pour un Manga à volumes '
     'sans cela, inconnue sinon ; édité ne veut pas dire en stock. '
     'nb_volumes : le plus grand du champ « tomes parus » et des numéros distincts, un '
-    'volume sans numéro comptant pour le 1, toutes éditions mêlées. '
+    'volume sans numéro comptant pour le 1, toutes éditions mêlées ; un numéro entre 1900 '
+    'et 2100 ne compte pas : c''est une année du titre, prise pour un numéro à la collecte. '
     'nb_volumes_source : divergent si les deux existent et s''écartent de plus de 20 % du '
     'plus grand, champ si le champ est au moins égal aux numéros, repli_volumes_distincts '
     'sinon ; toute source autre que champ se lit comme un minimum, « au moins N ». '

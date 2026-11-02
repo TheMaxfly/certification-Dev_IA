@@ -180,6 +180,7 @@ def test_la_vue_a_ses_sept_colonnes_et_lit_avec_les_droits_de_son_proprietaire(
         "en stock",
         "divergent",
         "au moins N",
+        "entre 1900 et 2100",
         "Migration 025",
     ):
         assert regle in commentaire, regle
@@ -339,8 +340,8 @@ def test_tomes_le_plus_grand_des_deux_et_ce_qu_il_vaut(
     assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (nb_volumes, source)
 
 
-def test_tomes_un_numero_qui_est_une_annee_compte_pour_un_de_plus(base_migree):
-    """Limite écrite : un seul tome, deux éditions dont l'une numérotée 2018."""
+def test_tomes_une_annee_prise_pour_un_numero_ne_compte_pas(base_migree):
+    """Un seul tome, deux éditions dont l'une « numérotée » 2018 par la collecte."""
     with psycopg.connect(base_migree) as admin:
         serie(admin)
         volume(admin, url="a", numero=None, tomes=1)
@@ -348,7 +349,47 @@ def test_tomes_un_numero_qui_est_une_annee_compte_pour_un_de_plus(base_migree):
 
         lu = metadonnees(admin)
 
-    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (2, "divergent")
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (1, "champ")
+
+
+@pytest.mark.parametrize(
+    ("numero", "nb_volumes"), ((1899, 2), (1900, 1), (2100, 1), (2101, 2))
+)
+def test_tomes_les_bornes_des_annees(base_migree, numero, nb_volumes):
+    with psycopg.connect(base_migree) as admin:
+        serie(admin)
+        volume(admin, url="a", numero=1)
+        volume(admin, url="b", numero=numero)
+
+        lu = metadonnees(admin)
+
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (
+        nb_volumes,
+        "repli_volumes_distincts",
+    )
+
+
+def test_tomes_rien_que_des_annees_le_champ_reste(base_migree):
+    with psycopg.connect(base_migree) as admin:
+        serie(admin)
+        for url in ("a", "b", "c"):
+            volume(admin, url=url, numero=2003, tomes=3)
+
+        lu = metadonnees(admin)
+
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (3, "champ")
+
+
+def test_tomes_rien_que_des_annees_sans_champ_ne_dit_rien(base_migree):
+    """Le nombre est absent ; la série a pourtant des volumes, et une disponibilité."""
+    with psycopg.connect(base_migree) as admin:
+        serie(admin)
+        volume(admin, numero=2011)
+
+        lu = metadonnees(admin)
+
+    assert (lu["nb_volumes"], lu["nb_volumes_source"]) == (None, None)
+    assert lu["disponibilite"] == "seulement_au_japon"
 
 
 @pytest.mark.parametrize("tomes", (None, 0))
