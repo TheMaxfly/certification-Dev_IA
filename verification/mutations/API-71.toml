@@ -1,0 +1,9 @@
+id = "API-71"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — le rôle d'un run : le profil actif, sinon un repli"
+fichier = "11_api_modele/src/api_modele/banc_reponse/enregistrement.py"
+avant = '''        "role": "profil_actif" if profil == profil_actif else "repli",
+        "invite_version": version_des_invites,'''
+apres = '''        "role": "profil_actif",
+        "invite_version": version_des_invites,'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "etiquettes_d_un_run"]

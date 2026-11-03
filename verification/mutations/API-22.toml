@@ -1,0 +1,7 @@
+id = "API-22"
+origine = "E3 étape 3, spec 02 (2026-10-26) — profil actif ignoré : toujours le premier profil déclaré (règle 2.10, le changement de modèle par la seule configuration)"
+fichier = "11_api_modele/src/api_modele/configuration.py"
+avant = '''    actif = environ.get("API_MODELE_PROFIL_ACTIF") or actif_fichier'''
+apres = '''    actif = noms[0] if noms else actif_fichier'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "changer_le_profil_actif"]

@@ -1,0 +1,7 @@
+id = "API-52"
+origine = "E3 étape 3, spec 06, bloc D (2026-11-02) — le faux négatif de reformulation_fidele : une marque venue de l'historique, dont le titre n'était cherché que dans la dernière réponse, comptait la reformulation infidèle alors qu'elle nommait la série"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''            connus.update({s["serie_id"]: s["titre"] for s in appel.corps["series"]})'''
+apres = '''            connus.clear(); connus.update({s["serie_id"]: s["titre"] for s in appel.corps["series"]})'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "marque_venue_de_l_historique"]

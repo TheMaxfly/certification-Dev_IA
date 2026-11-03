@@ -1,0 +1,9 @@
+id = "API-80"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une relecture ne réécrit pas le verdict d'alors"
+fichier = "11_api_modele/src/api_modele/banc_reponse/__main__.py"
+avant = '''        "verdict_a_la_mesure": resume["verdict"],
+'''
+apres = '''        "verdict_a_la_mesure": verdict_relu,
+'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "relire_un_run_sans_appel"]

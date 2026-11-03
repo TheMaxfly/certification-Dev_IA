@@ -1,0 +1,7 @@
+id = "API-23"
+origine = "E3 étape 3, spec 02 (2026-10-26) — reglages_absents ignoré : un réglage que le profil déclare absent est demandé, l'appel a lieu quand même (règle 2.10)"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''            if valeur is not None and reglage in profil.reglages_absents:'''
+apres = '''            if valeur is not None and reglage in ():'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "reglage_absent_demande_refuse"]

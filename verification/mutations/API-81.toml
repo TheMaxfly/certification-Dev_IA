@@ -1,0 +1,7 @@
+id = "API-81"
+origine = "E3 étape 3, spec 07, A0 (2026-11-03) — la ligne de titre sans l'auteur"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''        f"auteur : {m.auteurs or 'inconnu'} — tomes : {tomes(m)} — {statut}"'''
+apres = '''        f"tomes : {tomes(m)} — {statut}"'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "ce_que_dit_la_ligne"]

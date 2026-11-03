@@ -1,0 +1,7 @@
+id = "API-72"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — la version des invites est celle du commit mesuré, pas de la tête"
+fichier = "11_api_modele/src/api_modele/banc_reponse/enregistrement.py"
+avant = '''            racine, "log", "-1", "--format=%h", commit, "--", INVITES_DU_DEPOT'''
+apres = '''            racine, "log", "-1", "--format=%h", commit'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "version_des_invites"]

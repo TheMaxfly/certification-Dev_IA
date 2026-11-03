@@ -14,7 +14,13 @@ service réel.
 
 Le contrat est gardé sur toute la suite : une réponse de l'API, dans n'importe quel
 test, sur une opération du contrat versionné, doit avoir un statut que le contrat
-déclare pour elle (`aucun_statut_hors_contrat`).
+déclare pour elle, et, quand la description de ce statut énumère ses codes d'erreur
+(entre accents graves), l'un de ces codes (`aucun_statut_hors_contrat`).
+
+Les fournisseurs du modèle de langage sont des doublures sur le bouclage (deux
+serveurs, deux profils factices) ; sur toute la suite, une requête de la couche des
+fournisseurs vers un hôte hors du bouclage n'est pas envoyée et fait échouer le test
+(`aucun_appel_hors_du_bouclage`) : aucun test n'atteint un fournisseur réel.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import re
 import secrets
 import sys
 import threading
@@ -32,6 +39,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, ClassVar
 
+import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
@@ -40,7 +48,7 @@ from service_embedding.configuration import Instance
 from service_embedding.configuration import charger as charger_instance
 
 from api_modele.application import creer_application
-from api_modele.configuration import Reglages, charger
+from api_modele.configuration import FICHIER_REGLAGES, Reglages, charger
 from api_modele.contrat import DESTINATION
 
 RACINE_MODULE = Path(__file__).resolve().parents[1]
@@ -48,6 +56,8 @@ RACINE_DEPOT = RACINE_MODULE.parent
 
 CLE_APPLICATION = "a" * 40
 CLE_DEMONSTRATION = "d" * 40
+#: La clé du profil actif, factice : aucun test n'appelle un fournisseur réel.
+CLE_FOURNISSEUR = "factice-cle-du-harnais"
 ROLE_API = "essai_api_modele"
 
 
@@ -69,27 +79,51 @@ harnais = _charger_harnais()
 # --------------------------------------------------------------------------- #
 #  Le contrat, gardé sur toute la suite : aucun statut qu'il ne déclare pas
 # --------------------------------------------------------------------------- #
+CONTRAT_VERSIONNE = json.loads(DESTINATION.read_text(encoding="utf-8"))
 #: (gabarit de route, méthode) → statuts déclarés, lus dans le contrat versionné.
 OPERATIONS: dict[tuple[str, str], set[int]] = {
     (chemin, methode.upper()): {int(statut) for statut in operation["responses"]}
-    for chemin, operations in json.loads(DESTINATION.read_text(encoding="utf-8"))[
-        "paths"
-    ].items()
+    for chemin, operations in CONTRAT_VERSIONNE["paths"].items()
     for methode, operation in operations.items()
 }
 
 
+def codes_declares(description: str) -> set[str]:
+    """Les codes d'erreur qu'une description de réponse énumère (accents graves)."""
+    return set(re.findall(r"`([a-z_]+)`", description))
+
+
+#: (route, méthode, statut) → codes d'erreur énumérés par le contrat (vide : aucun).
+CODES: dict[tuple[str, str, int], set[str]] = {
+    (chemin, methode.upper(), int(statut)): codes_declares(
+        reponse.get("description", "")
+    )
+    for chemin, operations in CONTRAT_VERSIONNE["paths"].items()
+    for methode, operation in operations.items()
+    for statut, reponse in operation["responses"].items()
+}
+
+
+type Vue = tuple[str, str, int, str | None]  # route, méthode, statut, code
+
+
 class Reponses(logging.Handler):
-    """Recueille (route, méthode, statut) de chaque ligne « requete » du journal."""
+    """Recueille (route, méthode, statut, code) de chaque ligne « requete » du
+    journal."""
 
     def __init__(self) -> None:
         super().__init__(logging.INFO)
-        self.vues: list[tuple[str, str, int]] = []
+        self.vues: list[Vue] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         champs = getattr(record, "champs", None)
         if record.getMessage() == "requete" and isinstance(champs, dict):
-            vue = (champs.get("route"), champs.get("methode"), champs.get("statut"))
+            vue = (
+                champs.get("route"),
+                champs.get("methode"),
+                champs.get("statut"),
+                champs.get("code"),
+            )
             self.vues.append(vue)  # type: ignore[arg-type]
 
 
@@ -109,18 +143,47 @@ def aucun_statut_hors_contrat() -> Iterator[Reponses]:
         journal.removeHandler(capteur)
         journal.setLevel(niveau)
     hors = statuts_hors_contrat(capteur.vues)
-    assert not hors, f"statuts que le contrat ne déclare pas : {hors}"
+    assert not hors, f"statuts ou codes que le contrat ne déclare pas : {hors}"
 
 
-def statuts_hors_contrat(
-    vues: list[tuple[str, str, int]],
-) -> list[tuple[str, str, int]]:
-    """Les réponses d'une opération du contrat dont le statut n'y est pas déclaré."""
-    return [
-        (route, methode, statut)
-        for route, methode, statut in vues
-        if (route, methode) in OPERATIONS and statut not in OPERATIONS[route, methode]
-    ]
+#: Les hôtes qu'un test peut joindre par la couche des fournisseurs.
+BOUCLAGE = ("127.0.0.1", "localhost", "::1")
+
+
+@pytest.fixture(autouse=True)
+def aucun_appel_hors_du_bouclage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[list[str]]:
+    """Règle du cadre : aucun test n'appelle un fournisseur réel. Une requête du
+    client asynchrone de httpx (celui de la couche des fournisseurs) vers un hôte
+    hors du bouclage n'est pas envoyée, et fait échouer le test."""
+    hors: list[str] = []
+    envoyer = httpx.AsyncClient.send
+
+    async def garder(
+        client: httpx.AsyncClient, requete: httpx.Request, **options: Any
+    ) -> httpx.Response:
+        if requete.url.host not in BOUCLAGE:
+            hors.append(requete.url.host)
+            raise AssertionError(f"appel hors du bouclage : {requete.url.host}")
+        return await envoyer(client, requete, **options)
+
+    monkeypatch.setattr(httpx.AsyncClient, "send", garder)
+    yield hors
+    assert not hors, f"appels hors du bouclage : {hors}"
+
+
+def statuts_hors_contrat(vues: list[Vue]) -> list[Vue]:
+    """Les réponses d'une opération du contrat dont le statut n'y est pas déclaré, ou
+    dont le code n'est pas parmi ceux que le contrat énumère pour ce statut."""
+    hors: list[Vue] = []
+    for route, methode, statut, code in vues:
+        if (route, methode) not in OPERATIONS:
+            continue
+        codes = CODES.get((route, methode, statut), set())
+        if statut not in OPERATIONS[route, methode] or (codes and code not in codes):
+            hors.append((route, methode, statut, code))
+    return hors
 
 
 @pytest.fixture(scope="session")
@@ -311,6 +374,9 @@ def service_doublure() -> Iterator[ServiceDoublure]:
 #  Une base garnie : un corpus clos, son encodage EmbeddingGemma, promu
 # --------------------------------------------------------------------------- #
 CORPUS = "v7"
+#: Les auteurs de critiques de la base de test, factices : la vue des pseudonymes (024)
+#: les rend à l'API, qui refuse de démarrer si elle est vide.
+AUTEURS = ("Lecteurfactice", "Membrefictif")
 DOCUMENTS = {
     "ms_review:1": ("ms_review", 1, None, "Série 1"),
     "kitsu:50": ("kitsu_synopsis", None, 50, "Kitsu Cinquante"),
@@ -394,6 +460,12 @@ def garnir(dsn: str, instance: Instance, *, clore: bool = True) -> int:
         cx.execute(
             "INSERT INTO manga.work_identity (series_id, kitsu_id) VALUES (2, '50')"
         )
+        for auteur in AUTEURS:
+            cx.execute(
+                "INSERT INTO manga.ms_reviews_all (series_id, review_author)"
+                " VALUES (1, %s)",
+                (auteur,),
+            )
         cx.execute(
             "INSERT INTO bench.corpus (corpus_id, regle, chunking_id)"
             " SELECT %s, 'essai', chunking_id FROM bench.chunking_strategies"
@@ -442,6 +514,7 @@ def environnement(dsn: str) -> dict[str, str]:
             f"application:{CLE_APPLICATION},demonstration:{CLE_DEMONSTRATION}"
         ),
         "API_MODELE_DSN": dsn,
+        "MISTRAL_API_KEY": CLE_FOURNISSEUR,
     }
 
 
@@ -471,7 +544,10 @@ def api(
 ) -> Iterator[TestClient]:
     """L'API démarrée, vue depuis le bouclage (adresse admise pour `/metrics`)."""
     application = creer_application(
-        reglages, instance=service_doublure.instance, horloge=horloge
+        reglages,
+        instance=service_doublure.instance,
+        horloge=horloge,
+        environ={"MISTRAL_API_KEY": CLE_FOURNISSEUR},
     )
     with TestClient(application, client=("127.0.0.1", 50000)) as client:
         yield client
@@ -479,3 +555,265 @@ def api(
 
 def entetes(cle: str = CLE_APPLICATION) -> dict[str, str]:
     return {"X-API-Key": cle}
+
+
+# --------------------------------------------------------------------------- #
+#  Les doublures des fournisseurs du modèle de langage, et deux profils factices
+# --------------------------------------------------------------------------- #
+#: Les clés factices des deux profils : aucune n'a la forme d'une clé réelle.
+CLE_A = "factice-cle-a-0f1e2d3c4b5a6978"
+CLE_B = "factice-cle-b-8796a5b4c3d2e1f0"
+CLES_FACTICES = {"CLE_FACTICE_A": CLE_A, "CLE_FACTICE_B": CLE_B}
+#: Délais des profils factices : courts, pour éprouver les dépassements vite.
+CONNEXION_FACTICE_S = 0.2
+DELAI_FACTICE_S = 0.5
+
+
+#: Une sortie conforme au schéma de la route de réponse : la série 1, son fragment 702.
+SORTIE_VALIDE = json.dumps(
+    {
+        "refus": False,
+        "motif_refus": None,
+        "reponse": "Une aventure de pirates, d'après une critique [S:1].",
+        "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+    }
+)
+#: La sortie de la reformulation : la question d'essai, autonome.
+REFORMULATION_VALIDE = json.dumps({"question": QUESTION})
+#: Une ligne d'en-tête de passage : la série, et l'identifiant du passage s'il est
+#: montré.
+EN_TETE_DE_PASSAGE = re.compile(r"^\[S:(\d+)\] .*?(?: \[F:(\d+)\])?$", re.MULTILINE)
+
+
+def sortie_lue_du_contexte(message: str) -> str:
+    """La sortie d'un modèle qui suit l'invite : la première série du contexte, avec
+    les identifiants de passages qu'il y lit — aucun s'il n'en montre pas."""
+    lus: dict[int, list[int]] = {}
+    for serie, fragment in EN_TETE_DE_PASSAGE.findall(message):
+        lus.setdefault(int(serie), []).extend([int(fragment)] if fragment else [])
+    serie_id, fragment_ids = next(iter(lus.items()))
+    return json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": f"Une aventure de pirates [S:{serie_id}].",
+            "series_citees": [{"serie_id": serie_id, "fragment_ids": fragment_ids}],
+        }
+    )
+
+
+class DoublureFournisseur(BaseHTTPRequestHandler):
+    """Un fournisseur simulé, sur le bouclage : `POST /v1/chat/completions` et
+    `GET /v1/models`. Statut, corps, `usage`, modèle rendu, retard et envoi goutte à
+    goutte réglables ; le contenu rendu dépend du schéma demandé (reformulation ou
+    réponse), et la réponse peut être lue dans le contexte reçu
+    (`lire_le_contexte`) ; chaque requête reçue est gardée (port, chemin, en-tête
+    d'autorisation, corps)."""
+
+    statut: ClassVar[int] = 200
+    corps_brut: ClassVar[bytes | None] = None
+    en_tetes: ClassVar[dict[str, str]] = {}
+    contenu: ClassVar[str] = SORTIE_VALIDE
+    lire_le_contexte: ClassVar[bool] = False
+    contenu_reformulation: ClassVar[str] = REFORMULATION_VALIDE
+    usage: ClassVar[dict[str, Any] | None] = None
+    modele_rendu: ClassVar[str | None] = None
+    retard_s: ClassVar[float] = 0.0
+    goutte_s: ClassVar[float] = 0.0
+    statut_modeles: ClassVar[int] = 200
+    modeles: ClassVar[list[str]] = []
+    recus: ClassVar[list[dict[str, Any]]] = []
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+    def _noter(self, corps: object) -> None:
+        DoublureFournisseur.recus.append(
+            {
+                "port": self.server.server_address[1],
+                "chemin": self.path,
+                "autorisation": self.headers.get("Authorization"),
+                "corps": corps,
+            }
+        )
+
+    def _envoyer(self, statut: int, donnees: bytes) -> None:
+        self.send_response(statut)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(donnees)))
+        for nom, valeur in DoublureFournisseur.en_tetes.items():
+            self.send_header(nom, valeur)
+        self.end_headers()
+        if not DoublureFournisseur.goutte_s:
+            self.wfile.write(donnees)
+            return
+        quart = max(len(donnees) // 4, 1)
+        for debut in range(0, len(donnees), quart):
+            self.wfile.write(donnees[debut : debut + quart])
+            self.wfile.flush()
+            time.sleep(DoublureFournisseur.goutte_s)
+
+    def do_GET(self) -> None:  # noqa: N802
+        self._noter(None)
+        if self.path != "/v1/models":
+            self._envoyer(404, b"{}")
+            return
+        corps = {"object": "list", "data": [{"id": m} for m in self.modeles]}
+        self._envoyer(DoublureFournisseur.statut_modeles, json.dumps(corps).encode())
+
+    def do_POST(self) -> None:  # noqa: N802
+        corps = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self._noter(corps)
+        if DoublureFournisseur.retard_s:
+            time.sleep(DoublureFournisseur.retard_s)
+        if DoublureFournisseur.corps_brut is not None:
+            self._envoyer(DoublureFournisseur.statut, DoublureFournisseur.corps_brut)
+            return
+        schema = corps.get("response_format", {}).get("json_schema", {}).get("schema")
+        if isinstance(schema, dict) and schema.get("required") == ["question"]:
+            contenu = DoublureFournisseur.contenu_reformulation
+        elif DoublureFournisseur.lire_le_contexte:
+            contenu = sortie_lue_du_contexte(corps["messages"][-1]["content"])
+        else:
+            contenu = DoublureFournisseur.contenu
+        reponse: dict[str, Any] = {
+            "id": "cmpl-essai",
+            "model": DoublureFournisseur.modele_rendu or corps["model"],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": contenu},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+        if DoublureFournisseur.usage is not None:
+            reponse["usage"] = DoublureFournisseur.usage
+        self._envoyer(DoublureFournisseur.statut, json.dumps(reponse).encode())
+
+
+@dataclass
+class Doublures:
+    """Deux fournisseurs simulés, à deux adresses distinctes."""
+
+    serveurs: tuple[HTTPServer, HTTPServer]
+
+    @property
+    def port_a(self) -> int:
+        return self.serveurs[0].server_address[1]
+
+    @property
+    def port_b(self) -> int:
+        return self.serveurs[1].server_address[1]
+
+    def recus(self, port: int | None = None) -> list[dict[str, Any]]:
+        return [
+            r for r in DoublureFournisseur.recus if port is None or r["port"] == port
+        ]
+
+
+@pytest.fixture
+def doublures() -> Iterator[Doublures]:
+    DoublureFournisseur.statut = 200
+    DoublureFournisseur.corps_brut = None
+    DoublureFournisseur.en_tetes = {}
+    DoublureFournisseur.contenu = SORTIE_VALIDE
+    DoublureFournisseur.lire_le_contexte = False
+    DoublureFournisseur.contenu_reformulation = REFORMULATION_VALIDE
+    DoublureFournisseur.usage = None
+    DoublureFournisseur.modele_rendu = None
+    DoublureFournisseur.retard_s = 0.0
+    DoublureFournisseur.goutte_s = 0.0
+    DoublureFournisseur.statut_modeles = 200
+    DoublureFournisseur.modeles = []
+    DoublureFournisseur.recus = []
+    serveurs = (
+        ServeurDoublure(("127.0.0.1", 0), DoublureFournisseur),
+        ServeurDoublure(("127.0.0.1", 0), DoublureFournisseur),
+    )
+    for serveur in serveurs:
+        threading.Thread(
+            target=serveur.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        ).start()
+    yield Doublures(serveurs)
+    for serveur in serveurs:
+        serveur.shutdown()
+        serveur.server_close()
+
+
+def profils_factices(port_a: int, port_b: int) -> str:
+    """Deux profils factices : `factice-a` (forme Mistral) et `factice-b` (forme
+    OpenAI, `temperature` déclarée absente), chacun sur sa doublure."""
+    return f"""
+[modele_langage.profils.factice-a]
+fournisseur = "mistral"
+modele = "modele-a"
+adresse = "http://127.0.0.1:{port_a}/v1/chat/completions"
+variable_cle = "CLE_FACTICE_A"
+reglages_fixes = {{ top_p = 1.0 }}
+reglages_absents = []
+prix_usd_par_million = {{ entree = 2.0, sortie = 8.0 }}
+delai_s = {DELAI_FACTICE_S}
+statut = "stable"
+motif = "Profil factice des tests, sur une doublure du bouclage."
+
+[modele_langage.profils.factice-b]
+fournisseur = "openai"
+modele = "modele-b"
+adresse = "http://127.0.0.1:{port_b}/v1/chat/completions"
+variable_cle = "CLE_FACTICE_B"
+reglages_fixes = {{ top_p = 1.0, reasoning_effort = "none" }}
+reglages_absents = ["temperature"]
+prix_usd_par_million = {{ entree = 1.0, sortie = 4.0 }}
+delai_s = {DELAI_FACTICE_S}
+statut = "apercu"
+motif = "Profil factice des tests, sur une doublure du bouclage."
+"""
+
+
+def reglages_factices(tmp_path: Path, doublures: Doublures) -> Path:
+    """Le fichier versionné, ses quatre profils remplacés par les deux factices
+    (`factice-a` actif) et un délai de connexion court."""
+    texte = FICHIER_REGLAGES.read_text(encoding="utf-8")
+    texte = texte[: texte.index("[modele_langage.profils.")]
+    for avant, apres in (
+        ('profil_actif = "mistral-large-2512"', 'profil_actif = "factice-a"'),
+        ("connexion_s = 5.0", f"connexion_s = {CONNEXION_FACTICE_S}"),
+    ):
+        assert texte.count(avant) == 1
+        texte = texte.replace(avant, apres)
+    fichier = tmp_path / "reglages_factices.toml"
+    fichier.write_text(
+        texte + profils_factices(doublures.port_a, doublures.port_b), encoding="utf-8"
+    )
+    return fichier
+
+
+#: Un environnement complet pour `charger`, sans base : les tests de la couche.
+ENVIRONNEMENT_FACTICE = {
+    "API_MODELE_CLES": f"application:{CLE_APPLICATION}",
+    "API_MODELE_DSN": "postgresql://modele_api@localhost/apimanga",
+    **CLES_FACTICES,
+}
+
+
+@pytest.fixture
+def api_reponse(
+    base_api: BaseApi,
+    pgpass: Path,
+    service_doublure: ServiceDoublure,
+    doublures: Doublures,
+    horloge: Horloge,
+    tmp_path: Path,
+) -> Iterator[TestClient]:
+    """L'API démarrée sur les deux profils factices (`factice-a` actif), chacun sur sa
+    doublure : la route de réponse ne joint que le bouclage."""
+    env = environnement(dsn_du_role(base_api.dsn_admin)) | CLES_FACTICES
+    reglages = replace(
+        charger(env, reglages_factices(tmp_path, doublures)), pool_attente_s=2.0
+    )
+    application = creer_application(
+        reglages, instance=service_doublure.instance, horloge=horloge, environ=env
+    )
+    with TestClient(application, client=("127.0.0.1", 50000)) as client:
+        yield client

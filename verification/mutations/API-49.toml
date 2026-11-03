@@ -1,0 +1,7 @@
+id = "API-49"
+origine = "E3 étape 3, spec 06, bloc D (2026-11-02) — le run des scénarios interrompu par un refus du fournisseur, sans statut ni code d'erreur gardés : la cause ne se lisait nulle part ; le message du fournisseur, lui, ne doit pas entrer dans les pièces"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    return {k: v for k, v in (r.erreur or {}).items() if k in ("code", "type")}'''
+apres = '''    return dict(r.erreur or {})'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "gardent_le_refus_du_fournisseur"]

@@ -144,7 +144,7 @@ class Enveloppe:
             "cle": etat.get("cle"),
         }
         champs.update(self.contexte)
-        for cle in ("identite", "reglages", "question"):
+        for cle in ("identite", "reglages", "question", "reponse"):
             if cle in etat:
                 champs[cle] = etat[cle]
         journal.requete(champs)

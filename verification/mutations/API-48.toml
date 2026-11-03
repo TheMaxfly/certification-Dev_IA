@@ -1,0 +1,7 @@
+id = "API-48"
+origine = "E3 étape 3, spec 06, bloc D (2026-11-02) — la reformulation fidèle : un titre court pris dans un mot plus long (Blue dans Bluebird) compterait pour la série nommée"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    motif = rf"(?<!\w){re.escape(titre)}(?!\w)"'''
+apres = '''    motif = re.escape(titre)'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "la_question_reformulee_nomme_la_serie"]

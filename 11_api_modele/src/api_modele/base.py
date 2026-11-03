@@ -5,8 +5,8 @@ ouvert au démarrage, fermé à l'arrêt. Ici, chaque session est en lecture seu
 sa première requête (en plus du rôle `modele_api`, lui-même en lecture seule), et
 chaque transaction porte son délai maximal (`statement_timeout`).
 
-L'API ne lit que le périmètre de `modele_ro` (migration 023) ; l'encodage servi est
-toujours celui de la vue `bench.v_encodage_en_service`.
+L'API ne lit que le périmètre de `modele_ro` (migrations 023 à 025) ; l'encodage servi
+est toujours celui de la vue `bench.v_encodage_en_service`.
 """
 
 from __future__ import annotations
@@ -43,6 +43,11 @@ SQL_TITRES_SERIES = (
 SQL_TITRES_KITSU = (
     "SELECT kitsu_id, title FROM bench.corpus_docs WHERE corpus_id = %s"
     " AND source = 'kitsu_synopsis' AND kitsu_id = ANY(%s)"
+)
+SQL_METADONNEES = (
+    "SELECT series_id, disponibilite, nb_volumes, nb_volumes_source, statut,"
+    " demographie, annee_fr, auteurs FROM manga.v_metadonnees_serie"
+    " WHERE series_id = ANY(%s)"
 )
 SQL_PASSAGES = """
 SELECT k.chunk_id, k.doc_key, d.source, k.chunk_text
@@ -167,6 +172,16 @@ def lire_titres(
         if t is not None
     }
     return series, kitsu
+
+
+def lire_metadonnees(
+    cx: Connection[TupleRow], series_ids: list[int]
+) -> dict[int, tuple[object, ...]]:
+    """Les sept valeurs de chaque série, dans l'ordre de la vue (025, 026)."""
+    return {
+        int(ligne[0]): tuple(ligne[1:])
+        for ligne in cx.execute(SQL_METADONNEES, (series_ids,)).fetchall()
+    }
 
 
 def lire_passages(

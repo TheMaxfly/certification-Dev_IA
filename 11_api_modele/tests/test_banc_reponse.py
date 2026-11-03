@@ -1,0 +1,1818 @@
+"""Le banc de mesure de la réponse (spec 06, A) : sans appel réel.
+
+Tout ce qui parle à un fournisseur passe par les doublures du bouclage et les deux
+profils factices ; la garde de toute la suite (`aucun_appel_hors_du_bouclage`) le
+vérifie. MLflow est remplacé par un exécuteur factice (le script, lui, est éprouvé
+avec un MLflow simulé) ; la ligne `bench.eval_runs` est écrite dans la base jetable.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+import shutil
+import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import replace
+from pathlib import Path
+from typing import Any, cast
+
+import httpx
+import psycopg
+import pytest
+from conftest import (
+    AUTEURS,
+    CLE_APPLICATION,
+    ENVIRONNEMENT_FACTICE,
+    QUESTION,
+    SORTIE_VALIDE,
+    BaseApi,
+    DoublureFournisseur,
+    Doublures,
+    environnement,
+)
+from fastapi.testclient import TestClient
+
+from api_modele import reponse as route
+from api_modele.banc_reponse import __main__ as cli
+from api_modele.banc_reponse import enregistrement, jeu, journal_mlflow, mesure
+from api_modele.banc_reponse.espion import Espion, Releve, nombres
+from api_modele.banc_reponse.mesure import (
+    ATTENTE_DEBIT_S,
+    Appel,
+    Banc,
+    PlafondDepasse,
+    Run,
+    Tour,
+    essai,
+    estimer,
+    garder_plafond,
+    mesurer,
+    metriques,
+    metriques_scenarios,
+    nommee_par,
+    scenarios,
+    verdict,
+)
+from api_modele.configuration import Prix, Profil
+from api_modele.fournisseurs import cout_usd
+from api_modele.modeles import Serie
+from api_modele.pseudonymes import empreinte
+from api_modele.reponse import INVITE_REPONSE, message_de_reponse
+
+RUN1 = "famille:F7,issue:hors_catalogue,famille:F9,famille:F10"
+COURT = "famille:F7,issue:hors_catalogue"
+TEXTE_REFUS = "Les passages ne parlent pas de cette série."
+REFUS = json.dumps(
+    {
+        "refus": True,
+        "motif_refus": "inconnu",
+        "reponse": TEXTE_REFUS,
+        "series_citees": [],
+    }
+)
+RUN_ID = "0123456789abcdef0123456789abcdef"
+
+
+def profil(fournisseur: str = "mistral", **champs: Any) -> Profil:
+    valeurs: dict[str, Any] = {
+        "nom": "p",
+        "fournisseur": fournisseur,
+        "modele": "m",
+        "adresse": "http://127.0.0.1/v1/chat/completions",
+        "variable_cle": "CLE",
+        "top_p": 1.0,
+        "reasoning_effort": None,
+        "reglages_absents": (),
+        "prix": Prix(2.0, 8.0),
+        "delai_s": 1.0,
+        "statut": "stable",
+        "disponible": True,
+    }
+    return Profil(**(valeurs | champs))
+
+
+# --------------------------------------------------------------------------- #
+#  Le jeu, l'espion, les métriques : sans API
+# --------------------------------------------------------------------------- #
+def test_le_jeu_se_lit_par_famille_et_par_issue():
+    questions, empreinte = jeu.lire(COURT)
+    assert empreinte == jeu.EMPREINTE
+    assert len(questions) == 10
+    assert sum(q.famille == "F7" for q in questions) == 5
+    assert sum(q.issue == "reconnue_hors_catalogue" for q in questions) == 5
+    assert not any(q.attend_une_serie for q in questions)
+    assert [q.question_id for q in questions] == sorted(
+        q.question_id for q in questions
+    )
+    run1, _ = jeu.lire(RUN1)
+    assert len(run1) == 26
+    assert sum(q.attend_une_serie for q in run1) == 16
+    assert jeu.nom_court(RUN1) == "F7+hors_catalogue+F9+F10"
+
+
+@pytest.mark.parametrize("designation", ["question:Q001", "famille:X", "issue:autre"])
+def test_une_question_ne_se_designe_pas_une_par_une(designation):
+    with pytest.raises(jeu.JeuRefuse):
+        jeu.lire(designation)
+
+
+def test_un_jeu_altere_est_refuse_avant_tout(tmp_path):
+    copie = tmp_path / "v2"
+    shutil.copytree(jeu.DOSSIER, copie)
+    with (copie / "questions.csv").open("a", encoding="utf-8") as f:
+        f.write("\n")
+    with pytest.raises(jeu.JeuRefuse, match="empreinte"):
+        jeu.lire(COURT, copie)
+
+
+def test_le_texte_d_une_question_par_son_identifiant():
+    assert jeu.texte_de("Q001").startswith("Mon père adorait City Hunter")
+    with pytest.raises(jeu.JeuRefuse):
+        jeu.texte_de("Q999")
+
+
+def test_le_releve_compte_comme_la_couche_des_fournisseurs():
+    mistral = Releve("h", "reponse", {}, 700, statut=200)
+    mistral.usage = {"prompt_tokens": 1000, "completion_tokens": 100}
+    assert mistral.jetons(profil(), 3.5) == (1000, 100, 0, False)
+    assert mistral.cout(profil(), 3.5) == cout_usd(profil(), 1000, 100, 0)
+
+    openai = Releve("h", "reponse", {}, 700, statut=200)
+    openai.usage = {
+        "prompt_tokens": 1000,
+        "completion_tokens": 100,
+        "completion_tokens_details": {"reasoning_tokens": 30},
+    }
+    assert openai.jetons(profil("openai"), 3.5) == (1000, 70, 30, False)
+
+    sans_usage = Releve("h", "reponse", {}, 700, statut=200)
+    assert sans_usage.jetons(profil(), 3.5) == (200, 0, 0, True)
+
+    refuse = Releve("h", "reponse", {}, 700, statut=400)
+    refuse.usage = mistral.usage
+    assert refuse.cout(profil(), 3.5) == 0.0
+
+
+def test_l_espion_ne_garde_que_des_nombres():
+    assert nombres(
+        {
+            "prompt_tokens": 12,
+            "texte": "une critique",
+            "details": {"reasoning_tokens": 3, "vide": {}, "drapeau": True},
+            "liste": [1, 2],
+        }
+    ) == {"prompt_tokens": 12, "details": {"reasoning_tokens": 3}}
+
+
+def ligne(**champs: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "question_id": "Q",
+        "famille": "F9",
+        "issue": "au_catalogue",
+        "statut": 200,
+        "code": None,
+        "motif": None,
+        "pseudonymes": 0,
+        "refus": False,
+        "mention_hors_catalogue": False,
+        "appels": [
+            {
+                "statut": 200,
+                "jetons": {"entree": 1000, "sortie": 100, "raisonnement": 0},
+            },
+        ],
+        "latence_modele_ms": 1000.0,
+        "latence_totale_ms": 1200.0,
+        "nb_series_citees": 2,
+        "titres_presents": 1,
+        "titres_marques": 2,
+        "longueur_reponse": 300,
+        "recouvrement_8": 0.1,
+    }
+    return base | champs
+
+
+def test_les_metriques_et_le_critere():
+    run = Run("p", cout_reel_usd=0.0123)
+    run.par_question = [
+        *(ligne(famille="F7", issue="inconnue", refus=True) for _ in range(4)),
+        ligne(famille="F7", issue="inconnue"),
+        ligne(issue="reconnue_hors_catalogue", refus=True),
+        *(
+            ligne(issue="reconnue_hors_catalogue", mention_hors_catalogue=True)
+            for _ in range(3)
+        ),
+        ligne(issue="reconnue_hors_catalogue"),
+        ligne(citee_attendue_1=True, hit_rate_10=True, recouvrement_8=0.5),
+        ligne(citee_attendue_1=False, hit_rate_10=True, refus=True),
+        ligne(
+            statut=503,
+            code="sortie_modele_invalide",
+            motif="serie_inconnue",
+            appels=[
+                {
+                    "statut": 200,
+                    "jetons": {"entree": 900, "sortie": 50, "raisonnement": 0},
+                }
+            ],
+        ),
+    ]
+    m = metriques(run)
+    assert m["refus_correct_F7"] == 4
+    assert m["refus_correct_hors_catalogue"] == 4
+    assert m["refus_a_tort"] == 1
+    assert m["series_inventees"] == 1
+    assert m["sorties_invalides_serie_inconnue"] == 1
+    assert (m["citee_attendue_1"], m["hit_rate_10"], m["questions_de_rang"]) == (
+        1,
+        2,
+        2,
+    )
+    assert m["jetons_entree_somme"] == 12 * 1000 + 900
+    assert m["recouvrement_8_max"] == 0.5
+    assert m["latence_modele_ms_mediane"] == 1000.0
+    assert m["cout_usd"] == 0.0123
+    # Sur les douze réponses rendues : un titre écrit sur deux séries citées.
+    assert (m["titres_presents"], m["titres_cites"], m["titre_present"]) == (
+        12,
+        24,
+        0.5,
+    )
+    assert m["citees_sans_marque"] == 0
+    # Une série citée sans marque n'entre pas dans `titre_present` : comptée à part.
+    run.par_question = [ligne(titres_marques=1)]
+    m1 = metriques(run)
+    assert (m1["titres_cites"], m1["titre_present"], m1["citees_sans_marque"]) == (
+        1,
+        1.0,
+        1,
+    )
+    v = verdict(m)
+    assert v == {
+        "F7": True,
+        "hors_catalogue": True,
+        "series_inventees": False,
+        "pseudonymes": True,
+        "disponibilite": True,
+        "demographie": True,
+        "tenu": False,
+    }
+    sans_f7 = verdict(m | {"questions_F7": 0, "series_inventees": 0})
+    assert "F7" not in sans_f7 and sans_f7["tenu"] is True
+    for motif in ("disponibilite", "demographie"):
+        contredite = verdict(
+            m | {"series_inventees": 0, f"sorties_invalides_{motif}": 1}
+        )
+        assert contredite[motif] is False and contredite["tenu"] is False
+
+
+@pytest.mark.parametrize(
+    ("texte", "attendu"),
+    [
+        ("Ce titre n'apparaît pas dans les passages fournis. En revanche…", True),
+        ("Ce titre n’apparait pas dans les passages.", True),
+        ("Il ne semble pas être mentionné dans les passages disponibles.", True),
+        ("Elle n'est pas mentionnée dans les passages.", True),
+        ("Il n'est pas au catalogue.", True),
+        ("Ce titre apparaît dans les passages.", False),
+        ("Les passages ne précisent pas sa disponibilité.", False),
+    ],
+)
+def test_ce_qui_compte_comme_mention_hors_catalogue(texte, attendu):
+    assert bool(mesure.MENTION_HORS_CATALOGUE.search(texte)) is attendu
+
+
+def message_a_deux_series(passage_1: str, passage_2: str = "Rien de plus.") -> str:
+    return (
+        "Question : q\n\nPASSAGES :\n\n"
+        "[S:1] A — résumé de série — tomes : inconnu [F:10]\n"
+        f"{passage_1}\n\n"
+        "[S:2] B — critique de tome — tomes : 3 (champ) [F:20]\n"
+        f"{passage_2}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("passage", "dementie"),
+    [
+        ("L'éditeur lança la version française de ces deux livres !", True),
+        ("Un volume est paru en France en 2015.", True),
+        ("Il existe une édition française.", True),
+        ("Aucune édition française n'est prévue.", False),
+        ("Il n'existe pas de version française.", False),
+        ("Une série inédite, seulement au Japon.", False),
+        ("Le deuxième paragraphe.\n\nPuis la version française en 2015.", True),
+    ],
+)
+def test_une_ligne_dementie_par_un_passage(passage, dementie):
+    assert mesure.ligne_dementie(message_a_deux_series(passage), 1) is dementie
+
+
+def test_seuls_les_passages_de_la_serie_dementent_sa_ligne():
+    message = message_a_deux_series("Rien.", "La version française est parue.")
+
+    assert mesure.ligne_dementie(message, 1) is False
+    assert mesure.ligne_dementie(message, 2) is True
+    assert mesure.ligne_dementie(message, 3) is False
+
+
+def test_une_sortie_dont_le_catalogue_a_tort_ne_compte_pas_contre_le_critere():
+    run = Run("p", cout_reel_usd=0.01)
+    run.par_question = [
+        ligne(famille="F7", issue="inconnue", refus=True) for _ in range(4)
+    ]
+    run.par_question.append(
+        ligne(
+            statut=503,
+            code="sortie_modele_invalide",
+            motif="disponibilite",
+            catalogue_en_tort=True,
+        )
+    )
+    m = metriques(run)
+    assert (m["sorties_invalides_disponibilite"], m["catalogue_en_tort"]) == (1, 1)
+    assert verdict(m)["disponibilite"] is True
+
+    # Sans le catalogue en tort, elle compte : le modèle a contredit sa ligne.
+    run.par_question[-1]["catalogue_en_tort"] = False
+    m = metriques(run)
+    assert m["catalogue_en_tort"] == 0
+    assert verdict(m)["disponibilite"] is False
+
+
+def test_le_plafond_avant_tout_appel():
+    from api_modele.banc_reponse.mesure import Estimation
+
+    garder_plafond(Estimation(1, 1, 10, 0.4), 0.5)
+    with pytest.raises(PlafondDepasse, match="aucun appel"):
+        garder_plafond(Estimation(1, 1, 10, 0.6), 0.5)
+
+
+# --------------------------------------------------------------------------- #
+#  La garde de commit, MLflow, eval_runs
+# --------------------------------------------------------------------------- #
+def git(dossier: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=dossier, check=True, capture_output=True)
+
+
+def test_on_commite_d_abord_on_mesure_ensuite(tmp_path):
+    distant, local = tmp_path / "distant.git", tmp_path / "local"
+    git(tmp_path, "init", "-q", "--bare", str(distant))
+    git(tmp_path, "init", "-q", "-b", "travail", str(local))
+    for cle, valeur in (
+        ("user.name", "essai"),
+        ("user.email", "essai@exemple.invalid"),
+    ):
+        git(local, "config", cle, valeur)
+    (local / "f.txt").write_text("1")
+    git(local, "add", "f.txt")
+    git(local, "commit", "-q", "-m", "un")
+    with pytest.raises(enregistrement.CommitRefuse, match="sans amont"):
+        enregistrement.exiger_commit(local)
+    git(local, "remote", "add", "origin", str(distant))
+    git(local, "push", "-q", "-u", "origin", "travail")
+    etat = enregistrement.exiger_commit(local)
+    assert etat["branche"] == "travail" and len(etat["commit"]) == 40
+    (local / "f.txt").write_text("2")
+    with pytest.raises(enregistrement.CommitRefuse, match="non propre"):
+        enregistrement.exiger_commit(local)
+    git(local, "commit", "-q", "-am", "deux")
+    with pytest.raises(enregistrement.CommitRefuse, match="pas poussé"):
+        enregistrement.exiger_commit(local)
+
+
+def test_mlflow_par_l_interpreteur_du_module_10(tmp_path, monkeypatch):
+    recues: list[list[str]] = []
+
+    def executeur(commande: list[str]) -> str:
+        recues.append(commande)
+        return f"un avertissement\n{RUN_ID}\n"
+
+    charge = enregistrement.charge_mlflow(
+        "nom", {"statut": "termine"}, {"a": "x", "b": [1]}, {"m": 1.0}, {"p.json": [1]}
+    )
+    assert charge["parametres"] == {"a": "x", "b": "[1]"}
+    assert charge["experience"] == "E3-reponse"
+    assert enregistrement.journaliser_mlflow(charge, tmp_path, executeur) == RUN_ID
+    commande = recues[0]
+    assert commande[:5] == [
+        "uv",
+        "run",
+        "--project",
+        str(enregistrement.MODULE_10),
+        "--locked",
+    ]
+    assert commande[-3:] == [
+        "-I",
+        str(enregistrement.SCRIPT),
+        str(tmp_path / "mlflow_charge.json"),
+    ]
+    with pytest.raises(RuntimeError, match="illisible"):
+        enregistrement.journaliser_mlflow(charge, tmp_path, lambda _: "rien\n")
+
+    vus: dict[str, Any] = {}
+
+    def lancer(commande: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        vus.update(options)
+        return subprocess.CompletedProcess(commande, 0, stdout=RUN_ID)
+
+    monkeypatch.setenv("MISTRAL_API_KEY", "factice-ne-doit-pas-passer")
+    monkeypatch.setattr(enregistrement.subprocess, "run", lancer)
+    assert enregistrement.executer(["uv"]) == RUN_ID
+    assert "MISTRAL_API_KEY" not in vus["env"]
+    assert set(vus["env"]) <= set(enregistrement.ENVIRONNEMENT_TRANSMIS)
+
+
+class MlflowSimule:
+    def __init__(self) -> None:
+        self.appels: list[tuple[str, Any]] = []
+        self.experiences: set[str] = set()
+
+    def __getattr__(self, nom: str) -> Any:
+        def appel(*args: Any, **options: Any) -> Any:
+            self.appels.append((nom, args))
+            if nom == "get_experiment_by_name":
+                return args[0] if args[0] in self.experiences else None
+            if nom == "create_experiment":
+                self.experiences.add(args[0])
+            if nom == "start_run":
+                return type("R", (), {"info": type("I", (), {"run_id": RUN_ID})()})()
+            if nom == "log_metrics" and "boum" in args[0]:
+                raise RuntimeError("boum")
+            return None
+
+        return appel
+
+
+def test_le_script_mlflow(tmp_path, capsys, monkeypatch):
+    charge = enregistrement.charge_mlflow(
+        "nom", {"statut": "interrompu"}, {"a": "x"}, {"m": 1.0}, {"p.json": {"k": 1}}
+    )
+    mlflow = MlflowSimule()
+    assert journal_mlflow.journaliser(mlflow, charge) == RUN_ID
+    noms = [n for n, _ in mlflow.appels]
+    assert noms[:4] == [
+        "set_tracking_uri",
+        "get_experiment_by_name",
+        "create_experiment",
+        "set_experiment",
+    ]
+    assert ("log_text", ('{\n "k": 1\n}', "p.json")) in mlflow.appels
+    assert mlflow.appels[-1] == ("end_run", ("KILLED",))
+    mlflow.appels.clear()
+    journal_mlflow.journaliser(mlflow, charge | {"etiquettes": {"statut": "termine"}})
+    assert "create_experiment" not in [n for n, _ in mlflow.appels]
+    assert mlflow.appels[-1] == ("end_run", ("FINISHED",))
+    with pytest.raises(RuntimeError):
+        journal_mlflow.journaliser(mlflow, charge | {"metriques": {"boum": 1.0}})
+    assert mlflow.appels[-1] == ("end_run", ("FAILED",))
+
+    fichier = tmp_path / "charge.json"
+    fichier.write_text(json.dumps(charge), encoding="utf-8")
+    monkeypatch.setattr(
+        journal_mlflow.importlib, "import_module", lambda _: MlflowSimule()
+    )
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+    assert capsys.readouterr().out.strip() == RUN_ID
+    assert journal_mlflow.principal(["script"]) == 2
+
+
+def test_les_fichiers_du_run_et_leurs_empreintes(tmp_path):
+    for chemin in enregistrement.FICHIERS_DU_RUN:
+        (tmp_path / chemin).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / chemin).write_text(f"texte de {chemin}", encoding="utf-8")
+
+    fichiers = enregistrement.fichiers_du_run(tmp_path)
+    empreintes = enregistrement.empreintes_du_run(fichiers)
+
+    assert set(fichiers) == set(enregistrement.FICHIERS_DU_RUN)
+    assert set(empreintes) == {
+        "invite_reponse_sha",
+        "invite_reformulation_sha",
+        "reglages_sha",
+    }
+    attendue = hashlib.sha256(b"texte de config/reglages.toml").hexdigest()
+    assert empreintes["reglages_sha"] == attendue
+    # Les fichiers vont tels quels, pas en JSON.
+    charge = enregistrement.charge_mlflow(
+        "nom", {}, {}, {}, {"p.json": [1]}, fichiers=fichiers
+    )
+    assert charge["pieces_texte"]["config/reglages.toml"] == (
+        "texte de config/reglages.toml"
+    )
+    assert charge["pieces_texte"]["p.json"] == "[\n 1\n]"
+    # Le dépôt porte bien ces trois fichiers.
+    assert set(enregistrement.fichiers_du_run()) == set(fichiers)
+
+
+def test_la_version_des_invites_est_celle_du_commit(tmp_path):
+    local = tmp_path / "depot"
+    invites = local / enregistrement.INVITES_DU_DEPOT
+    invites.mkdir(parents=True)
+    git(local, "init", "-q")
+    git(local, "config", "user.email", "essai@exemple.org")
+    git(local, "config", "user.name", "essai")
+    (invites / "reponse.md").write_text("une", encoding="utf-8")
+    git(local, "add", ".")
+    git(local, "commit", "-qm", "les invites")
+    avec_invites = enregistrement.git(local, "rev-parse", "--short", "HEAD")
+    (local / "autre.txt").write_text("x", encoding="utf-8")
+    git(local, "add", ".")
+    git(local, "commit", "-qm", "autre chose")
+
+    assert enregistrement.invite_version("HEAD", local) == avec_invites
+    assert enregistrement.invite_version("c" * 40, local) == "inconnue"
+
+
+@pytest.mark.parametrize(
+    ("profil", "statut", "motif", "verdict_", "attendues"),
+    [
+        (
+            "actif",
+            "termine",
+            None,
+            {"tenu": True},
+            {"role": "profil_actif", "statut": "complet", "verdict": "tenu"},
+        ),
+        (
+            "autre",
+            "termine",
+            None,
+            {"tenu": False},
+            {"role": "repli", "statut": "complet", "verdict": "non_tenu"},
+        ),
+        # Les scénarios n'ont pas de critère : pas de verdict.
+        ("actif", "termine", None, None, {"role": "profil_actif", "statut": "complet"}),
+        (
+            "actif",
+            "interrompu",
+            "fournisseur_refus",
+            {"tenu": False},
+            {
+                "role": "profil_actif",
+                "statut": "interrompu",
+                "verdict": "non_tenu",
+                "cause_interruption": "fournisseur_refus",
+            },
+        ),
+        (
+            "actif",
+            "interrompu",
+            "coût réel 0,6 $ > plafond 0,50 $",
+            None,
+            {
+                "role": "profil_actif",
+                "statut": "interrompu",
+                "cause_interruption": "plafond",
+            },
+        ),
+    ],
+)
+def test_les_etiquettes_d_un_run(profil, statut, motif, verdict_, attendues):
+    assert enregistrement.etiquettes_du_run(
+        profil, "actif", "abc1234", statut, motif, verdict_
+    ) == {"etape": "E3-06", "invite_version": "abc1234", **attendues}
+
+
+def test_les_etiquettes_a_posteriori_se_lisent_dans_les_dossiers(tmp_path, monkeypatch):
+    monkeypatch.setattr(enregistrement, "invite_version", lambda commit: commit[:7])
+    for nom, run_id, resume in (
+        (
+            "a",
+            "a" * 32,
+            {
+                "statut": "termine",
+                "motif_interruption": None,
+                "verdict": {"tenu": True},
+                "parametres": {"profil": "actif", "commit": "1111111aaaa"},
+            },
+        ),
+        (
+            "b",
+            "b" * 32,
+            {
+                "statut": "interrompu",
+                "motif_interruption": "fournisseur_delai",
+                "parametres": {"profil": "autre", "commit": "2222222bbbb"},
+            },
+        ),
+    ):
+        dossier = tmp_path / nom
+        dossier.mkdir()
+        enregistrement.ecrire_json(dossier / "run_id.json", {"run_id": run_id})
+        enregistrement.ecrire_json(dossier / "resume.json", resume)
+    (tmp_path / "sans_run").mkdir()
+
+    runs = enregistrement.etiquettes_des_runs_faits("actif", tmp_path)
+
+    assert runs == {
+        "a" * 32: {
+            "etape": "E3-06",
+            "role": "profil_actif",
+            "invite_version": "1111111",
+            "statut": "complet",
+            "verdict": "tenu",
+        },
+        "b" * 32: {
+            "etape": "E3-06",
+            "role": "repli",
+            "invite_version": "2222222",
+            "statut": "interrompu",
+            "cause_interruption": "fournisseur_delai",
+        },
+    }
+
+
+class ClientSimule:
+    """Le registre et les runs d'un `MlflowClient`, en mémoire."""
+
+    def __init__(self) -> None:
+        self.modeles: list[str] = []
+        self.versions: list[Any] = []
+        self.etiquettes: dict[str, dict[str, str]] = {}
+        self.metriques: dict[str, dict[str, float]] = {}
+        self.pieces: dict[str, dict[str, str]] = {}
+
+    def set_tag(self, run_id: str, cle: str, valeur: str) -> None:
+        self.etiquettes.setdefault(run_id, {})[cle] = valeur
+
+    def log_metric(self, run_id: str, cle: str, valeur: float) -> None:
+        self.metriques.setdefault(run_id, {})[cle] = valeur
+
+    def log_text(self, run_id: str, contenu: str, chemin: str) -> None:
+        self.pieces.setdefault(run_id, {})[chemin] = contenu
+
+    def search_registered_models(self, filter_string: str) -> list[str]:
+        return [m for m in self.modeles if f"'{m}'" in filter_string]
+
+    def create_registered_model(self, nom: str, description: str) -> None:
+        assert "ne contrôle rien" in description
+        self.modeles.append(nom)
+
+    def search_model_versions(self, filtre: str) -> list[Any]:
+        return list(self.versions)
+
+    def get_run(self, run_id: str) -> Any:
+        info = type("I", (), {"artifact_uri": f"file:///pieces/{run_id}/artifacts"})
+        return type("R", (), {"info": info})
+
+    def create_model_version(
+        self, nom: str, source: str, run_id: str, tags: dict[str, str]
+    ) -> Any:
+        assert source.endswith(f"{run_id}/artifacts")
+        version = type(
+            "V",
+            (),
+            {
+                "version": len(self.versions) + 1,
+                "run_id": run_id,
+                "tags": tags,
+                "stade": None,
+            },
+        )
+        self.versions.append(version)
+        return version
+
+    def transition_model_version_stage(
+        self, nom: str, version: int, stade: str
+    ) -> None:
+        self.versions[version - 1].stade = stade
+
+
+QUALIFIANTS = {
+    "mistral-large-2512": "1" * 32,
+    "mistral-large-4": "2" * 32,
+    "gpt-6-luna": "3" * 32,
+    "gpt-6-sol": "4" * 32,
+}
+
+
+def test_le_registre_une_version_par_profil_a_son_stade():
+    client = ClientSimule()
+    charge = enregistrement.charge_du_registre(QUALIFIANTS, "mistral-large-2512")
+
+    sortie_ = journal_mlflow.inscrire(client, charge)
+
+    assert client.modeles == ["conseiller-manga-reponse"]
+    assert {
+        v.tags["profil"]: (v.stade, v.run_id, v.tags["role"]) for v in client.versions
+    } == {
+        "mistral-large-2512": ("Production", "1" * 32, "profil_actif"),
+        "mistral-large-4": ("Staging", "2" * 32, "repli"),
+        "gpt-6-luna": ("Archived", "3" * 32, "repli"),
+        "gpt-6-sol": ("Archived", "4" * 32, "repli"),
+    }
+    assert "mistral-large-2512=1:Production" in sortie_
+
+    # Rejouer ne double rien.
+    journal_mlflow.inscrire(client, charge)
+    assert len(client.versions) == 4 and client.modeles == ["conseiller-manga-reponse"]
+
+    # Requalifié par un autre run : une version de plus, l'ancienne archivée.
+    charge = enregistrement.charge_du_registre(
+        QUALIFIANTS | {"mistral-large-2512": "5" * 32}, "mistral-large-2512"
+    )
+    journal_mlflow.inscrire(client, charge)
+    assert len(client.versions) == 5
+    assert (client.versions[0].stade, client.versions[4].stade) == (
+        "Archived",
+        "Production",
+    )
+
+
+def test_le_script_mlflow_etiquette_et_inscrit(tmp_path, capsys, monkeypatch):
+    client = ClientSimule()
+    module = type("M", (), {"MlflowClient": staticmethod(lambda **_: client)})
+    monkeypatch.setattr(journal_mlflow.importlib, "import_module", lambda _: module)
+    etiquettes = enregistrement.charge_des_etiquettes(
+        {"a" * 32: {"etape": "E3-06"}, "b" * 32: {"statut": "complet"}}
+    )
+    fichier = tmp_path / "charge.json"
+    fichier.write_text(json.dumps(etiquettes), encoding="utf-8")
+
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+    assert client.etiquettes == {
+        "a" * 32: {"etape": "E3-06"},
+        "b" * 32: {"statut": "complet"},
+    }
+    assert "2 runs" in capsys.readouterr().out
+
+    charge = enregistrement.charge_du_registre(QUALIFIANTS, "mistral-large-2512")
+    fichier.write_text(json.dumps(charge), encoding="utf-8")
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+    assert len(client.versions) == 4
+
+
+def test_etiqueter_et_inscrire_par_la_ligne_de_commande(tmp_path, capsys, monkeypatch):
+    charges: list[dict[str, Any]] = []
+
+    def executer(commande: list[str]) -> str:
+        charges.append(json.loads(Path(commande[-1]).read_text(encoding="utf-8")))
+        return "un avertissement\nle résumé\n"
+
+    monkeypatch.setattr(enregistrement, "executer", executer)
+    monkeypatch.setattr(enregistrement, "SORTIES", tmp_path)
+    monkeypatch.setattr(cli, "profil_actif_declare", lambda _: "mistral-large-2512")
+    monkeypatch.setattr(
+        enregistrement, "etiquettes_des_runs_faits", lambda _: {"a" * 32: {"x": "y"}}
+    )
+
+    assert cli.principal(["etiqueter"], environ={}) == 0
+    assert charges[-1]["action"] == "etiquettes"
+    assert charges[-1]["runs"] == {"a" * 32: {"x": "y"}}
+
+    couples = [f"{p}={r}" for p, r in QUALIFIANTS.items()]
+    assert cli.principal(["registre", *couples], environ={}) == 0
+    assert charges[-1]["action"] == "registre"
+    assert [v["stade"] for v in charges[-1]["versions"]] == [
+        "Production",
+        "Staging",
+        "Archived",
+        "Archived",
+    ]
+    assert "le résumé" in capsys.readouterr().out
+
+    # Un profil sans son run, un identifiant illisible : refusés, sans écrire.
+    nombre = len(charges)
+    assert cli.principal(["registre", *couples[:3]], environ={}) == 2
+    assert cli.principal(["registre", *couples[:3], "gpt-6-sol=x"], environ={}) == 2
+    assert len(charges) == nombre
+
+
+def test_le_profil_actif_se_lit_sans_cle_de_consommateur():
+    environ = environnement("postgresql://modele_api@localhost:1/essai")
+    environ.pop("API_MODELE_CLES")
+
+    assert cli.profil_actif_declare(environ) == "mistral-large-2512"
+
+
+def test_la_ligne_eval_runs(base_api: BaseApi):
+    enregistrement.inscrire_eval_run(
+        base_api.dsn_admin, RUN_ID, "v7", base_api.encodage_id, "essai"
+    )
+    with psycopg.connect(base_api.dsn_admin) as cx:
+        assert cx.execute(
+            "SELECT corpus_id, encodage_id, note FROM bench.eval_runs"
+            " WHERE run_id = %s",
+            (RUN_ID,),
+        ).fetchone() == ("v7", base_api.encodage_id, "essai")
+
+
+def scenarios_csv(dossier: Path, lignes: list[str]) -> Path:
+    fichier = dossier / "scenarios.csv"
+    entete = ",".join(cli.COLONNES_SCENARIOS)
+    fichier.write_text("\n".join([entete, *lignes]) + "\n", encoding="utf-8")
+    return fichier
+
+
+def cinq_scenarios(premiere: str = "Q001") -> list[str]:
+    return [
+        ligne
+        for s in range(1, 6)
+        for ligne in (
+            f"S{s},1,{premiere},{QUESTION},1",
+            f"S{s},2,et un autre ?,{QUESTION},",
+        )
+    ]
+
+
+def test_les_scenarios_ecrits_par_max(tmp_path):
+    fichier = scenarios_csv(tmp_path, cinq_scenarios())
+    tours, empreinte = cli.lire_scenarios(fichier)
+    assert len(tours) == 10 and len(empreinte) == 64
+    assert tours[0].question == jeu.texte_de("Q001")
+    assert (tours[0].serie_attendue_id, tours[1].serie_attendue_id) == (1, None)
+    with pytest.raises(cli.BancRefuse, match="5 scénarios"):
+        cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios()[:8]))
+    with pytest.raises(cli.BancRefuse, match="tour vide"):
+        cli.lire_scenarios(scenarios_csv(tmp_path, ["S1,1,,x,"]))
+    fichier.write_text("a,b\n", encoding="utf-8")
+    with pytest.raises(cli.BancRefuse, match="colonnes"):
+        cli.lire_scenarios(fichier)
+
+
+def test_le_banc_refuse_sans_dsn_ni_configuration(doublures):
+    assert cli.principal(["mesurer", "p", COURT], environ={}) == 2
+    assert cli.principal(["estimer", "p", COURT], environ={}) == 2
+    verifier = ENVIRONNEMENT_FACTICE | {
+        "API_MODELE_VERIFIER_MODELES": "vrai",
+        "MISTRAL_API_KEY": "factice",
+    }
+    with pytest.raises(cli.BancRefuse, match="VERIFIER_MODELES"):
+        with cli.ouvrir(verifier):
+            pass
+    assert cli.principal(["estimer", "p", COURT], environ=verifier) == 2
+    assert doublures.recus() == []
+
+
+# --------------------------------------------------------------------------- #
+#  Contre l'API et les doublures des fournisseurs
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def banc_(api_reponse: TestClient) -> Iterator[Banc]:
+    etat = api_reponse.app.state.etat
+    espion = Espion()
+    with espion.ecouter():
+        yield Banc(
+            api_reponse,
+            CLE_APPLICATION,
+            etat.reglages.modele_langage,
+            etat.pseudonymes,
+            espion,
+            pause_s=0.0,
+            dormir=lambda _: None,
+        )
+
+
+def test_l_estimation_est_la_formule(banc_: Banc):
+    p = banc_.profil("factice-a")
+    r = banc_.api.post(
+        "/v1/recherche",
+        json={"question": QUESTION, "nombre_series": 5, "passages_par_serie": 2},
+        headers=banc_.entetes,
+    )
+    series = [Serie.model_validate(s) for s in r.json()["series"]]
+    caracteres = len(INVITE_REPONSE) + len(message_de_reponse("", QUESTION, series))
+    entree = math.ceil(caracteres / banc_.modele_langage.caracteres_par_jeton)
+    attendu = cout_usd(p, entree, 400, 0)
+    e = estimer(banc_, p, [QUESTION, QUESTION])
+    assert (e.questions, e.appels, e.jetons_entree) == (2, 2, 2 * entree)
+    assert e.cout_usd == pytest.approx(2 * attendu)
+    # La longueur du profil, s'il en déclare une, borne l'estimation.
+    long_ = replace(p, longueur_max=2000)
+    assert estimer(banc_, long_, [QUESTION]).cout_usd == pytest.approx(
+        cout_usd(long_, entree, 2000, 0)
+    )
+
+
+def test_l_essai_ses_chiffres_et_son_texte(banc_: Banc, doublures: Doublures):
+    DoublureFournisseur.usage = {"prompt_tokens": 1000, "completion_tokens": 50}
+    chiffres, texte = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    assert chiffres["statut"] == 200 and chiffres["pseudonymes"] == 0
+    ecrit = json.loads(SORTIE_VALIDE)["reponse"]
+    assert texte is not None and texte == ecrit.replace("[S:1]", "Série 1 [S:1]")
+    (appel,) = chiffres["appels"]
+    assert appel["parametres_envoyes"] == {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 400,
+    }
+    assert appel["usage"] == {"prompt_tokens": 1000, "completion_tokens": 50}
+    assert appel["caracteres_par_jeton"] == round(appel["caracteres_envoyes"] / 1000, 3)
+    assert chiffres["cout_reel_usd"] == round((1000 * 2.0 + 50 * 8.0) / 1e6, 6)
+    assert texte not in json.dumps(chiffres, ensure_ascii=False)
+
+    chiffres, texte = essai(banc_, banc_.profil("factice-b"), QUESTION, temperature=0.7)
+    assert (chiffres["statut"], chiffres["code"], texte) == (
+        422,
+        "reglage_non_expose",
+        None,
+    )
+    assert len(doublures.recus()) == 1
+
+    # Une longueur demandée part telle quelle et borne l'estimation.
+    p = banc_.profil("factice-a")
+    chiffres, _ = essai(banc_, p, QUESTION, longueur_max=1000)
+    (appel,) = chiffres["appels"]
+    assert (chiffres["statut"], appel["parametres_envoyes"]["max_tokens"]) == (
+        200,
+        1000,
+    )
+    assert chiffres["longueur_max_demandee"] == 1000
+    assert chiffres["estimation"] == estimer(banc_, p, [QUESTION], 1000).en_dict()
+    assert (
+        estimer(banc_, p, [QUESTION], 1000).cout_usd
+        > estimer(banc_, p, [QUESTION]).cout_usd
+    )
+
+
+def test_le_plafond_en_cours_de_run(banc_: Banc, doublures: Doublures):
+    DoublureFournisseur.contenu = REFUS
+    DoublureFournisseur.usage = {"prompt_tokens": 10_000_000, "completion_tokens": 1}
+    questions, _ = jeu.lire(COURT)
+    run = mesurer(banc_, banc_.profil("factice-a"), questions, 0.5)
+    assert run.statut == "interrompu" and "plafond" in str(run.motif_interruption)
+    assert len(run.par_question) == 1 and len(doublures.recus()) == 1
+
+
+def test_un_fournisseur_en_echec_interrompt_le_run(banc_: Banc, doublures: Doublures):
+    DoublureFournisseur.statut = 500
+    questions, _ = jeu.lire(COURT)
+    run = mesurer(banc_, banc_.profil("factice-a"), questions, 0.5)
+    assert (run.statut, run.motif_interruption) == ("interrompu", "fournisseur_refus")
+    assert len(run.par_question) == 1
+
+
+def test_la_forme_du_contenu_et_la_latence_meme_en_echec(
+    banc_: Banc, doublures: Doublures
+):
+    # Une chaîne : sa taille ; une liste : le type et la taille de chaque morceau ;
+    # jamais le texte. La latence est relevée, même quand l'appel échoue.
+    essai(banc_, banc_.profil("factice-a"), QUESTION)
+    r = banc_.espion.releves[-1]
+    assert r.forme_contenu == {
+        "type": "chaine",
+        "caracteres": len(DoublureFournisseur.contenu),
+    }
+    assert r.latence_ms is not None and r.latence_ms >= 0
+
+    DoublureFournisseur.corps_brut = json.dumps(
+        {
+            "model": "x",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": [{"type": "text", "text": "abcd"}],
+                            },
+                            {"type": "text", "text": SORTIE_VALIDE},
+                        ],
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 300},
+        }
+    ).encode()
+    chiffres, texte = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    (appel,) = chiffres["appels"]
+    assert chiffres["statut"] == 200 and texte is not None
+    assert appel["forme_contenu"] == {
+        "type": "liste",
+        "morceaux": [
+            {"type": "thinking", "caracteres": 4},
+            {"type": "text", "caracteres": len(SORTIE_VALIDE)},
+        ],
+    }
+    assert "abcd" not in json.dumps(chiffres)
+
+    DoublureFournisseur.corps_brut = None
+    DoublureFournisseur.statut = 500
+    chiffres, _ = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    (appel,) = chiffres["appels"]
+    assert appel["statut"] == 500 and appel["latence_ms"] is not None
+
+
+def test_une_sortie_coupee_par_la_borne_n_interrompt_pas_le_run(
+    banc_: Banc, doublures: Doublures
+):
+    # `longueur_atteinte` : une question en échec, comptée ; le run continue.
+    DoublureFournisseur.corps_brut = json.dumps(
+        {
+            "model": "x",
+            "choices": [
+                {
+                    "message": {"role": "assistant", "content": '{"refus": fa'},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 400},
+        }
+    ).encode()
+    questions, _ = jeu.lire(COURT)
+    run = mesurer(banc_, banc_.profil("factice-a"), questions, 0.5)
+    assert (run.statut, run.motif_interruption) == ("termine", None)
+    assert len(run.par_question) == len(questions) == len(doublures.recus())
+    assert {(x["code"], x["motif"]) for x in run.par_question} == {
+        ("fournisseur_refus", "longueur_atteinte")
+    }
+    assert metriques(run)["longueur_atteinte"] == len(questions)
+
+
+def test_une_sortie_refusee_et_ses_releves_sans_texte(
+    banc_: Banc, doublures: Doublures
+):
+    # Un nom de membre : la route refuse ; le banc relève son empreinte, s'il était
+    # dans le message envoyé, s'il est un homonyme admis, et la forme de la sortie.
+    nom = AUTEURS[0]
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": f"Selon {nom}, une aventure [S:1].",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F7", "inconnue", ())
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+    (x,) = run.par_question
+    assert (x["code"], x["motif"]) == ("sortie_modele_invalide", "pseudonyme")
+    assert x["forme_sortie"] == {
+        "refus": False,
+        "series_citees": 1,
+        "motif_refus": None,
+    }
+    assert x["noms_trouves"] == [
+        {
+            "empreinte": empreinte(nom),
+            "dans_le_message_envoye": False,
+            "homonyme_admis": False,
+        }
+    ]
+    assert nom not in json.dumps(run.par_question, ensure_ascii=False)
+
+    # Un refus qui cite une série : la forme dit quelle branche de la règle cède.
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": True,
+            "motif_refus": "inconnu",
+            "reponse": TEXTE_REFUS,
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+    (x,) = run.par_question
+    assert (x["motif"], x["forme_sortie"]) == (
+        "refus_incoherent",
+        {"refus": True, "series_citees": 1, "motif_refus": "inconnu"},
+    )
+    assert "noms_trouves" not in x and run.statut == "termine"
+    assert TEXTE_REFUS not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def test_une_sortie_contredite_par_la_ligne_est_gardee_pour_la_lecture(
+    banc_: Banc, doublures: Doublures
+):
+    texte = "Une aventure [S:1], disponible en France."
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": texte,
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+
+    (x,) = run.par_question
+    assert (x["motif"], x["serie_contredite"]) == ("disponibilite", 1)
+    assert run.textes == {"Q (sortie refusée, disponibilite)": texte}
+    assert metriques(run)["sorties_invalides_disponibilite"] == 1
+    assert run.statut == "termine"
+    assert texte not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def test_le_banc_dit_quand_le_catalogue_a_tort(
+    banc_: Banc, doublures: Doublures, monkeypatch
+):
+    # Le corpus d'essai est clos : c'est la forme cherchée qui vise son texte.
+    monkeypatch.setattr(mesure, "EDITION_FRANCAISE", re.compile(r"\bcritique\b"))
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": "Une aventure [S:1], publiée en France.",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+
+    (x,) = run.par_question
+    assert (x["motif"], x["serie_contredite"], x["catalogue_en_tort"]) == (
+        "disponibilite",
+        1,
+        True,
+    )
+    m = metriques(run)
+    assert m["catalogue_en_tort"] == 1 and verdict(m)["disponibilite"] is True
+
+
+def test_relire_un_run_sans_appel_au_fournisseur(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch
+):
+    """Le verdict d'alors reste ; la relecture s'y ajoute, et rien n'est appelé."""
+    questions, _ = jeu.lire("issue:hors_catalogue")
+    q_jeu = questions[0]
+    resume = {
+        "metriques": {"cout_usd": 0.01, "refus_correct_hors_catalogue": 0},
+        "verdict": {"tenu": False},
+        "parametres": {"profil": "factice-a", "jeu": "issue:hors_catalogue"},
+    }
+    (tmp_path / "resume.json").write_text(json.dumps(resume), encoding="utf-8")
+    lignes = [
+        ligne(
+            question_id=q_jeu.question_id,
+            issue="reconnue_hors_catalogue",
+            mention_hors_catalogue=False,
+        ),
+        ligne(
+            question_id="Q999",
+            statut=503,
+            code="sortie_modele_invalide",
+            motif="serie_inconnue",
+        ),
+    ]
+    (tmp_path / "par_question.json").write_text(json.dumps(lignes), encoding="utf-8")
+    enregistrement.ecrire_textes(
+        tmp_path, "t", {q_jeu.question_id: "Il n'apparaît pas dans les passages."}
+    )
+    (tmp_path / "run_id.json").write_text(
+        json.dumps({"run_id": RUN_ID}), encoding="utf-8"
+    )
+    charges: list[dict[str, Any]] = []
+
+    def executer(commande: list[str]) -> str:
+        charges.append(json.loads(Path(commande[-1]).read_text(encoding="utf-8")))
+        return "relu\n"
+
+    monkeypatch.setattr(enregistrement, "executer", executer)
+    avant = len(appels_au_fournisseur(doublures))
+
+    code = cli.principal(
+        ["relire", str(tmp_path)], environ={}, ouvreur=lambda _: ouvreur_de(banc_)
+    )
+
+    assert code == 0
+    assert len(appels_au_fournisseur(doublures)) == avant
+    relecture = json.loads((tmp_path / "relecture.json").read_text(encoding="utf-8"))
+    assert relecture["refus_correct_hors_catalogue"] == 1
+    assert relecture["refus_correct_hors_catalogue_a_la_mesure"] == 0
+    assert relecture["questions_changees"] == [q_jeu.question_id]
+    assert relecture["verdict_a_la_mesure"] == {"tenu": False}
+    # Le verdict d'alors reste : `resume.json` n'est pas réécrit.
+    assert json.loads((tmp_path / "resume.json").read_text(encoding="utf-8")) == resume
+    (charge,) = charges
+    assert charge["action"] == "relecture"
+    assert charge["etiquettes"]["verdict_a_la_mesure"] == "non_tenu"
+    assert charge["metriques"]["refus_correct_hors_catalogue_relu"] == 1.0
+    # Les étiquettes a posteriori prennent le verdict de la relecture.
+    (tmp_path / "run").mkdir()
+    for nom in ("resume.json", "relecture.json", "run_id.json"):
+        (tmp_path / "run" / nom).write_text(
+            (tmp_path / nom).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    enregistrement.ecrire_json(
+        tmp_path / "run" / "resume.json",
+        resume
+        | {
+            "statut": "termine",
+            "parametres": {"profil": "factice-a", "commit": "c" * 40},
+        },
+    )
+    enregistrement.ecrire_json(
+        tmp_path / "run" / "relecture.json", {"verdict": {"tenu": True}}
+    )
+    etiquettes = enregistrement.etiquettes_des_runs_faits("factice-a", tmp_path)
+    assert etiquettes[RUN_ID]["verdict"] == "tenu"
+
+
+def test_relire_rejoue_la_recherche_d_une_sortie_contredite(
+    banc_: Banc, doublures: Doublures, monkeypatch
+):
+    monkeypatch.setattr(mesure, "EDITION_FRANCAISE", re.compile(r"\bcritique\b"))
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+    x = ligne(
+        question_id="Q",
+        statut=503,
+        code="sortie_modele_invalide",
+        motif="disponibilite",
+        serie_contredite=1,
+    )
+
+    (relue,) = mesure.relire(banc_, [x], {}, {"Q": question})
+
+    assert relue["catalogue_en_tort"] is True
+    assert "catalogue_en_tort" not in x
+
+
+def test_le_script_mlflow_ajoute_une_relecture(tmp_path, capsys, monkeypatch):
+    client = ClientSimule()
+    module = type("M", (), {"MlflowClient": staticmethod(lambda **_: client)})
+    monkeypatch.setattr(journal_mlflow.importlib, "import_module", lambda _: module)
+    charge = enregistrement.charge_de_relecture(
+        RUN_ID, {"verdict": "tenu"}, {"catalogue_en_tort": 1.0}, {"k": 1}
+    )
+    fichier = tmp_path / "charge.json"
+    fichier.write_text(json.dumps(charge), encoding="utf-8")
+
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+
+    assert client.etiquettes == {RUN_ID: {"verdict": "tenu"}}
+    assert client.metriques == {RUN_ID: {"catalogue_en_tort": 1.0}}
+    assert list(client.pieces[RUN_ID]) == ["relecture.json"]
+    assert "relu" in capsys.readouterr().out
+
+
+def appels_au_fournisseur(doublures: Doublures) -> list[dict[str, Any]]:
+    return [r for r in doublures.recus() if r["chemin"] == "/v1/chat/completions"]
+
+
+def test_une_sortie_contredite_portant_un_nom_de_membre_n_est_pas_gardee(
+    banc_: Banc, doublures: Doublures
+):
+    # Le contrôle des noms passe avant : le cas est celui d'un homonyme admis pour la
+    # route. Le banc, lui, n'écrit aucun texte qui porte un nom de la liste.
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": "Une aventure [S:1], disponible en France.",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    appel = mesure.demander(banc_, {"question": QUESTION, "profil": "factice-a"})
+    assert appel.motif == "disponibilite"
+    releve = appel.releve_de_reponse
+    assert releve is not None
+    releve.texte_modele = f"{AUTEURS[0]} dit : une aventure [S:1]."
+    run = Run("factice-a")
+    ligne_du_run: dict[str, object] = {}
+
+    mesure.garder_la_contredite(banc_, run, "Q", appel, ligne_du_run)
+
+    assert ligne_du_run == {"serie_contredite": 1, "catalogue_en_tort": False}
+    assert run.textes == {}
+
+
+def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+    (x,) = run.par_question
+    assert (x["refus"], x["series_citees"], x["citee_attendue_1"]) == (False, [1], True)
+    assert x["hit_rate_10"] is True
+    # Le texte lu par Max est celui de la route, titre inséré ; `titres_presents`
+    # compte ce que le modèle a écrit seul.
+    ecrit = json.loads(SORTIE_VALIDE)["reponse"]
+    assert run.textes == {"Q": ecrit.replace("[S:1]", "Série 1 [S:1]")}
+    assert (x["titres_presents"], x["titres_marques"]) == (0, 1)
+    assert list(x["metadonnees_citees"]) == [1]
+    assert x["metadonnees_citees"][1]["disponibilite"] == "inconnue"
+    assert banc_.espion.releves[-1].texte_modele == ecrit
+    assert run.contexte["corpus_id"] == "v7"
+
+
+@contextmanager
+def ouvreur_de(banc_: Banc) -> Iterator[Banc]:
+    yield banc_
+
+
+def test_un_run_complet_par_la_ligne_de_commande(
+    banc_: Banc, doublures: Doublures, base_api: BaseApi, tmp_path, monkeypatch
+):
+    DoublureFournisseur.contenu = REFUS
+    DoublureFournisseur.usage = {"prompt_tokens": 1000, "completion_tokens": 20}
+    sorties = tmp_path / "sorties"
+    monkeypatch.setattr(enregistrement, "SORTIES", sorties)
+    etat_git = {"commit": "c" * 40, "branche": "b", "arbre_propre": "True"}
+    monkeypatch.setattr(enregistrement, "exiger_commit", lambda: etat_git)
+    charges: list[dict[str, Any]] = []
+
+    def executer(commande: list[str]) -> str:
+        charges.append(json.loads(Path(commande[-1]).read_text(encoding="utf-8")))
+        return RUN_ID
+
+    monkeypatch.setattr(enregistrement, "executer", executer)
+    code = cli.principal(
+        ["mesurer", "factice-a", COURT],
+        environ={"DATABASE_URL": base_api.dsn_admin},
+        ouvreur=lambda _: ouvreur_de(banc_),
+    )
+    assert code == 0
+    (dossier,) = sorties.iterdir()
+    assert dossier.name.startswith("factice-a-F7+hors_catalogue-")
+    resume = json.loads((dossier / "resume.json").read_text(encoding="utf-8"))
+    assert resume["verdict"]["tenu"] is True
+    assert resume["metriques"]["refus_correct_F7"] == 5
+    assert resume["parametres"]["commit"] == "c" * 40
+    # Les pièces de MLflow : des nombres et des noms, aucun texte de réponse.
+    (charge,) = charges
+    assert TEXTE_REFUS not in json.dumps(charge, ensure_ascii=False)
+    # Les étiquettes, les invites et les réglages en artefacts, leurs empreintes.
+    etiquettes = charge["etiquettes"]
+    assert (etiquettes["etape"], etiquettes["role"], etiquettes["statut"]) == (
+        "E3-06",
+        "profil_actif",
+        "complet",
+    )
+    assert etiquettes["verdict"] == "tenu"
+    assert etiquettes["invite_version"] == "inconnue"  # le commit factice
+    for chemin, parametre in enregistrement.FICHIERS_DU_RUN.items():
+        contenu = charge["pieces_texte"][chemin]
+        assert contenu == (enregistrement.RACINE_MODULE / chemin).read_text("utf-8")
+        assert charge["parametres"][parametre] == (
+            hashlib.sha256(contenu.encode("utf-8")).hexdigest()
+        )
+    assert TEXTE_REFUS in (dossier / "reponses.md").read_text(encoding="utf-8")
+    with psycopg.connect(base_api.dsn_admin) as cx:
+        assert cx.execute(
+            "SELECT corpus_id FROM bench.eval_runs WHERE run_id = %s", (RUN_ID,)
+        ).fetchone() == ("v7",)
+
+    # Reprendre un run mesuré : le même enregistrement, rejoué.
+    autre = "fedcba9876543210fedcba9876543210"
+    monkeypatch.setattr(enregistrement, "executer", lambda _: autre)
+    code = cli.principal(
+        ["reprendre", str(dossier)], environ={"DATABASE_URL": base_api.dsn_admin}
+    )
+    assert code == 0
+    assert json.loads((dossier / "run_id.json").read_text())["run_id"] == autre
+
+
+def test_les_refus_avant_tout_appel(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch
+):
+    environ = {"DATABASE_URL": "postgresql://x@localhost/y"}
+
+    def refuser() -> dict[str, str]:
+        raise enregistrement.CommitRefuse("arbre non propre")
+
+    monkeypatch.setattr(enregistrement, "exiger_commit", refuser)
+    assert (
+        cli.principal(
+            ["mesurer", "factice-a", COURT], environ, lambda _: ouvreur_de(banc_)
+        )
+        == 2
+    )
+    monkeypatch.setattr(
+        enregistrement, "exiger_commit", lambda: {"commit": "c", "branche": "b"}
+    )
+    pauvre = replace(
+        banc_, modele_langage=replace(banc_.modele_langage, plafond_run_usd=1e-9)
+    )
+    assert (
+        cli.principal(
+            ["mesurer", "factice-a", COURT], environ, lambda _: ouvreur_de(pauvre)
+        )
+        == 2
+    )
+    assert doublures.recus() == []
+
+
+def test_l_essai_et_l_estimation_par_la_ligne_de_commande(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(enregistrement, "SORTIES", tmp_path)
+    ouvreur = lambda _: ouvreur_de(banc_)  # noqa: E731
+    assert cli.principal(["estimer", "factice-a", COURT], {}, ouvreur) == 0
+    sortie = json.loads(capsys.readouterr().out)
+    assert sortie["questions"] == 10 and sortie["sous_le_plafond"] is True
+    assert cli.principal(["essai", "factice-a", QUESTION], {}, ouvreur) == 0
+    (dossier,) = (tmp_path / "essais").iterdir()
+    assert (dossier / "essai.json").is_file() and (dossier / "reponses.md").is_file()
+    assert "réponse (contrôlée" in capsys.readouterr().out
+    argv = ["essai", "factice-a", QUESTION, "--longueur-max", "1000"]
+    assert cli.principal(argv, {}, ouvreur) == 0
+    (long_,) = (d for d in (tmp_path / "essais").iterdir() if d.name.endswith("_l1000"))
+    assert (
+        json.loads((long_ / "essai.json").read_text())["longueur_max_demandee"] == 1000
+    )
+    assert cli.principal(["essai", "inconnu", QUESTION], {}, ouvreur) == 2
+
+
+def test_les_scenarios_contre_les_doublures(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["tours"], m["tours_avec_historique"]) == (10, 5)
+    assert m["reformulation_meme_serie"] == 5
+    assert m["reformulation_serie_attendue"] == 0
+    # Le second tour porte l'historique : la vraie réponse du premier, telle que la
+    # route l'a rendue (titre inséré).
+    rendue = json.loads(SORTIE_VALIDE)["reponse"].replace("[S:1]", "Série 1 [S:1]")
+    seconds = [
+        r["corps"]
+        for r in doublures.recus()
+        if len(r["corps"]["messages"][1]["content"])
+        and "Libraire" in r["corps"]["messages"][1]["content"]
+    ]
+    assert seconds and rendue in seconds[0]["messages"][1]["content"]
+    assert run.textes and all("-" in cle for cle in run.textes)
+
+
+@pytest.mark.parametrize(
+    ("reformulee", "attendu"),
+    [
+        ("Combien de tomes compte Blue [S:1123] ?", "marque"),
+        ("Combien de tomes compte Blue [S:1123] et [S:9] ?", "marque"),
+        ("Combien de tomes compte *blue* ?", "titre"),
+        ("Combien de tomes compte Bluebird ?", None),
+        ("Combien de tomes compte [S:9] ?", None),
+        ("Combien de tomes ?", None),
+    ],
+)
+def test_la_question_reformulee_nomme_la_serie(reformulee, attendu):
+    assert nommee_par(reformulee, 1123, "Blue") == attendu
+    assert nommee_par(reformulee, 7, "") is None
+
+
+def test_les_scenarios_relevent_la_reformulation_fidele(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    # La réponse rendue cite « Série 1 [S:1] » en tête : le second tour la nomme.
+    DoublureFournisseur.contenu_reformulation = json.dumps(
+        {"question": "Et Série 1, elle est finie ?"}
+    )
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (5, 5)
+    premier, second = run.par_question[:2]
+    assert "reformulation_fidele" not in premier
+    assert second["serie_en_tete_precedente"] == 1
+    assert second["fidele_par"] == "titre"
+
+
+def test_les_scenarios_sans_la_serie_de_tete(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    DoublureFournisseur.contenu_reformulation = json.dumps(
+        {"question": "Et une autre, elle est finie ?"}
+    )
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (0, 5)
+    assert run.par_question[1]["reformulation_fidele"] is False
+    # Un refus ne porte pas de marque : le tour suivant n'a rien à comparer.
+    DoublureFournisseur.contenu = REFUS
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    m = metriques_scenarios(run)
+    assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (0, 0)
+    assert "reformulation_fidele" not in run.par_question[1]
+
+
+def test_l_estimation_des_scenarios_par_la_ligne_de_commande(
+    banc_: Banc, doublures: Doublures, tmp_path, capsys
+):
+    fichier = scenarios_csv(tmp_path, cinq_scenarios(QUESTION))
+
+    code = cli.principal(
+        ["estimer-scenarios", "factice-a", str(fichier)],
+        {},
+        lambda _: ouvreur_de(banc_),
+    )
+
+    assert code == 0
+    sortie_ = json.loads(capsys.readouterr().out)
+    assert sortie_["questions"] == 10 and sortie_["cout_usd"] > 0
+    assert sortie_["sous_le_plafond"] is True
+    assert appels_au_fournisseur(doublures) == []
+
+
+def test_les_scenarios_par_la_ligne_de_commande(
+    banc_: Banc, doublures: Doublures, base_api: BaseApi, tmp_path, monkeypatch, capsys
+):
+    sorties = tmp_path / "sorties"
+    monkeypatch.setattr(enregistrement, "SORTIES", sorties)
+    monkeypatch.setattr(
+        enregistrement, "exiger_commit", lambda: {"commit": "c" * 40, "branche": "b"}
+    )
+
+    def en_panne(commande: list[str]) -> str:
+        raise subprocess.CalledProcessError(1, commande)
+
+    monkeypatch.setattr(enregistrement, "executer", en_panne)
+    fichier = scenarios_csv(tmp_path, cinq_scenarios(QUESTION))
+    code = cli.principal(
+        ["scenarios", "factice-a", str(fichier)],
+        {"DATABASE_URL": base_api.dsn_admin},
+        lambda _: ouvreur_de(banc_),
+    )
+    assert code == 4
+    assert "NON enregistré" in capsys.readouterr().err
+    (dossier,) = sorties.iterdir()
+    assert dossier.name.startswith("factice-a-scenarios-")
+    resume = json.loads((dossier / "resume.json").read_text(encoding="utf-8"))
+    assert resume["metriques"]["reformulation_meme_serie"] == 5
+    assert len(resume["parametres"]["scenarios_empreinte"]) == 64
+    assert (dossier / "mlflow_charge.json").is_file()
+
+
+@pytest.mark.parametrize("panne", ["fournisseur", "plafond"])
+def test_les_scenarios_s_interrompent(
+    banc_: Banc, doublures: Doublures, tmp_path, panne
+):
+    if panne == "fournisseur":
+        DoublureFournisseur.statut = 500
+    else:
+        DoublureFournisseur.usage = {
+            "prompt_tokens": 10_000_000,
+            "completion_tokens": 1,
+        }
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "interrompu" and len(run.par_question) == 1
+
+
+def test_les_scenarios_gardent_le_refus_du_fournisseur(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    """Statut et code d'erreur de chaque appel ; jamais le message du fournisseur."""
+    message = "le texte envoyé, repris par le fournisseur"
+    DoublureFournisseur.statut = 400
+    DoublureFournisseur.corps_brut = json.dumps(
+        {"message": message, "type": "invalide", "param": None, "code": "3051"}
+    ).encode()
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "interrompu"
+    (ligne,) = run.par_question
+    (appel,) = cast(list[dict[str, object]], ligne["appels"])
+    assert (appel["role"], appel["statut"]) == ("reponse", 400)
+    assert appel["erreur"] == {"code": "3051", "type": "invalide"}
+    assert message not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def corps_de_refus(type_: str) -> bytes:
+    return json.dumps(
+        {"message": "m", "type": type_, "param": None, "code": "1300"}
+    ).encode()
+
+
+@pytest.fixture
+def route_sans_attente(monkeypatch) -> list[float]:
+    """Le nouvel essai de la route, sans son attente réelle ; les attentes vues."""
+    vues: list[float] = []
+
+    async def dormir(secondes: float) -> None:
+        vues.append(secondes)
+
+    monkeypatch.setattr(route, "dormir", dormir)
+    return vues
+
+
+def test_un_tour_sauve_par_la_route_ne_se_rejoue_pas(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch
+):
+    """Le 429 est au relevé, mais la requête a réussi : ni reprise, ni attente du banc,
+    et les jetons du run ne comptent que les appels rendus."""
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    DoublureFournisseur.usage = {"prompt_tokens": 100, "completion_tokens": 10}
+
+    async def dormir(_: float) -> None:
+        DoublureFournisseur.statut = 200
+        DoublureFournisseur.corps_brut = None
+
+    monkeypatch.setattr(route, "dormir", dormir)
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "termine" and ATTENTE_DEBIT_S not in attentes
+    premier = run.par_question[0]
+    assert (premier["statut"], premier["tentatives"]) == (200, 1)
+    appels = cast(list[dict[str, object]], premier["appels"])
+    assert [(a["tentative"], a["statut"]) for a in appels] == [(1, 429), (1, 200)]
+    questions, _ = jeu.lire(COURT)
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    un_run = mesurer(banc_, banc_.profil("factice-a"), questions[:1], 0.5)
+    assert metriques(un_run)["jetons_entree_somme"] == 100
+
+
+def test_un_refus_de_debit_rejoue_le_tour(
+    banc_: Banc, doublures: Doublures, tmp_path, route_sans_attente
+):
+    """Un 429 `rate_limited` qui résiste au nouvel essai de la route, puis le
+    fournisseur rend : le tour se rejoue après l'attente, le run continue, toutes les
+    tentatives restent au relevé."""
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    attentes: list[float] = []
+
+    def dormir(duree: float) -> None:
+        attentes.append(duree)
+        if duree == ATTENTE_DEBIT_S:
+            DoublureFournisseur.statut = 200
+            DoublureFournisseur.corps_brut = None
+
+    banc_.dormir = dormir
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "termine" and len(run.par_question) == 10
+    assert attentes.count(ATTENTE_DEBIT_S) == 1
+    premier = run.par_question[0]
+    assert (premier["statut"], premier["tentatives"]) == (200, 2)
+    appels = cast(list[dict[str, object]], premier["appels"])
+    assert [(a["tentative"], a["statut"]) for a in appels] == [
+        (1, 429),
+        (1, 429),
+        (2, 200),
+    ]
+    assert appels[0]["erreur"] == {"code": "1300", "type": "rate_limited"}
+    assert run.par_question[1]["tentatives"] == 1
+
+
+def test_un_refus_de_debit_qui_dure_interrompt_le_run(
+    banc_: Banc, doublures: Doublures, tmp_path, route_sans_attente
+):
+    DoublureFournisseur.statut = 429
+    DoublureFournisseur.corps_brut = corps_de_refus("rate_limited")
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert (run.statut, run.motif_interruption) == ("interrompu", "fournisseur_refus")
+    (ligne,) = run.par_question
+    assert attentes == [ATTENTE_DEBIT_S] * 3
+    assert ligne["tentatives"] == 4
+    # Chaque tentative : l'appel, et le nouvel essai de la route.
+    assert len(cast(list[object], ligne["appels"])) == 8
+    assert len(doublures.recus()) == 8
+
+
+@pytest.mark.parametrize(("statut", "type_"), [(429, "autre"), (500, "rate_limited")])
+def test_un_autre_refus_ne_rejoue_pas_le_tour(
+    banc_: Banc, doublures: Doublures, tmp_path, statut, type_
+):
+    DoublureFournisseur.statut = statut
+    DoublureFournisseur.corps_brut = corps_de_refus(type_)
+    attentes: list[float] = []
+    banc_.dormir = attentes.append
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    assert run.statut == "interrompu" and attentes == []
+    assert run.par_question[0]["tentatives"] == 1
+
+
+def test_la_marque_venue_de_l_historique_se_compare_par_le_titre(
+    banc_: Banc, monkeypatch
+):
+    """La réponse du deuxième tour marque une série qu'elle n'a pas reçue : son titre
+    vient de ce que le scénario a rendu avant, et la reformulation le nomme."""
+
+    def rendu(texte: str, serie: tuple[int, str], reformulee: str | None) -> Appel:
+        contexte = dict.fromkeys(
+            ("reglages", "reglages_appliques", "corpus_id", "encodage_id"), "x"
+        ) | {
+            "version_api": "x",
+            "date_appel": "x",
+            "question_reformulee": reformulee,
+        }
+        corps = {
+            "refus": False,
+            "series": [{"serie_id": serie[0], "titre": serie[1]}],
+            "contexte": contexte,
+        }
+        return Appel(200, corps, [], texte=texte)
+
+    appels = iter(
+        [
+            rendu("Sorairo Kaigan [S:13588].", (13588, "Sorairo Kaigan"), None),
+            rendu(
+                "Sorairo Kaigan [S:13588], puis Shortcakes [S:2221].",
+                (2221, "Shortcakes"),
+                "Lequel ?",
+            ),
+            rendu(
+                "Shortcakes [S:2221].",
+                (2221, "Shortcakes"),
+                "Shortcakes est-il court, comme sorairo kaigan ?",
+            ),
+        ]
+    )
+    monkeypatch.setattr(mesure, "demander", lambda *_: next(appels))
+    monkeypatch.setattr(mesure, "premiere_serie", lambda *_: 2221)
+    tours = [Tour("S1", n, "q", "a", None) for n in (1, 2, 3)]
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    troisieme = run.par_question[2]
+    assert troisieme["serie_en_tete_precedente"] == 13588
+    assert troisieme["reformulation_fidele"] is True
+    assert troisieme["fidele_par"] == "titre"
+
+
+def test_les_scenarios_gardent_chaque_appel_rendu(
+    banc_: Banc, doublures: Doublures, tmp_path
+):
+    tours, _ = cli.lire_scenarios(scenarios_csv(tmp_path, cinq_scenarios(QUESTION)))
+    run = scenarios(banc_, banc_.profil("factice-a"), tours, 0.5)
+    premier, second = run.par_question[:2]
+    assert [a["role"] for a in cast(list[dict[str, object]], premier["appels"])] == [
+        "reponse"
+    ]
+    appels = cast(list[dict[str, object]], second["appels"])
+    assert [a["role"] for a in appels] == ["reformulation", "reponse"]
+    assert all(a["statut"] == 200 and a["erreur"] == {} for a in appels)
+
+
+def test_les_erreurs_des_fournisseurs_relevees(banc_: Banc, doublures: Doublures):
+    from api_modele.banc_reponse import espion
+
+    assert espion._erreur(
+        httpx.Response(
+            400,
+            json={"error": {"code": "invalide", "param": "response_format", "x": 1}},
+        )
+    ) == {"code": "invalide", "param": "response_format"}
+    assert espion._erreur(httpx.Response(422, json={"detail": [{"msg": "m"}]})) == {
+        "message": '[{"msg": "m"}]'
+    }
+    assert espion._erreur(httpx.Response(400, json={"error": "texte"})) == {
+        "message": "texte"
+    }
+    assert espion._erreur(httpx.Response(502, content=b"<html>")) == {}
+    assert espion._caracteres({"messages": "pas une liste"}) == 0
+
+    DoublureFournisseur.statut = 400
+    DoublureFournisseur.corps_brut = json.dumps(
+        {"error": {"message": "minLength n'est pas admis", "type": "invalid"}}
+    ).encode()
+    chiffres, texte = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    assert (chiffres["statut"], chiffres["code"], texte) == (
+        503,
+        "fournisseur_refus",
+        None,
+    )
+    (appel,) = chiffres["appels"]
+    assert appel["erreur"] == {
+        "type": "invalid",
+        "message": "minLength n'est pas admis",
+    }
+    assert appel["cout_usd"] == 0.0
+
+    DoublureFournisseur.statut = 200
+    DoublureFournisseur.corps_brut = b"pas du json"
+    chiffres, _ = essai(banc_, banc_.profil("factice-a"), QUESTION)
+    assert chiffres["code"] == "fournisseur_refus"
+    assert chiffres["appels"][-1]["usage"] == {}
+
+
+def test_les_refus_du_banc(banc_: Banc, monkeypatch):
+    with pytest.raises(ValueError, match="inconnu"):
+        banc_.profil("inconnu")
+    ml = banc_.modele_langage
+    sans_cle = replace(
+        banc_,
+        modele_langage=replace(
+            ml, profils=tuple(replace(p, disponible=False) for p in ml.profils)
+        ),
+    )
+    with pytest.raises(ValueError, match="indisponible"):
+        sans_cle.profil("factice-a")
+    with pytest.raises(RuntimeError, match="422"):
+        banc_.rechercher("x" * 600)
+    with pytest.raises(PlafondDepasse, match="prix"):
+        estimer(banc_, replace(banc_.profil("factice-a"), prix=None), [QUESTION])
+    monkeypatch.setattr(banc_, "rechercher", lambda *a, **k: [])
+    e = estimer(banc_, banc_.profil("factice-a"), [QUESTION])
+    assert (e.questions, e.appels, e.cout_usd) == (1, 0, 0.0)
+    with pytest.raises(jeu.JeuRefuse, match="aucune question"):
+        jeu.lire("famille:F99")
+
+
+def test_les_metriques_sans_reponse_rendue():
+    run = Run("p")
+    run.par_question = [
+        ligne(statut=503, code="fournisseur_refus", appels=[]),
+    ]
+    m = metriques(run)
+    assert m["reponses_rendues"] == 0
+    assert "latence_modele_ms_mediane" not in m and "recouvrement_8_moyen" not in m
+    run.par_question = [ligne()]
+    assert metriques(run)["latence_totale_ms_p95"] == 1200.0
+    run.par_question = [ligne(titres_presents=None)]
+    assert "titre_present" not in metriques(run)

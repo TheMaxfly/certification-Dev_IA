@@ -1,0 +1,8 @@
+id = "API-69"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — les empreintes des invites et des réglages sont en paramètres"
+fichier = "11_api_modele/src/api_modele/banc_reponse/__main__.py"
+avant = '''        **enregistrement.empreintes_du_run(enregistrement.fichiers_du_run()),
+'''
+apres = ''''''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "run_complet_par_la_ligne_de_commande"]

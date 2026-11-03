@@ -1,0 +1,7 @@
+id = "API-79"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une négation dans un passage ne dément pas la ligne"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''            if any(affirmations.affirmee(texte, f) for f in motif.finditer(texte)):'''
+apres = '''            if any(True for f in motif.finditer(texte)):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "une_ligne_dementie_par_un_passage"]

@@ -1,0 +1,8 @@
+id = "API-73"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une version du registre est à son stade"
+fichier = "11_api_modele/src/api_modele/banc_reponse/journal_mlflow.py"
+avant = '''        client.transition_model_version_stage(nom, version.version, voulue["stade"])
+'''
+apres = ''''''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "registre_une_version_par_profil"]

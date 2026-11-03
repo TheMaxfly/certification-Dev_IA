@@ -1,0 +1,8 @@
+id = "API-76"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — dire un titre absent des passages compte comme la seconde branche du critère"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    r"|n['’]appara[iî]t pas dans les passages"
+'''
+apres = ''''''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "compte_comme_mention_hors_catalogue"]

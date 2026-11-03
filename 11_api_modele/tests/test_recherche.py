@@ -98,6 +98,38 @@ def test_hors_catalogue_une_oeuvre_kitsu_sans_serie(api):
     )
 
 
+def test_chaque_serie_porte_ses_metadonnees(api, base_api: BaseApi):
+    """Sans volume : disponibilité « inconnue », le reste absent ; lues par la vue."""
+    with psycopg.connect(base_api.dsn_admin) as cx:
+        cx.execute(
+            "INSERT INTO manga.ms_volumes_enriched (volume_url, series_id,"
+            " volume_number, volume_ean) VALUES ('v', 2, 1, '9784000000001')"
+        )
+        cx.execute("UPDATE manga.ms_series_enriched SET series_type = 'Manga'")
+        cx.execute(
+            "UPDATE manga.ms_series_enriched SET series_scenariste = 'Autrice A',"
+            " series_dessinateur = 'Auteur B' WHERE series_id = 2"
+        )
+
+    series = {s["serie_id"]: s["metadonnees"] for s in chercher(api).json()["series"]}
+
+    assert series[1] == {
+        "disponibilite": "inconnue",
+        "nb_volumes": None,
+        "nb_volumes_source": None,
+        "statut": None,
+        "demographie": None,
+        "annee_fr": None,
+        "auteurs": None,
+    }
+    assert series[2]["auteurs"] == "Autrice A, Auteur B"
+    assert series[2]["disponibilite"] == "seulement_au_japon"
+    assert (series[2]["nb_volumes"], series[2]["nb_volumes_source"]) == (
+        1,
+        "repli_volumes_distincts",
+    )
+
+
 def test_les_vecteurs_lus_sont_ceux_de_l_encodage_en_service(api):
     """Le leurre (non promu) classerait la série 2 devant la série 1."""
     assert entites(chercher(api)) == ["serie:1", "serie:2"]
