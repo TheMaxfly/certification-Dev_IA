@@ -90,17 +90,21 @@ def test_egalite_avec_le_banc_sur_les_69_questions():
     assert set(questions) == set(attendus)
 
     cle = secrets.token_urlsafe(32)
-    reglages = replace(
-        charger({"API_MODELE_CLES": f"egalite:{cle}", "API_MODELE_DSN": dsn}),
-        debit_par_minute=100_000,
-    )
+    environ = {
+        "API_MODELE_CLES": f"egalite:{cle}",
+        "API_MODELE_DSN": dsn,
+        # Le profil actif exige sa clé au démarrage ; la recherche n'appelle aucun
+        # fournisseur : une valeur factice, comme dans conftest.py.
+        "MISTRAL_API_KEY": "factice",
+    }
+    reglages = replace(charger(environ), debit_par_minute=100_000)
     entetes = {"X-API-Key": cle}
     differentes: list[str] = []
     durees_ms: list[float] = []
     ecart_score = 0.0
     hors_catalogue_differents = 0
     fragments_rendus: set[int] = set()
-    with TestClient(creer_application(reglages)) as api:
+    with TestClient(creer_application(reglages, environ=environ)) as api:
         info = api.get("/v1/info", headers=entetes).json()
         if (info["encodage_id"], info["corpus_id"]) != (3, "v2"):
             pytest.fail(
