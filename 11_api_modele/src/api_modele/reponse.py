@@ -4,7 +4,8 @@
    pas (422) ; l'entrée elle-même est validée par sa forme (`DemandeReponse`).
 Sur un refus de débit du fournisseur (`rate_limited`), et rien d'autre : un seul nouvel
 essai de l'appel refusé, après `Retry-After` (sinon 2 s), tracé dans `appels` ; refusé
-encore, ou `Retry-After` au-delà de 10 s, le 503 `fournisseur_refus`.
+encore, ou `Retry-After` au-delà de 10 s, le 503 `fournisseur_refus`, qui porte alors
+`Retry-After` (`erreur_api`), comme tout 503 qui enveloppe un 429 du fournisseur.
 
 2. Reformulation, s'il y a un historique et que `reformuler` est vrai : un premier
    appel écrit une question autonome (température 0, 150 jetons, fixés). Plus de 500
@@ -47,6 +48,7 @@ from api_modele.configuration import RACINE_MODULE, Profil
 from api_modele.erreurs import ErreurApi
 from api_modele.etat import EtatApi
 from api_modele.fournisseurs import (
+    STATUT_DEBIT,
     Appliques,
     Demandes,
     ErreurFournisseur,
@@ -321,7 +323,16 @@ def attente_de_debit(exc: ErreurFournisseur) -> float | None:
 
 
 def erreur_api(exc: ErreurFournisseur) -> ErreurApi:
-    return ErreurApi(STATUTS[exc.code], exc.code, exc.message, exc.details)
+    """Le code et les détails de la couche, tels quels ; le 503 d'un 429 du fournisseur,
+    nouvel essai ou non, porte en plus `Retry-After` : sa valeur si elle est entière et
+    d'au moins 1 s, sinon l'attente du nouvel essai."""
+    entetes = None
+    if exc.details.get("statut") == STATUT_DEBIT:
+        secondes = exc.retry_after_s
+        if secondes is None or secondes < 1 or not secondes.is_integer():
+            secondes = ATTENTE_DEBIT_S
+        entetes = {"Retry-After": str(int(secondes))}
+    return ErreurApi(STATUTS[exc.code], exc.code, exc.message, exc.details, entetes)
 
 
 async def appeler(

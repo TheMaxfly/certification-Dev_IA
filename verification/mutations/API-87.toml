@@ -1,0 +1,7 @@
+id = "API-87"
+origine = "E3 étape 4, spec 02, dette 42 (2026-11-03) — un 503 du fournisseur qui n'enveloppe pas un 429 porterait Retry-After, et l'écran dirait d'attendre pour rien"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    if exc.details.get("statut") == STATUT_DEBIT:'''
+apres = '''    if "statut" in exc.details:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "seul_un_429_du_fournisseur"]

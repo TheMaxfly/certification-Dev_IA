@@ -2,7 +2,8 @@
 
 Une API REST qui expose le modèle d'embedding en service et, depuis la version
 **1.1.0**, un modèle de langage choisi par profil ; depuis la **1.2.0**, chaque série
-porte ses métadonnées, et depuis la **1.3.0** ses auteurs. Deux routes métier, sous `/v1/` :
+porte ses métadonnées, et depuis la **1.3.0** ses auteurs ; la **1.3.1** rend l'attente
+d'un 429 du fournisseur (`Retry-After`). Deux routes métier, sous `/v1/` :
 
 - `POST /v1/recherche` : une question entre, une liste de séries classées sort, avec
   les passages qui les justifient ;
@@ -408,7 +409,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
     "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3,
     "identifiant_requete": "7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90",
-    "duree_ms": 84.7, "version_api": "1.3.0"
+    "duree_ms": 84.7, "version_api": "1.3.1"
   }
 }
 ```
@@ -471,7 +472,7 @@ X-Identifiant-Requete: 6f1c…
     "reglages": {"nombre_series": 2, "passages_par_serie": 2, "catalogue_seul": true},
     "modele": "google/embeddinggemma-300m", "revision": "…", "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3, "identifiant_requete": "6f1c…",
-    "duree_ms": 3104.5, "version_api": "1.3.0",
+    "duree_ms": 3104.5, "version_api": "1.3.1",
     "profil": "mistral-large-2512", "fournisseur": "mistral",
     "modele_langage": "mistral-large-2512", "statut_profil": "stable",
     "date_appel": "2026-11-02T10:14:07+00:00",
@@ -582,7 +583,7 @@ série sous `modele_api`, qui ne lit pas ces tables.
 `GET /v1/info` (avec la clé) — le modèle d'embedding servi, et le modèle de langage :
 
 ```json
-{"version_api": "1.3.0", "modele": "google/embeddinggemma-300m",
+{"version_api": "1.3.1", "modele": "google/embeddinggemma-300m",
  "revision": "57c266a740f537b4dc058e1b0cda161fd15afa75", "precision": "float32", "dimension": 768,
  "outil": "text-embeddings-inference", "outil_version": "1.9.4",
  "corpus_id": "v2", "encodage_id": 3, "nb_fragments": 77006,
@@ -640,7 +641,7 @@ statut ; les tests en produisent chacun (« Vérifier »).
 | 503 | `encodage_en_service_change` | une promotion ou un retour arrière a eu lieu depuis le démarrage : redémarrer l'API | `{"charge": 3, "en_service": 4}` |
 | 503 | `fournisseur_injoignable` | (réponse) connexion refusée, trop lente ou coupée | `{"profil": "…", "role": "reponse"}` |
 | 503 | `fournisseur_delai` | (réponse) le fournisseur n'a pas répondu dans le délai du profil | `{"profil": "…", "role": "reponse"}` |
-| 503 | `fournisseur_refus` | (réponse) le fournisseur a refusé l'appel (statut hors 2xx, 429 compris), rendu un corps inattendu (`motif` : `corps_inattendu`), ou atteint la borne de longueur avant la fin de la sortie (`longueur_atteinte`) | `{"profil": "…", "role": "reponse", "statut": 429, "code_fournisseur": "rate_limited"}` — **jamais le corps** |
+| 503 | `fournisseur_refus` | (réponse) le fournisseur a refusé l'appel (statut hors 2xx, 429 compris), rendu un corps inattendu (`motif` : `corps_inattendu`), ou atteint la borne de longueur avant la fin de la sortie (`longueur_atteinte`) ; sur un 429, en-tête `Retry-After` | `{"profil": "…", "role": "reponse", "statut": 429, "code_fournisseur": "rate_limited"}` — **jamais le corps** |
 | 503 | `sortie_modele_invalide` | (réponse) la sortie du modèle ne tient pas le contrat | `{"motif": "…", "role": "reponse"}` (ou `"reformulation"`) |
 | 500 | `erreur_interne` | imprévu ; la trace est au journal, sous l'identifiant | `null` |
 
@@ -675,6 +676,12 @@ dans `appels`. Refusé encore, ou `Retry-After` au-delà de 10 s : le 503
 `fournisseur_refus` habituel. Un refus de débit n'est pas facturé et ne dit rien du
 modèle ; avec un historique, la route enchaîne deux appels, et le libraire ne doit pas
 voir une erreur pour si peu.
+
+**Tout 503 qui enveloppe un 429 du fournisseur porte l'en-tête `Retry-After`**, qu'il y ait
+eu un nouvel essai ou non : la valeur du fournisseur si elle est entière et d'au moins 1 s,
+sinon 2 s, l'attente du nouvel essai. Le corps ne change pas. **Limite** : un 429 sans
+rapport avec le débit (un quota épuisé chez OpenAI, par exemple) le porte aussi, et attendre
+n'y changera rien ; `details.code_fournisseur` le distingue quand le fournisseur en rend un.
 
 `/v1/sante` rend 503 avec ses états (`degrade`), pas cette forme.
 
@@ -971,7 +978,8 @@ restent mesurées sur l'invite d'avant.
 ## Limites déclarées
 
 - **Le profil actif est plafonné par le compte Mistral à 15 requêtes par minute (2026-11-03), soit
-  environ 7 tours de conversation : au-delà, un 503 après un seul nouvel essai.**
+  environ 7 tours de conversation : au-delà, un 503 après un seul nouvel essai.** Ce 503 rend
+  l'attente à l'appelant (`Retry-After`) ; il n'y a pas de file d'attente (épreuve E4).
 - **Une ligne fausse prime sur un passage juste.** C'est le revers de la priorité de la
   ligne : une série dite terminée sur le badge d'une édition (136 numéros au catalogue), un
   « seulement au Japon » faute de ligne française. Une réponse qui suit le passage rend alors
@@ -1092,7 +1100,8 @@ Pour ajouter une route :
    contrat périmé.
 4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`, 1.2.0 pour
    `metadonnees`, 1.3.0 pour `auteurs`) : la
-   majeure reste celle de l'adresse.
+   majeure reste celle de l'adresse. Un en-tête documenté, sans champ ni route, monte la
+   corrective (1.3.1 pour `Retry-After`).
 
 **Toute rupture ouvre `/v2/`** : retirer ou renommer un champ, restreindre un type ou
 une borne, changer un défaut, changer la définition du score ou du classement. Il faut
