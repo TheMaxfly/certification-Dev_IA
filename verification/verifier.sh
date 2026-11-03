@@ -83,6 +83,7 @@ MODULES=(
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
   "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
+  "12|12_application|12_application|pytest|--extra dev||application||pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
   "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,

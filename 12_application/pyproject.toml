@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "application-conseiller"
+version = "0.1.0"
+description = "L'application du libraire : une page, une question, la réponse de l'API du modèle, ses sources et ses cas dégradés"
+readme = "README.md"
+requires-python = ">=3.12"
+# Épinglées. FastAPI, Starlette, Pydantic, Uvicorn, httpx, prometheus-client : les
+# versions du verrou du module 11 ; aucun code de ce module n'est importé, l'application
+# ne connaît l'API que par HTTP.
+dependencies = [
+    "fastapi==0.139.0",
+    "httpx==0.28.1",
+    "jinja2==3.1.6",
+    "prometheus-client==0.26.0",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.33",
+    "starlette==1.3.1",
+    "uvicorn==0.51.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Les tests de balisage lisent le HTML rendu.
+    "beautifulsoup4==4.15.0",
+    # La doublure de l'API est validée contre le contrat du module 11.
+    "jsonschema==4.26.0",
+    # L'audit d'accessibilité : axe-core dans Chromium, dans `make verify-poste`.
+    "playwright==1.64.1",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.pyright]
+# Exigence du module neuf : strict sur le code de l'application. `make verify` désigne
+# l'interpréteur du module (--pythonpath) ; en local, celui de `.venv`.
+include = ["src"]
+strict = ["src"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+[tool.bandit]
+# Lancé sur src/ seulement ; aucune règle écartée.
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

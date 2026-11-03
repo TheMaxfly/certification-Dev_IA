@@ -454,7 +454,7 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_ro`, et
   l'equivalence de l'API du modele sous `modele_api`.
 - Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
-  `statique` (actionlint, shellcheck, essais des hooks) : 13 controles,
+  `statique` (actionlint, shellcheck, essais des hooks) : 14 controles,
   obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
   par les changements reussit sans rien faire.
 - `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture
