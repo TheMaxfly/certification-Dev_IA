@@ -1313,7 +1313,7 @@
   "info": {
     "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n",
     "title": "API du modèle",
-    "version": "1.3.0"
+    "version": "1.3.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1521,7 +1521,16 @@
                 }
               }
             },
-            "description": "La recherche ne répond pas : service d'embedding indisponible (`service_embedding_indisponible`) ou incohérent (`service_embedding_incoherent`), base indisponible (`base_indisponible`), encodage en service changé depuis le démarrage (`encodage_en_service_change`) ; le fournisseur du modèle est injoignable (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le contrat (`sortie_modele_invalide`, son motif dans les détails)."
+            "description": "La recherche ne répond pas : service d'embedding indisponible (`service_embedding_indisponible`) ou incohérent (`service_embedding_incoherent`), base indisponible (`base_indisponible`), encodage en service changé depuis le démarrage (`encodage_en_service_change`) ; le fournisseur du modèle est injoignable (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le contrat (`sortie_modele_invalide`, son motif dans les détails).",
+            "headers": {
+              "Retry-After": {
+                "description": "Présent quand le fournisseur a rendu un 429 : les secondes à attendre, celles du fournisseur si elles sont entières et d'au moins 1, sinon l'attente du nouvel essai de l'API.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [

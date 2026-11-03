@@ -120,6 +120,14 @@ REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
         " (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse"
         " l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le"
         " contrat (`sortie_modele_invalide`, son motif dans les détails).",
+        "headers": {
+            "Retry-After": {
+                "description": "Présent quand le fournisseur a rendu un 429 : les"
+                " secondes à attendre, celles du fournisseur si elles sont entières et"
+                " d'au moins 1, sinon l'attente du nouvel essai de l'API.",
+                "schema": {"type": "integer", "minimum": 1},
+            }
+        },
     },
 }
 #: L'exemple exact du 503 de `/v1/sante` (dette de l'étape 2, soldée à l'étape 3).
