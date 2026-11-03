@@ -970,6 +970,8 @@ restent mesurées sur l'invite d'avant.
 
 ## Limites déclarées
 
+- **Le profil actif est plafonné par le compte Mistral à 15 requêtes par minute (2026-11-03), soit
+  environ 7 tours de conversation : au-delà, un 503 après un seul nouvel essai.**
 - **Une ligne fausse prime sur un passage juste.** C'est le revers de la priorité de la
   ligne : une série dite terminée sur le badge d'une édition (136 numéros au catalogue), un
   « seulement au Japon » faute de ligne française. Une réponse qui suit le passage rend alors
