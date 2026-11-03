@@ -105,10 +105,11 @@ le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 2026-10-09 (22:03 UTC, après sauvegarde), `022` le 2026-10-19 (21:53 UTC, après
 sauvegarde), `023` le 2026-10-20 (11:53 UTC, après sauvegarde, rôle de connexion
 `modele_api` créé par son script), `024` le 2026-10-27 (00:22 UTC, après sauvegarde),
-`025` le 2026-11-02 (23:35 UTC, après sauvegarde) ; `000` y a été **marquée appliquée** le
-2026-07-15, sans exécution. Le contrôle affiche **26 migrations appliquées et 0 en
+`025` le 2026-11-02 (23:35 UTC, après sauvegarde), `026` le 2026-11-03 (10:30 UTC, après
+sauvegarde) ; `000` y a été **marquée appliquée** le
+2026-07-15, sans exécution. Le contrôle affiche **27 migrations appliquées et 0 en
 attente**, et `outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
-2026-11-02).
+2026-11-03).
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
 (1 et 2 sur le v1, 3 sur le v2). Le journal des promotions a deux lignes : la reprise
