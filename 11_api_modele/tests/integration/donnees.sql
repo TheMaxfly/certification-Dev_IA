@@ -8,7 +8,8 @@
 --
 -- Le même jeu que la base de test du module (`tests/conftest.py`, `garnir`) : la série
 -- 1 a une critique (fragments 701, 702) ; la série 2 n'est atteinte que par le synopsis
--- Kitsu 50, rattaché par le moyeu (703) ; l'œuvre Kitsu 60 est hors catalogue (704).
+-- Kitsu 50, rattaché par le moyeu (703) ; l'œuvre Kitsu 60 est hors catalogue (704) ;
+-- un auteur de critique factice, pour la vue des pseudonymes.
 -- Un axe par fragment ; la doublure encode toute question sur l'axe du fragment 702.
 
 \set ON_ERROR_STOP on
@@ -18,6 +19,9 @@ BEGIN;
 INSERT INTO manga.ms_series_enriched (series_id, series_title)
 VALUES (1, 'Série 1'), (2, 'Série 2');
 INSERT INTO manga.work_identity (series_id, kitsu_id) VALUES (2, '50');
+-- Un auteur factice : la vue des pseudonymes (024) ne doit pas être vide, sinon l'API
+-- refuse de démarrer.
+INSERT INTO manga.ms_reviews_all (series_id, review_author) VALUES (1, 'Lecteurfactice');
 
 INSERT INTO bench.corpus (corpus_id, regle, chunking_id)
 SELECT 'v7', 'essai d''intégration', chunking_id

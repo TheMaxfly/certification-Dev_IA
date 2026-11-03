@@ -1,0 +1,7 @@
+id = "API-82"
+origine = "E3 étape 3, spec 07, A0 (2026-11-03) — un auteur absent n'est plus dit inconnu"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''{m.auteurs or 'inconnu'}'''
+apres = '''{m.auteurs}'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "ce_que_dit_la_ligne"]

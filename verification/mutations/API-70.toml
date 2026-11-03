@@ -1,0 +1,9 @@
+id = "API-70"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — un run interrompu dit sa cause"
+fichier = "11_api_modele/src/api_modele/banc_reponse/enregistrement.py"
+avant = '''    if statut == "interrompu":
+'''
+apres = '''    if statut == "jamais":
+'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "etiquettes_d_un_run"]

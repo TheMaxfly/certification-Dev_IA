@@ -1,0 +1,7 @@
+id = "API-28"
+origine = "E3 étape 3, spec 02 (2026-10-26) — le délai de réponse ne borne plus l'appel entier : une réponse goutte à goutte passerait"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''            async with asyncio.timeout(connexion + profil.delai_s):'''
+apres = '''            async with asyncio.timeout(None):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_fournisseurs.py", "-k", "goutte_a_goutte"]

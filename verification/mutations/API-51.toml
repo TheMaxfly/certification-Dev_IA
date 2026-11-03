@@ -1,0 +1,7 @@
+id = "API-51"
+origine = "E3 étape 3, spec 06, bloc D (2026-11-02) — trois reprises au plus sur un refus de débit, décision de Max : une de moins interromprait un run que la dernière reprise aurait sauvé"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    while refus_de_debit(tentatives[-1]) and len(tentatives) <= REPRISES_DEBIT:'''
+apres = '''    while refus_de_debit(tentatives[-1]) and len(tentatives) < REPRISES_DEBIT:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "refus_de_debit_qui_dure"]

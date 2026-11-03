@@ -1,6 +1,59 @@
 {
   "components": {
     "schemas": {
+      "AppelModele": {
+        "properties": {
+          "estimes": {
+            "description": "Vrai : comptés par caractères (sans `usage`).",
+            "title": "Estimes",
+            "type": "boolean"
+          },
+          "jetons_entree": {
+            "title": "Jetons Entree",
+            "type": "integer"
+          },
+          "jetons_raisonnement": {
+            "title": "Jetons Raisonnement",
+            "type": "integer"
+          },
+          "jetons_sortie": {
+            "title": "Jetons Sortie",
+            "type": "integer"
+          },
+          "latence_ms": {
+            "title": "Latence Ms",
+            "type": "number"
+          },
+          "role": {
+            "enum": [
+              "reformulation",
+              "reponse"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "statut": {
+            "default": "ok",
+            "description": "`refus_debit` : refusé pour débit par le fournisseur (aucun jeton, non facturé), puis rejoué une fois.",
+            "enum": [
+              "ok",
+              "refus_debit"
+            ],
+            "title": "Statut",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "jetons_entree",
+          "jetons_sortie",
+          "jetons_raisonnement",
+          "estimes",
+          "latence_ms"
+        ],
+        "title": "AppelModele",
+        "type": "object"
+      },
       "BorneBooleenne": {
         "properties": {
           "defaut": {
@@ -35,6 +88,29 @@
           "max"
         ],
         "title": "BorneEntiere",
+        "type": "object"
+      },
+      "BorneReelle": {
+        "properties": {
+          "defaut": {
+            "title": "Defaut",
+            "type": "number"
+          },
+          "max": {
+            "title": "Max",
+            "type": "number"
+          },
+          "min": {
+            "title": "Min",
+            "type": "number"
+          }
+        },
+        "required": [
+          "defaut",
+          "min",
+          "max"
+        ],
+        "title": "BorneReelle",
         "type": "object"
       },
       "Contexte": {
@@ -89,6 +165,259 @@
         "title": "Contexte",
         "type": "object"
       },
+      "ContexteReponse": {
+        "description": "Le contexte de la recherche, plus le modèle de langage et ses appels.",
+        "properties": {
+          "appels": {
+            "items": {
+              "$ref": "#/components/schemas/AppelModele"
+            },
+            "title": "Appels",
+            "type": "array"
+          },
+          "corpus_id": {
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "cout_estime_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La somme des appels, en dollars ; null si un prix n'est pas déclaré.",
+            "title": "Cout Estime Usd"
+          },
+          "date_appel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le dernier appel au modèle (UTC, ISO 8601) ; null sans appel.",
+            "title": "Date Appel"
+          },
+          "duree_ms": {
+            "title": "Duree Ms",
+            "type": "number"
+          },
+          "encodage_id": {
+            "title": "Encodage Id",
+            "type": "integer"
+          },
+          "fournisseur": {
+            "title": "Fournisseur",
+            "type": "string"
+          },
+          "identifiant_requete": {
+            "title": "Identifiant Requete",
+            "type": "string"
+          },
+          "latences_ms": {
+            "$ref": "#/components/schemas/Latences"
+          },
+          "modele": {
+            "title": "Modele",
+            "type": "string"
+          },
+          "modele_langage": {
+            "description": "L'identifiant du modèle de langage.",
+            "title": "Modele Langage",
+            "type": "string"
+          },
+          "precision": {
+            "title": "Precision",
+            "type": "string"
+          },
+          "profil": {
+            "title": "Profil",
+            "type": "string"
+          },
+          "question_reformulee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Reformulee"
+          },
+          "reformulation_ignoree": {
+            "anyOf": [
+              {
+                "const": "trop_longue",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reformulation Ignoree"
+          },
+          "reglages": {
+            "$ref": "#/components/schemas/ReglagesAppliques"
+          },
+          "reglages_absents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reglages Absents",
+            "type": "array"
+          },
+          "reglages_appliques": {
+            "$ref": "#/components/schemas/ReglagesReponseAppliques"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "statut_profil": {
+            "enum": [
+              "stable",
+              "apercu"
+            ],
+            "title": "Statut Profil",
+            "type": "string"
+          },
+          "version_api": {
+            "title": "Version Api",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reglages",
+          "modele",
+          "revision",
+          "precision",
+          "corpus_id",
+          "encodage_id",
+          "identifiant_requete",
+          "duree_ms",
+          "version_api",
+          "profil",
+          "fournisseur",
+          "modele_langage",
+          "statut_profil",
+          "date_appel",
+          "reglages_appliques",
+          "reglages_absents",
+          "question_reformulee",
+          "reformulation_ignoree",
+          "appels",
+          "cout_estime_usd",
+          "latences_ms"
+        ],
+        "title": "ContexteReponse",
+        "type": "object"
+      },
+      "DemandeReponse": {
+        "additionalProperties": false,
+        "description": "Une question, l'historique de la conversation et les réglages de la réponse ;\nun champ inconnu est refusé.",
+        "properties": {
+          "catalogue_seul": {
+            "default": true,
+            "title": "Catalogue Seul",
+            "type": "boolean"
+          },
+          "historique": {
+            "description": "Les tours précédents, dans l'ordre : au plus 10 tours et 4000 caractères ; ni gardés ni journalisés.",
+            "items": {
+              "$ref": "#/components/schemas/Tour"
+            },
+            "title": "Historique",
+            "type": "array"
+          },
+          "identite": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._@:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recopiée dans le journal, sans effet sur la réponse.",
+            "title": "Identite"
+          },
+          "longueur_max": {
+            "default": 400,
+            "description": "Jetons de sortie au plus.",
+            "maximum": 4000.0,
+            "minimum": 50.0,
+            "title": "Longueur Max",
+            "type": "integer"
+          },
+          "mode": {
+            "const": "strict",
+            "default": "strict",
+            "title": "Mode",
+            "type": "string"
+          },
+          "nombre_series": {
+            "default": 5,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Nombre Series",
+            "type": "integer"
+          },
+          "passages_par_serie": {
+            "default": 2,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Passages Par Serie",
+            "type": "integer"
+          },
+          "profil": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le profil qui rédige (un profil déclaré) ; le profil actif par défaut.",
+            "title": "Profil"
+          },
+          "question": {
+            "description": "La question du libraire, dernier tour de la conversation.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "reformuler": {
+            "default": true,
+            "description": "Avec un historique : réécrire la question en question autonome avant la recherche.",
+            "title": "Reformuler",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "DemandeReponse",
+        "type": "object"
+      },
       "Erreur": {
         "description": "La forme de toute erreur de l'API.",
         "properties": {
@@ -126,6 +455,24 @@
         "title": "Erreur",
         "type": "object"
       },
+      "HistoriqueDecrit": {
+        "properties": {
+          "caracteres_max": {
+            "title": "Caracteres Max",
+            "type": "integer"
+          },
+          "tours_max": {
+            "title": "Tours Max",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tours_max",
+          "caracteres_max"
+        ],
+        "title": "HistoriqueDecrit",
+        "type": "object"
+      },
       "Info": {
         "description": "Ce que l'API sert : modèle, encodage, corpus, réglages et leurs bornes.",
         "properties": {
@@ -148,6 +495,9 @@
           "modele": {
             "title": "Modele",
             "type": "string"
+          },
+          "modele_langage": {
+            "$ref": "#/components/schemas/ModeleLangage"
           },
           "nb_fragments": {
             "title": "Nb Fragments",
@@ -193,9 +543,212 @@
           "nb_fragments",
           "reglages",
           "question",
-          "debit_par_minute"
+          "debit_par_minute",
+          "modele_langage"
         ],
         "title": "Info",
+        "type": "object"
+      },
+      "Latences": {
+        "properties": {
+          "modele": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modele"
+          },
+          "recherche": {
+            "title": "Recherche",
+            "type": "number"
+          },
+          "reformulation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reformulation"
+          },
+          "totale": {
+            "title": "Totale",
+            "type": "number"
+          }
+        },
+        "required": [
+          "recherche",
+          "reformulation",
+          "modele",
+          "totale"
+        ],
+        "title": "Latences",
+        "type": "object"
+      },
+      "Metadonnees": {
+        "description": "Ce que le catalogue dit d'une série (`manga.v_metadonnees_serie`) ; `null` : il\nne le sait pas. Une œuvre hors catalogue n'a que des `null`.",
+        "properties": {
+          "annee_fr": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "L'année du premier volume à EAN français.",
+            "title": "Annee Fr"
+          },
+          "auteurs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le scénariste puis le dessinateur, tels que le catalogue les écrit, joints par une virgule ; un même nom une seule fois.",
+            "title": "Auteurs"
+          },
+          "demographie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le libellé du catalogue, tel quel.",
+            "title": "Demographie"
+          },
+          "disponibilite": {
+            "anyOf": [
+              {
+                "enum": [
+                  "edite_en_france",
+                  "seulement_au_japon",
+                  "inconnue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Édité en France : au moins un volume y est paru, pas qu'il est en stock.",
+            "title": "Disponibilite"
+          },
+          "nb_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le plus grand du champ « tomes parus » et des numéros de volume distincts.",
+            "title": "Nb Volumes"
+          },
+          "nb_volumes_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "champ",
+                  "repli_volumes_distincts",
+                  "divergent"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Toute source autre que `champ` se lit « au moins N ».",
+            "title": "Nb Volumes Source"
+          },
+          "statut": {
+            "anyOf": [
+              {
+                "enum": [
+                  "termine",
+                  "en_cours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statut"
+          }
+        },
+        "required": [
+          "disponibilite",
+          "nb_volumes",
+          "nb_volumes_source",
+          "statut",
+          "demographie",
+          "annee_fr",
+          "auteurs"
+        ],
+        "title": "Metadonnees",
+        "type": "object"
+      },
+      "ModeDecrit": {
+        "properties": {
+          "defaut": {
+            "title": "Defaut",
+            "type": "string"
+          },
+          "valeurs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Valeurs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "defaut",
+          "valeurs"
+        ],
+        "title": "ModeDecrit",
+        "type": "object"
+      },
+      "ModeleLangage": {
+        "description": "Le modèle de langage : le profil qui rédige, les profils déclarés, les\nréglages de la réponse. Distinct de `modele`, le modèle d'embedding.",
+        "properties": {
+          "profil_actif": {
+            "title": "Profil Actif",
+            "type": "string"
+          },
+          "profils": {
+            "items": {
+              "$ref": "#/components/schemas/ProfilDecrit"
+            },
+            "title": "Profils",
+            "type": "array"
+          },
+          "reglages_reponse": {
+            "$ref": "#/components/schemas/ReglagesReponse"
+          }
+        },
+        "required": [
+          "profil_actif",
+          "profils",
+          "reglages_reponse"
+        ],
+        "title": "ModeleLangage",
         "type": "object"
       },
       "Passage": {
@@ -234,6 +787,60 @@
           "extrait"
         ],
         "title": "Passage",
+        "type": "object"
+      },
+      "ProfilDecrit": {
+        "properties": {
+          "disponible": {
+            "description": "La clé du profil est présente (et, si le contrôle d'exploitation a tourné au démarrage, le modèle figure chez le fournisseur).",
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "fournisseur": {
+            "title": "Fournisseur",
+            "type": "string"
+          },
+          "modele": {
+            "description": "L'identifiant du modèle chez le fournisseur.",
+            "title": "Modele",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "reglages_absents": {
+            "description": "Les réglages que ce profil n'expose pas : les demander est refusé.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reglages Absents",
+            "type": "array"
+          },
+          "statut": {
+            "enum": [
+              "stable",
+              "apercu"
+            ],
+            "title": "Statut",
+            "type": "string"
+          },
+          "variable_cle": {
+            "description": "Le NOM de la variable d'environnement de la clé, jamais sa valeur.",
+            "title": "Variable Cle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "fournisseur",
+          "modele",
+          "statut",
+          "disponible",
+          "reglages_absents",
+          "variable_cle"
+        ],
+        "title": "ProfilDecrit",
         "type": "object"
       },
       "Question": {
@@ -344,6 +951,163 @@
         "title": "ReglagesRecherche",
         "type": "object"
       },
+      "ReglagesReponse": {
+        "description": "Les réglages de la route de réponse : défauts et bornes (`reglages.toml`).",
+        "properties": {
+          "catalogue_seul": {
+            "$ref": "#/components/schemas/BorneBooleenne"
+          },
+          "historique": {
+            "$ref": "#/components/schemas/HistoriqueDecrit"
+          },
+          "longueur_max": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ModeDecrit"
+          },
+          "nombre_series": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "passages_par_serie": {
+            "$ref": "#/components/schemas/BorneEntiere"
+          },
+          "reformuler": {
+            "$ref": "#/components/schemas/BorneBooleenne"
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/BorneReelle"
+          }
+        },
+        "required": [
+          "temperature",
+          "longueur_max",
+          "mode",
+          "historique",
+          "reformuler",
+          "nombre_series",
+          "passages_par_serie",
+          "catalogue_seul"
+        ],
+        "title": "ReglagesReponse",
+        "type": "object"
+      },
+      "ReglagesReponseAppliques": {
+        "properties": {
+          "longueur_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longueur Max"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          }
+        },
+        "required": [
+          "temperature",
+          "longueur_max",
+          "mode",
+          "top_p",
+          "reasoning_effort"
+        ],
+        "title": "ReglagesReponseAppliques",
+        "type": "object"
+      },
+      "Reponse": {
+        "properties": {
+          "contexte": {
+            "$ref": "#/components/schemas/ContexteReponse"
+          },
+          "motif_refus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aucun_passage",
+                  "hors_catalogue",
+                  "inconnu"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motif Refus"
+          },
+          "refus": {
+            "title": "Refus",
+            "type": "boolean"
+          },
+          "reponse": {
+            "title": "Reponse",
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/Serie"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_citees": {
+            "items": {
+              "$ref": "#/components/schemas/SerieCitee"
+            },
+            "title": "Series Citees",
+            "type": "array"
+          }
+        },
+        "required": [
+          "refus",
+          "motif_refus",
+          "reponse",
+          "series_citees",
+          "series",
+          "contexte"
+        ],
+        "title": "Reponse",
+        "type": "object"
+      },
       "Resultat": {
         "properties": {
           "contexte": {
@@ -430,6 +1194,9 @@
             ],
             "title": "Kitsu Id"
           },
+          "metadonnees": {
+            "$ref": "#/components/schemas/Metadonnees"
+          },
           "passages": {
             "items": {
               "$ref": "#/components/schemas/Passage"
@@ -469,9 +1236,68 @@
           "kitsu_id",
           "titre",
           "score",
-          "passages"
+          "passages",
+          "metadonnees"
         ],
         "title": "Serie",
+        "type": "object"
+      },
+      "SerieCitee": {
+        "properties": {
+          "fragment_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Fragment Ids",
+            "type": "array"
+          },
+          "rang": {
+            "title": "Rang",
+            "type": "integer"
+          },
+          "serie_id": {
+            "title": "Serie Id",
+            "type": "integer"
+          },
+          "titre": {
+            "description": "Le titre du catalogue, jamais celui du modèle.",
+            "title": "Titre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serie_id",
+          "titre",
+          "rang",
+          "fragment_ids"
+        ],
+        "title": "SerieCitee",
+        "type": "object"
+      },
+      "Tour": {
+        "additionalProperties": false,
+        "description": "Un tour de la conversation, dans l'ordre.",
+        "properties": {
+          "contenu": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Contenu",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "libraire",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "contenu"
+        ],
+        "title": "Tour",
         "type": "object"
       }
     },
@@ -485,9 +1311,9 @@
     }
   },
   "info": {
-    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n",
+    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n",
     "title": "API du modèle",
-    "version": "1.0.0"
+    "version": "1.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -623,6 +1449,92 @@
         ]
       }
     },
+    "/v1/reponse": {
+      "post": {
+        "operationId": "repondre_v1_reponse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandeReponse"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Clé d'accès absente ou invalide."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Corps de requête trop volumineux."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Entrée invalide (`entree_invalide`), question trop longue (`question_trop_longue`), historique invalide (`historique_invalide`), profil inconnu ou indisponible (`profil_inconnu`, `profil_indisponible`), réglage que le profil n'expose pas (`reglage_non_expose`). Aucun appel au modèle n'a eu lieu."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Débit dépassé pour cette clé."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "La recherche ne répond pas : service d'embedding indisponible (`service_embedding_indisponible`) ou incohérent (`service_embedding_incoherent`), base indisponible (`base_indisponible`), encodage en service changé depuis le démarrage (`encodage_en_service_change`) ; le fournisseur du modèle est injoignable (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le contrat (`sortie_modele_invalide`, son motif dans les détails)."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Une réponse rédigée par le modèle de langage, des seuls passages",
+        "tags": [
+          "reponse"
+        ]
+      }
+    },
     "/v1/sante": {
       "get": {
         "operationId": "sante_v1_sante_get",
@@ -640,6 +1552,12 @@
           "503": {
             "content": {
               "application/json": {
+                "example": {
+                  "base": "injoignable",
+                  "encodage": "inconnu",
+                  "service_embedding": "ok",
+                  "statut": "degrade"
+                },
                 "schema": {
                   "$ref": "#/components/schemas/Sante"
                 }

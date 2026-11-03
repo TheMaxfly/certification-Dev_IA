@@ -1,0 +1,8 @@
+id = "API-59"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une disponibilité conforme à la ligne n'est pas rejetée"
+fichier = "11_api_modele/src/api_modele/affirmations.py"
+avant = '''            and lignes[serie_id].disponibilite in DISPONIBILITES_MUETTES
+'''
+apres = ''''''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_affirmations.py", "-k", "disponibilite_conforme_a_la_ligne"]

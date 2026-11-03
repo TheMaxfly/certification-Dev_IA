@@ -1,0 +1,7 @@
+id = "API-57"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — hors de la source champ, la ligne écrit un minimum"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    if m.nb_volumes_source == "champ":'''
+apres = '''    if m.nb_volumes_source is not None:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "ce_que_dit_la_ligne"]

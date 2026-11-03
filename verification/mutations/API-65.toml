@@ -1,0 +1,7 @@
+id = "API-65"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — chaque série rendue porte ses métadonnées"
+fichier = "11_api_modele/src/api_modele/recherche.py"
+avant = '''                    None if e.serie_id is None else metadonnees.get(e.serie_id)'''
+apres = '''                    None'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "porte_ses_metadonnees"]

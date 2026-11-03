@@ -1,0 +1,9 @@
+id = "API-43"
+origine = "E3 étape 3, spec 06 (2026-10-30) — une sortie coupée par la borne prise pour un fournisseur en échec : le run 1 s'arrêtait à la neuvième question sur une réponse trop longue"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''        return (self.code or "").startswith("fournisseur_") and (
+            self.motif != MOTIF_LONGUEUR
+        )'''
+apres = '''        return (self.code or "").startswith("fournisseur_")'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "sortie_coupee_par_la_borne"]

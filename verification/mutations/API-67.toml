@@ -1,0 +1,7 @@
+id = "API-67"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — le banc n'écrit aucun texte qui porte un nom de la liste"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    if texte is not None and not banc_.pseudonymes.empreintes_trouvees(texte):'''
+apres = '''    if texte is not None:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "portant_un_nom_de_membre"]

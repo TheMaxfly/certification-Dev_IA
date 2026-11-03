@@ -1,0 +1,7 @@
+id = "API-85"
+origine = "E3 étape 3, spec 07, A0 (2026-11-03) — l'invite ne renvoie plus l'auteur à la ligne de titre"
+fichier = "11_api_modele/config/invites/reponse.md"
+avant = '''ont le même auteur si leurs lignes le disent, pas autrement.'''
+apres = '''ont le même auteur.'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "invite_renvoie"]

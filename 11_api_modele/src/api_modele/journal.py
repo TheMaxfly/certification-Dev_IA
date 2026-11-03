@@ -5,6 +5,11 @@ clé (jamais sa valeur), corpus et encodage servis — et, pour la recherche, le
 réglages appliqués et l'`identite` si le client la fournit. Le texte d'une question
 n'y entre que sur réglage explicite (désactivé par défaut).
 
+Un appel au modèle de langage : une ligne de plus (`appel_modele`), écrite par la
+couche des fournisseurs — profil, modèle, réglages, jetons, coût, latence, statut, le
+NOM de la variable de la clé. Jamais une clé, un message, un passage ni une sortie du
+modèle.
+
 `configurer` n'est appelé qu'au lancement du serveur (`__main__`) : en test, les
 enregistrements remontent au journal racine, où pytest les recueille.
 """
@@ -19,6 +24,7 @@ from typing import Any, cast
 
 JOURNAL = logging.getLogger("api_modele")
 REQUETES = logging.getLogger("api_modele.requetes")
+APPELS = logging.getLogger("api_modele.appels")
 
 
 class FormatJson(logging.Formatter):
@@ -55,3 +61,7 @@ def evenement(nom: str, champs: dict[str, object], niveau: int = logging.INFO) -
 
 def requete(champs: dict[str, object]) -> None:
     REQUETES.info("requete", extra={"champs": champs})
+
+
+def appel(champs: dict[str, object]) -> None:
+    APPELS.info("appel_modele", extra={"champs": champs})

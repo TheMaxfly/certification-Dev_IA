@@ -48,10 +48,12 @@ class Erreur(BaseModel):
     identifiant_requete: str
 
 
-def bornes_de(request: Request) -> dict[str, tuple[int, int]]:
+def bornes_de(request: Request) -> dict[str, tuple[float, float]]:
     """Les bornes des réglages connus, posées par l'application à sa création."""
     bornes: object = getattr(request.app.state, "bornes", None)
-    return cast(dict[str, tuple[int, int]], bornes) if isinstance(bornes, dict) else {}
+    return (
+        cast(dict[str, tuple[float, float]], bornes) if isinstance(bornes, dict) else {}
+    )
 
 
 def identifiant(request: Request) -> str:
@@ -102,7 +104,7 @@ BORNES = (("ge", "le"), ("gt", "lt"), ("min_length", "max_length"))
 
 def champs(
     erreurs: Sequence[Mapping[str, Any]],
-    bornes_connues: Mapping[str, tuple[int, int]] | None = None,
+    bornes_connues: Mapping[str, tuple[float, float]] | None = None,
 ) -> list[dict[str, object]]:
     """Les champs fautifs, dans l'ordre : `champ`, `raison`, et `bornes` s'il y en a.
 
@@ -155,6 +157,17 @@ async def _validation(request: Request, exc: Exception) -> JSONResponse:
                     "maximum": maximum,
                     "unite": "caracteres",
                 },
+            )
+    for erreur in erreurs:
+        # L'historique de la route de réponse a son code, et son motif.
+        if erreur.get("type") == "historique_invalide":
+            contexte = cast(Mapping[str, Any], erreur.get("ctx") or {})
+            return reponse(
+                request,
+                422,
+                "historique_invalide",
+                "Historique de conversation invalide.",
+                {"motif": contexte.get("motif")},
             )
     return reponse(
         request,

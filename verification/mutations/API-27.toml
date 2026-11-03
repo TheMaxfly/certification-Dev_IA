@@ -1,0 +1,7 @@
+id = "API-27"
+origine = "E3 étape 3, spec 02 (2026-10-26) — un profil tenu pour disponible sans que la variable de sa clé soit présente : le profil actif sans clé démarrerait"
+fichier = "11_api_modele/src/api_modele/configuration.py"
+avant = '''        disponible=bool(variable) and bool(environ.get(variable, "").strip()),'''
+apres = '''        disponible=bool(variable),'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_configuration.py", "-k", "profil_actif_sans_cle"]

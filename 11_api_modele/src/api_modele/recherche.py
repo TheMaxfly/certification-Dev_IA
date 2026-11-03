@@ -7,7 +7,8 @@
 2. Le classement est celui du banc (`classement.Classeur`), sur les vecteurs de
    l'encodage en service, chargés au démarrage.
 3. Une transaction en lecture seule, bornée : l'encodage est-il toujours en service
-   (sinon 503 `encodage_en_service_change`) ; les titres ; le texte des passages.
+   (sinon 503 `encodage_en_service_change`) ; les titres et les métadonnées ; le texte
+   des passages.
 
 Aucune écriture en base.
 """
@@ -26,6 +27,7 @@ from api_modele.erreurs import ErreurApi
 from api_modele.etat import EtatApi
 from api_modele.modeles import (
     Contexte,
+    Metadonnees,
     Passage,
     Recherche,
     ReglagesAppliques,
@@ -98,8 +100,22 @@ def _refus(etat: EtatApi, question: str) -> ErreurApi:
     )
 
 
+#: Les champs de `Metadonnees`, dans l'ordre de la vue.
+CHAMPS_METADONNEES = tuple(Metadonnees.model_fields)
+
+
+def metadonnees_de(valeurs: tuple[object, ...] | None) -> Metadonnees:
+    """Les valeurs lues de la vue ; aucune ligne (une œuvre hors catalogue) : `null`."""
+    if valeurs is None:
+        valeurs = (None,) * len(CHAMPS_METADONNEES)
+    return Metadonnees.model_validate(
+        dict(zip(CHAMPS_METADONNEES, valeurs, strict=True))
+    )
+
+
 def completer(etat: EtatApi, entites: list[EntiteClassee]) -> list[Serie]:
-    """Titres et passages, lus dans une transaction bornée, en lecture seule."""
+    """Titres, métadonnées et passages, lus dans une transaction bornée, en lecture
+    seule."""
     charge = etat.coherence.encodage
     corpus = charge.corpus_id
     try:
@@ -122,6 +138,9 @@ def completer(etat: EtatApi, entites: list[EntiteClassee]) -> list[Serie]:
                 corpus,
                 [e.serie_id for e in entites if e.serie_id is not None],
                 [e.kitsu_id for e in entites if e.kitsu_id is not None],
+            )
+            metadonnees = base.lire_metadonnees(
+                cx, [e.serie_id for e in entites if e.serie_id is not None]
             )
             textes = base.lire_passages(
                 cx, corpus, [f.chunk_id for e in entites for f in e.fragments]
@@ -164,6 +183,9 @@ def completer(etat: EtatApi, entites: list[EntiteClassee]) -> list[Serie]:
                 titre=titre,
                 score=e.score,
                 passages=passages,
+                metadonnees=metadonnees_de(
+                    None if e.serie_id is None else metadonnees.get(e.serie_id)
+                ),
             )
         )
     return series

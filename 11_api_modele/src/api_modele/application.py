@@ -2,16 +2,21 @@
 
 Au démarrage, le pool est ouvert, la cohérence vérifiée (`demarrage.verifier`) et
 le classement du banc chargé (rattachement et vecteurs de l'encodage en service) ;
-un écart, et l'API ne démarre pas. Routes : `/v1/recherche` et `/v1/info` (avec
-clé), `/v1/sante` (sans clé), `/metrics` (réseau interne), `/v1/openapi.json` (le
-contrat) et, sur réglage, `/v1/docs` (Swagger UI).
+puis la liste des pseudonymes est lue (`manga.v_pseudonymes`, gardée en mémoire) et
+la couche des fournisseurs du modèle de langage est posée (son contrôle
+d'exploitation, s'il est demandé : `/v1/models`) ; un écart, et l'API ne démarre pas.
+Routes : `/v1/recherche` et `/v1/info` (avec clé), `/v1/sante` (sans clé), `/metrics`
+(réseau interne), `/v1/openapi.json` (le contrat) et, sur réglage, `/v1/docs`
+(Swagger UI).
 """
 
 from __future__ import annotations
 
+import os
 import time
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
@@ -27,23 +32,34 @@ from api_modele import (
     erreurs,
     journal,
     memoire,
+    pseudonymes,
     recherche,
     service,
 )
+from api_modele import reponse as route_reponse
 from api_modele.classement import Classeur
-from api_modele.configuration import Reglages
+from api_modele.configuration import Borne, Reglages
 from api_modele.debit import Limiteur
 from api_modele.enveloppe import Enveloppe
 from api_modele.erreurs import Erreur, ErreurApi
 from api_modele.etat import EtatApi, etat_de
+from api_modele.fournisseurs import ErreurFournisseur, Fournisseurs
 from api_modele.metriques import Metriques, autorisee
 from api_modele.modeles import (
     BorneBooleenne,
     BorneEntiere,
+    BorneReelle,
+    DemandeReponse,
+    HistoriqueDecrit,
     Info,
+    ModeDecrit,
+    ModeleLangage,
+    ProfilDecrit,
     Question,
     Recherche,
     ReglagesRecherche,
+    ReglagesReponse,
+    Reponse,
     Resultat,
     Sante,
 )
@@ -57,6 +73,10 @@ Le classement est celui que le banc de mesure a mesuré.
 
 Toutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).
 `/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.
+
+Depuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en
+français une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse
+porte ses sources, le profil, les réglages, les jetons, le coût et les latences.
 """
 
 REPONSES_CLE: dict[int | str, dict[str, object]] = {
@@ -77,6 +97,37 @@ REPONSES_RECHERCHE: dict[int | str, dict[str, object]] = {
         "description": "Service d'embedding indisponible ou incohérent, base"
         " indisponible, ou encodage en service changé depuis le démarrage.",
     },
+}
+
+REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
+    **REPONSES_CLE,
+    413: {"model": Erreur, "description": "Corps de requête trop volumineux."},
+    422: {
+        "model": Erreur,
+        "description": "Entrée invalide (`entree_invalide`), question trop longue"
+        " (`question_trop_longue`), historique invalide (`historique_invalide`),"
+        " profil inconnu ou indisponible (`profil_inconnu`, `profil_indisponible`),"
+        " réglage que le profil n'expose pas (`reglage_non_expose`). Aucun appel au"
+        " modèle n'a eu lieu.",
+    },
+    503: {
+        "model": Erreur,
+        "description": "La recherche ne répond pas : service d'embedding"
+        " indisponible (`service_embedding_indisponible`) ou incohérent"
+        " (`service_embedding_incoherent`), base indisponible"
+        " (`base_indisponible`), encodage en service changé depuis le démarrage"
+        " (`encodage_en_service_change`) ; le fournisseur du modèle est injoignable"
+        " (`fournisseur_injoignable`), trop lent (`fournisseur_delai`) ou refuse"
+        " l'appel (`fournisseur_refus`) ; la sortie du modèle ne tient pas le"
+        " contrat (`sortie_modele_invalide`, son motif dans les détails).",
+    },
+}
+#: L'exemple exact du 503 de `/v1/sante` (dette de l'étape 2, soldée à l'étape 3).
+EXEMPLE_SANTE_503 = {
+    "statut": "degrade",
+    "base": "injoignable",
+    "service_embedding": "ok",
+    "encodage": "inconnu",
 }
 
 CleExigee = Annotated[str, Depends(exiger_cle)]
@@ -121,8 +172,14 @@ def creer_application(
     *,
     instance: Instance | None = None,
     horloge: Callable[[], float] = time.monotonic,
+    environ: Mapping[str, str] | None = None,
+    homonymes: Path = pseudonymes.FICHIER_HOMONYMES,
 ) -> FastAPI:
-    """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie."""
+    """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
+
+    `environ` : où la couche des fournisseurs lit les clés au moment de l'appel
+    (l'environnement du processus par défaut) ; `homonymes` : la liste des
+    homonymes admis (celle de l'étape 1 par défaut)."""
     metriques = Metriques()
     contexte: dict[str, object] = {}
 
@@ -131,6 +188,11 @@ def creer_application(
         inst = instance or service.charger_instance(reglages.instance)
         client = service.client(inst, reglages)
         pool = base.creer_pool(reglages)
+        fournisseurs = Fournisseurs(
+            reglages.modele_langage,
+            os.environ if environ is None else environ,
+            metriques,
+        )
         try:
             try:
                 pool.open(wait=True, timeout=reglages.pool_attente_s)
@@ -141,9 +203,15 @@ def creer_application(
                 ) from exc
             coherence = demarrage.verifier(pool, client, inst, reglages)
             classeur = charger_classement(pool, reglages, coherence)
+            noms = pseudonymes.charger(pool, reglages, homonymes)
+            try:
+                await fournisseurs.demarrer()
+            except ErreurFournisseur as exc:
+                raise demarrage.DemarrageRefuse(exc.message) from exc
         except demarrage.DemarrageRefuse as exc:
             journal.evenement("demarrage_refuse", {"raison": str(exc)}, 40)
             pool.close()
+            await fournisseurs.fermer()
             raise
         encodage = coherence.encodage
         app.state.etat = EtatApi(
@@ -154,6 +222,8 @@ def creer_application(
             classeur=classeur,
             limiteur=Limiteur(reglages.debit_par_minute, horloge),
             metriques=metriques,
+            fournisseurs=fournisseurs,
+            pseudonymes=noms,
         )
         contexte.update(corpus_id=encodage.corpus_id, encodage_id=encodage.encodage_id)
         metriques.encodage.labels(
@@ -168,12 +238,20 @@ def creer_application(
                 "corpus_id": encodage.corpus_id,
                 "encodage_id": encodage.encodage_id,
                 "service": client.url,
+                "profil_actif": fournisseurs.profil_actif,
+                "profils_disponibles": [
+                    nom for nom, p in fournisseurs.profils.items() if p.disponible
+                ],
+                # Des nombres seulement : jamais un nom.
+                "pseudonymes": noms.nb_noms,
+                "homonymes_admis": noms.nb_admis,
             },
         )
         try:
             yield
         finally:
             pool.close()
+            await fournisseurs.fermer()
             journal.evenement("arret", {})
 
     app = FastAPI(
@@ -193,6 +271,14 @@ def creer_application(
             reglages.passages_par_serie.max,
         ),
         "question": (1, reglages.longueur_question_max),
+        "temperature": (
+            reglages.modele_langage.reponse.temperature.min,
+            reglages.modele_langage.reponse.temperature.max,
+        ),
+        "longueur_max": (
+            reglages.modele_langage.reponse.longueur_max.min,
+            reglages.modele_langage.reponse.longueur_max.max,
+        ),
     }
     app.add_middleware(
         Enveloppe,
@@ -223,10 +309,47 @@ def creer_application(
             request.state.question = corps.question
         return recherche.rechercher(etat, corps, erreurs.identifiant(request), debut)
 
+    @app.post(
+        f"{prefixe}/reponse",
+        response_model=Reponse,
+        responses=REPONSES_REPONSE,
+        tags=["reponse"],
+        summary="Une réponse rédigée par le modèle de langage, des seuls passages",
+    )
+    async def repondre(
+        request: Request, corps: DemandeReponse, _cle: CleExigee
+    ) -> Reponse:
+        debut = time.perf_counter()
+        etat = etat_de(request)
+        if corps.identite is not None:
+            request.state.identite = corps.identite
+        request.state.reglages = {
+            "nombre_series": corps.nombre_series,
+            "passages_par_serie": corps.passages_par_serie,
+            "catalogue_seul": corps.catalogue_seul,
+            "temperature": corps.temperature,
+            "longueur_max": corps.longueur_max,
+            "mode": corps.mode,
+        }
+        if etat.reglages.journal_question:
+            request.state.question = corps.question
+        # Des nombres et des codes : jamais un texte (journal de la requête).
+        suivi: dict[str, object] = {}
+        request.state.reponse = suivi
+        return await route_reponse.repondre(
+            etat, corps, erreurs.identifiant(request), debut, suivi
+        )
+
     @app.get(
         f"{prefixe}/sante",
         response_model=Sante,
-        responses={503: {"model": Sante, "description": "Un composant ne répond pas."}},
+        responses={
+            503: {
+                "model": Sante,
+                "description": "Un composant ne répond pas.",
+                "content": {"application/json": {"example": EXEMPLE_SANTE_503}},
+            }
+        },
         tags=["exploitation"],
         summary="Vivant ; base, service et encodage en service cohérents",
     )
@@ -299,6 +422,49 @@ def sonder(etat: EtatApi) -> Sante:
     )
 
 
+def _borne(borne: Borne) -> BorneEntiere:
+    return BorneEntiere(defaut=borne.defaut, min=borne.min, max=borne.max)
+
+
+def decrire_modele_langage(etat: EtatApi) -> ModeleLangage:
+    """Le profil actif, les profils tels que la couche les sert (disponibilité
+    effective), les réglages de la réponse ; le nom des variables, jamais une clé."""
+    ml = etat.reglages.modele_langage
+    r = ml.reponse
+    return ModeleLangage(
+        profil_actif=etat.fournisseurs.profil_actif,
+        profils=[
+            ProfilDecrit(
+                nom=p.nom,
+                fournisseur=p.fournisseur,
+                modele=p.modele,
+                statut="apercu" if p.statut == "apercu" else "stable",
+                disponible=p.disponible,
+                reglages_absents=list(p.reglages_absents),
+                variable_cle=p.variable_cle,
+            )
+            for p in etat.fournisseurs.profils.values()
+        ],
+        reglages_reponse=ReglagesReponse(
+            temperature=BorneReelle(
+                defaut=r.temperature.defaut,
+                min=r.temperature.min,
+                max=r.temperature.max,
+            ),
+            longueur_max=_borne(r.longueur_max),
+            mode=ModeDecrit(defaut=r.mode_defaut, valeurs=list(r.modes)),
+            historique=HistoriqueDecrit(
+                tours_max=r.historique_tours_max,
+                caracteres_max=r.historique_caracteres_max,
+            ),
+            reformuler=BorneBooleenne(defaut=r.reformuler),
+            nombre_series=_borne(r.nombre_series),
+            passages_par_serie=_borne(r.passages_par_serie),
+            catalogue_seul=BorneBooleenne(defaut=r.catalogue_seul),
+        ),
+    )
+
+
 def decrire(etat: EtatApi) -> Info:
     r = etat.reglages
     c = etat.coherence
@@ -329,4 +495,5 @@ def decrire(etat: EtatApi) -> Info:
         ),
         question=Question(longueur_max_caracteres=r.longueur_question_max),
         debit_par_minute=r.debit_par_minute,
+        modele_langage=decrire_modele_langage(etat),
     )

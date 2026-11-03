@@ -1,0 +1,7 @@
+id = "API-50"
+origine = "E3 étape 3, spec 06, bloc D (2026-11-02) — un tour se rejoue sur un 429 rate_limited et rien d'autre : tout 429 rejoué masquerait un refus qui n'est pas une question de débit"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''        r.statut == STATUT_DEBIT and (r.erreur or {}).get("type") == TYPE_DEBIT'''
+apres = '''        r.statut == STATUT_DEBIT'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "autre_refus_ne_rejoue_pas"]

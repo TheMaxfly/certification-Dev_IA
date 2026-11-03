@@ -1,0 +1,7 @@
+id = "API-83"
+origine = "E3 étape 3, spec 07, A0 (2026-11-03) — la route ne lit plus les auteurs de la vue"
+fichier = "11_api_modele/src/api_modele/base.py"
+avant = '''annee_fr, auteurs FROM'''
+apres = '''annee_fr, NULL FROM'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "metadonnees"]

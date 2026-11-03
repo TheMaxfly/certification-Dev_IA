@@ -1,0 +1,8 @@
+id = "API-54"
+origine = "E3 étape 3, dette 34 (2026-11-02) — le refus de débit tracé dans appels : sans lui, un nouvel essai resterait invisible dans la réponse"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''        deroulement.noter_refus_de_debit(role, latence_refus)
+'''
+apres = ''''''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "refus_de_debit_est_rejoue_une_fois"]

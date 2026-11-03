@@ -1,0 +1,9 @@
+id = "API-77"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une sortie dont le catalogue a tort ne compte pas contre le critère"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''        m.get("sorties_invalides_disponibilite", 0) - m.get("catalogue_en_tort", 0)
+'''
+apres = '''        m.get("sorties_invalides_disponibilite", 0)
+'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "catalogue_a_tort_ne_compte_pas"]
