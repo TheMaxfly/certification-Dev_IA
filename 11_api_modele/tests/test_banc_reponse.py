@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 from collections.abc import Iterator
@@ -267,6 +268,80 @@ def test_les_metriques_et_le_critere():
             m | {"series_inventees": 0, f"sorties_invalides_{motif}": 1}
         )
         assert contredite[motif] is False and contredite["tenu"] is False
+
+
+@pytest.mark.parametrize(
+    ("texte", "attendu"),
+    [
+        ("Ce titre n'apparaît pas dans les passages fournis. En revanche…", True),
+        ("Ce titre n’apparait pas dans les passages.", True),
+        ("Il ne semble pas être mentionné dans les passages disponibles.", True),
+        ("Elle n'est pas mentionnée dans les passages.", True),
+        ("Il n'est pas au catalogue.", True),
+        ("Ce titre apparaît dans les passages.", False),
+        ("Les passages ne précisent pas sa disponibilité.", False),
+    ],
+)
+def test_ce_qui_compte_comme_mention_hors_catalogue(texte, attendu):
+    assert bool(mesure.MENTION_HORS_CATALOGUE.search(texte)) is attendu
+
+
+def message_a_deux_series(passage_1: str, passage_2: str = "Rien de plus.") -> str:
+    return (
+        "Question : q\n\nPASSAGES :\n\n"
+        "[S:1] A — résumé de série — tomes : inconnu [F:10]\n"
+        f"{passage_1}\n\n"
+        "[S:2] B — critique de tome — tomes : 3 (champ) [F:20]\n"
+        f"{passage_2}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("passage", "dementie"),
+    [
+        ("L'éditeur lança la version française de ces deux livres !", True),
+        ("Un volume est paru en France en 2015.", True),
+        ("Il existe une édition française.", True),
+        ("Aucune édition française n'est prévue.", False),
+        ("Il n'existe pas de version française.", False),
+        ("Une série inédite, seulement au Japon.", False),
+        ("Le deuxième paragraphe.\n\nPuis la version française en 2015.", True),
+    ],
+)
+def test_une_ligne_dementie_par_un_passage(passage, dementie):
+    assert mesure.ligne_dementie(message_a_deux_series(passage), 1) is dementie
+
+
+def test_seuls_les_passages_de_la_serie_dementent_sa_ligne():
+    message = message_a_deux_series("Rien.", "La version française est parue.")
+
+    assert mesure.ligne_dementie(message, 1) is False
+    assert mesure.ligne_dementie(message, 2) is True
+    assert mesure.ligne_dementie(message, 3) is False
+
+
+def test_une_sortie_dont_le_catalogue_a_tort_ne_compte_pas_contre_le_critere():
+    run = Run("p", cout_reel_usd=0.01)
+    run.par_question = [
+        ligne(famille="F7", issue="inconnue", refus=True) for _ in range(4)
+    ]
+    run.par_question.append(
+        ligne(
+            statut=503,
+            code="sortie_modele_invalide",
+            motif="disponibilite",
+            catalogue_en_tort=True,
+        )
+    )
+    m = metriques(run)
+    assert (m["sorties_invalides_disponibilite"], m["catalogue_en_tort"]) == (1, 1)
+    assert verdict(m)["disponibilite"] is True
+
+    # Sans le catalogue en tort, elle compte : le modèle a contredit sa ligne.
+    run.par_question[-1]["catalogue_en_tort"] = False
+    m = metriques(run)
+    assert m["catalogue_en_tort"] == 0
+    assert verdict(m)["disponibilite"] is False
 
 
 def test_le_plafond_avant_tout_appel():
@@ -559,9 +634,17 @@ class ClientSimule:
         self.modeles: list[str] = []
         self.versions: list[Any] = []
         self.etiquettes: dict[str, dict[str, str]] = {}
+        self.metriques: dict[str, dict[str, float]] = {}
+        self.pieces: dict[str, dict[str, str]] = {}
 
     def set_tag(self, run_id: str, cle: str, valeur: str) -> None:
         self.etiquettes.setdefault(run_id, {})[cle] = valeur
+
+    def log_metric(self, run_id: str, cle: str, valeur: float) -> None:
+        self.metriques.setdefault(run_id, {})[cle] = valeur
+
+    def log_text(self, run_id: str, contenu: str, chemin: str) -> None:
+        self.pieces.setdefault(run_id, {})[chemin] = contenu
 
     def search_registered_models(self, filter_string: str) -> list[str]:
         return [m for m in self.modeles if f"'{m}'" in filter_string]
@@ -1018,6 +1101,153 @@ def test_une_sortie_contredite_par_la_ligne_est_gardee_pour_la_lecture(
     assert texte not in json.dumps(run.par_question, ensure_ascii=False)
 
 
+def test_le_banc_dit_quand_le_catalogue_a_tort(
+    banc_: Banc, doublures: Doublures, monkeypatch
+):
+    # Le corpus d'essai est clos : c'est la forme cherchée qui vise son texte.
+    monkeypatch.setattr(mesure, "EDITION_FRANCAISE", re.compile(r"\bcritique\b"))
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": "Une aventure [S:1], publiée en France.",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+
+    (x,) = run.par_question
+    assert (x["motif"], x["serie_contredite"], x["catalogue_en_tort"]) == (
+        "disponibilite",
+        1,
+        True,
+    )
+    m = metriques(run)
+    assert m["catalogue_en_tort"] == 1 and verdict(m)["disponibilite"] is True
+
+
+def test_relire_un_run_sans_appel_au_fournisseur(
+    banc_: Banc, doublures: Doublures, tmp_path, monkeypatch
+):
+    """Le verdict d'alors reste ; la relecture s'y ajoute, et rien n'est appelé."""
+    questions, _ = jeu.lire("issue:hors_catalogue")
+    q_jeu = questions[0]
+    resume = {
+        "metriques": {"cout_usd": 0.01, "refus_correct_hors_catalogue": 0},
+        "verdict": {"tenu": False},
+        "parametres": {"profil": "factice-a", "jeu": "issue:hors_catalogue"},
+    }
+    (tmp_path / "resume.json").write_text(json.dumps(resume), encoding="utf-8")
+    lignes = [
+        ligne(
+            question_id=q_jeu.question_id,
+            issue="reconnue_hors_catalogue",
+            mention_hors_catalogue=False,
+        ),
+        ligne(
+            question_id="Q999",
+            statut=503,
+            code="sortie_modele_invalide",
+            motif="serie_inconnue",
+        ),
+    ]
+    (tmp_path / "par_question.json").write_text(json.dumps(lignes), encoding="utf-8")
+    enregistrement.ecrire_textes(
+        tmp_path, "t", {q_jeu.question_id: "Il n'apparaît pas dans les passages."}
+    )
+    (tmp_path / "run_id.json").write_text(
+        json.dumps({"run_id": RUN_ID}), encoding="utf-8"
+    )
+    charges: list[dict[str, Any]] = []
+
+    def executer(commande: list[str]) -> str:
+        charges.append(json.loads(Path(commande[-1]).read_text(encoding="utf-8")))
+        return "relu\n"
+
+    monkeypatch.setattr(enregistrement, "executer", executer)
+    avant = len(appels_au_fournisseur(doublures))
+
+    code = cli.principal(
+        ["relire", str(tmp_path)], environ={}, ouvreur=lambda _: ouvreur_de(banc_)
+    )
+
+    assert code == 0
+    assert len(appels_au_fournisseur(doublures)) == avant
+    relecture = json.loads((tmp_path / "relecture.json").read_text(encoding="utf-8"))
+    assert relecture["refus_correct_hors_catalogue"] == 1
+    assert relecture["refus_correct_hors_catalogue_a_la_mesure"] == 0
+    assert relecture["questions_changees"] == [q_jeu.question_id]
+    assert relecture["verdict_a_la_mesure"] == {"tenu": False}
+    # Le verdict d'alors reste : `resume.json` n'est pas réécrit.
+    assert json.loads((tmp_path / "resume.json").read_text(encoding="utf-8")) == resume
+    (charge,) = charges
+    assert charge["action"] == "relecture"
+    assert charge["etiquettes"]["verdict_a_la_mesure"] == "non_tenu"
+    assert charge["metriques"]["refus_correct_hors_catalogue_relu"] == 1.0
+    # Les étiquettes a posteriori prennent le verdict de la relecture.
+    (tmp_path / "run").mkdir()
+    for nom in ("resume.json", "relecture.json", "run_id.json"):
+        (tmp_path / "run" / nom).write_text(
+            (tmp_path / nom).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    enregistrement.ecrire_json(
+        tmp_path / "run" / "resume.json",
+        resume
+        | {
+            "statut": "termine",
+            "parametres": {"profil": "factice-a", "commit": "c" * 40},
+        },
+    )
+    enregistrement.ecrire_json(
+        tmp_path / "run" / "relecture.json", {"verdict": {"tenu": True}}
+    )
+    etiquettes = enregistrement.etiquettes_des_runs_faits("factice-a", tmp_path)
+    assert etiquettes[RUN_ID]["verdict"] == "tenu"
+
+
+def test_relire_rejoue_la_recherche_d_une_sortie_contredite(
+    banc_: Banc, doublures: Doublures, monkeypatch
+):
+    monkeypatch.setattr(mesure, "EDITION_FRANCAISE", re.compile(r"\bcritique\b"))
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+    x = ligne(
+        question_id="Q",
+        statut=503,
+        code="sortie_modele_invalide",
+        motif="disponibilite",
+        serie_contredite=1,
+    )
+
+    (relue,) = mesure.relire(banc_, [x], {}, {"Q": question})
+
+    assert relue["catalogue_en_tort"] is True
+    assert "catalogue_en_tort" not in x
+
+
+def test_le_script_mlflow_ajoute_une_relecture(tmp_path, capsys, monkeypatch):
+    client = ClientSimule()
+    module = type("M", (), {"MlflowClient": staticmethod(lambda **_: client)})
+    monkeypatch.setattr(journal_mlflow.importlib, "import_module", lambda _: module)
+    charge = enregistrement.charge_de_relecture(
+        RUN_ID, {"verdict": "tenu"}, {"catalogue_en_tort": 1.0}, {"k": 1}
+    )
+    fichier = tmp_path / "charge.json"
+    fichier.write_text(json.dumps(charge), encoding="utf-8")
+
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+
+    assert client.etiquettes == {RUN_ID: {"verdict": "tenu"}}
+    assert client.metriques == {RUN_ID: {"catalogue_en_tort": 1.0}}
+    assert list(client.pieces[RUN_ID]) == ["relecture.json"]
+    assert "relu" in capsys.readouterr().out
+
+
+def appels_au_fournisseur(doublures: Doublures) -> list[dict[str, Any]]:
+    return [r for r in doublures.recus() if r["chemin"] == "/v1/chat/completions"]
+
+
 def test_une_sortie_contredite_portant_un_nom_de_membre_n_est_pas_gardee(
     banc_: Banc, doublures: Doublures
 ):
@@ -1041,7 +1271,7 @@ def test_une_sortie_contredite_portant_un_nom_de_membre_n_est_pas_gardee(
 
     mesure.garder_la_contredite(banc_, run, "Q", appel, ligne_du_run)
 
-    assert ligne_du_run == {"serie_contredite": 1}
+    assert ligne_du_run == {"serie_contredite": 1, "catalogue_en_tort": False}
     assert run.textes == {}
 
 
@@ -1252,6 +1482,24 @@ def test_les_scenarios_sans_la_serie_de_tete(
     m = metriques_scenarios(run)
     assert (m["reformulation_fidele"], m["reformulation_fidele_sur"]) == (0, 0)
     assert "reformulation_fidele" not in run.par_question[1]
+
+
+def test_l_estimation_des_scenarios_par_la_ligne_de_commande(
+    banc_: Banc, doublures: Doublures, tmp_path, capsys
+):
+    fichier = scenarios_csv(tmp_path, cinq_scenarios(QUESTION))
+
+    code = cli.principal(
+        ["estimer-scenarios", "factice-a", str(fichier)],
+        {},
+        lambda _: ouvreur_de(banc_),
+    )
+
+    assert code == 0
+    sortie_ = json.loads(capsys.readouterr().out)
+    assert sortie_["questions"] == 10 and sortie_["cout_usd"] > 0
+    assert sortie_["sous_le_plafond"] is True
+    assert appels_au_fournisseur(doublures) == []
 
 
 def test_les_scenarios_par_la_ligne_de_commande(

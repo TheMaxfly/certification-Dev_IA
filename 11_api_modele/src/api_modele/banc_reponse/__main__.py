@@ -3,9 +3,11 @@
     B="uv run --env-file .env python -m api_modele.banc_reponse"
     $B essai <profil> "<question>" [--temperature T] [--longueur-max N]
     $B estimer <profil> <jeu>
+    $B estimer-scenarios <profil> <fichier.csv>
     DATABASE_URL=… $B mesurer <profil> <jeu>
     DATABASE_URL=… $B scenarios <profil> <fichier.csv>
     DATABASE_URL=… $B reprendre <dossier du run>
+    $B relire <dossier du run>           # selon les règles d'aujourd'hui, sans appel
     $B etiqueter                         # les runs déjà faits, a posteriori
     $B registre <profil>=<run_id> …      # une version par profil, liée à son run
 
@@ -51,6 +53,7 @@ from api_modele.banc_reponse.mesure import (
     mesurer,
     metriques,
     metriques_scenarios,
+    relire,
     scenarios,
     verdict,
 )
@@ -279,6 +282,94 @@ def commande_estimer(banc_: Banc, args: argparse.Namespace) -> int:
     return 0
 
 
+def commande_estimer_scenarios(banc_: Banc, args: argparse.Namespace) -> int:
+    profil = banc_.profil(args.profil)
+    tours, empreinte = lire_scenarios(Path(args.fichier))
+    estimation = estimer_scenarios(banc_, profil, tours)
+    plafond = banc_.modele_langage.plafond_run_usd
+    afficher(
+        {
+            "profil": profil.nom,
+            "scenarios_empreinte": empreinte,
+            **estimation.en_dict(),
+            "plafond_usd": plafond,
+            "sous_le_plafond": estimation.cout_usd <= plafond,
+        }
+    )
+    return 0
+
+
+def commande_relire(banc_: Banc, dossier: Path) -> int:
+    """Un run mesuré, relu selon les règles d'aujourd'hui, sans appel à un fournisseur :
+    le verdict d'alors reste dans `resume.json` et dans les métriques du run ; la
+    relecture s'y ajoute (`relecture.json`, étiquettes, métriques `_relu`)."""
+    resume = cast(
+        dict[str, object],
+        json.loads((dossier / "resume.json").read_text(encoding="utf-8")),
+    )
+    lignes = cast(
+        list[dict[str, object]],
+        json.loads((dossier / "par_question.json").read_text(encoding="utf-8")),
+    )
+    parametres = cast(dict[str, str], resume["parametres"])
+    questions, _ = jeu.lire(parametres["jeu"])
+    relues = relire(
+        banc_,
+        lignes,
+        enregistrement.lire_textes(dossier),
+        {q.question_id: q for q in questions},
+    )
+    avant = cast(dict[str, float], resume["metriques"])
+    run = Run(
+        parametres["profil"],
+        par_question=relues,
+        cout_reel_usd=float(avant["cout_usd"]),
+    )
+    apres = metriques(run)
+    verdict_relu = verdict(apres)
+    commit = enregistrement.etat_git()["commit"]
+    relecture: dict[str, object] = {
+        "commit": commit,
+        "verdict_a_la_mesure": resume["verdict"],
+        "verdict": verdict_relu,
+        "refus_correct_hors_catalogue_a_la_mesure": avant[
+            "refus_correct_hors_catalogue"
+        ],
+        "refus_correct_hors_catalogue": apres["refus_correct_hors_catalogue"],
+        "catalogue_en_tort": apres["catalogue_en_tort"],
+        "questions_changees": [
+            r["question_id"] for r, x in zip(relues, lignes, strict=True) if r != x
+        ],
+    }
+    enregistrement.ecrire_json(dossier / "relecture.json", relecture)
+    run_id = str(
+        json.loads((dossier / "run_id.json").read_text(encoding="utf-8"))["run_id"]
+    )
+    charge = enregistrement.charge_de_relecture(
+        run_id,
+        {
+            "verdict": "tenu" if verdict_relu["tenu"] is True else "non_tenu",
+            "verdict_a_la_mesure": (
+                "tenu"
+                if cast(dict[str, object], resume["verdict"])["tenu"] is True
+                else "non_tenu"
+            ),
+            "relecture": commit[:7],
+        },
+        {
+            "refus_correct_hors_catalogue_relu": float(
+                apres["refus_correct_hors_catalogue"]
+            ),
+            "catalogue_en_tort": float(apres["catalogue_en_tort"]),
+        },
+        relecture,
+    )
+    fichier = enregistrement.ecrire_json(dossier / "mlflow_relecture.json", charge)
+    print(enregistrement.par_le_module_10(fichier).strip().splitlines()[-1])
+    afficher(relecture)
+    return 0
+
+
 def commande_mesurer(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
     git = enregistrement.exiger_commit()
     profil = banc_.profil(args.profil)
@@ -430,9 +521,12 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
         p = sous.add_parser(nom)
         p.add_argument("profil")
         p.add_argument("jeu", help="famille:F7,issue:hors_catalogue,…")
-    p = sous.add_parser("scenarios")
-    p.add_argument("profil")
-    p.add_argument("fichier", help="le CSV des scénarios écrits par Max")
+    for nom in ("scenarios", "estimer-scenarios"):
+        p = sous.add_parser(nom)
+        p.add_argument("profil")
+        p.add_argument("fichier", help="le CSV des scénarios écrits par Max")
+    p = sous.add_parser("relire", help="un run mesuré, selon les règles d'aujourd'hui")
+    p.add_argument("dossier")
     p = sous.add_parser("reprendre", help="enregistrer un run déjà mesuré")
     p.add_argument("dossier")
     sous.add_parser("etiqueter", help="les étiquettes des runs déjà faits")
@@ -467,6 +561,10 @@ def principal(
                 return commande_essai(banc_, args)
             if args.commande == "estimer":
                 return commande_estimer(banc_, args)
+            if args.commande == "estimer-scenarios":
+                return commande_estimer_scenarios(banc_, args)
+            if args.commande == "relire":
+                return commande_relire(banc_, Path(args.dossier))
             if args.commande == "mesurer":
                 return commande_mesurer(banc_, args, dsn)
             return commande_scenarios(banc_, args, dsn)

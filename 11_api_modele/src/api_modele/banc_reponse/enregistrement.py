@@ -136,6 +136,19 @@ def ecrire_textes(dossier: Path, titre: str, textes: dict[str, str]) -> Path:
     return chemin
 
 
+def lire_textes(dossier: Path) -> dict[str, str]:
+    """Les textes d'un run, par identifiant (l'inverse d'`ecrire_textes`)."""
+    blocs = re.split(
+        r"^## (.+)$",
+        (dossier / "reponses.md").read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )[1:]
+    return {
+        cle.strip(): texte.strip()
+        for cle, texte in zip(blocs[0::2], blocs[1::2], strict=True)
+    }
+
+
 def executer(commande: list[str]) -> str:
     """La commande, dans le module 10, avec l'environnement réduit ; sa sortie."""
     environnement = {k: v for k, v in os.environ.items() if k in ENVIRONNEMENT_TRANSMIS}
@@ -246,13 +259,20 @@ def etiquettes_des_runs_faits(
             json.loads(fichier.with_name("resume.json").read_text(encoding="utf-8")),
         )
         parametres = cast(dict[str, str], resume["parametres"])
+        # Un run relu : son verdict est celui de la relecture.
+        relecture = fichier.with_name("relecture.json")
+        verdict = (
+            cast(dict[str, object], json.loads(relecture.read_text("utf-8")))["verdict"]
+            if relecture.exists()
+            else resume.get("verdict")
+        )
         runs[run_id] = etiquettes_du_run(
             parametres["profil"],
             profil_actif,
             invite_version(parametres["commit"]),
             str(resume["statut"]),
             cast(str | None, resume.get("motif_interruption")),
-            cast(Mapping[str, object] | None, resume.get("verdict")),
+            cast(Mapping[str, object] | None, verdict),
         )
     return runs
 
@@ -264,6 +284,29 @@ def charge_des_etiquettes(
         "action": "etiquettes",
         "suivi": f"sqlite:///{(stockage or STOCKAGE) / 'mlflow.db'}",
         "runs": runs,
+    }
+
+
+def charge_de_relecture(
+    run_id: str,
+    etiquettes: Mapping[str, str],
+    metriques: Mapping[str, float],
+    relecture: object,
+    stockage: Path | None = None,
+) -> dict[str, object]:
+    """Ce qu'une relecture ajoute au run : des étiquettes, des métriques `_relu`, sa
+    pièce ; ses métriques d'origine restent."""
+    return {
+        "action": "relecture",
+        "suivi": f"sqlite:///{(stockage or STOCKAGE) / 'mlflow.db'}",
+        "run_id": run_id,
+        "etiquettes": etiquettes,
+        "metriques": metriques,
+        "pieces_texte": {
+            "relecture.json": json.dumps(
+                relecture, ensure_ascii=False, indent=1, default=str
+            )
+        },
     }
 
 

@@ -1,6 +1,6 @@
 """MLflow à partir d'une charge JSON : un run, dont l'identifiant sort sur la sortie
-(sans `action`) ; des étiquettes sur des runs déjà faits (`etiquettes`) ; les versions
-du registre de modèles (`registre`).
+(sans `action`) ; des étiquettes sur des runs déjà faits (`etiquettes`) ; ce qu'une
+relecture ajoute à un run (`relecture`) ; les versions du registre (`registre`).
 
 Exécuté par l'interpréteur du module 10, qui a MLflow (le module 11 ne l'installe
 pas : l'API n'installe que ce qu'elle exécute) :
@@ -53,6 +53,18 @@ def etiqueter(client: Any, charge: dict[str, Any]) -> str:
     return f"{len(charge['runs'])} runs étiquetés"
 
 
+def relire(client: Any, charge: dict[str, Any]) -> str:
+    """Les étiquettes, les métriques et la pièce d'une relecture, sur un run terminé."""
+    run_id = charge["run_id"]
+    for cle, valeur in charge["etiquettes"].items():
+        client.set_tag(run_id, cle, valeur)
+    for cle, valeur in charge["metriques"].items():
+        client.log_metric(run_id, cle, valeur)
+    for chemin, contenu in charge["pieces_texte"].items():
+        client.log_text(run_id, contenu, chemin)
+    return f"run {run_id} relu"
+
+
 def inscrire(client: Any, charge: dict[str, Any]) -> str:
     """Le modèle logique et une version par profil, liée à son run, à son stade. Rejouer
     ne double rien ; un profil requalifié par un autre run a une version de plus, et
@@ -97,6 +109,8 @@ def principal(argv: list[str]) -> int:
     action = charge.get("action")
     if action == "etiquettes":
         print(etiqueter(client_de(mlflow, charge), charge))
+    elif action == "relecture":
+        print(relire(client_de(mlflow, charge), charge))
     elif action == "registre":
         print(inscrire(client_de(mlflow, charge), charge))
     else:

@@ -9,9 +9,16 @@ invalide `disponibilite` et `demographie`. Pas de seuil sur le recouvrement ni s
 F9 / F10 : à la première mesure, on écrit le chiffre.
 
 « Mention pas au catalogue » : la réponse (non refusée) contient l'une des formes de
-`MENTION_HORS_CATALOGUE`, sans tenir compte de la casse. Une série inventée est une
-sortie que la route rejette (503 `sortie_modele_invalide`, motif `serie_inconnue`) :
-la réponse rendue n'en contient jamais, par construction.
+`MENTION_HORS_CATALOGUE`, sans tenir compte de la casse. Dire un titre absent des
+passages en est une : lecture arrêtée après la première mesure qui l'a montré, et
+écrite comme telle. Une série inventée est une sortie que la route rejette (503
+`sortie_modele_invalide`, motif `serie_inconnue`) : la réponse rendue n'en contient
+jamais, par construction.
+
+**`catalogue_en_tort`** : une sortie `disponibilite` dont la ligne est démentie par un
+passage envoyé (`ligne_dementie`). Le contrôle de la route ne change pas, le libraire
+reçoit le 503 ; le banc la compte à part, et elle ne compte pas contre le critère :
+ce n'est pas le modèle qui s'est trompé.
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ from typing import Any, Protocol, cast
 
 import httpx
 
-from api_modele import banc
+from api_modele import affirmations, banc
 from api_modele.banc_reponse.espion import Espion, Releve, objet
 from api_modele.banc_reponse.jeu import Question
 from api_modele.configuration import ModeleLangage, Profil
@@ -57,8 +64,20 @@ CRITERE = {
 MOTIFS_DE_LIGNE = ("disponibilite", "demographie")
 MENTION_HORS_CATALOGUE = re.compile(
     r"pas (?:au|dans (?:le|notre)) catalogue|hors (?:du )?catalogue"
-    r"|ne figure pas (?:au|dans)",
+    r"|ne figure pas (?:au|dans)"
+    r"|n['’]appara[iî]t pas dans les passages"
+    r"|pas (?:être )?mentionn[ée]e?s? dans les passages",
     re.IGNORECASE,
+)
+#: Une édition française dite telle quelle dans un passage, en plus des formes du
+#: contrôle ; sur le texte aplati (`affirmations.aplatir`).
+EDITION_FRANCAISE = re.compile(
+    r"\b(?:version|edition|traduction|parution)s?\s+francaises?\b"
+)
+#: Un passage du message envoyé : sa ligne de titre, son texte, jusqu'à la suivante.
+PASSAGE_DU_MESSAGE = re.compile(
+    r"^\[S:(\d+)\] [^\n]*\[F:\d+\]\n(.*?)(?=\n\n\[[SK]:\d+\] |\Z)",
+    re.MULTILINE | re.DOTALL,
 )
 #: Suites de mots comptées pour le recouvrement réponse / passages.
 NGRAMME = 8
@@ -290,15 +309,35 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     return appel
 
 
+def ligne_dementie(message: str, serie_id: int) -> bool:
+    """Un passage de la série, tel qu'envoyé au modèle, dit-il une édition française ?
+    La ligne qui dit « seulement au Japon » ou « inconnue » est alors démentie : le
+    catalogue a tort, pas le modèle."""
+    for serie, passage in PASSAGE_DU_MESSAGE.findall(message):
+        if int(serie) != serie_id:
+            continue
+        texte = affirmations.aplatir(passage)
+        for motif in (affirmations.FORMES.disponibilite, EDITION_FRANCAISE):
+            if any(affirmations.affirmee(texte, f) for f in motif.finditer(texte)):
+                return True
+    return False
+
+
 def garder_la_contredite(
     banc_: Banc, run: Run, cle: str, appel: Appel, ligne: dict[str, object]
 ) -> None:
-    """Une sortie que la ligne de titre contredit : la série visée et, pour la lecture
-    humaine (hors dépôt, hors MLflow), son texte s'il ne porte aucun nom de membre."""
+    """Une sortie que la ligne de titre contredit : la série visée, si le catalogue a
+    tort et, pour la lecture humaine (hors dépôt, hors MLflow), son texte s'il ne porte
+    aucun nom de membre."""
     if appel.motif not in MOTIFS_DE_LIGNE:
         return
-    ligne["serie_contredite"] = objet(appel.corps.get("details")).get("serie_id")
+    serie_id = objet(appel.corps.get("details")).get("serie_id")
+    ligne["serie_contredite"] = serie_id
     releve = appel.releve_de_reponse
+    if appel.motif == "disponibilite" and isinstance(serie_id, int):
+        ligne["catalogue_en_tort"] = releve is not None and ligne_dementie(
+            releve.message_envoye, serie_id
+        )
     texte = None if releve is None else releve.texte_modele
     if texte is not None and not banc_.pseudonymes.empreintes_trouvees(texte):
         run.textes[f"{cle} (sortie refusée, {appel.motif})"] = texte
@@ -597,6 +636,7 @@ def metriques(run: Run) -> dict[str, float]:
     m["sorties_invalides"] = sum(
         1 for x in lignes if x["code"] == "sortie_modele_invalide"
     )
+    m["catalogue_en_tort"] = sum(1 for x in lignes if x.get("catalogue_en_tort"))
     m["longueur_atteinte"] = sum(1 for x in lignes if x["motif"] == MOTIF_LONGUEUR)
     de_rang = [x for x in rendues if "citee_attendue_1" in x]
     if de_rang:
@@ -662,7 +702,7 @@ def verdict(m: dict[str, float]) -> dict[str, object]:
         <= CRITERE["sorties_pseudonyme_max"]
     )
     points["disponibilite"] = (
-        m.get("sorties_invalides_disponibilite", 0)
+        m.get("sorties_invalides_disponibilite", 0) - m.get("catalogue_en_tort", 0)
         <= CRITERE["sorties_disponibilite_max"]
     )
     points["demographie"] = (
@@ -670,6 +710,40 @@ def verdict(m: dict[str, float]) -> dict[str, object]:
     )
     points["tenu"] = all(v is True for v in points.values())
     return points
+
+
+def relire(
+    banc_: Banc,
+    lignes: Sequence[dict[str, object]],
+    textes: Mapping[str, str],
+    questions: Mapping[str, Question],
+) -> list[dict[str, object]]:
+    """Les lignes d'un run mesuré, relues selon les règles d'aujourd'hui : la mention
+    sur le texte gardé ; `catalogue_en_tort` sur le message que la route enverrait (la
+    recherche seule, aucun appel à un fournisseur). Rien d'autre ne change."""
+    r = banc_.modele_langage.reponse
+    relues: list[dict[str, object]] = []
+    for ligne in lignes:
+        relue = dict(ligne)
+        cle = cast(str, ligne["question_id"])
+        if ligne["statut"] == 200 and cle in textes:
+            relue["mention_hors_catalogue"] = bool(
+                MENTION_HORS_CATALOGUE.search(textes[cle])
+            )
+        serie_id = ligne.get("serie_contredite")
+        if ligne["motif"] == "disponibilite" and isinstance(serie_id, int):
+            q = questions[cle]
+            series = banc_.rechercher(
+                q.texte,
+                nombre_series=r.nombre_series.defaut,
+                passages_par_serie=r.passages_par_serie.defaut,
+                catalogue_seul=r.catalogue_seul,
+            )
+            relue["catalogue_en_tort"] = ligne_dementie(
+                message_de_reponse("", q.texte, series), serie_id
+            )
+        relues.append(relue)
+    return relues
 
 
 # --------------------------------------------------------------------------- #
@@ -863,6 +937,7 @@ def metriques_scenarios(run: Run) -> dict[str, float]:
         "sorties_invalides": sum(
             1 for x in lignes if x["code"] == "sortie_modele_invalide"
         ),
+        "catalogue_en_tort": sum(1 for x in lignes if x.get("catalogue_en_tort")),
         "cout_usd": round(run.cout_reel_usd, 6),
     }
 
