@@ -197,7 +197,7 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 69 scénarios sur 69 ; joués aussi par la tâche statique
+bash .githooks/tester.sh   # 75 scénarios sur 75 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
@@ -230,6 +230,8 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 | jeton Hugging Face | `HF_TOKEN`, ou le fichier `$HF_HOME/token` | `pre-commit` et `pre-push` : sa valeur ; `hf_` suivi de 34 caractères |
 | clé Mistral | `MISTRAL_API_KEY`, dans le `.env` du module de l'API du modèle | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale à `MISTRAL_API_KEY` |
 | clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
+| trousseau de l'API du modèle | `API_MODELE_CLES`, `nom:secret,nom:secret`, dans le `.env` du module de l'API | `pre-commit` et `pre-push` : la valeur de chaque secret ; une affectation littérale d'un secret de 32 caractères au moins, à toute place |
+| clé de l'application | `APPLICATION_CLE_API`, le secret seul, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` n'en est pas une) |
 
 - Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
   elle. Une variable absente ou vide ne compare rien.
