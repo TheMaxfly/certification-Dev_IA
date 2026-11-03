@@ -1,0 +1,7 @@
+id = "API-64"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une forme se rapporte à la marque la plus proche avant elle"
+fichier = "11_api_modele/src/api_modele/affirmations.py"
+avant = '''        return int(dans_la_phrase_avant[-1].group(1))'''
+apres = '''        return int(dans_la_phrase_avant[0].group(1))'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_affirmations.py", "-k", "se_rapporte"]

@@ -1,0 +1,42 @@
+# Les formes que cherchent les contrôles de sortie `disponibilite` et `demographie` de
+# la route de réponse (`api_modele.affirmations`, seul lecteur).
+#
+# Versionné : ajouter une forme est un changement relu, éprouvé par un test. Le texte
+# du modèle est d'abord aplati : minuscules, sans accents, apostrophe droite. Les motifs
+# s'écrivent donc sur cette forme aplatie.
+#
+# Formes AFFIRMATIVES seulement : une négation n'est pas une affirmation, et la route
+# préfère laisser passer une tournure rare que refuser à tort. Une forme sans effet n'a
+# qu'un coût : la ligne de titre et l'invite restent les premières garanties.
+
+[disponibilite]
+motif = "Le texte dit une série disponible, publiée, éditée, sortie ou commandable en France, alors que sa ligne dit seulement au Japon ou inconnue."
+formes = [
+    '''\b(?:disponible|publie|edite|sorti|paru|traduit|commandable)e?s?\s+(?:[\w'-]+\s+){0,2}?en (?:france|francais)\b''',
+    '''\bexistes?\s+(?:[\w'-]+\s+){0,2}?en (?:france|francais)\b''',
+    '''\b(?:existe|a|ont|possede|possedent|compte|comptent)\s+(?:[\w'-]+\s+){0,3}?(?:edition|version|traduction)s?\s+francaises?\b''',
+]
+
+[demographie]
+motif = "Le texte affirme un public (shōnen, seinen, shōjo, josei) différent de celui de la ligne. Seule une ligne qui porte l'un de ces quatre publics se contredit : « inconnu » ou un autre libellé du catalogue ne dit pas le contraire."
+# `{public}` : le motif de chaque public, ci-dessous.
+formes = [
+    '''\b(?:est|reste|demeure)\s+(?:un|une|du)\s+(?:[\w'-]+\s+){0,3}?{public}''',
+    '''\bs'agit\s+(?:d'un|d'une|de|du)\s+(?:[\w'-]+\s+){0,3}?{public}''',
+    '''\b(?:ce|cet|cette)\s+(?:(?:manga|serie|titre|oeuvre)\s+)?{public}''',
+    '''\b(?:un|une|la|le)\s+(?:manga|serie|titre|oeuvre)\s+{public}''',
+    '''\b(?:destinee?s?|s'adresse|s'adressent)\s+(?:a\s+|au\s+)?(?:un\s+|une\s+)?(?:public|lectorat)\s+{public}''',
+    '''\bpublic\s*:\s*{public}''',
+]
+
+# La clé : le libellé du catalogue. `shonen-ai` et `shojo-ai` sont d'autres libellés.
+[demographie.publics]
+Shonen = '''sho+u?nen\b(?!-ai)'''
+Seinen = '''seinen\b'''
+Shojo = '''sho+u?jo\b(?!-ai)'''
+Josei = '''josei\b'''
+
+[reserves]
+motif = "Devant une forme, dans la même proposition, ou dans la forme elle-même : ce n'est pas une affirmation. Une phrase qui finit par un point d'interrogation non plus."
+negations = '''\b(?:ne|n'|pas|jamais|aucune?s?|sans|ni|non|guere|si|ignorons?|ignore|ignorent|incertain|incertaine|verifier|savoir|confirmer|garantir|peut-etre|pourrait|pourraient|serait|seraient|soit|soient)\b'''
+comparaisons = '''\b(?:comme|proche|proches|rappelle|rappellent|rappelant|facon|maniere|style|loin|contrairement|plutot|amateurs?|fans?|lecteurs?|lectrices?|habitues?|genre|type|compare|comparee|comparaison|influence|influencee|inspire|inspiree|heritier|heritiere|melange|melant|croise|croisant|entre|hors|dela)\b'''

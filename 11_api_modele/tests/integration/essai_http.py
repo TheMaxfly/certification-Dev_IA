@@ -69,6 +69,12 @@ def principal() -> None:
     verifier(
         entites == ["serie:1", "serie:2"], f"classement du jeu d'essai : {entites}"
     )
+    metadonnees = resultat["series"][0]["metadonnees"]
+    verifier(
+        metadonnees["disponibilite"] == "inconnue"
+        and metadonnees["nb_volumes"] is None,
+        f"métadonnées lues par la vue, sous le rôle de l'API : {metadonnees}",
+    )
     premier = resultat["series"][0]["passages"][0]
     verifier(
         premier["fragment_id"] == 702, f"meilleur passage : {premier['fragment_id']}"
@@ -117,8 +123,8 @@ def principal() -> None:
         contexte["profil"] == "essai-local"
         and [a["role"] for a in contexte["appels"]] == ["reponse"]
         and contexte["cout_estime_usd"] > 0
-        and contexte["version_api"] == "1.1.0",
-        "/v1/reponse : contexte (profil, un appel, coût, version 1.1.0)",
+        and contexte["version_api"] == "1.2.0",
+        "/v1/reponse : contexte (profil, un appel, coût, version 1.2.0)",
     )
     verifier(entetes.get("Cache-Control") == "no-store", "Cache-Control: no-store")
 

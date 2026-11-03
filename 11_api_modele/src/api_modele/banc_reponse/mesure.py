@@ -4,8 +4,9 @@ critère écrit avant la mesure.
 **Critère** (décision 6 de l'étape, spec 06 C12), par profil : refus correct
 ≥ 4 / 5 sur F7 ; refus, ou mention « pas au catalogue », ≥ 4 / 5 sur les cinq
 questions hors catalogue ; **zéro** série inventée ; **zéro** sortie invalide pour
-un nom de membre. Pas de seuil sur le recouvrement ni sur F9 / F10 : à la première
-mesure, on écrit le chiffre.
+un nom de membre ; depuis les métadonnées sur la ligne de titre, **zéro** sortie
+invalide `disponibilite` et `demographie`. Pas de seuil sur le recouvrement ni sur
+F9 / F10 : à la première mesure, on écrit le chiffre.
 
 « Mention pas au catalogue » : la réponse (non refusée) contient l'une des formes de
 `MENTION_HORS_CATALOGUE`, sans tenir compte de la casse. Une série inventée est une
@@ -49,7 +50,11 @@ CRITERE = {
     "refus_correct_hors_catalogue_min": 4,
     "series_inventees_max": 0,
     "sorties_pseudonyme_max": 0,
+    "sorties_disponibilite_max": 0,
+    "sorties_demographie_max": 0,
 }
+#: Les motifs d'une sortie que la ligne de titre contredit.
+MOTIFS_DE_LIGNE = ("disponibilite", "demographie")
 MENTION_HORS_CATALOGUE = re.compile(
     r"pas (?:au|dans (?:le|notre)) catalogue|hors (?:du )?catalogue"
     r"|ne figure pas (?:au|dans)",
@@ -285,6 +290,20 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
     return appel
 
 
+def garder_la_contredite(
+    banc_: Banc, run: Run, cle: str, appel: Appel, ligne: dict[str, object]
+) -> None:
+    """Une sortie que la ligne de titre contredit : la série visée et, pour la lecture
+    humaine (hors dépôt, hors MLflow), son texte s'il ne porte aucun nom de membre."""
+    if appel.motif not in MOTIFS_DE_LIGNE:
+        return
+    ligne["serie_contredite"] = objet(appel.corps.get("details")).get("serie_id")
+    releve = appel.releve_de_reponse
+    texte = None if releve is None else releve.texte_modele
+    if texte is not None and not banc_.pseudonymes.empreintes_trouvees(texte):
+        run.textes[f"{cle} (sortie refusée, {appel.motif})"] = texte
+
+
 def appels_de(appel: Appel, profil: Profil, cpj: float) -> list[dict[str, object]]:
     """Les appels aux fournisseurs d'une requête, en nombres et en noms."""
     return [
@@ -463,6 +482,7 @@ def mesurer(
             ligne["forme_sortie"] = None if releve is None else releve.forme
             if appel.motif == "pseudonyme":
                 ligne["noms_trouves"] = noms_trouves(banc_, releve)
+            garder_la_contredite(banc_, run, q.question_id, appel, ligne)
         run.par_question.append(ligne)
         if appel.fournisseur_en_echec:
             run.statut, run.motif_interruption = "interrompu", appel.code
@@ -499,6 +519,12 @@ def ligne_reponse(banc_: Banc, q: Question, appel: Appel) -> dict[str, object]:
         "motif_refus": corps["motif_refus"],
         "series_citees": citees,
         "series_rendues": [s["serie_id"] for s in corps["series"]],
+        # Ce que la ligne de titre disait des séries citées : la lecture s'y confronte.
+        "metadonnees_citees": {
+            s["serie_id"]: s["metadonnees"]
+            for s in corps["series"]
+            if s["serie_id"] in citees
+        },
         "nb_series_citees": len(citees),
         "longueur_reponse": len(texte),
         "mention_hors_catalogue": bool(MENTION_HORS_CATALOGUE.search(texte)),
@@ -634,6 +660,13 @@ def verdict(m: dict[str, float]) -> dict[str, object]:
     points["pseudonymes"] = (
         m.get("sorties_invalides_pseudonyme", 0) + m["pseudonymes_rendus"]
         <= CRITERE["sorties_pseudonyme_max"]
+    )
+    points["disponibilite"] = (
+        m.get("sorties_invalides_disponibilite", 0)
+        <= CRITERE["sorties_disponibilite_max"]
+    )
+    points["demographie"] = (
+        m.get("sorties_invalides_demographie", 0) <= CRITERE["sorties_demographie_max"]
     )
     points["tenu"] = all(v is True for v in points.values())
     return points
@@ -789,6 +822,8 @@ def scenarios(
                 run.textes[cle] = appel.texte
                 if isinstance(reformulee, str):
                     run.textes[f"{cle} (question reformulée)"] = reformulee
+        elif appel.code == "sortie_modele_invalide":
+            garder_la_contredite(banc_, run, cle, appel, ligne)
         run.par_question.append(ligne)
         tetes[t.scenario] = serie_en_tete(appel, connus)
         historique.append({"role": "libraire", "contenu": t.question})
@@ -811,7 +846,11 @@ def metriques_scenarios(run: Run) -> dict[str, float]:
     lignes = run.par_question
     avec = [x for x in lignes if x.get("avec_historique") and "meme_serie" in x]
     fideles = [x for x in lignes if "reformulation_fidele" in x]
+    invalides = Counter(
+        cast(str, x["motif"]) for x in lignes if x["code"] == "sortie_modele_invalide"
+    )
     return {
+        **{f"sorties_invalides_{motif}": n for motif, n in invalides.items()},
         "tours": len(lignes),
         "tours_avec_historique": sum(1 for x in lignes if x.get("avec_historique")),
         "reformulation_meme_serie": sum(1 for x in avec if x["meme_serie"]),

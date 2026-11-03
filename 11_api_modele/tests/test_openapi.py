@@ -134,13 +134,14 @@ def test_exporter_ecrit_le_contrat(tmp_path):
 
 
 def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
-    """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seul `Info`
-    gagne un champ (`modele_langage`) ; la route de réponse, ses schémas et l'exemple
-    du 503 de `/v1/sante` s'ajoutent ; la version passe à 1.1.0 (mineure)."""
+    """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seuls `Info`
+    (`modele_langage`) et `Serie` (`metadonnees`) gagnent un champ ; la route de
+    réponse, ses schémas, `Metadonnees` et l'exemple du 503 de `/v1/sante` s'ajoutent ;
+    la version passe à 1.2.0 (mineure)."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.1.0")
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.2.0")
     assert apres["info"]["title"] == avant["info"]["title"]
     assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (
@@ -155,16 +156,17 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
         assert actuelles == operations, chemin
     assert set(apres["paths"]) - set(avant["paths"]) == {"/v1/reponse"}
     schemas = apres["components"]["schemas"]
+    gagnants = {"Info": "modele_langage", "Serie": "metadonnees"}
     for nom, schema in avant["components"]["schemas"].items():
-        if nom != "Info":
+        if nom not in gagnants:
             assert schemas[nom] == schema, nom
             continue
-        info = schemas["Info"]
-        assert set(info["properties"]) - set(schema["properties"]) == {"modele_langage"}
+        actuel = schemas[nom]
+        assert set(actuel["properties"]) - set(schema["properties"]) == {gagnants[nom]}
         for champ, forme in schema["properties"].items():
-            assert info["properties"][champ] == forme, champ
-        assert set(schema["required"]) <= set(info["required"])
-        reste = {k: v for k, v in info.items() if k not in ("properties", "required")}
+            assert actuel["properties"][champ] == forme, champ
+        assert set(schema["required"]) <= set(actuel["required"])
+        reste = {k: v for k, v in actuel.items() if k not in ("properties", "required")}
         assert reste == {
             k: v for k, v in schema.items() if k not in ("properties", "required")
         }
@@ -176,6 +178,7 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
         "DemandeReponse",
         "HistoriqueDecrit",
         "Latences",
+        "Metadonnees",
         "ModeDecrit",
         "ModeleLangage",
         "ProfilDecrit",

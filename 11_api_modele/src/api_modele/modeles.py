@@ -68,6 +68,30 @@ class Passage(BaseModel):
     extrait: str
 
 
+class Metadonnees(BaseModel):
+    """Ce que le catalogue dit d'une série (`manga.v_metadonnees_serie`) ; `null` : il
+    ne le sait pas. Une œuvre hors catalogue n'a que des `null`."""
+
+    disponibilite: (
+        Literal["edite_en_france", "seulement_au_japon", "inconnue"] | None
+    ) = Field(
+        description="Édité en France : au moins un volume y est paru, pas qu'il est"
+        " en stock."
+    )
+    nb_volumes: int | None = Field(
+        description="Le plus grand du champ « tomes parus » et des numéros de volume"
+        " distincts."
+    )
+    nb_volumes_source: (
+        Literal["champ", "repli_volumes_distincts", "divergent"] | None
+    ) = Field(description="Toute source autre que `champ` se lit « au moins N ».")
+    statut: Literal["termine", "en_cours"] | None
+    demographie: str | None = Field(description="Le libellé du catalogue, tel quel.")
+    annee_fr: int | None = Field(
+        description="L'année du premier volume à EAN français."
+    )
+
+
 class Serie(BaseModel):
     rang: int
     entite: str = Field(description="« serie:<id> » ou « kitsu:<id> », la clé du banc.")
@@ -76,6 +100,7 @@ class Serie(BaseModel):
     titre: str
     score: float = Field(description="Cosinus du meilleur fragment (non arrondi).")
     passages: list[Passage]
+    metadonnees: Metadonnees
 
 
 class ReglagesAppliques(BaseModel):

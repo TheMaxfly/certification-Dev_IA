@@ -14,13 +14,14 @@ encore, ou `Retry-After` au-delà de 10 s, le 503 `fournisseur_refus`.
 3. Recherche : la fonction interne de `/v1/recherche`, mêmes réglages, même classement.
 4. Aucun passage : 200, refus `aucun_passage`, SANS appel au modèle (déterministe,
    gratuit, et c'est ce que le mode strict dirait).
-5. Contexte : par série, dans l'ordre du classement, `[S:<serie_id>] <titre> — <type>
-   [F:<fragment_id>]` puis le texte du passage tel quel ; la question, l'historique
+5. Contexte : par série, dans l'ordre du classement, la ligne de titre (`[S:<serie_id>]
+   <titre> — <type> — tomes : … — <statut> — public : … — disponibilité : …
+   [F:<fragment_id>]`) puis le texte du passage tel quel ; la question, l'historique
    plié. Appel de réponse, sortie contrainte par un schéma JSON strict.
 6. Contrôles de sortie, dans cet ordre — `schema`, `serie_inconnue`,
-   `fragment_inconnu`, `refus_incoherent`, `pseudonyme` — chacun : 503
-   `sortie_modele_invalide`, son motif, son compteur ; la sortie fautive n'est ni
-   rendue ni journalisée ; pas de second essai.
+   `fragment_inconnu`, `refus_incoherent`, `pseudonyme`, `disponibilite`,
+   `demographie` — chacun : 503 `sortie_modele_invalide`, son motif, son compteur ; la
+   sortie fautive n'est ni rendue ni journalisée ; pas de second essai.
 7. Réponse : les séries citées complétées par leur titre et leur rang (pris dans la
    recherche, jamais chez le modèle), les séries de la recherche, le `contexte`. Dans
    le texte, chaque `[S:<serie_id>]` sans le titre du catalogue juste avant ni juste
@@ -41,7 +42,7 @@ from typing import Any
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from api_modele import __version__, recherche
+from api_modele import __version__, affirmations, recherche
 from api_modele.configuration import RACINE_MODULE, Profil
 from api_modele.erreurs import ErreurApi
 from api_modele.etat import EtatApi
@@ -60,6 +61,7 @@ from api_modele.modeles import (
     ContexteReponse,
     DemandeReponse,
     Latences,
+    Metadonnees,
     MotifRefus,
     Recherche,
     ReglagesAppliques,
@@ -93,6 +95,12 @@ LIBELLES = {
     "synopsis_kitsu": "synopsis",
     "resume_serie": "résumé de série",
 }
+STATUTS_DE_SERIE = {"termine": "terminé", "en_cours": "en cours"}
+DISPONIBILITES = {
+    "edite_en_france": "édité en France",
+    "seulement_au_japon": "seulement au Japon",
+    "inconnue": "inconnue",
+}
 ETIQUETTES = {"libraire": "Libraire", "assistant": "Assistant"}
 PHRASE_AUCUN_PASSAGE = (
     "Les passages disponibles ne permettent pas de répondre à cette question."
@@ -121,11 +129,32 @@ def entete(serie: Serie) -> str:
     return f"[K:{serie.kitsu_id}] {serie.titre}"
 
 
+def tomes(m: Metadonnees) -> str:
+    """Le nombre, tel quel pour la source `champ` ; pour toute autre, un minimum."""
+    if m.nb_volumes is None:
+        return "inconnu"
+    if m.nb_volumes_source == "champ":
+        return f"{m.nb_volumes} (champ)"
+    return f"au moins {m.nb_volumes}"
+
+
+def ce_que_dit_la_ligne(m: Metadonnees) -> str:
+    """Tomes, statut, public, disponibilité : une valeur absente se dit « inconnu »."""
+    statut = "statut inconnu" if m.statut is None else STATUTS_DE_SERIE[m.statut]
+    disponibilite = DISPONIBILITES[m.disponibilite or "inconnue"]
+    return (
+        f"tomes : {tomes(m)} — {statut} — public : {m.demographie or 'inconnu'}"
+        f" — disponibilité : {disponibilite}"
+    )
+
+
 def contexte_des_passages(series: list[Serie]) -> str:
     """Les passages, série par série dans l'ordre du classement, textes tels quels ;
-    chacun porte son identifiant `[F:<fragment_id>]`, que la sortie cite."""
+    chacun sous sa ligne de titre, qui porte son identifiant `[F:<fragment_id>]`, que
+    la sortie cite."""
     return "\n\n".join(
-        f"{entete(s)} — {LIBELLES[p.type_document]} [F:{p.fragment_id}]\n{p.extrait}"
+        f"{entete(s)} — {LIBELLES[p.type_document]}"
+        f" — {ce_que_dit_la_ligne(s.metadonnees)} [F:{p.fragment_id}]\n{p.extrait}"
         for s in series
         for p in s.passages
     )
@@ -177,14 +206,20 @@ def message_de_reponse(historique: str, question: str, series: list[Serie]) -> s
     )
 
 
-def sortie_invalide(etat: EtatApi, motif: str, role: Role) -> ErreurApi:
-    """503 ; le motif, le rôle de l'appel ; jamais la sortie elle-même."""
+def sortie_invalide(
+    etat: EtatApi, motif: str, role: Role, serie_id: int | None = None
+) -> ErreurApi:
+    """503 ; le motif, le rôle de l'appel, la série qu'une ligne de titre contredit ;
+    jamais la sortie elle-même."""
     etat.metriques.sortie_invalide.labels(motif=motif).inc()
+    details: dict[str, object] = {"motif": motif, "role": role}
+    if serie_id is not None:
+        details["serie_id"] = serie_id
     return ErreurApi(
         503,
         "sortie_modele_invalide",
         "La sortie du modèle ne tient pas le contrat de la réponse.",
-        {"motif": motif, "role": role},
+        details,
     )
 
 
@@ -210,6 +245,11 @@ def controler(
     envoyes = [(p.doc_key, p.extrait) for s in series for p in s.passages]
     if etat.pseudonymes.fautifs(modele.reponse, envoyes, question):
         raise sortie_invalide(etat, "pseudonyme", "reponse")
+    contredite = affirmations.contredite(
+        modele.reponse, series, [c.serie_id for c in modele.series_citees]
+    )
+    if contredite is not None:
+        raise sortie_invalide(etat, contredite[0], "reponse", contredite[1])
     return [
         SerieCitee(
             serie_id=c.serie_id,

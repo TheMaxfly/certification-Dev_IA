@@ -1,0 +1,7 @@
+id = "API-61"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une réserve ne vaut que dans sa proposition"
+fichier = "11_api_modele/src/api_modele/affirmations.py"
+avant = '''    proposition = BORNE_DE_PROPOSITION.split(avant)[-1]'''
+apres = '''    proposition = avant'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_affirmations.py", "-k", "une_disponibilite_affirmee"]

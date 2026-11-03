@@ -1,0 +1,7 @@
+id = "API-62"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — une ligne sans l'un des quatre publics ne contredit rien"
+fichier = "11_api_modele/src/api_modele/affirmations.py"
+avant = '''            if ligne in FORMES.publics and ligne != public and affirmee(texte, forme):'''
+apres = '''            if ligne != public and affirmee(texte, forme):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_affirmations.py", "-k", "sans_l_un_des_quatre_publics"]

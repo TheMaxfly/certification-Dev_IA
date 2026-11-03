@@ -254,10 +254,17 @@ def test_les_metriques_et_le_critere():
         "hors_catalogue": True,
         "series_inventees": False,
         "pseudonymes": True,
+        "disponibilite": True,
+        "demographie": True,
         "tenu": False,
     }
     sans_f7 = verdict(m | {"questions_F7": 0, "series_inventees": 0})
     assert "F7" not in sans_f7 and sans_f7["tenu"] is True
+    for motif in ("disponibilite", "demographie"):
+        contredite = verdict(
+            m | {"series_inventees": 0, f"sorties_invalides_{motif}": 1}
+        )
+        assert contredite[motif] is False and contredite["tenu"] is False
 
 
 def test_le_plafond_avant_tout_appel():
@@ -684,6 +691,57 @@ def test_une_sortie_refusee_et_ses_releves_sans_texte(
     assert TEXTE_REFUS not in json.dumps(run.par_question, ensure_ascii=False)
 
 
+def test_une_sortie_contredite_par_la_ligne_est_gardee_pour_la_lecture(
+    banc_: Banc, doublures: Doublures
+):
+    texte = "Une aventure [S:1], disponible en France."
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": texte,
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
+
+    run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
+
+    (x,) = run.par_question
+    assert (x["motif"], x["serie_contredite"]) == ("disponibilite", 1)
+    assert run.textes == {"Q (sortie refusée, disponibilite)": texte}
+    assert metriques(run)["sorties_invalides_disponibilite"] == 1
+    assert run.statut == "termine"
+    assert texte not in json.dumps(run.par_question, ensure_ascii=False)
+
+
+def test_une_sortie_contredite_portant_un_nom_de_membre_n_est_pas_gardee(
+    banc_: Banc, doublures: Doublures
+):
+    # Le contrôle des noms passe avant : le cas est celui d'un homonyme admis pour la
+    # route. Le banc, lui, n'écrit aucun texte qui porte un nom de la liste.
+    DoublureFournisseur.contenu = json.dumps(
+        {
+            "refus": False,
+            "motif_refus": None,
+            "reponse": "Une aventure [S:1], disponible en France.",
+            "series_citees": [{"serie_id": 1, "fragment_ids": [702]}],
+        }
+    )
+    appel = mesure.demander(banc_, {"question": QUESTION, "profil": "factice-a"})
+    assert appel.motif == "disponibilite"
+    releve = appel.releve_de_reponse
+    assert releve is not None
+    releve.texte_modele = f"{AUTEURS[0]} dit : une aventure [S:1]."
+    run = Run("factice-a")
+    ligne_du_run: dict[str, object] = {}
+
+    mesure.garder_la_contredite(banc_, run, "Q", appel, ligne_du_run)
+
+    assert ligne_du_run == {"serie_contredite": 1}
+    assert run.textes == {}
+
+
 def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):
     question = jeu.Question("Q", QUESTION, "F9", "au_catalogue", (1,))
     run = mesurer(banc_, banc_.profil("factice-a"), [question], 0.5)
@@ -695,6 +753,8 @@ def test_une_reponse_rendue_et_ses_mesures(banc_: Banc, doublures: Doublures):
     ecrit = json.loads(SORTIE_VALIDE)["reponse"]
     assert run.textes == {"Q": ecrit.replace("[S:1]", "Série 1 [S:1]")}
     assert (x["titres_presents"], x["titres_marques"]) == (0, 1)
+    assert list(x["metadonnees_citees"]) == [1]
+    assert x["metadonnees_citees"][1]["disponibilite"] == "inconnue"
     assert banc_.espion.releves[-1].texte_modele == ecrit
     assert run.contexte["corpus_id"] == "v7"
 

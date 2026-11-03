@@ -591,6 +591,106 @@
         "title": "Latences",
         "type": "object"
       },
+      "Metadonnees": {
+        "description": "Ce que le catalogue dit d'une série (`manga.v_metadonnees_serie`) ; `null` : il\nne le sait pas. Une œuvre hors catalogue n'a que des `null`.",
+        "properties": {
+          "annee_fr": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "L'année du premier volume à EAN français.",
+            "title": "Annee Fr"
+          },
+          "demographie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le libellé du catalogue, tel quel.",
+            "title": "Demographie"
+          },
+          "disponibilite": {
+            "anyOf": [
+              {
+                "enum": [
+                  "edite_en_france",
+                  "seulement_au_japon",
+                  "inconnue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Édité en France : au moins un volume y est paru, pas qu'il est en stock.",
+            "title": "Disponibilite"
+          },
+          "nb_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Le plus grand du champ « tomes parus » et des numéros de volume distincts.",
+            "title": "Nb Volumes"
+          },
+          "nb_volumes_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "champ",
+                  "repli_volumes_distincts",
+                  "divergent"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Toute source autre que `champ` se lit « au moins N ».",
+            "title": "Nb Volumes Source"
+          },
+          "statut": {
+            "anyOf": [
+              {
+                "enum": [
+                  "termine",
+                  "en_cours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statut"
+          }
+        },
+        "required": [
+          "disponibilite",
+          "nb_volumes",
+          "nb_volumes_source",
+          "statut",
+          "demographie",
+          "annee_fr"
+        ],
+        "title": "Metadonnees",
+        "type": "object"
+      },
       "ModeDecrit": {
         "properties": {
           "defaut": {
@@ -1081,6 +1181,9 @@
             ],
             "title": "Kitsu Id"
           },
+          "metadonnees": {
+            "$ref": "#/components/schemas/Metadonnees"
+          },
           "passages": {
             "items": {
               "$ref": "#/components/schemas/Passage"
@@ -1120,7 +1223,8 @@
           "kitsu_id",
           "titre",
           "score",
-          "passages"
+          "passages",
+          "metadonnees"
         ],
         "title": "Serie",
         "type": "object"
@@ -1196,7 +1300,7 @@
   "info": {
     "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n",
     "title": "API du modèle",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "openapi": "3.1.0",
   "paths": {

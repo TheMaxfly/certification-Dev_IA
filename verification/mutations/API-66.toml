@@ -1,0 +1,9 @@
+id = "API-66"
+origine = "E3 étape 3, spec 06 bis (2026-11-03) — le critère du run compte les sorties que la ligne contredit"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''        m.get("sorties_invalides_disponibilite", 0)
+'''
+apres = '''        0
+'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "metriques_et_le_critere"]

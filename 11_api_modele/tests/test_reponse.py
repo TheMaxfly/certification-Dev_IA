@@ -42,10 +42,11 @@ from api_modele.application import creer_application
 from api_modele.configuration import charger
 from api_modele.contrat import DESTINATION
 from api_modele.journal import FormatJson
-from api_modele.modeles import Resultat
+from api_modele.modeles import Metadonnees, Resultat
 from api_modele.pseudonymes import empreinte
 from api_modele.reponse import (
     PHRASE_AUCUN_PASSAGE,
+    ce_que_dit_la_ligne,
     contexte_des_passages,
     titre_marque,
 )
@@ -132,7 +133,7 @@ def test_une_reponse_avec_ses_sources_et_son_contexte(
     assert c["cout_estime_usd"] == pytest.approx((100 * 2 + 20 * 8) / 1e6)
     assert c["question_reformulee"] is None and c["reformulation_ignoree"] is None
     assert c["date_appel"].endswith("+00:00")
-    assert c["version_api"] == "1.1.0"
+    assert c["version_api"] == "1.2.0"
     assert set(c["latences_ms"]) == {"recherche", "reformulation", "modele", "totale"}
     assert c["latences_ms"]["reformulation"] is None
 
@@ -147,10 +148,13 @@ def test_le_contexte_envoye_au_modele_est_celui_de_la_recherche(api_reponse, dou
     attendu = contexte_des_passages(Resultat.model_validate(corps).series)
     assert utilisateur == f"Question : {QUESTION}\n\nPASSAGES :\n\n{attendu}"
     lignes = [ligne for ligne in attendu.splitlines() if ligne.startswith("[")]
+    sans_rien = (
+        "tomes : inconnu — statut inconnu — public : inconnu — disponibilité : inconnue"
+    )
     assert lignes == [
-        "[S:1] Série 1 — critique de tome [F:702]",
-        "[S:1] Série 1 — critique de tome [F:701]",
-        "[S:2] Série 2 — synopsis [F:703]",
+        f"[S:1] Série 1 — critique de tome — {sans_rien} [F:702]",
+        f"[S:1] Série 1 — critique de tome — {sans_rien} [F:701]",
+        f"[S:2] Série 2 — synopsis — {sans_rien} [F:703]",
     ]
     textes = [p["extrait"] for s in corps["series"] for p in s["passages"]]
     assert all(t in utilisateur for t in textes)
@@ -498,6 +502,138 @@ def test_un_refus_du_modele_est_un_200(api_reponse):
 # --------------------------------------------------------------------------- #
 #  Les contrôles de sortie
 # --------------------------------------------------------------------------- #
+def renseigner_la_serie(dsn: str) -> None:
+    """La série 1 : éditée en France, trois tomes, terminée, seinen."""
+    with psycopg.connect(dsn) as cx:
+        cx.execute(
+            "UPDATE manga.ms_series_enriched SET series_type = 'Manga',"
+            " series_category_clean = 'Seinen',"
+            """ series_statuses = '[{"statut": "Complète"}]' WHERE series_id = 1"""
+        )
+        for numero in (1, 2, 3):
+            cx.execute(
+                "INSERT INTO manga.ms_volumes_enriched (volume_url, series_id,"
+                " volume_number, volume_ean, volume_tomes_published)"
+                " VALUES (%s, 1, %s, '9782000000001', 3)",
+                (f"v{numero}", numero),
+            )
+
+
+def test_la_ligne_de_titre_porte_ce_que_dit_le_catalogue(
+    api_reponse, doublures, base_api: BaseApi
+):
+    renseigner_la_serie(base_api.dsn_admin)
+
+    corps = conforme(repondre(api_reponse))
+
+    (appel,) = appels(doublures)
+    utilisateur = appel["corps"]["messages"][1]["content"]
+    assert (
+        "[S:1] Série 1 — critique de tome — tomes : 3 (champ) — terminé"
+        " — public : Seinen — disponibilité : édité en France [F:702]\n"
+    ) in utilisateur
+    assert corps["series"][0]["metadonnees"] == {
+        "disponibilite": "edite_en_france",
+        "nb_volumes": 3,
+        "nb_volumes_source": "champ",
+        "statut": "termine",
+        "demographie": "Seinen",
+        "annee_fr": None,
+    }
+    assert corps["series"][1]["metadonnees"]["disponibilite"] == "inconnue"
+
+
+@pytest.mark.parametrize(
+    ("valeurs", "attendu"),
+    [
+        (
+            {"nb_volumes": 19, "nb_volumes_source": "champ", "statut": "termine"},
+            "tomes : 19 (champ) — terminé",
+        ),
+        (
+            {"nb_volumes": 3, "nb_volumes_source": "repli_volumes_distincts"},
+            "tomes : au moins 3 — statut inconnu",
+        ),
+        (
+            {"nb_volumes": 136, "nb_volumes_source": "divergent", "statut": "en_cours"},
+            "tomes : au moins 136 — en cours",
+        ),
+        ({"demographie": "Yuri"}, "public : Yuri"),
+        ({"disponibilite": "seulement_au_japon"}, "disponibilité : seulement au Japon"),
+        ({}, "tomes : inconnu — statut inconnu — public : inconnu"),
+    ],
+)
+def test_ce_que_dit_la_ligne(valeurs, attendu):
+    vide = dict.fromkeys(Metadonnees.model_fields)
+
+    assert attendu in ce_que_dit_la_ligne(Metadonnees.model_validate(vide | valeurs))
+
+
+def test_une_oeuvre_hors_catalogue_a_sa_ligne_toute_inconnue(api_reponse, doublures):
+    corps = conforme(repondre(api_reponse, catalogue_seul=False))
+
+    (kitsu,) = (s for s in corps["series"] if s["serie_id"] is None)
+    assert set(kitsu["metadonnees"].values()) == {None}
+    (appel,) = appels(doublures)
+    assert (
+        f"[K:{kitsu['kitsu_id']}] {kitsu['titre']} — synopsis — tomes : inconnu"
+        " — statut inconnu — public : inconnu — disponibilité : inconnue [F:"
+    ) in appel["corps"]["messages"][1]["content"]
+
+
+def test_une_disponibilite_que_la_ligne_contredit(api_reponse, doublures):
+    """La série 1 n'a aucun volume : sa ligne dit « inconnue »."""
+    DoublureFournisseur.contenu = sortie(
+        reponse="Une aventure de pirates [S:1], disponible en France."
+    )
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503
+    assert conforme(r)["code"] == "sortie_modele_invalide"
+    assert r.json()["details"] == {
+        "motif": "disponibilite",
+        "role": "reponse",
+        "serie_id": 1,
+    }
+    assert (
+        'api_modele_sortie_invalide_total{motif="disponibilite"} 1.0'
+        in api_reponse.get("/metrics").text
+    )
+
+
+def test_un_public_que_la_ligne_contredit(api_reponse, doublures, base_api: BaseApi):
+    renseigner_la_serie(base_api.dsn_admin)
+    DoublureFournisseur.contenu = sortie(reponse="Série 1 [S:1] est un shōjo tendre.")
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503
+    assert r.json()["details"] == {
+        "motif": "demographie",
+        "role": "reponse",
+        "serie_id": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    "reponse",
+    [
+        "Série 1 [S:1] est disponible en France, et c'est un seinen.",
+        "Série 1 [S:1] n'est pas un shōjo.",
+    ],
+)
+def test_ce_que_la_ligne_ne_contredit_pas_est_rendu(
+    api_reponse, doublures, base_api: BaseApi, reponse
+):
+    renseigner_la_serie(base_api.dsn_admin)
+    DoublureFournisseur.contenu = sortie(reponse=reponse)
+
+    corps = conforme(repondre(api_reponse))
+
+    assert corps["reponse"] == reponse
+
+
 @pytest.mark.parametrize(
     ("contenu", "motif"),
     [
@@ -886,9 +1022,9 @@ def test_la_ligne_de_journal_de_la_requete(api_reponse, caplog):
         assert absent not in texte
 
 
-def test_info_annonce_la_1_1_0_et_v2_n_existe_pas(api_reponse):
+def test_info_annonce_la_1_2_0_et_v2_n_existe_pas(api_reponse):
     assert (
-        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.1.0"
+        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.2.0"
     )
     assert (
         api_reponse.post("/v2/reponse", json={"question": QUESTION}).status_code == 404
