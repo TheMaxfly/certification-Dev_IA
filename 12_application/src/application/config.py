@@ -56,7 +56,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " apropos_registre apropos_licences_titre apropos_licences"
             " erreur_404_titre erreur_404_texte erreur_405_titre erreur_405_texte"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
-            " erreur_retour en_construction"
+            " erreur_retour"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),

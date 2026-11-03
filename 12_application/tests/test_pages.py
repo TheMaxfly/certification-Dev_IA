@@ -407,12 +407,6 @@ def test_une_erreur_apres_le_debut_de_la_reponse_remonte(doublure, reglages):
         navigateur.get("/essai-coupe")
 
 
-def test_le_501_provisoire_de_la_question(navigateur):
-    r = navigateur.post("/question", data={"question": "x"})
-
-    assert r.status_code == 501
-
-
 # --------------------------------------------------------------------------- #
 #  Sécurité : en-têtes, hors ligne, ressources vendues, secrets
 # --------------------------------------------------------------------------- #

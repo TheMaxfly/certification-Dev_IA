@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import httpx
@@ -17,10 +18,17 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import __version__, journal, presentation
-from application.client_api import ClientApi, VueApi
+from application import __version__, historique, journal, presentation
+from application.client_api import (
+    ApiDelai,
+    ApiInjoignable,
+    ClientApi,
+    ErreurApi,
+    VueApi,
+)
 from application.config import Reglages
 from application.enveloppe import Enveloppe
 from application.metriques import Metriques, autorisee
@@ -35,6 +43,26 @@ PAGES_ERREUR = {
     413: ("erreur_413_titre", "erreur_413_texte"),
     500: ("erreur_500_titre", "erreur_500_texte"),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class Formulaire:
+    """Ce que le formulaire porte ; None : la valeur par défaut."""
+
+    question: str = ""
+    historique: str = ""
+    profil: str | None = None
+    temperature: float | None = None
+    reformuler: bool | None = None
+    mode: str | None = None
+    champ_fautif: str | None = None
+    erreur: str | None = None
+
+
+def champ(donnees: FormData, nom: str) -> str:
+    """Un champ texte du formulaire ; un fichier envoyé à sa place ne compte pas."""
+    valeur = donnees.get(nom)
+    return valeur if isinstance(valeur, str) else ""
 
 
 def environnement_gabarits() -> Environment:
@@ -127,13 +155,20 @@ def creer_application(
     app.add_exception_handler(StarletteHTTPException, erreur_http)
     app.mount("/statique", StaticFiles(directory=STATIQUE), name="statique")
 
-    def page_principale(request: Request, statut: int = 200) -> Response:
+    def page_principale(
+        request: Request,
+        statut: int = 200,
+        *,
+        formulaire: Formulaire | None = None,
+        tours: list[historique.Tour] | None = None,
+        affichage: presentation.Affichage | None = None,
+        encart: presentation.Encart | None = None,
+        cloture: str | None = None,
+    ) -> Response:
         info = vue.info
         limites = vue.limites()
-        choisi = (
-            None if info is None else presentation.profil_par_defaut(info, reglages)
-        )
-        return gabarits.TemplateResponse(
+        f = formulaire or Formulaire()
+        reponse = gabarits.TemplateResponse(
             request,
             "index.html",
             contexte(
@@ -142,42 +177,185 @@ def creer_application(
                 options=(
                     []
                     if info is None
-                    else presentation.options_profils(info, reglages, choisi)
+                    else presentation.options_profils(info, reglages, f.profil)
                 ),
                 positions=presentation.positions_proposees(info, reglages),
-                temperature=reglages.temperature_defaut,
-                reformuler=reglages.reformuler_defaut,
+                temperature=(
+                    reglages.temperature_defaut
+                    if f.temperature is None
+                    else f.temperature
+                ),
+                reformuler=(
+                    reglages.reformuler_defaut if f.reformuler is None else f.reformuler
+                ),
                 modes=presentation.modes_proposes(info),
+                mode_choisi=f.mode,
                 question_max=limites.question_caracteres_max,
                 question_aide=presentation.dire(
                     t, "question_aide", max=limites.question_caracteres_max
                 ),
+                formulaire=f,
+                tours=[
+                    {
+                        "role": t[f"role_{tour.role}"],
+                        "segments": presentation.segments_d_un_tour(tour.contenu),
+                    }
+                    for tour in tours or []
+                ],
+                affichage=affichage,
+                encart=encart,
+                cloture=cloture,
             ),
             status_code=statut,
         )
+        if encart is not None and encart.retry_after is not None:
+            reponse.headers["Retry-After"] = str(encart.retry_after)
+        return reponse
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def accueil(request: Request) -> Response:
         await vue.rafraichir()
         return page_principale(request)
 
+    def lire_formulaire(
+        donnees: FormData,
+    ) -> tuple[Formulaire, str | None, str | None]:
+        """Les champs, et l'erreur de formulaire : (formulaire, champ, message)."""
+        limites = vue.limites()
+        question = champ(donnees, "question").replace("\r\n", "\n").strip()
+        profil = champ(donnees, "profil")
+        brute = champ(donnees, "temperature")
+        positions = presentation.positions_proposees(vue.info, reglages)
+        try:
+            temperature = float(brute) if brute else reglages.temperature_defaut
+        except ValueError:
+            temperature = float("nan")
+        admise = temperature in [p.valeur for p in positions]
+        lu = Formulaire(
+            question=question,
+            historique=champ(donnees, "historique"),
+            profil=profil or None,
+            temperature=temperature if admise else None,
+            reformuler="reformuler" in donnees,
+            mode=champ(donnees, "mode") or None,
+        )
+        if not question:
+            return lu, "question", t["erreur_question_vide"]
+        if len(question) > limites.question_caracteres_max:
+            message = presentation.dire(
+                t,
+                "erreur_question_longue",
+                max=limites.question_caracteres_max,
+                n=len(question),
+            )
+            return lu, "question", message
+        if not admise:
+            return lu, "temperature", t["erreur_temperature"]
+        if vue.info is not None:
+            noms = [p.nom for p in presentation.profils_proposes(vue.info, reglages)]
+            if profil not in noms:
+                return lu, "profil", t["erreur_profil"]
+        return lu, None, None
+
     @app.post("/question", response_class=HTMLResponse, include_in_schema=False)
     async def question(request: Request) -> Response:
-        # Provisoire : le traitement arrive avec l'écran de la réponse.
         await vue.rafraichir()
-        return gabarits.TemplateResponse(
+        limites = vue.limites()
+        identifiant = str(request.state.identifiant_requete)
+        donnees = await request.form()
+        try:
+            tours = historique.lire(champ(donnees, "historique"), limites)
+        except historique.HistoriqueInvalide:
+            # Rien n'est envoyé ; le texte porté par la page n'est pas repris.
+            request.state.code_erreur = "historique_invalide"
+            encart = presentation.Encart(t["conversation_invalide"], 422)
+            return page_principale(request, 422, encart=encart)
+        request.state.nb_tours_historique = len(tours)
+        request.state.taille_historique = historique.taille(tours)
+        if len(tours) >= limites.tours_max:
+            texte = presentation.dire(
+                t, "conversation_terminee", echanges=limites.echanges
+            )
+            return page_principale(request, encart=presentation.Encart(texte, 200))
+
+        lu, fautif, message = lire_formulaire(donnees)
+        if fautif is not None:
+            f = replace(lu, champ_fautif=fautif, erreur=message)
+            return page_principale(request, 422, formulaire=f, tours=tours)
+        info = vue.info
+        if info is None:
+            # Aucune liste connue : rien à valider, rien n'est envoyé.
+            cle = "etat_cle" if vue.etat == "cle" else "degrade_injoignable"
+            encart = presentation.Encart(t[cle], 503)
+            return page_principale(
+                request, 503, formulaire=lu, tours=tours, encart=encart
+            )
+
+        reglages_reponse = info.modele_langage.reglages_reponse
+        mode = (
+            lu.mode
+            if lu.mode in reglages_reponse.mode.valeurs
+            else reglages_reponse.mode.defaut
+        )
+        demande: dict[str, object] = {
+            "question": lu.question,
+            "historique": historique.en_liste(tours),
+            "reformuler": lu.reformuler,
+            "profil": lu.profil,
+            "temperature": lu.temperature,
+            "mode": mode,
+            "identite": reglages.identite,
+        }
+        try:
+            resultat = await client.reponse(demande)
+        except (ApiInjoignable, ApiDelai) as exc:
+            delai = isinstance(exc, ApiDelai)
+            request.state.code_erreur = "api_delai" if delai else "api_injoignable"
+            encart = presentation.encart_transport(delai, reglages)
+            return page_principale(
+                request, encart.statut, formulaire=lu, tours=tours, encart=encart
+            )
+        except ErreurApi as exc:
+            request.state.code_erreur = exc.code
+            if exc.identifiant_requete:
+                request.state.identifiant_api = exc.identifiant_requete
+            encart = presentation.encart_erreur(
+                exc, str(lu.profil), identifiant, reglages
+            )
+            if encart.profil_a_revoir:
+                await vue.rafraichir()
+                lu = replace(lu, profil=None)
+            return page_principale(
+                request, encart.statut, formulaire=lu, tours=tours, encart=encart
+            )
+
+        corps = resultat.corps
+        request.state.identifiant_api = (
+            resultat.identifiant_api or corps.contexte.identifiant_requete
+        )
+        suivants = [
+            *tours,
+            historique.Tour("libraire", lu.question),
+            historique.Tour("assistant", corps.reponse),
+        ]
+        cloture: str | None = None
+        if len(suivants) // 2 >= limites.echanges:
+            cloture = presentation.dire(
+                t, "conversation_terminee", echanges=limites.echanges
+            )
+        elif historique.depasse(suivants, limites):
+            cloture = t["conversation_longueur"]
+        f = replace(
+            lu,
+            question="",
+            historique="" if cloture else historique.ecrire(suivants),
+        )
+        return page_principale(
             request,
-            "erreur.html",
-            contexte(
-                titre=t["en_construction"],
-                texte=t["en_construction"],
-                identifiant=presentation.dire(
-                    t,
-                    "erreur_identifiant",
-                    identifiant=str(request.state.identifiant_requete),
-                ),
-            ),
-            status_code=501,
+            formulaire=f,
+            tours=tours,
+            affichage=presentation.affichage_de(lu.question, corps, reglages),
+            cloture=cloture,
         )
 
     @app.get("/a-propos", response_class=HTMLResponse, include_in_schema=False)

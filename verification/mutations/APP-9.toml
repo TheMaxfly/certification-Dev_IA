@@ -1,0 +1,7 @@
+id = "APP-9"
+origine = "E3 étape 4, spec 04 (2026-11-04) — un profil hors liste, mistral-large-4 compris, partirait à l'API"
+fichier = "12_application/src/application/app.py"
+avant = '''            if profil not in noms:'''
+apres = '''            if False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_question.py", "-k", "profil_hors_liste"]
