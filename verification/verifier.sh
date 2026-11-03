@@ -827,6 +827,11 @@ poste() {
   # Les essais des hooks (tâche statique) et l'intégration Compose du 02 font partie de
   # make verify : ils tournent aussi sur GitHub. Restent ici les harnais du poste seul.
   local cmd
+  # L'accessibilité de l'application : axe-core dans Chromium, contre la doublure de l'API.
+  cmd=(uv run --locked --extra dev --extra audit pytest -q -p no:cacheprovider tests/test_audit_axe.py)
+  dire "poste — (12_application/) accessibilité de l'application : AUDIT_AXE=1 ${cmd[*]}"
+  (cd "$RACINE/12_application" && "${PROPRE[@]}" AUDIT_AXE=1 "${cmd[@]}") ||
+    echouer poste "accessibilité de l'application" "(12_application/) AUDIT_AXE=1 ${cmd[*]}"
   cmd=(bash outils/fidelite.sh)
   dire "poste — (database/) ${cmd[*]}"
   (cd "$RACINE/database" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "fidélité du schéma" "(database/) ${cmd[*]}"
@@ -839,7 +844,7 @@ poste() {
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
   dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
   REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
-  dire "poste — harnais : fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages compris), ensemble de règles passés"
+  dire "poste — harnais : accessibilité de l'application, fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages compris), ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #

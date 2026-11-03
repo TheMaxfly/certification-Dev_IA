@@ -16,10 +16,12 @@
 {% include "composants/formulaire.html" %}
 <section aria-live="polite">
 {% if encart %}
-<article role="alert">
+<article>
+<div role="alert">
 <h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ t.encart_titre }}</h2>
 <p id="encart-texte">{{ encart.texte }}</p>
 <p><a href="/">{{ t.nouvelle_conversation }}</a></p>
+</div>
 </article>
 {% elif affichage %}
 {% include "composants/reponse.html" %}

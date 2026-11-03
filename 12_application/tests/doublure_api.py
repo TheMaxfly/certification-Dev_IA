@@ -637,6 +637,13 @@ SCENARIOS_SANTE: dict[str, Callable[[], Rendu]] = {
 HORS_CONTRAT = {"corps_hors_contrat", "reponse_hors_contrat"}
 
 
+def connu(nom: str, scenarios: Mapping[str, Any]) -> str:
+    """Un scénario du catalogue ; un nom inconnu est une erreur de test."""
+    if nom not in scenarios:
+        raise KeyError(nom)
+    return nom
+
+
 class Doublure:
     """L'application de test, ses scénarios, ce qu'elle a reçu."""
 
@@ -657,11 +664,11 @@ class Doublure:
         reponse: str | None = None,
     ) -> None:
         if info is not None:
-            self.scenario_info = SCENARIOS_INFO[info].__name__ and info
+            self.scenario_info = connu(info, SCENARIOS_INFO)
         if sante is not None:
-            self.scenario_sante = SCENARIOS_SANTE[sante].__name__ and sante
+            self.scenario_sante = connu(sante, SCENARIOS_SANTE)
         if reponse is not None:
-            self.scenario_reponse = SCENARIOS_REPONSE[reponse].__name__ and reponse
+            self.scenario_reponse = connu(reponse, SCENARIOS_REPONSE)
 
     def _verifier(self, route: str, methode: str, nom: str, rendu: Rendu) -> str | None:
         """Le corps d'un scénario contre le contrat : un écart, ou None."""

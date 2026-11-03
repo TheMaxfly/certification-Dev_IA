@@ -28,11 +28,12 @@ dev = [
     "beautifulsoup4==4.15.0",
     # La doublure de l'API est validée contre le contrat du module 11.
     "jsonschema==4.26.0",
-    # L'audit d'accessibilité : axe-core dans Chromium, dans `make verify-poste`.
-    "playwright==1.64.1",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
 ]
+# L'audit d'accessibilité : axe-core dans Chromium, dans `make verify-poste`. À part : la
+# tâche de GitHub, où l'audit saute, ne l'installe pas.
+audit = ["playwright==1.64.1"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

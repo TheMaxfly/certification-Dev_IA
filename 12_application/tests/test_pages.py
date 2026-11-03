@@ -512,6 +512,7 @@ def contraste(a: str, b: str) -> float:
         ("--pico-primary-inverse", "--pico-primary-background"),
         ("--pico-primary-inverse", "--pico-primary-hover-background"),
         ("--pico-color", "--pico-card-background-color"),
+        ("--pico-form-element-color", "--pico-form-element-background-color"),
     ],
 )
 def test_wcag_1_4_3_contraste_des_couleurs_du_theme(texte, fond):

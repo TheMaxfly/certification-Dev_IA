@@ -8,9 +8,11 @@
 {% endif %}
 <p><small>{{ affichage.ligne }}</small></p>
 {% if cloture %}
-<article role="alert">
+<article>
+<div role="alert">
 <p>{{ cloture }}</p>
 <p><a href="/"><strong>{{ t.nouvelle_conversation }}</strong></a></p>
+</div>
 </article>
 {% endif %}
 {% if affichage.complement %}

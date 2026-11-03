@@ -17,5 +17,7 @@
   --pico-primary-hover-background: #084568;
   --pico-primary-inverse: #ffffff;
   --pico-card-background-color: #f4f6f8;
+  --pico-form-element-background-color: #ffffff;
+  --pico-form-element-color: #2b2f36;
   --pico-spacing: 1rem;
 }

@@ -1,0 +1,7 @@
+id = "APP-18"
+origine = "E3 étape 4, spec 05 (2026-11-04) — une carte de série perdrait sa cible : l'ancre du texte ne mènerait nulle part"
+fichier = "12_application/src/application/gabarits/composants/reponse.html"
+avant = '''<h3 id="serie-{{ carte.serie_id }}">'''
+apres = '''<h3>'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_balisage.py", "-k", "wcag_2_4_4"]
