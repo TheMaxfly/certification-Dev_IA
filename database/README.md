@@ -66,6 +66,8 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `021_corpus_cohabitation.sql` | **Plusieurs corpus et plusieurs encodages côte à côte** (E3, étape 1) : `bench.corpus` (une ligne par version : règle, découpage, clôture) ; `corpus_id` sur les documents, les fragments, les encodages et les vecteurs, clé des documents `(corpus_id, doc_key)`, vecteurs identifiés par `(encodage_id, chunk_id)` et reliés à leur corpus par clés composites ; **journal des promotions** en ajout seul et vue `v_encodage_en_service` ; `eval_runs` (corpus et encodage d'un run) ; **un corpus clos refuse toute écriture**, sauf `bench.autoriser_extension` (insertion seule). Aucune élévation de privilège (cf. « Notes sur `021` ») |
 | `022_role_verification.sql` | **lecture de vérification** : rôle de groupe `verif_ro`, `SELECT` sur `manga`, `bench` et `public.schema_migrations` — l'étape « état d'apimanga » de `make verify-poste` (cf. « La lecture de vérification ») |
 | `023_role_modele.sql` | **lecture de l'API du modèle** (module 11) : rôle de groupe `modele_ro`, `SELECT` **énumérés** — six relations de `bench` (corpus, documents, fragments, registre des encodages, vecteurs EmbeddingGemma, encodage en service) et quatre colonnes de `manga` (rattachement et titre) ; aucun droit par défaut (cf. « La lecture de l'API du modèle ») |
+| `024_vue_pseudonymes.sql` | **la vue `manga.v_pseudonymes`** : les pseudonymes distincts, seule chose que `modele_ro` lit de la table des critiques, pour le contrôle « aucun nom de membre » de la route de réponse ; un droit, élévation déclarée |
+| `025_vue_metadonnees_serie.sql` | **la vue `manga.v_metadonnees_serie`** : disponibilité, nombre de tomes et sa source, statut, public, année française par série, calculés à la lecture sur les volumes, la fiche, le moyeu et Kitsu, règles dans `COMMENT ON VIEW` ; un droit pour `modele_ro`, élévation déclarée, aucune table, aucune donnée |
 
 ## `000` — la frontière héritage / versionné
 
@@ -101,10 +103,11 @@ le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 `017` le 2026-09-29, `018` et `019` le 2026-09-30, `020` le 2026-10-07, `021` le
 2026-10-09 (22:03 UTC, après sauvegarde), `022` le 2026-10-19 (21:53 UTC, après
 sauvegarde), `023` le 2026-10-20 (11:53 UTC, après sauvegarde, rôle de connexion
-`modele_api` créé par son script) ; `000` y a été **marquée appliquée** le 2026-07-15,
-sans exécution. Le contrôle affiche **24 migrations appliquées et 0 en attente**, et
-`outils/fidelite.sh` rend un **diff vide** (1 986 lignes de part et d'autre, extensions
-et versions identiques, 2026-10-20).
+`modele_api` créé par son script), `024` le 2026-10-27 (00:22 UTC, après sauvegarde),
+`025` le 2026-11-02 (23:35 UTC, après sauvegarde) ; `000` y a été **marquée appliquée** le
+2026-07-15, sans exécution. Le contrôle affiche **26 migrations appliquées et 0 en
+attente**, et `outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
+2026-11-02).
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
 (1 et 2 sur le v1, 3 sur le v2). Le journal des promotions a deux lignes : la reprise
@@ -346,7 +349,7 @@ journal compris) ne conviennent : un troisième couple de rôles, au périmètre
 
 | Rôle | Nature | Créé par | Porte un secret |
 | --- | --- | --- | --- |
-| `modele_ro` | groupe, `NOLOGIN` ; `SELECT` sur six relations de `bench` et quatre colonnes de `manga` | migration `023_role_modele.sql` | non |
+| `modele_ro` | groupe, `NOLOGIN` ; `SELECT` sur six relations de `bench`, quatre colonnes de `manga` et deux vues de `manga` | migrations `023`, `024`, `025` | non |
 | `modele_api` | connexion, `LOGIN`, membre de `modele_ro`, sessions en lecture seule, 10 connexions au plus | `outils/creer_role_modele.sh` | oui |
 
 | Objet | Accordé à `modele_ro` |
@@ -354,12 +357,17 @@ journal compris) ne conviennent : un troisième couple de rôles, au périmètre
 | `bench.corpus`, `corpus_docs`, `corpus_chunks`, `encodages`, `vecteurs_embeddinggemma`, `v_encodage_en_service` | `SELECT` |
 | `manga.work_identity` | `SELECT (series_id, kitsu_id)` — le rattachement d'un synopsis Kitsu |
 | `manga.ms_series_enriched` | `SELECT (series_id, series_title)` — le titre |
+| `manga.v_pseudonymes` (`024`) | `SELECT` — les pseudonymes distincts, jamais la table des critiques |
+| `manga.v_metadonnees_serie` (`025`) | `SELECT` — six valeurs par série, jamais les volumes ni le reste de la fiche |
 | `bench.promotions`, `eval_*`, `vecteurs_bge_m3`, le reste de `bench` et de `manga`, `staging`, `public.schema_migrations`, les séquences | **non** |
 | objets créés plus tard | **non** — aucun `ALTER DEFAULT PRIVILEGES` : une migration les accorde, ou personne |
 
 **Élévation déclarée** : la vue `bench.v_encodage_en_service` (021) n'est pas
 `security_invoker` ; elle lit `bench.promotions` avec les droits de son propriétaire.
-`modele_ro` y voit la dernière décision `promu` ou `retour_arriere`, jamais la table.
+`modele_ro` y voit la dernière décision `promu` ou `retour_arriere`, jamais la table. Même
+construction pour les deux vues de `manga` : par elles seules, il voit ce qu'elles rendent.
+`tests/test_vue_pseudonymes.py` et `tests/test_vue_metadonnees.py` prouvent, pour chacune, un
+seul droit gagné et les refus sur les tables lues.
 
 `tests/test_role_modele.py` (31 tests) le vérifie relation par relation et colonne par
 colonne, sur un inventaire dérivé du catalogue sous sentinelles ; prouve que `023` ne

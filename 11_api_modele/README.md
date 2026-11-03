@@ -1,7 +1,8 @@
 # 11 — API du modèle
 
 Une API REST qui expose le modèle d'embedding en service et, depuis la version
-**1.1.0**, un modèle de langage choisi par profil. Deux routes métier, sous `/v1/` :
+**1.1.0**, un modèle de langage choisi par profil ; depuis la **1.2.0**, chaque série
+porte ses métadonnées. Deux routes métier, sous `/v1/` :
 
 - `POST /v1/recherche` : une question entre, une liste de séries classées sort, avec
   les passages qui les justifient ;
@@ -34,8 +35,10 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
 - **mode strict** : la réponse n'affirme que ce que disent les passages rendus par la
   recherche, et ne cite que des séries de cette recherche et leurs passages — chacun lui
   est montré avec son identifiant, `[F:<fragment_id>]`, qu'il recopie dans
-  `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit, métadonnées
-  comprises : nombre de tomes, auteur, éditeur, année, disponibilité en France, édition ;
+  `fragment_ids`. Ce que les passages ne disent pas, la réponse le dit ;
+- **les métadonnées viennent du catalogue** : nombre de tomes, statut, public et
+  disponibilité sont sur la ligne de titre de chaque passage, et priment sur ce qu'une
+  critique dit, qui peut être ancienne (« Les métadonnées d'une série ») ;
 - **chaque série citée porte son titre** : l'invite demande le titre devant
   `[S:<serie_id>]` ; quand le modèle l'omet (ni juste avant ni juste après la marque,
   casse, espaces, emphase, guillemets et ponctuation ignorés), la route insère le titre
@@ -52,7 +55,8 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
   ne renvoie pas, qui part seule dans la recherche ;
 - **sorties contrôlées** : la sortie du modèle est contrainte par un schéma JSON, puis
   relue par l'API — séries et fragments cités, cohérence du refus, **aucun nom de
-  membre**. Une sortie fautive n'est ni rendue ni journalisée.
+  membre**, disponibilité et public que la ligne de titre ne contredit pas. Une sortie
+  fautive n'est ni rendue ni journalisée.
 
 **Elle ne fait pas** :
 
@@ -382,6 +386,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
   "series": [
     {"rang": 1, "entite": "serie:101", "serie_id": 101, "kitsu_id": null,
      "titre": "Titre de série A", "score": 0.6412093187,
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 12, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2016},
      "passages": [
        {"fragment_id": 500001, "doc_key": "ms_synopsis:101", "type_document": "resume_serie",
         "score": 0.6412093187, "extrait": "Dans un restaurant de quartier, une jeune cuisinière se lance dans des concours…"},
@@ -389,6 +394,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
         "score": 0.5873310442, "extrait": "Les duels culinaires sont rythmés et l'humour fait mouche…"}]},
     {"rang": 2, "entite": "serie:202", "serie_id": 202, "kitsu_id": null,
      "titre": "Titre de série B", "score": 0.6127745390,
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 5, "nb_volumes_source": "repli_volumes_distincts", "statut": "en_cours", "demographie": "Seinen", "annee_fr": 2021},
      "passages": [
        {"fragment_id": 600042, "doc_key": "kitsu:3003", "type_document": "synopsis_kitsu",
         "score": 0.6127745390, "extrait": "A young chef joins a cooking school where every class is a battle…"},
@@ -402,7 +408,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
     "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3,
     "identifiant_requete": "7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90",
-    "duree_ms": 84.7, "version_api": "1.1.0"
+    "duree_ms": 84.7, "version_api": "1.2.0"
   }
 }
 ```
@@ -412,6 +418,8 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
 - `score` est le cosinus du meilleur fragment, non arrondi ; le premier passage porte
   le score de sa série.
 - Les passages sont classés par score décroissant, puis par `fragment_id`.
+- `metadonnees` : ce que le catalogue dit de la série (« Les métadonnées d'une série ») ;
+  six `null` pour une œuvre hors catalogue.
 
 
 ### `POST /v1/reponse`
@@ -442,17 +450,19 @@ X-Identifiant-Requete: 6f1c…
 {
   "refus": false,
   "motif_refus": null,
-  "reponse": "D'après les critiques, Yakitate!! Japan [S:1708] est une série de cuisine humoristique centrée sur la boulangerie, avec des concours et un ton léger qui convient à un jeune lecteur. Les passages disponibles ne disent pas son nombre de tomes. Food wars ! [S:15123] est plus orienté compétition et comporte des scènes de dégustation très suggestives, signalées par les critiques : à feuilleter avant de le proposer à un lecteur de 13 ans.",
+  "reponse": "D'après les critiques, Yakitate!! Japan [S:1708] est une série de cuisine humoristique centrée sur la boulangerie, avec des concours et un ton léger qui convient à un jeune lecteur ; elle est terminée, en 26 tomes, et éditée en France. Food wars ! [S:15123] est plus orienté compétition et comporte des scènes de dégustation très suggestives, signalées par les critiques : à feuilleter avant de le proposer à un lecteur de 13 ans.",
   "series_citees": [
     {"serie_id": 1708, "titre": "Yakitate!! Japan", "rang": 1, "fragment_ids": [473803, 474337]},
     {"serie_id": 15123, "titre": "Food wars !", "rang": 2, "fragment_ids": [460377]}
   ],
   "series": [
     {"rang": 1, "entite": "serie:1708", "serie_id": 1708, "kitsu_id": 1234, "titre": "Yakitate!! Japan", "score": 0.6812,
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 26, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2005},
      "passages": [
        {"fragment_id": 473803, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6812, "extrait": "…"},
        {"fragment_id": 474337, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6520, "extrait": "…"}]},
     {"rang": 2, "entite": "serie:15123", "serie_id": 15123, "kitsu_id": 5678, "titre": "Food wars !", "score": 0.6407,
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 36, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2014},
      "passages": [
        {"fragment_id": 460377, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6407, "extrait": "…"},
        {"fragment_id": 483381, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6101, "extrait": "…"}]}
@@ -461,7 +471,7 @@ X-Identifiant-Requete: 6f1c…
     "reglages": {"nombre_series": 2, "passages_par_serie": 2, "catalogue_seul": true},
     "modele": "google/embeddinggemma-300m", "revision": "…", "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3, "identifiant_requete": "6f1c…",
-    "duree_ms": 3104.5, "version_api": "1.1.0",
+    "duree_ms": 3104.5, "version_api": "1.2.0",
     "profil": "mistral-large-2512", "fournisseur": "mistral",
     "modele_langage": "mistral-large-2512", "statut_profil": "stable",
     "date_appel": "2026-11-02T10:14:07+00:00",
@@ -526,12 +536,50 @@ passage) :
  "series_citees": [], "series": [], "contexte": {"appels": [], "cout_estime_usd": 0.0, "date_appel": null, "…": "…"}}
 ```
 
+### Les métadonnées d'une série
+
+Depuis la version 1.2.0, chaque série de `/v1/recherche` et de `/v1/reponse` porte un objet
+`metadonnees`, et chaque passage envoyé au modèle est précédé de sa **ligne de titre** :
+
+```text
+[S:<id>] <titre> — <type> — tomes : <N> (champ) | au moins <N> | inconnu — <terminé | en cours | statut inconnu> — public : <public | inconnu> — disponibilité : <édité en France | seulement au Japon | inconnue> [F:<id>]
+```
+
+**La source** : la vue `manga.v_metadonnees_serie` (migration 025), calculée à la lecture sur
+les volumes et la fiche de Manga Sanctuary, le moyeu d'identité et Kitsu, lue une fois par
+série sous `modele_api`, qui ne lit pas ces tables.
+
+| Champ | Règle | Séries (2026-11-02, sur 14 670) |
+|---|---|---|
+| `disponibilite` | `edite_en_france` : un volume à EAN français (`9782`, `97910`) ou le badge « français » de la fiche ; `seulement_au_japon` : un manga à volumes sans cela ; `inconnue` sinon | 7 827, 6 804, 39 |
+| `nb_volumes` | le plus grand du champ « tomes parus » et des numéros de volume distincts ; un numéro entre 1900 et 2100 ne compte pas : la collecte prend pour numéro le premier nombre du titre | 14 665 ; absent : 5 |
+| `nb_volumes_source` | `divergent` : les deux comptes s'écartent de plus de 20 % du plus grand ; `champ` : le champ est au moins égal aux numéros ; `repli_volumes_distincts` sinon | 468, 10 615, 3 582 |
+| `statut` | `termine` : le badge « Complète », sinon Kitsu `finished` ; `en_cours` : Kitsu `current` sans badge ; le catalogue n'écrit jamais « en cours » | 11 876, 827 ; absent : 1 967 |
+| `demographie` | `series_category_clean`, sinon `series_category` s'il porte une valeur de la même liste ; le libellé du catalogue, tel quel | 13 680 ; absent : 990 |
+| `annee_fr` | l'année du premier volume à EAN français | 7 629 ; absent : 7 041 |
+
+**Ce que ces mots ne disent pas** :
+
+- **« Édité en France » ne veut pas dire « en stock »** : au moins un volume y est paru. Le
+  catalogue ne connaît pas les stocks.
+- **« Seulement au Japon »** : aucune édition française *connue du catalogue* ; pas la preuve
+  qu'il n'y en a pas (voir plus bas). Il ne dit pas non plus d'où vient la série.
+- **« Inconnue »** : la réponse ne peut rien en dire.
+- **« Au moins N »** : toute source autre que `champ` est un minimum. Les numéros mêlent les
+  éditions et sous-comptent une série dont le catalogue n'a qu'une partie des tomes ; le
+  champ ne dit pas de quelle édition il parle.
+- **L'âge** : **il n'y a pas de donnée**. La réponse ne dit une série adaptée à un âge ou à
+  une contrainte de contenu que si un passage le dit explicitement ; sinon, elle dit qu'elle
+  ne peut pas le garantir et signale les thèmes adultes qu'un passage mentionne.
+- **Les auteurs** : ni sur la ligne ni dans la vue : aucune table d'auteurs n'est fiable au
+  grain de la série.
+
 ### `GET /v1/info`, `GET /v1/sante`
 
 `GET /v1/info` (avec la clé) — le modèle d'embedding servi, et le modèle de langage :
 
 ```json
-{"version_api": "1.1.0", "modele": "google/embeddinggemma-300m",
+{"version_api": "1.2.0", "modele": "google/embeddinggemma-300m",
  "revision": "57c266a740f537b4dc058e1b0cda161fd15afa75", "precision": "float32", "dimension": 768,
  "outil": "text-embeddings-inference", "outil_version": "1.9.4",
  "corpus_id": "v2", "encodage_id": 3, "nb_fragments": 77006,
@@ -593,7 +641,7 @@ statut ; les tests en produisent chacun (« Vérifier »).
 | 503 | `sortie_modele_invalide` | (réponse) la sortie du modèle ne tient pas le contrat | `{"motif": "…", "role": "reponse"}` (ou `"reformulation"`) |
 | 500 | `erreur_interne` | imprévu ; la trace est au journal, sous l'identifiant | `null` |
 
-Les cinq motifs de `sortie_modele_invalide`, contrôlés dans cet ordre, chacun compté
+Les sept motifs de `sortie_modele_invalide`, contrôlés dans cet ordre, chacun compté
 par `api_modele_sortie_invalide_total{motif}` :
 
 | Motif | Le modèle a rendu… |
@@ -603,6 +651,14 @@ par `api_modele_sortie_invalide_total{motif}` :
 | `fragment_inconnu` | un fragment cité qui n'est pas un passage de sa série |
 | `refus_incoherent` | un refus qui cite des séries ou sans motif, ou une réponse qui n'en cite aucune ou porte un motif |
 | `pseudonyme` | un nom de membre, dans la réponse ou la question reformulée (règle des homonymes : « Sécurité et données ») |
+| `disponibilite` | une série citée dite disponible, publiée, éditée, sortie ou commandable en France, alors que sa ligne dit `seulement_au_japon` ou `inconnue` |
+| `demographie` | un public (shōnen, seinen, shōjo, josei) différent de celui de la ligne, quand elle porte l'un de ces quatre |
+
+Pour ces deux derniers, `details.serie_id` dit la série contredite. **Formes affirmatives
+seulement**, liste versionnée (`config/formes_affirmations.toml`) : une négation, une question,
+une comparaison ne sont pas des affirmations, et une forme se rapporte à la marque `[S:<id>]`
+la plus proche avant elle dans la phrase. Pas de contrôle sur les tomes ni le statut : leurs
+formes sont trop variées ; la ligne et l'invite suffisent, la mesure le dit.
 
 **Pas de second essai**, ni sur une sortie invalide ni sur un refus du fournisseur : un
 seul appel par rôle. L'erreur est visible et comptée ; un second essai cacherait un modèle
@@ -702,10 +758,14 @@ Le seul chemin d'un appel réel hors du service : à la main, commande par comma
 ```bash
 B="uv run --env-file .env python -m api_modele.banc_reponse"
 $B estimer mistral-large-2512 famille:F7,issue:hors_catalogue   # aucun appel
+$B estimer-scenarios mistral-large-2512 <fichier des scénarios>.csv   # aucun appel
 $B essai mistral-large-2512 "<question inventée>" [--temperature 0.7] [--longueur-max 1000]
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
   $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
 DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
+$B relire <dossier du run>             # selon les règles d'aujourd'hui, aucun appel
+$B etiqueter                           # les runs déjà faits, a posteriori
+$B registre <profil>=<run_id> …        # une version par profil
 ```
 
 - **Où il tourne** : l'API dans le processus (comme les tests et l'étape d'équivalence
@@ -734,20 +794,40 @@ DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
   réponses, contrôlés (aucun nom de membre), dans
   `05_nettoyage_agregation_bdd/data/rapports/mesures_reponse/<run>/reponses.md`, hors
   dépôt et hors MLflow, pour la lecture humaine.
+- **MLflow, en plus** : chaque run joint en artefacts les deux invites et `reglages.toml`,
+  leurs empreintes en paramètres (`invite_reponse_sha`, `invite_reformulation_sha`,
+  `reglages_sha`), et porte ses étiquettes : `etape`, `role` (`profil_actif`, `repli`),
+  `invite_version` (le commit court qui a écrit les invites), `statut` (`complet`,
+  `interrompu`), `verdict` (`tenu`, `non_tenu`, sauf les scénarios, sans critère),
+  `cause_interruption`. Les runs déjà faits ont reçu leurs étiquettes a posteriori, pas
+  d'artefacts : leurs invites sont celles de leur commit.
+- **Le registre de modèles** `conseiller-manga-reponse` : une version par profil, liée au
+  run qui l'a qualifiée ; *Production* pour `mistral-large-2512`, *Staging* pour
+  `mistral-large-4`, *Archived* pour les deux profils OpenAI. **Il ne contrôle rien** : le
+  profil actif reste celui de `reglages.toml` ; il rend la promotion visible. Les stades sont
+  dépréciés par MLflow, encore acceptés à la version épinglée (3.17.0).
 - **Critère, écrit avant la mesure** (`banc_reponse/mesure.py`, `CRITERE`), par
   profil : refus correct ≥ 4 / 5 sur F7 ; refus, ou mention « pas au catalogue »,
   ≥ 4 / 5 sur les cinq questions hors catalogue ; **zéro** série inventée ; **zéro**
-  sortie invalide pour un nom de membre. Pas de seuil sur le recouvrement (suites de
+  sortie invalide pour un nom de membre ; depuis la 1.2.0, **zéro** sortie invalide
+  `disponibilite` et `demographie`. Pas de seuil sur le recouvrement (suites de
   8 mots de la réponse présentes telles quelles dans un passage) ni sur F9 / F10 : à
   la première mesure, on écrit le chiffre. `titre_present` : part des séries citées
   dont le titre est juste avant ou juste après chacune de leurs marques dans le texte
   **du modèle**, avant l'insertion de la route — la règle de l'insertion, appliquée à
   ce que le modèle fait seul (son texte reste en mémoire, jamais écrit) ; une série
   citée que le texte ne marque pas est comptée à part (`citees_sans_marque`).
+- **Deux lectures du critère, arrêtées après une mesure et écrites comme telles** (voir
+  les résultats) : dire le titre demandé absent des passages vaut mention « pas au
+  catalogue » ; une sortie `disponibilite` dont un passage envoyé dit une édition française
+  (`catalogue_en_tort`) reste rejetée par la route, mais se compte à part, hors du zéro.
+- **`relire <dossier>`** applique les règles d'aujourd'hui à un run mesuré, sans appel à un
+  fournisseur : son verdict d'alors reste (`resume.json`, métriques d'origine, étiquette
+  `verdict_a_la_mesure`), la relecture s'y ajoute (`relecture.json`, métriques `_relu`).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
 
-## Résultats de la mesure (2026-10-30 ; profil actif rejoué le 2026-11-02)
+## Résultats de la mesure (2026-10-30 ; profil actif rejoué les 2026-11-02 et 03)
 
 Jeu v2 gelé (`31712b0d…`), réglages par défaut (`temperature` 0, strict, 5 séries ×
 2 passages, catalogue seul), sans historique ; un run MLflow par profil (expérience
@@ -781,8 +861,8 @@ aucun test statistique n'est fait.
   en morceaux typés. Chez Mistral comme chez OpenAI, les jetons de raisonnement sont
   comptés dans `completion_tokens` (vérifié chez Mistral ; chez OpenAI, aucun jeton de
   raisonnement à l'effort `none`).
-- **Coût de toute la mesure** (appels d'essai, runs, scénarios, rejeu) : 249 appels,
-  0,46 $.
+- **Coût de toute la mesure** (appels d'essai, runs, scénarios, rejeux) : 314 appels,
+  0,55 $.
 
 ### Le rejeu du profil actif, et la conversation (2026-11-02)
 
@@ -804,13 +884,45 @@ d'un tour sur le suivant, n'est pas mesurée.
   la reformulation ; 4 viennent de la recherche elle-même : même la question autonome ne met
   pas la série attendue en tête. Un seul run : à `temperature` 0, les réponses varient d'un
   run à l'autre.
-- **Limites connues** : sur une série au catalogue sans édition française, une réponse
-  affirme encore une disponibilité en français : la disponibilité n'est pas construite, et
-  une consigne d'invite ne suffit pas à l'éviter. Une reformulation peut encore reporter un
+- **Limites à cette date** : sur une série au catalogue sans édition française, une réponse
+  affirmait encore une disponibilité en français : la disponibilité n'était pas construite,
+  et une consigne d'invite ne suffit pas à l'éviter. Une reformulation peut encore reporter un
   critère d'un tour sur le suivant. Une réponse peut mal lire un passage qui écrit le bon
   fait pour un autre volume. Les refus de débit de Mistral reviennent en conversation (5 sur
   39 appels) : le nouvel essai de la route en a sauvé un, mais 2 requêtes sur 21 ont rendu
   le 503 ; le plafond du compte n'a pas été lu.
+
+### Le rejeu sur les métadonnées (2026-11-03)
+
+Ligne de titre complète, invite qui rend la ligne prioritaire, deux contrôles de sortie.
+**Seul le profil actif est remesuré : les trois profils de repli restent mesurés sur l'invite
+d'avant** (leurs refus en F7 ne dépendent pas de ces phrases).
+
+| Profil | Questions | Refus corrects F7 | Hors catalogue | Séries inventées | Sorties invalides | Coût réel | Latence du modèle, médiane | Critère |
+|---|---|---|---|---|---|---|---|---|
+| `mistral-large-2512` | 26 | **5 / 5** | **3 / 5 à la mesure, 5 / 5 relu** | 0 | 1 `disponibilite`, catalogue en tort | 0,047 $ | 2,6 s | **non tenu à la mesure, tenu relu** |
+
+- **Une interprétation rendue après la mesure, écrite comme telle.** Le critère dit « refus,
+  ou mention pas au catalogue », sans dire quelles formes comptent. Sur deux questions, le
+  modèle dit le titre demandé absent des passages, puis propose d'autres séries, sans refus :
+  la lecture a été arrêtée après avoir vu le chiffre (3 / 5), pour que cette absence dite
+  compte. **Un critère écrit avant dit aussi comment on le lit.**
+- **La sortie rejetée** : le texte dit publiée en France une série dont le catalogue n'a
+  qu'une ligne japonaise, alors que deux fragments citent l'éditeur français. La règle a
+  joué, le catalogue a tort, le libraire reçoit un 503 ; l'arbitrage reviendra au libraire
+  à l'interface (étape 4).
+- **Lecture des 16 réponses F9 et F10 contre leur ligne** : dans les 15 rendues, tomes 0,
+  statut 0, disponibilité 0 ; public, 1 contradiction implicite (une série proposée sur une
+  demande de seinen, ligne Shonen). F9 / F10 : une série attendue citée pour 1 question sur
+  15 ; dans les dix premières de la recherche pour 2 sur 15.
+- **Conversation** (5 scénarios, 19 tours, sans seuil) : `reformulation_fidele` 9 / 10 ;
+  `reformulation_meme_serie` 3 / 14 (6 / 14 au rejeu d'avant : trois tours basculent, entre
+  deux runs qui ne diffèrent pas que par la ligne : l'invite de reformulation a changé aussi) ;
+  série attendue en tête 4 sur 12, contre 8 sur 12 sur la question autonome. Aucune
+  contradiction de la ligne sur 19 tours, aucune sortie rejetée. **Les deux cas lus comme
+  faux au rejeu d'avant sont justes** : disponibilité en français, série terminée.
+- **Refus de débit** : 4 sur 37 appels, tous sur un tour, que le nouvel essai de la route n'a
+  pas sauvé (rendu à la troisième tentative du banc). 0,041 $.
 
 ## Les traces
 
@@ -829,6 +941,18 @@ d'un tour sur le suivant, n'est pas mesurée.
 
 ## Limites déclarées
 
+- **Une ligne fausse prime sur un passage juste.** C'est le revers de la priorité de la
+  ligne : une série dite terminée sur le badge d'une édition (136 numéros au catalogue), un
+  « seulement au Japon » faute de ligne française. Une réponse qui suit le passage rend alors
+  un 503 : ligne et passages contradictoires, l'arbitrage reviendra au libraire (étape 4).
+- **« Au moins N » n'est pas toujours repris** : la réponse peut écrire le nombre sec, ou mal
+  en raisonner (« au moins 9 », donc « moins de 10 »). Le mot technique « (champ) » de la ligne
+  peut passer dans le texte. Les valeurs aberrantes du champ restent (1 624, 176).
+- **Une réponse peut encore affirmer un auteur** que le catalogue dément : les auteurs ne sont
+  pas sur la ligne (même autrice affirmée pour deux séries, au dernier rejeu). Une
+  reformulation peut encore reporter un critère, ou une métadonnée, d'un tour sur le suivant.
+- **Les contrôles de sortie ne voient que des formes.** Un public seulement sous-entendu, ou
+  affirmé sur une ligne « inconnu » ou portant un autre libellé (`Yuri`, `Yaoi`), passe.
 - **Une instance.** Le débit est compté en mémoire du processus : plusieurs instances
   derrière un répartiteur auraient chacune leur compte.
 - **Pas de haute disponibilité.** Un seul service d'embedding, une seule base, aucune
@@ -925,7 +1049,8 @@ Pour ajouter une route :
 3. **Régénérer le contrat** : `uv run python -m api_modele.contrat`, puis commiter
    `contrat/openapi_v1.json` avec la route. Le test d'égalité à l'octet refuse un
    contrat périmé.
-4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`) : la
+4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`, 1.2.0 pour
+   `metadonnees`) : la
    majeure reste celle de l'adresse.
 
 **Toute rupture ouvre `/v2/`** : retirer ou renommer un champ, restreindre un type ou
