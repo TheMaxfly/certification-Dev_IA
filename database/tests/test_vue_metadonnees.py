@@ -1,10 +1,11 @@
-"""Migration 025 — les métadonnées d'une série, `manga.v_metadonnees_serie`, lisibles
-par `modele_ro`.
+"""Migrations 025 et 026 — les métadonnées d'une série, `manga.v_metadonnees_serie`,
+lisibles par `modele_ro`.
 
-En une phrase : `modele_ro` gagne un seul droit, `SELECT` sur la vue, qui rend six
-valeurs par série et rien d'autre ; les tables qu'elle lit lui restent illisibles (les
-refus précédents tiennent : ils sont éprouvés par `test_role_modele.py` et
-`test_vue_pseudonymes.py` sur la même base migrée jusqu'au bout).
+En une phrase : `modele_ro` gagne un seul droit, `SELECT` sur la vue, qui rend sept
+valeurs par série (les auteurs depuis 026, sans droit de plus) et rien d'autre ; les
+tables qu'elle lit lui restent illisibles (les refus précédents tiennent : ils sont
+éprouvés par `test_role_modele.py` et `test_vue_pseudonymes.py` sur la même base migrée
+jusqu'au bout).
 
 Les séries d'essai sont factices ; aucun test ne lit la base réelle.
 """
@@ -19,8 +20,9 @@ from psycopg.types.json import Jsonb
 from test_role_modele import DROITS_DU_ROLE, modele_api  # noqa: F401 (fixture)
 
 FICHIER = migrate.MIGRATIONS_DIR / "025_vue_metadonnees_serie.sql"
+FICHIER_026 = migrate.MIGRATIONS_DIR / "026_auteurs_metadonnees_serie.sql"
 VUE = "manga.v_metadonnees_serie"
-COLONNES = [
+COLONNES_025 = [
     "series_id",
     "disponibilite",
     "nb_volumes",
@@ -29,6 +31,7 @@ COLONNES = [
     "demographie",
     "annee_fr",
 ]
+COLONNES = [*COLONNES_025, "auteurs"]
 EAN_FR = "9782000000001"
 EAN_FR_RECENT = "9791000000001"
 EAN_JP = "9784000000001"
@@ -50,12 +53,23 @@ def serie(
     badges: list | None = None,
     categorie: str | None = None,
     categorie_propre: str | None = None,
+    scenariste: str | None = None,
+    dessinateur: str | None = None,
 ) -> int:
     admin.execute(
         "INSERT INTO manga.ms_series_enriched (series_id, series_type,"
-        " series_statuses, series_category, series_category_clean)"
-        " VALUES (%s, %s, %s, %s, %s)",
-        (series_id, type_, Jsonb(badges or []), categorie, categorie_propre),
+        " series_statuses, series_category, series_category_clean,"
+        " series_scenariste, series_dessinateur)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (
+            series_id,
+            type_,
+            Jsonb(badges or []),
+            categorie,
+            categorie_propre,
+            scenariste,
+            dessinateur,
+        ),
     )
     return series_id
 
@@ -94,7 +108,8 @@ def kitsu(admin: psycopg.Connection, series_id: int, statut: str | None) -> None
 def metadonnees(admin: psycopg.Connection, series_id: int = 1) -> dict[str, object]:
     ligne = admin.execute(
         "SELECT series_id, disponibilite, nb_volumes, nb_volumes_source, statut,"
-        " demographie, annee_fr FROM manga.v_metadonnees_serie WHERE series_id = %s",
+        " demographie, annee_fr, auteurs FROM manga.v_metadonnees_serie"
+        " WHERE series_id = %s",
         (series_id,),
     ).fetchone()
     assert ligne is not None
@@ -117,7 +132,13 @@ def test_025_n_accorde_a_modele_ro_que_la_vue(base):
 
 def test_la_vue_se_lit_sous_le_role_de_l_api(base_migree, modele_api):  # noqa: F811
     with psycopg.connect(base_migree) as admin:
-        serie(admin, categorie_propre="Seinen", badges=[BADGE_FR])
+        serie(
+            admin,
+            categorie_propre="Seinen",
+            badges=[BADGE_FR],
+            scenariste="Autrice A",
+            dessinateur="Auteur B",
+        )
         volume(admin, ean=EAN_FR, tomes=1, date="2015-06-01")
     with psycopg.connect(modele_api) as connexion:
         assert metadonnees(connexion) == {
@@ -128,6 +149,7 @@ def test_la_vue_se_lit_sous_le_role_de_l_api(base_migree, modele_api):  # noqa: 
             "statut": "termine",
             "demographie": "Seinen",
             "annee_fr": 2015,
+            "auteurs": "Autrice A, Auteur B",
         }
 
 
@@ -140,19 +162,21 @@ def test_la_vue_se_lit_sous_le_role_de_l_api(base_migree, modele_api):  # noqa: 
         "SELECT status FROM manga.kitsu_series_core",
         "SELECT series_statuses FROM manga.ms_series_enriched",
         "SELECT series_category_clean FROM manga.ms_series_enriched",
+        "SELECT series_scenariste FROM manga.ms_series_enriched",
+        "SELECT series_dessinateur FROM manga.ms_series_enriched",
     ),
 )
 def test_refus_les_tables_lues_par_la_vue_restent_illisibles(
     modele_api,  # noqa: F811
     requete,
 ):
-    """Par la vue, six valeurs ; jamais les volumes ni le reste de la fiche."""
+    """Par la vue, sept valeurs ; jamais les volumes ni le reste de la fiche."""
     with psycopg.connect(modele_api) as connexion:
         with pytest.raises(errors.InsufficientPrivilege):
             connexion.execute(requete)
 
 
-def test_la_vue_a_ses_sept_colonnes_et_lit_avec_les_droits_de_son_proprietaire(
+def test_la_vue_a_ses_huit_colonnes_et_lit_avec_les_droits_de_son_proprietaire(
     base_migree,
 ):
     with psycopg.connect(base_migree) as connexion:
@@ -181,7 +205,9 @@ def test_la_vue_a_ses_sept_colonnes_et_lit_avec_les_droits_de_son_proprietaire(
         "divergent",
         "au moins N",
         "entre 1900 et 2100",
-        "Migration 025",
+        "le scénariste puis le dessinateur",
+        "COLLECTIF reste",
+        "Migrations 025 et 026",
     ):
         assert regle in commentaire, regle
 
@@ -235,8 +261,119 @@ def test_la_migration_ne_porte_qu_une_vue_et_un_droit():
 
 
 # --------------------------------------------------------------------------- #
+#  026 : une colonne de plus, sans droit de plus
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("role", ("modele_ro", "manga_ro", "verif_ro"))
+def test_026_ne_change_aucun_droit(base, role):
+    harnais.migrer(base, "025")
+    avant = droits(base, role)
+    harnais.migrer(base, "026")
+
+    assert ("relation", VUE, "SELECT") in avant
+    assert droits(base, role) == avant
+
+
+def test_026_garde_les_valeurs_et_ajoute_les_auteurs_en_derniere_colonne(base):
+    """Les sept premières colonnes de 025, à l'identique, sur les mêmes séries."""
+    lire = f"SELECT {', '.join(COLONNES_025)} FROM {VUE} ORDER BY series_id"
+    harnais.migrer(base, "025")
+    with psycopg.connect(base) as admin:
+        serie(admin, 1, badges=[BADGE_FR], categorie_propre="Josei")
+        volume(admin, 1, "a", ean=EAN_FR, tomes=2, date="2015-06-01")
+        volume(admin, 1, "b", numero=2018)
+        serie(admin, 2, scenariste="Autrice A", dessinateur="Auteur B")
+        volume(admin, 2, "a", ean=EAN_JP)
+        kitsu(admin, 2, "current")
+        serie(admin, 3, type_="Manhwa")
+        avant = admin.execute(lire).fetchall()
+
+    harnais.migrer(base, "026")
+
+    with psycopg.connect(base) as admin:
+        assert admin.execute(lire).fetchall() == avant
+        derniere = admin.execute(
+            "SELECT attname FROM pg_attribute WHERE attrelid = %s::regclass"
+            " AND attnum > 0 AND NOT attisdropped ORDER BY attnum DESC LIMIT 1",
+            (VUE,),
+        ).fetchone()
+    assert derniere == ("auteurs",)
+
+
+def test_la_026_ne_porte_qu_une_vue_et_son_commentaire():
+    code = "\n".join(
+        ligne
+        for ligne in FICHIER_026.read_text(encoding="utf-8").splitlines()
+        if not ligne.lstrip().startswith("--")
+    )
+
+    assert code.count("CREATE OR REPLACE VIEW manga.v_metadonnees_serie") == 1
+    assert code.count("COMMENT ON VIEW manga.v_metadonnees_serie") == 1
+    for interdit in (
+        "CREATE TABLE",
+        "ALTER",
+        "DROP",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "GRANT",
+        "REVOKE",
+        "ROLE",
+    ):
+        assert interdit not in code, interdit
+
+
+# --------------------------------------------------------------------------- #
 #  Les règles
 # --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("scenariste", "dessinateur", "attendu"),
+    (
+        # Le même nom aux deux colonnes s'écrit une fois.
+        ("Kiriko NANANAN", "Kiriko NANANAN", "Kiriko NANANAN"),
+        # Deux noms : le scénariste d'abord, jamais triés.
+        ("Tsugumi OHBA", "Takeshi OBATA", "Tsugumi OHBA, Takeshi OBATA"),
+        ("Takeshi OBATA", "Tsugumi OHBA", "Takeshi OBATA, Tsugumi OHBA"),
+        # Une seule colonne remplie.
+        ("Tsuneo TAKANO", None, "Tsuneo TAKANO"),
+        (None, "Takeshi OBATA", "Takeshi OBATA"),
+        # Rien : absent, jamais une chaîne vide ni une virgule seule.
+        (None, None, None),
+        ("", "", None),
+        ("  ", None, None),
+        ("", "Takeshi OBATA", "Takeshi OBATA"),
+        # Un « inconnu » textuel vaut absence, sous toutes ses formes.
+        ("inconnu", "inconnu", None),
+        ("Inconnu", "Takeshi OBATA", "Takeshi OBATA"),
+        ("Takeshi OBATA", "INCONNUE", "Takeshi OBATA"),
+        (" inconnus ", None, None),
+        # Un nom qui commence par ce mot reste un nom.
+        ("Inconnu TARO", None, "Inconnu TARO"),
+        # Le catalogue, tel quel : la casse, le suffixe, le collectif.
+        ("COLLECTIF", "COLLECTIF", "COLLECTIF"),
+        ("AKI (JP)", "Kazuma KONDô", "AKI (JP), Kazuma KONDô"),
+        # Deux casses sur la même ligne : deux graphies, écrites telles quelles.
+        ("Carlo ZEN", "CARLO ZEN", "Carlo ZEN, CARLO ZEN"),
+    ),
+)
+def test_auteurs(base_migree, scenariste, dessinateur, attendu):
+    """Aucun volume ici : les auteurs ne dépendent que de la fiche."""
+    with psycopg.connect(base_migree) as admin:
+        serie(admin, scenariste=scenariste, dessinateur=dessinateur)
+
+        assert metadonnees(admin)["auteurs"] == attendu
+
+
+def test_auteurs_deux_series_du_meme_nom_ont_la_meme_valeur(base_migree):
+    """Ce que l'invite compare : la même chaîne, sur les deux lignes."""
+    with psycopg.connect(base_migree) as admin:
+        serie(admin, 1, scenariste="Kiriko NANANAN", dessinateur="Kiriko NANANAN")
+        serie(admin, 2, scenariste="Kiriko NANANAN", dessinateur="Kiriko NANANAN")
+        serie(admin, 3, scenariste="Nanpei YAMADA", dessinateur="Nanpei YAMADA")
+
+        assert metadonnees(admin, 1)["auteurs"] == metadonnees(admin, 2)["auteurs"]
+        assert metadonnees(admin, 1)["auteurs"] != metadonnees(admin, 3)["auteurs"]
+
+
 @pytest.mark.parametrize(
     ("ean", "badges", "attendu"),
     (

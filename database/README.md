@@ -68,6 +68,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `023_role_modele.sql` | **lecture de l'API du modèle** (module 11) : rôle de groupe `modele_ro`, `SELECT` **énumérés** — six relations de `bench` (corpus, documents, fragments, registre des encodages, vecteurs EmbeddingGemma, encodage en service) et quatre colonnes de `manga` (rattachement et titre) ; aucun droit par défaut (cf. « La lecture de l'API du modèle ») |
 | `024_vue_pseudonymes.sql` | **la vue `manga.v_pseudonymes`** : les pseudonymes distincts, seule chose que `modele_ro` lit de la table des critiques, pour le contrôle « aucun nom de membre » de la route de réponse ; un droit, élévation déclarée |
 | `025_vue_metadonnees_serie.sql` | **la vue `manga.v_metadonnees_serie`** : disponibilité, nombre de tomes et sa source, statut, public, année française par série, calculés à la lecture sur les volumes, la fiche, le moyeu et Kitsu, règles dans `COMMENT ON VIEW` ; un droit pour `modele_ro`, élévation déclarée, aucune table, aucune donnée |
+| `026_auteurs_metadonnees_serie.sql` | **les auteurs dans `manga.v_metadonnees_serie`** : le scénariste puis le dessinateur, tels quels, un même nom une fois, une colonne de plus sur la vue (`CREATE OR REPLACE`) ; aucun droit, aucune table, aucune donnée |
 
 ## `000` — la frontière héritage / versionné
 
@@ -358,7 +359,7 @@ journal compris) ne conviennent : un troisième couple de rôles, au périmètre
 | `manga.work_identity` | `SELECT (series_id, kitsu_id)` — le rattachement d'un synopsis Kitsu |
 | `manga.ms_series_enriched` | `SELECT (series_id, series_title)` — le titre |
 | `manga.v_pseudonymes` (`024`) | `SELECT` — les pseudonymes distincts, jamais la table des critiques |
-| `manga.v_metadonnees_serie` (`025`) | `SELECT` — six valeurs par série, jamais les volumes ni le reste de la fiche |
+| `manga.v_metadonnees_serie` (`025`, `026`) | `SELECT` — sept valeurs par série, jamais les volumes ni le reste de la fiche |
 | `bench.promotions`, `eval_*`, `vecteurs_bge_m3`, le reste de `bench` et de `manga`, `staging`, `public.schema_migrations`, les séquences | **non** |
 | objets créés plus tard | **non** — aucun `ALTER DEFAULT PRIVILEGES` : une migration les accorde, ou personne |
 
