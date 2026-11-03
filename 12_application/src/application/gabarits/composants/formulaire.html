@@ -1,0 +1,40 @@
+<section>
+<h2>{{ t.question_titre }}</h2>
+<form method="post" action="/question">
+<label for="question">{{ t.question_etiquette }}</label>
+<textarea id="question" name="question" rows="3" maxlength="{{ question_max }}" required aria-describedby="question-aide"></textarea>
+<small id="question-aide">{{ question_aide }}</small>
+<details>
+<summary>{{ t.reglages_titre }}</summary>
+{% if options %}
+<label for="profil">{{ t.profil_etiquette }}</label>
+<select id="profil" name="profil">
+{% for option in options %}
+<option value="{{ option.nom }}"{% if option.choisi %} selected{% endif %}>{{ option.etiquette }}</option>
+{% endfor %}
+</select>
+{% elif info_connue %}
+<p>{{ t.aucun_profil }}</p>
+{% endif %}
+<fieldset>
+<legend>{{ t.temperature_legende }}</legend>
+{% for position in positions %}
+<label for="temperature-{{ loop.index }}"><input type="radio" id="temperature-{{ loop.index }}" name="temperature" value="{{ position.valeur }}"{% if position.valeur == temperature %} checked{% endif %}> {{ position.etiquette }}</label>
+{% endfor %}
+</fieldset>
+<label for="reformuler"><input type="checkbox" id="reformuler" name="reformuler" value="1" aria-describedby="reformuler-aide"{% if reformuler %} checked{% endif %}> {{ t.reformuler_etiquette }}</label>
+<small id="reformuler-aide">{{ t.reformuler_aide }}</small>
+{% if modes|length > 1 %}
+<label for="mode">{{ t.mode_etiquette }}</label>
+<select id="mode" name="mode">
+{% for mode in modes %}
+<option value="{{ mode }}">{{ mode }}</option>
+{% endfor %}
+</select>
+{% endif %}
+</details>
+<input type="hidden" name="historique" value="">
+<button type="submit"{% if info_connue and not options %} disabled{% endif %}>{{ t.bouton }}</button>
+<p><a href="/">{{ t.nouvelle_conversation }}</a></p>
+</form>
+</section>

@@ -1,0 +1,207 @@
+# Réglages de l'application : valeur et motif de chacun.
+#
+# Versionné, lu et validé au démarrage par `application.config`, seul lecteur ; une
+# valeur fautive, un texte absent : l'application refuse de démarrer. La clé de l'API
+# vit dans `.env` (hors dépôt, modèle : `.env.example`), jamais ici.
+
+[api]
+adresse = "http://127.0.0.1:8010"
+identite = "libraire-demo"
+motif = "L'API du modèle, sur le poste : 8010, le port de son module. Surchargeable : API_MODELE_ADRESSE. L'identité est fixe tant qu'il n'y a pas de comptes ; l'API la recopie dans son journal."
+
+[api.delais]
+connexion_s = 5.0
+reponse_s = 75.0
+info_s = 5.0
+sante_s = 5.0
+motif = "La réponse : 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s sur les profils proposés, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) ; attendre davantage devant une page ne sert personne. Au-delà, l'écran le dit, et l'appel peut continuer côté API. L'état du service : 5 s, sans attendre."
+
+[api.attentes]
+debit_defaut_s = 60
+fournisseur_defaut_s = 2
+motif = "Ce que l'écran annonce si la réponse ne porte pas de Retry-After lisible : la fenêtre du débit de l'API, une minute ; l'attente du nouvel essai de l'API, 2 s."
+
+[reglages]
+temperature_defaut = 0.0
+reformuler_defaut = true
+profils_exclus = ["mistral-large-4"]
+motif = "0 : la seule valeur mesurée. mistral-large-4 n'est pas proposé tant qu'il n'est pas remesuré : en aperçu, raisonnement instable. Une position hors des bornes de l'API n'est pas proposée."
+
+[[reglages.positions]]
+valeur = 0.0
+nom = "rejouable"
+etiquette = "Rejouable (0) : la même question donne la même réponse ; seule valeur mesurée."
+motif = "Le défaut : ce qu'un conseil sourcé veut."
+
+[[reglages.positions]]
+valeur = 0.3
+nom = "modérée"
+etiquette = "Modérée (0,3) : varie un peu ; non mesurée."
+motif = "La candidate pour la production de l'épreuve E4 ; elle ne devient défaut qu'après un rejeu des 26 questions à cette température."
+
+[[reglages.positions]]
+valeur = 0.7
+nom = "variée"
+etiquette = "Variée (0,7) : varie d'un essai à l'autre ; non mesurée, pour la démonstration."
+motif = "Le contraste avec 0, à montrer ; élevé pour un usage réel."
+
+[conversation]
+question_caracteres_max = 500
+echanges = 5
+tours_max = 10
+caracteres_max = 4000
+tour_caracteres_max = 2000
+motif = "Les bornes de l'API, recopiées : celles que /v1/info publie sont revérifiées à chaque lecture, un écart est journalisé et la valeur de l'API l'emporte. La longueur d'un tour n'y est pas publiée : un test la compare au contrat."
+
+[corps]
+octets_max = 16384
+motif = "Une question et un historique plein, encodés en formulaire, tiennent en 6,5 Kio environ pour un texte français ; au-delà de 16 Kio, le corps est refusé avant d'être lu."
+
+[ecoute]
+hote = "127.0.0.1"
+port = 8020
+motif = "Sur le bouclage du poste. 8020, à côté de l'API : 8000 est au module 02, 8080 à un autre projet du poste. Surchargeable : APPLICATION_ECOUTE (hôte:port)."
+
+[metriques]
+reseaux = ["127.0.0.1/32", "::1/128"]
+motif = "/metrics ne répond qu'au bouclage, 404 ailleurs. Dans un conteneur, le client n'est pas le bouclage : surchargeable, APPLICATION_METRIQUES_RESEAUX (réseaux séparés par des virgules)."
+
+[fournisseurs.mistral]
+nom = "Mistral"
+hebergement = "Union européenne"
+
+[fournisseurs.openai]
+nom = "OpenAI"
+hebergement = "hors Union européenne par défaut"
+
+[textes]
+# Généraux
+titre_application = "Conseiller de lecture"
+nom_librairie = "Librairie de démonstration"
+evitement = "Aller au contenu"
+mention_courte = "Vous parlez à une IA."
+mention_complete = "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à partir de critiques et de résumés du catalogue ; elles peuvent être incomplètes."
+etat_ok = "Service disponible — profil actif : {profil} (modèle {modele})."
+etat_ko = "Le service de recommandation ne répond pas."
+etat_cle = "Le service de recommandation refuse l'accès de l'application : l'exploitant doit vérifier sa clé."
+lien_a_propos = "À propos et données"
+pied_versions = "Application {version} — API {version_api}"
+pied_versions_ko = "Application {version} — API indisponible"
+# Conversation et formulaire
+conversation_titre = "Conversation en cours"
+role_libraire = "Libraire"
+role_assistant = "Assistant"
+question_titre = "Votre question"
+question_etiquette = "Question"
+question_aide = "{max} caractères au plus."
+bouton = "Demander"
+nouvelle_conversation = "Nouvelle conversation"
+reglages_titre = "Réglages"
+profil_etiquette = "Profil du modèle de langage"
+profil_option = "{nom} — {fournisseur}, {hebergement}"
+suffixe_actif = "(actif)"
+suffixe_apercu = "(aperçu)"
+temperature_legende = "Température"
+reformuler_etiquette = "Reformuler la question à partir de la conversation"
+reformuler_aide = "Sans effet à la première question."
+mode_etiquette = "Mode de réponse"
+erreur_question_vide = "Posez une question."
+erreur_question_longue = "La question dépasse {max} caractères ({n} saisis)."
+erreur_profil = "Ce profil n'est pas proposé."
+erreur_temperature = "Cette température n'est pas proposée."
+aucun_profil = "Aucun profil de modèle de langage n'est disponible."
+# Réponse et cartes
+reponse_titre = "Réponse"
+refus_titre = "Pas de réponse à partir du catalogue"
+refus_motif = "Motif : {motif}."
+motif_aucun_passage = "aucun passage du catalogue ne répond"
+motif_hors_catalogue = "ce titre n'est pas au catalogue"
+motif_inconnu = "je ne sais pas répondre à partir du catalogue"
+ligne_profil = "Profil {profil} · {fournisseur} · modèle {modele}"
+ligne_date = "appel du {date}"
+ligne_sans_appel = "aucun appel au modèle"
+reformulation_faite = "question reformulée : « {question} »"
+reformulation_sans = "sans reformulation"
+reformulation_ignoree = "reformulation ignorée : trop longue"
+ligne_cout = "coût estimé {cout} $"
+ligne_cout_inconnu = "coût non estimé"
+ligne_latence = "{latence} ms"
+carte_auteurs = "Auteurs"
+carte_tomes = "Tomes"
+carte_statut = "Statut"
+carte_public = "Public"
+carte_disponibilite = "Disponibilité"
+valeur_inconnue = "inconnu"
+tomes_au_moins = "au moins {n}"
+statut_termine = "terminé"
+statut_en_cours = "en cours"
+dispo_france = "édité en France"
+dispo_japon = "seulement au Japon"
+dispo_inconnue = "inconnue"
+passage_critique = "critique de tome"
+passage_resume = "résumé de série"
+passage_synopsis = "synopsis"
+carte_sans_passage = "Aucun passage cité pour cette série."
+mention_carte = "Les métadonnées viennent du catalogue ; une critique peut être ancienne."
+mention_dispo = "« Édité en France » : au moins un volume y est paru, pas qu'il est en stock."
+details_titre = "Détails techniques"
+details_appel = "{role} : {entree} jetons en entrée, {sortie} en sortie, {raisonnement} de raisonnement ; {latence} ms"
+details_refus_debit = "{role} : refusé pour débit, non facturé, rejoué une fois"
+details_estimes = "(jetons estimés)"
+details_ids = "Corpus {corpus_id} · encodage {encodage_id} · identifiant {identifiant}"
+role_appel_reformulation = "reformulation"
+role_appel_reponse = "réponse"
+non_verifie = "Non vérifié — connaissances du modèle, sans source"
+non_verifie_titres = "Titres évoqués, sans vérification :"
+# Cas dégradés
+encart_titre = "Demande non traitée"
+degrade_injoignable = "Le service de recommandation ne répond pas. Vous pouvez réessayer."
+degrade_delai = "Le service de recommandation ne répond pas (délai dépassé). Vous pouvez réessayer."
+degrade_debit = "Trop de demandes. Réessayez dans {n} secondes."
+degrade_saturation = "Le modèle de langage est saturé. Réessayez dans {n} secondes."
+degrade_modele = "Le modèle de langage ne répond pas (profil {profil}). L'exploitant peut changer de profil."
+degrade_longueur = "Le modèle de langage n'a pas terminé sa réponse (profil {profil}). Posez la question autrement ou changez de profil."
+degrade_sortie = "La réponse du modèle a été refusée par nos contrôles (motif : {motif}). Posez la question autrement ou changez de profil."
+degrade_recherche = "La recherche est indisponible."
+degrade_profil = "Le profil {profil} n'est pas disponible. La liste des profils a été rechargée."
+degrade_reglage = "Le profil {profil} n'accepte pas le réglage {reglage}."
+degrade_service = "Erreur du service (identifiant {identifiant})."
+conversation_invalide = "Cette conversation n'est plus valide. Commencez-en une nouvelle."
+conversation_terminee = "Conversation terminée ({echanges} échanges). Commencez une nouvelle conversation."
+conversation_longueur = "Conversation terminée (longueur maximale atteinte). Commencez une nouvelle conversation."
+sortie_schema = "réponse mal formée"
+sortie_serie_inconnue = "série absente de la recherche"
+sortie_fragment_inconnu = "passage absent de la recherche"
+sortie_refus_incoherent = "refus incohérent"
+sortie_pseudonyme = "nom de personne"
+sortie_disponibilite = "disponibilité contredite par le catalogue"
+sortie_demographie = "public contredit par le catalogue"
+# À propos
+apropos_titre = "À propos et données"
+apropos_quoi_titre = "Ce qu'est cette application"
+apropos_quoi = "Un prototype de conseiller de lecture pour une librairie fictive. Le libraire pose une question ; l'application la transmet à l'API du modèle, qui cherche dans le catalogue et fait rédiger une réponse par un modèle de langage, à partir des seuls passages retrouvés."
+apropos_transmis_titre = "Ce qui est transmis"
+apropos_transmis = "Pour répondre, l'API envoie au fournisseur du profil utilisé : votre question, les échanges précédents de la conversation et les passages retrouvés."
+apropos_profils_titre = "Les profils proposés"
+apropos_colonne_profil = "Profil"
+apropos_colonne_fournisseur = "Fournisseur"
+apropos_colonne_hebergement = "Hébergement"
+apropos_liste_inconnue = "Liste inconnue : le service ne répond pas."
+apropos_conserve_titre = "Ce qui n'est pas conservé"
+apropos_conserve = "L'application ne garde rien : ni compte, ni cookie, ni fichier, ni écriture en base. La conversation vit dans la page ; fermer l'onglet l'efface. Son journal ne contient ni la question, ni la conversation, ni la réponse : des nombres et des identifiants techniques seulement."
+apropos_registre_titre = "Registre des traitements"
+apropos_registre = "Ce traitement sera inscrit au registre des traitements du projet avant toute mise en service."
+apropos_licences_titre = "Licences"
+apropos_licences = "Feuille de style : Pico CSS (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
+# Pages d'erreur
+erreur_404_titre = "Page introuvable"
+erreur_404_texte = "Cette adresse n'existe pas."
+erreur_405_titre = "Action non permise"
+erreur_405_texte = "Cette action n'est pas permise à cette adresse."
+erreur_413_titre = "Demande trop volumineuse"
+erreur_413_texte = "La question et la conversation dépassent la taille admise. Commencez une nouvelle conversation."
+erreur_500_titre = "Erreur de l'application"
+erreur_500_texte = "Une erreur imprévue est survenue."
+erreur_identifiant = "Identifiant : {identifiant}"
+erreur_retour = "Retour à la page d'accueil"
+en_construction = "En construction."

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titre %}{{ t.titre_application }}{% endblock %} — {{ t.nom_librairie }}</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/statique/pico.classless.min.css">
+<link rel="stylesheet" href="/statique/theme.css">
+</head>
+<body>
+<a href="#contenu">{{ t.evitement }}</a>
+<header>
+<p>{{ t.nom_librairie }}</p>
+<p>{{ t.mention_courte }}</p>
+</header>
+<main id="contenu">
+{% block contenu %}{% endblock %}
+</main>
+<footer>
+<p>{{ t.mention_complete }}</p>
+<p><a href="/a-propos">{{ t.lien_a_propos }}</a></p>
+<p>{{ pied }}</p>
+</footer>
+</body>
+</html>
