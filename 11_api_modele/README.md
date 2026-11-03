@@ -2,7 +2,7 @@
 
 Une API REST qui expose le modèle d'embedding en service et, depuis la version
 **1.1.0**, un modèle de langage choisi par profil ; depuis la **1.2.0**, chaque série
-porte ses métadonnées. Deux routes métier, sous `/v1/` :
+porte ses métadonnées, et depuis la **1.3.0** ses auteurs. Deux routes métier, sous `/v1/` :
 
 - `POST /v1/recherche` : une question entre, une liste de séries classées sort, avec
   les passages qui les justifient ;
@@ -386,7 +386,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
   "series": [
     {"rang": 1, "entite": "serie:101", "serie_id": 101, "kitsu_id": null,
      "titre": "Titre de série A", "score": 0.6412093187,
-     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 12, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2016},
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 12, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2016, "auteurs": "Autrice A"},
      "passages": [
        {"fragment_id": 500001, "doc_key": "ms_synopsis:101", "type_document": "resume_serie",
         "score": 0.6412093187, "extrait": "Dans un restaurant de quartier, une jeune cuisinière se lance dans des concours…"},
@@ -394,7 +394,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
         "score": 0.5873310442, "extrait": "Les duels culinaires sont rythmés et l'humour fait mouche…"}]},
     {"rang": 2, "entite": "serie:202", "serie_id": 202, "kitsu_id": null,
      "titre": "Titre de série B", "score": 0.6127745390,
-     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 5, "nb_volumes_source": "repli_volumes_distincts", "statut": "en_cours", "demographie": "Seinen", "annee_fr": 2021},
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 5, "nb_volumes_source": "repli_volumes_distincts", "statut": "en_cours", "demographie": "Seinen", "annee_fr": 2021, "auteurs": "Auteur B, Autrice C"},
      "passages": [
        {"fragment_id": 600042, "doc_key": "kitsu:3003", "type_document": "synopsis_kitsu",
         "score": 0.6127745390, "extrait": "A young chef joins a cooking school where every class is a battle…"},
@@ -408,7 +408,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
     "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3,
     "identifiant_requete": "7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90",
-    "duree_ms": 84.7, "version_api": "1.2.0"
+    "duree_ms": 84.7, "version_api": "1.3.0"
   }
 }
 ```
@@ -457,12 +457,12 @@ X-Identifiant-Requete: 6f1c…
   ],
   "series": [
     {"rang": 1, "entite": "serie:1708", "serie_id": 1708, "kitsu_id": 1234, "titre": "Yakitate!! Japan", "score": 0.6812,
-     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 26, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2005},
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 26, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2005, "auteurs": "Takashi HASHIGUCHI"},
      "passages": [
        {"fragment_id": 473803, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6812, "extrait": "…"},
        {"fragment_id": 474337, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6520, "extrait": "…"}]},
     {"rang": 2, "entite": "serie:15123", "serie_id": 15123, "kitsu_id": 5678, "titre": "Food wars !", "score": 0.6407,
-     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 36, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2014},
+     "metadonnees": {"disponibilite": "edite_en_france", "nb_volumes": 36, "nb_volumes_source": "champ", "statut": "termine", "demographie": "Shonen", "annee_fr": 2014, "auteurs": "Yûto TSUKUDA, Shun SAEKI"},
      "passages": [
        {"fragment_id": 460377, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6407, "extrait": "…"},
        {"fragment_id": 483381, "doc_key": "ms_review:…", "type_document": "critique", "score": 0.6101, "extrait": "…"}]}
@@ -471,7 +471,7 @@ X-Identifiant-Requete: 6f1c…
     "reglages": {"nombre_series": 2, "passages_par_serie": 2, "catalogue_seul": true},
     "modele": "google/embeddinggemma-300m", "revision": "…", "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3, "identifiant_requete": "6f1c…",
-    "duree_ms": 3104.5, "version_api": "1.2.0",
+    "duree_ms": 3104.5, "version_api": "1.3.0",
     "profil": "mistral-large-2512", "fournisseur": "mistral",
     "modele_langage": "mistral-large-2512", "statut_profil": "stable",
     "date_appel": "2026-11-02T10:14:07+00:00",
@@ -539,13 +539,14 @@ passage) :
 ### Les métadonnées d'une série
 
 Depuis la version 1.2.0, chaque série de `/v1/recherche` et de `/v1/reponse` porte un objet
-`metadonnees`, et chaque passage envoyé au modèle est précédé de sa **ligne de titre** :
+`metadonnees` (les auteurs depuis la 1.3.0), et chaque passage envoyé au modèle est précédé de sa
+**ligne de titre** :
 
 ```text
-[S:<id>] <titre> — <type> — tomes : <N> (champ) | au moins <N> | inconnu — <terminé | en cours | statut inconnu> — public : <public | inconnu> — disponibilité : <édité en France | seulement au Japon | inconnue> [F:<id>]
+[S:<id>] <titre> — <type> — auteur : <noms | inconnu> — tomes : <N> (champ) | au moins <N> | inconnu — <terminé | en cours | statut inconnu> — public : <public | inconnu> — disponibilité : <édité en France | seulement au Japon | inconnue> [F:<id>]
 ```
 
-**La source** : la vue `manga.v_metadonnees_serie` (migration 025), calculée à la lecture sur
+**La source** : la vue `manga.v_metadonnees_serie` (migrations 025 et 026), calculée à la lecture sur
 les volumes et la fiche de Manga Sanctuary, le moyeu d'identité et Kitsu, lue une fois par
 série sous `modele_api`, qui ne lit pas ces tables.
 
@@ -557,6 +558,7 @@ série sous `modele_api`, qui ne lit pas ces tables.
 | `statut` | `termine` : le badge « Complète », sinon Kitsu `finished` ; `en_cours` : Kitsu `current` sans badge ; le catalogue n'écrit jamais « en cours » | 11 876, 827 ; absent : 1 967 |
 | `demographie` | `series_category_clean`, sinon `series_category` s'il porte une valeur de la même liste ; le libellé du catalogue, tel quel | 13 680 ; absent : 990 |
 | `annee_fr` | l'année du premier volume à EAN français | 7 629 ; absent : 7 041 |
+| `auteurs` | le scénariste puis le dessinateur, tels quels, joints par une virgule, un même nom une seule fois ; un « inconnu » textuel vaut absence | 14 387 (2026-11-03) ; absent : 283 |
 
 **Ce que ces mots ne disent pas** :
 
@@ -571,16 +573,16 @@ série sous `modele_api`, qui ne lit pas ces tables.
 - **L'âge** : **il n'y a pas de donnée**. La réponse ne dit une série adaptée à un âge ou à
   une contrainte de contenu que si un passage le dit explicitement ; sinon, elle dit qu'elle
   ne peut pas le garantir et signale les thèmes adultes qu'un passage mentionne.
-- **Les auteurs** : pas encore sur la ligne, alors que la fiche du catalogue les porte (14 387
-  séries sur 14 670, 2026-11-03). La migration 026 les ajoute à la vue ; la route ne les lit pas
-  encore.
+- **Les auteurs** : ceux de la ligne. Deux séries ont le même auteur si leurs lignes le disent,
+  pas autrement. La ligne compare des graphies, pas des personnes (voir « Limites déclarées »).
+  Seul un lecteur ne se nomme pas : ni membre, ni pseudonyme, ni signature.
 
 ### `GET /v1/info`, `GET /v1/sante`
 
 `GET /v1/info` (avec la clé) — le modèle d'embedding servi, et le modèle de langage :
 
 ```json
-{"version_api": "1.2.0", "modele": "google/embeddinggemma-300m",
+{"version_api": "1.3.0", "modele": "google/embeddinggemma-300m",
  "revision": "57c266a740f537b4dc058e1b0cda161fd15afa75", "precision": "float32", "dimension": 768,
  "outil": "text-embeddings-inference", "outil_version": "1.9.4",
  "corpus_id": "v2", "encodage_id": 3, "nb_fragments": 77006,
@@ -925,6 +927,32 @@ d'avant** (leurs refus en F7 ne dépendent pas de ces phrases).
 - **Refus de débit** : 4 sur 37 appels, tous sur un tour, que le nouvel essai de la route n'a
   pas sauvé (rendu à la troisième tentative du banc). 0,041 $.
 
+### Le rejeu sur les auteurs (2026-11-03)
+
+L'auteur sur la ligne de titre, une phrase d'invite, pas de contrôle de sortie. **Seules les
+conversations sont rejouées** : l'auteur n'est pas en jeu dans les 26 questions du run 1, qui
+restent mesurées sur l'invite d'avant.
+
+| Conversation (5 scénarios, 19 tours, sans seuil) | Rejeu d'avant | Ce rejeu |
+|---|---|---|
+| `reformulation_fidele` | 9 / 10 | **10 / 12** |
+| `reformulation_meme_serie` | 3 / 14 | **5 / 14** |
+| Série attendue en tête, question reformulée | 4 / 12 | **4 / 12** |
+| Série attendue en tête, question autonome | 8 / 12 | 8 / 12 |
+| Contradictions de la ligne | 0 | **0** |
+| Sorties rejetées | 0 | **0** |
+| Coût réel | 0,041 $ | 0,043 $ |
+
+- **Le cas qui a motivé la colonne** : au rejeu d'avant, la réponse affirmait une même autrice
+  pour deux séries qui n'en ont pas. Elle ne l'affirme plus : elle dit l'autrice de la série
+  précédente absente des passages, ce qui est vrai (sixième de la recherche, seules les cinq
+  premières sont envoyées), et le seul auteur qu'elle nomme sur les 19 tours est celui de sa
+  ligne. **La série attendue n'est pas trouvée pour autant** : voir « Limites déclarées ».
+- **Un run de chaque, sans conclusion sur les deux métriques** : la reformulation dépend aussi de
+  la réponse du tour d'avant, et celle-ci a changé avec l'invite.
+- **Refus de débit** : 6 sur 41 appels, sur deux tours que le nouvel essai de la route n'a pas
+  sauvés (rendus à la deuxième et à la troisième tentative du banc).
+
 ## Les traces
 
 - **Journal** : une ligne JSON par requête (identifiant, route, statut, code, durée,
@@ -949,9 +977,19 @@ d'avant** (leurs refus en F7 ne dépendent pas de ces phrases).
 - **« Au moins N » n'est pas toujours repris** : la réponse peut écrire le nombre sec, ou mal
   en raisonner (« au moins 9 », donc « moins de 10 »). Le mot technique « (champ) » de la ligne
   peut passer dans le texte. Les valeurs aberrantes du champ restent (1 624, 176).
-- **Une réponse peut encore affirmer un auteur** que le catalogue dément : les auteurs ne sont
-  pas sur la ligne (même autrice affirmée pour deux séries, au dernier rejeu). Une
-  reformulation peut encore reporter un critère, ou une métadonnée, d'un tour sur le suivant.
+- **« Du même auteur » dépend de la recherche, qui ne connaît pas les auteurs.** La réponse ne
+  compare que les lignes des cinq séries envoyées, et dit sinon ce qu'elle ne sait pas : une
+  autre série du même auteur n'arrive que par hasard.
+- **La ligne compare des graphies, pas des personnes.** Scénariste puis dessinateur, dans
+  l'ordre du catalogue : sept paires de noms sont croisées d'une série à l'autre, et leurs
+  lignes diffèrent. `COLLECTIF` (33 séries) reste tel quel : deux séries `COLLECTIF` ont le même
+  auteur pour elle. Deux noms ont deux graphies, et les romanisations ne se rapprochent pas.
+  Aucun contrôle de sortie sur les auteurs : leurs formes sont trop variées.
+- **Dix séries ont un auteur dont le nom contient celui d'un membre** (2026-11-03). Si la réponse
+  écrit ce nom, hors d'un homonyme admis, le contrôle la rejette (503) : le refus de trop, jamais
+  la fuite.
+- **Une reformulation peut encore reporter** un critère, ou une métadonnée, d'un tour sur le
+  suivant.
 - **Les contrôles de sortie ne voient que des formes.** Un public seulement sous-entendu, ou
   affirmé sur une ligne « inconnu » ou portant un autre libellé (`Yuri`, `Yaoi`), passe.
 - **Une instance.** Le débit est compté en mémoire du processus : plusieurs instances
@@ -1051,7 +1089,7 @@ Pour ajouter une route :
    `contrat/openapi_v1.json` avec la route. Le test d'égalité à l'octet refuse un
    contrat périmé.
 4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`, 1.2.0 pour
-   `metadonnees`) : la
+   `metadonnees`, 1.3.0 pour `auteurs`) : la
    majeure reste celle de l'adresse.
 
 **Toute rupture ouvre `/v2/`** : retirer ou renommer un champ, restreindre un type ou
