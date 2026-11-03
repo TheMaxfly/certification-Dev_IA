@@ -31,6 +31,7 @@ from conftest import (
     BaseApi,
     DoublureFournisseur,
     Doublures,
+    environnement,
 )
 from fastapi.testclient import TestClient
 
@@ -697,6 +698,13 @@ def test_etiqueter_et_inscrire_par_la_ligne_de_commande(tmp_path, capsys, monkey
     assert cli.principal(["registre", *couples[:3]], environ={}) == 2
     assert cli.principal(["registre", *couples[:3], "gpt-6-sol=x"], environ={}) == 2
     assert len(charges) == nombre
+
+
+def test_le_profil_actif_se_lit_sans_cle_de_consommateur():
+    environ = environnement("postgresql://modele_api@localhost:1/essai")
+    environ.pop("API_MODELE_CLES")
+
+    assert cli.profil_actif_declare(environ) == "mistral-large-2512"
 
 
 def test_la_ligne_eval_runs(base_api: BaseApi):

@@ -373,8 +373,12 @@ def commande_reprendre(dossier: Path, dsn: str) -> int:
 
 
 def profil_actif_declare(environ: Mapping[str, str]) -> str:
-    """Le profil actif de la configuration, sans ouvrir l'API."""
-    return charger(environ).modele_langage.profil_actif
+    """Le profil actif de la configuration, sans ouvrir l'API : la clé de consommateur
+    qu'elle exige n'a pas à exister pour ces commandes, on en tire une."""
+    cle = secrets.token_urlsafe(32)
+    return charger(
+        {**environ, "API_MODELE_CLES": f"banc:{cle}"}
+    ).modele_langage.profil_actif
 
 
 def commande_etiqueter(environ: Mapping[str, str]) -> int:
