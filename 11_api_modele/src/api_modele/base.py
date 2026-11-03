@@ -46,7 +46,8 @@ SQL_TITRES_KITSU = (
 )
 SQL_METADONNEES = (
     "SELECT series_id, disponibilite, nb_volumes, nb_volumes_source, statut,"
-    " demographie, annee_fr FROM manga.v_metadonnees_serie WHERE series_id = ANY(%s)"
+    " demographie, annee_fr, auteurs FROM manga.v_metadonnees_serie"
+    " WHERE series_id = ANY(%s)"
 )
 SQL_PASSAGES = """
 SELECT k.chunk_id, k.doc_key, d.source, k.chunk_text
@@ -176,7 +177,7 @@ def lire_titres(
 def lire_metadonnees(
     cx: Connection[TupleRow], series_ids: list[int]
 ) -> dict[int, tuple[object, ...]]:
-    """Les six valeurs de chaque série, dans l'ordre de la vue (migration 025)."""
+    """Les sept valeurs de chaque série, dans l'ordre de la vue (025, 026)."""
     return {
         int(ligne[0]): tuple(ligne[1:])
         for ligne in cx.execute(SQL_METADONNEES, (series_ids,)).fetchall()

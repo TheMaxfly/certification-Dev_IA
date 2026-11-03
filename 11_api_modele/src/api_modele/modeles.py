@@ -90,6 +90,10 @@ class Metadonnees(BaseModel):
     annee_fr: int | None = Field(
         description="L'année du premier volume à EAN français."
     )
+    auteurs: str | None = Field(
+        description="Le scénariste puis le dessinateur, tels que le catalogue les"
+        " écrit, joints par une virgule ; un même nom une seule fois."
+    )
 
 
 class Serie(BaseModel):

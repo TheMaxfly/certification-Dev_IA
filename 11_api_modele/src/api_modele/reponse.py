@@ -139,12 +139,13 @@ def tomes(m: Metadonnees) -> str:
 
 
 def ce_que_dit_la_ligne(m: Metadonnees) -> str:
-    """Tomes, statut, public, disponibilité : une valeur absente se dit « inconnu »."""
+    """Auteur, tomes, statut, public, disponibilité : une valeur absente se dit
+    « inconnu »."""
     statut = "statut inconnu" if m.statut is None else STATUTS_DE_SERIE[m.statut]
     disponibilite = DISPONIBILITES[m.disponibilite or "inconnue"]
     return (
-        f"tomes : {tomes(m)} — {statut} — public : {m.demographie or 'inconnu'}"
-        f" — disponibilité : {disponibilite}"
+        f"auteur : {m.auteurs or 'inconnu'} — tomes : {tomes(m)} — {statut}"
+        f" — public : {m.demographie or 'inconnu'} — disponibilité : {disponibilite}"
     )
 
 

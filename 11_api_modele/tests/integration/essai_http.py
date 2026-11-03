@@ -72,7 +72,8 @@ def principal() -> None:
     metadonnees = resultat["series"][0]["metadonnees"]
     verifier(
         metadonnees["disponibilite"] == "inconnue"
-        and metadonnees["nb_volumes"] is None,
+        and metadonnees["nb_volumes"] is None
+        and metadonnees["auteurs"] is None,
         f"métadonnées lues par la vue, sous le rôle de l'API : {metadonnees}",
     )
     premier = resultat["series"][0]["passages"][0]
@@ -123,8 +124,8 @@ def principal() -> None:
         contexte["profil"] == "essai-local"
         and [a["role"] for a in contexte["appels"]] == ["reponse"]
         and contexte["cout_estime_usd"] > 0
-        and contexte["version_api"] == "1.2.0",
-        "/v1/reponse : contexte (profil, un appel, coût, version 1.2.0)",
+        and contexte["version_api"] == "1.3.0",
+        "/v1/reponse : contexte (profil, un appel, coût, version 1.3.0)",
     )
     verifier(entetes.get("Cache-Control") == "no-store", "Cache-Control: no-store")
 

@@ -137,11 +137,11 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seuls `Info`
     (`modele_langage`) et `Serie` (`metadonnees`) gagnent un champ ; la route de
     réponse, ses schémas, `Metadonnees` et l'exemple du 503 de `/v1/sante` s'ajoutent ;
-    la version passe à 1.2.0 (mineure)."""
+    la version passe à 1.3.0 (mineure)."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.2.0")
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.3.0")
     assert apres["info"]["title"] == avant["info"]["title"]
     assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (

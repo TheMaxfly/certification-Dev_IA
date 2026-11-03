@@ -106,6 +106,10 @@ def test_chaque_serie_porte_ses_metadonnees(api, base_api: BaseApi):
             " volume_number, volume_ean) VALUES ('v', 2, 1, '9784000000001')"
         )
         cx.execute("UPDATE manga.ms_series_enriched SET series_type = 'Manga'")
+        cx.execute(
+            "UPDATE manga.ms_series_enriched SET series_scenariste = 'Autrice A',"
+            " series_dessinateur = 'Auteur B' WHERE series_id = 2"
+        )
 
     series = {s["serie_id"]: s["metadonnees"] for s in chercher(api).json()["series"]}
 
@@ -116,7 +120,9 @@ def test_chaque_serie_porte_ses_metadonnees(api, base_api: BaseApi):
         "statut": None,
         "demographie": None,
         "annee_fr": None,
+        "auteurs": None,
     }
+    assert series[2]["auteurs"] == "Autrice A, Auteur B"
     assert series[2]["disponibilite"] == "seulement_au_japon"
     assert (series[2]["nb_volumes"], series[2]["nb_volumes_source"]) == (
         1,

@@ -45,6 +45,7 @@ from api_modele.journal import FormatJson
 from api_modele.modeles import Metadonnees, Resultat
 from api_modele.pseudonymes import empreinte
 from api_modele.reponse import (
+    INVITE_REPONSE,
     PHRASE_AUCUN_PASSAGE,
     ce_que_dit_la_ligne,
     contexte_des_passages,
@@ -133,7 +134,7 @@ def test_une_reponse_avec_ses_sources_et_son_contexte(
     assert c["cout_estime_usd"] == pytest.approx((100 * 2 + 20 * 8) / 1e6)
     assert c["question_reformulee"] is None and c["reformulation_ignoree"] is None
     assert c["date_appel"].endswith("+00:00")
-    assert c["version_api"] == "1.2.0"
+    assert c["version_api"] == "1.3.0"
     assert set(c["latences_ms"]) == {"recherche", "reformulation", "modele", "totale"}
     assert c["latences_ms"]["reformulation"] is None
 
@@ -149,7 +150,8 @@ def test_le_contexte_envoye_au_modele_est_celui_de_la_recherche(api_reponse, dou
     assert utilisateur == f"Question : {QUESTION}\n\nPASSAGES :\n\n{attendu}"
     lignes = [ligne for ligne in attendu.splitlines() if ligne.startswith("[")]
     sans_rien = (
-        "tomes : inconnu — statut inconnu — public : inconnu — disponibilité : inconnue"
+        "auteur : inconnu — tomes : inconnu — statut inconnu — public : inconnu"
+        " — disponibilité : inconnue"
     )
     assert lignes == [
         f"[S:1] Série 1 — critique de tome — {sans_rien} [F:702]",
@@ -503,11 +505,12 @@ def test_un_refus_du_modele_est_un_200(api_reponse):
 #  Les contrôles de sortie
 # --------------------------------------------------------------------------- #
 def renseigner_la_serie(dsn: str) -> None:
-    """La série 1 : éditée en France, trois tomes, terminée, seinen."""
+    """La série 1 : deux auteurs, éditée en France, trois tomes, terminée, seinen."""
     with psycopg.connect(dsn) as cx:
         cx.execute(
             "UPDATE manga.ms_series_enriched SET series_type = 'Manga',"
             " series_category_clean = 'Seinen',"
+            " series_scenariste = 'Autrice A', series_dessinateur = 'Auteur B',"
             """ series_statuses = '[{"statut": "Complète"}]' WHERE series_id = 1"""
         )
         for numero in (1, 2, 3):
@@ -529,7 +532,8 @@ def test_la_ligne_de_titre_porte_ce_que_dit_le_catalogue(
     (appel,) = appels(doublures)
     utilisateur = appel["corps"]["messages"][1]["content"]
     assert (
-        "[S:1] Série 1 — critique de tome — tomes : 3 (champ) — terminé"
+        "[S:1] Série 1 — critique de tome — auteur : Autrice A, Auteur B"
+        " — tomes : 3 (champ) — terminé"
         " — public : Seinen — disponibilité : édité en France [F:702]\n"
     ) in utilisateur
     assert corps["series"][0]["metadonnees"] == {
@@ -539,6 +543,7 @@ def test_la_ligne_de_titre_porte_ce_que_dit_le_catalogue(
         "statut": "termine",
         "demographie": "Seinen",
         "annee_fr": None,
+        "auteurs": "Autrice A, Auteur B",
     }
     assert corps["series"][1]["metadonnees"]["disponibilite"] == "inconnue"
 
@@ -558,6 +563,8 @@ def test_la_ligne_de_titre_porte_ce_que_dit_le_catalogue(
             {"nb_volumes": 136, "nb_volumes_source": "divergent", "statut": "en_cours"},
             "tomes : au moins 136 — en cours",
         ),
+        ({"auteurs": "Kiriko NANANAN"}, "auteur : Kiriko NANANAN — tomes"),
+        ({}, "auteur : inconnu — tomes : inconnu"),
         ({"demographie": "Yuri"}, "public : Yuri"),
         ({"disponibilite": "seulement_au_japon"}, "disponibilité : seulement au Japon"),
         ({}, "tomes : inconnu — statut inconnu — public : inconnu"),
@@ -576,9 +583,21 @@ def test_une_oeuvre_hors_catalogue_a_sa_ligne_toute_inconnue(api_reponse, doublu
     assert set(kitsu["metadonnees"].values()) == {None}
     (appel,) = appels(doublures)
     assert (
-        f"[K:{kitsu['kitsu_id']}] {kitsu['titre']} — synopsis — tomes : inconnu"
+        f"[K:{kitsu['kitsu_id']}] {kitsu['titre']} — synopsis — auteur : inconnu"
+        " — tomes : inconnu"
         " — statut inconnu — public : inconnu — disponibilité : inconnue [F:"
     ) in appel["corps"]["messages"][1]["content"]
+
+
+def test_l_invite_renvoie_l_auteur_a_la_ligne_et_n_interdit_de_nommer_qu_un_lecteur():
+    invite = " ".join(INVITE_REPONSE.split())
+
+    assert (
+        "L'auteur d'une série est celui de sa ligne de titre ; deux séries ont le même"
+        " auteur si leurs lignes le disent, pas autrement."
+    ) in invite
+    assert "Tu ne nommes jamais un lecteur : ni membre," in invite
+    assert "une personne" not in invite
 
 
 def test_une_disponibilite_que_la_ligne_contredit(api_reponse, doublures):
@@ -748,6 +767,22 @@ def test_un_homonyme_admis_venu_de_la_question_de_la_requete(api_homonymes, doub
         )
     with api_homonymes(admis=False) as api:
         r = repondre(api, question=question)
+    assert (r.status_code, r.json()["details"]["motif"]) == (503, "pseudonyme")
+
+
+def test_un_auteur_qui_porte_le_nom_d_un_membre_reste_rejete(api_homonymes, base_api):
+    """Limite écrite : la ligne de titre n'admet aucun nom. Le refus de trop, jamais la
+    fuite : dix séries du catalogue au 2026-11-03."""
+    with psycopg.connect(base_api.dsn_admin) as cx:
+        cx.execute(
+            "UPDATE manga.ms_series_enriched SET series_scenariste = %s"
+            " WHERE series_id = 1",
+            (NOM,),
+        )
+    DoublureFournisseur.contenu = AVEC_LE_NOM
+    with api_homonymes(admis=True) as api:
+        r = repondre(api)
+
     assert (r.status_code, r.json()["details"]["motif"]) == (503, "pseudonyme")
 
 
@@ -1024,7 +1059,7 @@ def test_la_ligne_de_journal_de_la_requete(api_reponse, caplog):
 
 def test_info_annonce_la_1_2_0_et_v2_n_existe_pas(api_reponse):
     assert (
-        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.2.0"
+        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.3.0"
     )
     assert (
         api_reponse.post("/v2/reponse", json={"question": QUESTION}).status_code == 404
