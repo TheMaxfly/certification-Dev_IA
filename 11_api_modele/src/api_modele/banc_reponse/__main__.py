@@ -6,6 +6,8 @@
     DATABASE_URL=… $B mesurer <profil> <jeu>
     DATABASE_URL=… $B scenarios <profil> <fichier.csv>
     DATABASE_URL=… $B reprendre <dossier du run>
+    $B etiqueter                         # les runs déjà faits, a posteriori
+    $B registre <profil>=<run_id> …      # une version par profil, liée à son run
 
 Codes de sortie : 0 fait ; 2 refusé avant tout appel (configuration, jeu, commit,
 plafond, fichier) ; 3 run interrompu (plafond atteint, fournisseur en échec) ; 4 run
@@ -171,6 +173,7 @@ def parametres_du_run(
         "critere": CRITERE,
         "statut_run": run.statut,
         "motif_interruption": str(run.motif_interruption),
+        **enregistrement.empreintes_du_run(enregistrement.fichiers_du_run()),
     }
 
 
@@ -196,13 +199,21 @@ def enregistrer(
         nom,
         {
             "spec": SPEC,
-            "statut": run.statut,
             "profil": run.profil,
             "statut_profil": str(parametres["statut_profil"]),
+            **enregistrement.etiquettes_du_run(
+                run.profil,
+                banc_.modele_langage.profil_actif,
+                enregistrement.invite_version(str(parametres["commit"])),
+                run.statut,
+                run.motif_interruption,
+                cast(Mapping[str, object] | None, resultat.get("verdict")),
+            ),
         },
         parametres,
         {k: float(v) for k, v in mesures.items()},
         pieces,
+        fichiers=enregistrement.fichiers_du_run(),
     )
     code = 3 if run.statut == "interrompu" else 0
     try:
@@ -361,6 +372,48 @@ def commande_reprendre(dossier: Path, dsn: str) -> int:
     return 0
 
 
+def profil_actif_declare(environ: Mapping[str, str]) -> str:
+    """Le profil actif de la configuration, sans ouvrir l'API."""
+    return charger(environ).modele_langage.profil_actif
+
+
+def commande_etiqueter(environ: Mapping[str, str]) -> int:
+    """Les étiquettes a posteriori des runs déjà faits. Pas leurs artefacts : leurs
+    invites sont celles de leur commit, pas celles du dépôt."""
+    runs = enregistrement.etiquettes_des_runs_faits(profil_actif_declare(environ))
+    charge = enregistrement.charge_des_etiquettes(runs)
+    fichier = enregistrement.ecrire_json(
+        enregistrement.SORTIES / f"etiquettes_{horodatage()}.json", charge
+    )
+    print(enregistrement.par_le_module_10(fichier).strip().splitlines()[-1])
+    return 0
+
+
+def commande_registre(couples: Sequence[str], environ: Mapping[str, str]) -> int:
+    """Une version par profil, chacune liée au run désigné (`<profil>=<run_id>`). Le
+    registre ne contrôle rien : le profil actif reste celui de `reglages.toml`."""
+    qualifiants: dict[str, str] = {}
+    for couple in couples:
+        profil, _, run_id = couple.partition("=")
+        qualifiants[profil] = run_id
+    manquants = set(enregistrement.STADES) - set(qualifiants)
+    if manquants or any(
+        not enregistrement.RUN_ID.fullmatch(r) for r in qualifiants.values()
+    ):
+        raise BancRefuse(
+            "registre : un <profil>=<run_id> par profil, "
+            + ", ".join(enregistrement.STADES)
+        )
+    charge = enregistrement.charge_du_registre(
+        qualifiants, profil_actif_declare(environ)
+    )
+    fichier = enregistrement.ecrire_json(
+        enregistrement.SORTIES / f"registre_{horodatage()}.json", charge
+    )
+    print(enregistrement.par_le_module_10(fichier).strip().splitlines()[-1])
+    return 0
+
+
 def analyser(argv: Sequence[str]) -> argparse.Namespace:
     parseur = argparse.ArgumentParser(prog="python -m api_modele.banc_reponse")
     sous = parseur.add_subparsers(dest="commande", required=True)
@@ -378,6 +431,9 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("fichier", help="le CSV des scénarios écrits par Max")
     p = sous.add_parser("reprendre", help="enregistrer un run déjà mesuré")
     p.add_argument("dossier")
+    sous.add_parser("etiqueter", help="les étiquettes des runs déjà faits")
+    p = sous.add_parser("registre", help="le registre de modèles")
+    p.add_argument("qualifiants", nargs="+", help="<profil>=<run_id>")
     return parseur.parse_args(argv)
 
 
@@ -398,6 +454,10 @@ def principal(
             )
         if args.commande == "reprendre":
             return commande_reprendre(Path(args.dossier), dsn)
+        if args.commande == "etiqueter":
+            return commande_etiqueter(environ)
+        if args.commande == "registre":
+            return commande_registre(args.qualifiants, environ)
         with ouvreur(environ) as banc_:
             if args.commande == "essai":
                 return commande_essai(banc_, args)

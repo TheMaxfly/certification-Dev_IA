@@ -8,6 +8,7 @@ avec un MLflow simulé) ; la ligne `bench.eval_runs` est écrite dans la base je
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import shutil
@@ -404,6 +405,300 @@ def test_le_script_mlflow(tmp_path, capsys, monkeypatch):
     assert journal_mlflow.principal(["script"]) == 2
 
 
+def test_les_fichiers_du_run_et_leurs_empreintes(tmp_path):
+    for chemin in enregistrement.FICHIERS_DU_RUN:
+        (tmp_path / chemin).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / chemin).write_text(f"texte de {chemin}", encoding="utf-8")
+
+    fichiers = enregistrement.fichiers_du_run(tmp_path)
+    empreintes = enregistrement.empreintes_du_run(fichiers)
+
+    assert set(fichiers) == set(enregistrement.FICHIERS_DU_RUN)
+    assert set(empreintes) == {
+        "invite_reponse_sha",
+        "invite_reformulation_sha",
+        "reglages_sha",
+    }
+    attendue = hashlib.sha256(b"texte de config/reglages.toml").hexdigest()
+    assert empreintes["reglages_sha"] == attendue
+    # Les fichiers vont tels quels, pas en JSON.
+    charge = enregistrement.charge_mlflow(
+        "nom", {}, {}, {}, {"p.json": [1]}, fichiers=fichiers
+    )
+    assert charge["pieces_texte"]["config/reglages.toml"] == (
+        "texte de config/reglages.toml"
+    )
+    assert charge["pieces_texte"]["p.json"] == "[\n 1\n]"
+    # Le dépôt porte bien ces trois fichiers.
+    assert set(enregistrement.fichiers_du_run()) == set(fichiers)
+
+
+def test_la_version_des_invites_est_celle_du_commit(tmp_path):
+    local = tmp_path / "depot"
+    invites = local / enregistrement.INVITES_DU_DEPOT
+    invites.mkdir(parents=True)
+    git(local, "init", "-q")
+    git(local, "config", "user.email", "essai@exemple.org")
+    git(local, "config", "user.name", "essai")
+    (invites / "reponse.md").write_text("une", encoding="utf-8")
+    git(local, "add", ".")
+    git(local, "commit", "-qm", "les invites")
+    avec_invites = enregistrement.git(local, "rev-parse", "--short", "HEAD")
+    (local / "autre.txt").write_text("x", encoding="utf-8")
+    git(local, "add", ".")
+    git(local, "commit", "-qm", "autre chose")
+
+    assert enregistrement.invite_version("HEAD", local) == avec_invites
+    assert enregistrement.invite_version("c" * 40, local) == "inconnue"
+
+
+@pytest.mark.parametrize(
+    ("profil", "statut", "motif", "verdict_", "attendues"),
+    [
+        (
+            "actif",
+            "termine",
+            None,
+            {"tenu": True},
+            {"role": "profil_actif", "statut": "complet", "verdict": "tenu"},
+        ),
+        (
+            "autre",
+            "termine",
+            None,
+            {"tenu": False},
+            {"role": "repli", "statut": "complet", "verdict": "non_tenu"},
+        ),
+        # Les scénarios n'ont pas de critère : pas de verdict.
+        ("actif", "termine", None, None, {"role": "profil_actif", "statut": "complet"}),
+        (
+            "actif",
+            "interrompu",
+            "fournisseur_refus",
+            {"tenu": False},
+            {
+                "role": "profil_actif",
+                "statut": "interrompu",
+                "verdict": "non_tenu",
+                "cause_interruption": "fournisseur_refus",
+            },
+        ),
+        (
+            "actif",
+            "interrompu",
+            "coût réel 0,6 $ > plafond 0,50 $",
+            None,
+            {
+                "role": "profil_actif",
+                "statut": "interrompu",
+                "cause_interruption": "plafond",
+            },
+        ),
+    ],
+)
+def test_les_etiquettes_d_un_run(profil, statut, motif, verdict_, attendues):
+    assert enregistrement.etiquettes_du_run(
+        profil, "actif", "abc1234", statut, motif, verdict_
+    ) == {"etape": "E3-06", "invite_version": "abc1234", **attendues}
+
+
+def test_les_etiquettes_a_posteriori_se_lisent_dans_les_dossiers(tmp_path, monkeypatch):
+    monkeypatch.setattr(enregistrement, "invite_version", lambda commit: commit[:7])
+    for nom, run_id, resume in (
+        (
+            "a",
+            "a" * 32,
+            {
+                "statut": "termine",
+                "motif_interruption": None,
+                "verdict": {"tenu": True},
+                "parametres": {"profil": "actif", "commit": "1111111aaaa"},
+            },
+        ),
+        (
+            "b",
+            "b" * 32,
+            {
+                "statut": "interrompu",
+                "motif_interruption": "fournisseur_delai",
+                "parametres": {"profil": "autre", "commit": "2222222bbbb"},
+            },
+        ),
+    ):
+        dossier = tmp_path / nom
+        dossier.mkdir()
+        enregistrement.ecrire_json(dossier / "run_id.json", {"run_id": run_id})
+        enregistrement.ecrire_json(dossier / "resume.json", resume)
+    (tmp_path / "sans_run").mkdir()
+
+    runs = enregistrement.etiquettes_des_runs_faits("actif", tmp_path)
+
+    assert runs == {
+        "a" * 32: {
+            "etape": "E3-06",
+            "role": "profil_actif",
+            "invite_version": "1111111",
+            "statut": "complet",
+            "verdict": "tenu",
+        },
+        "b" * 32: {
+            "etape": "E3-06",
+            "role": "repli",
+            "invite_version": "2222222",
+            "statut": "interrompu",
+            "cause_interruption": "fournisseur_delai",
+        },
+    }
+
+
+class ClientSimule:
+    """Le registre et les runs d'un `MlflowClient`, en mémoire."""
+
+    def __init__(self) -> None:
+        self.modeles: list[str] = []
+        self.versions: list[Any] = []
+        self.etiquettes: dict[str, dict[str, str]] = {}
+
+    def set_tag(self, run_id: str, cle: str, valeur: str) -> None:
+        self.etiquettes.setdefault(run_id, {})[cle] = valeur
+
+    def search_registered_models(self, filter_string: str) -> list[str]:
+        return [m for m in self.modeles if f"'{m}'" in filter_string]
+
+    def create_registered_model(self, nom: str, description: str) -> None:
+        assert "ne contrôle rien" in description
+        self.modeles.append(nom)
+
+    def search_model_versions(self, filtre: str) -> list[Any]:
+        return list(self.versions)
+
+    def get_run(self, run_id: str) -> Any:
+        info = type("I", (), {"artifact_uri": f"file:///pieces/{run_id}/artifacts"})
+        return type("R", (), {"info": info})
+
+    def create_model_version(
+        self, nom: str, source: str, run_id: str, tags: dict[str, str]
+    ) -> Any:
+        assert source.endswith(f"{run_id}/artifacts")
+        version = type(
+            "V",
+            (),
+            {
+                "version": len(self.versions) + 1,
+                "run_id": run_id,
+                "tags": tags,
+                "stade": None,
+            },
+        )
+        self.versions.append(version)
+        return version
+
+    def transition_model_version_stage(
+        self, nom: str, version: int, stade: str
+    ) -> None:
+        self.versions[version - 1].stade = stade
+
+
+QUALIFIANTS = {
+    "mistral-large-2512": "1" * 32,
+    "mistral-large-4": "2" * 32,
+    "gpt-6-luna": "3" * 32,
+    "gpt-6-sol": "4" * 32,
+}
+
+
+def test_le_registre_une_version_par_profil_a_son_stade():
+    client = ClientSimule()
+    charge = enregistrement.charge_du_registre(QUALIFIANTS, "mistral-large-2512")
+
+    sortie_ = journal_mlflow.inscrire(client, charge)
+
+    assert client.modeles == ["conseiller-manga-reponse"]
+    assert {
+        v.tags["profil"]: (v.stade, v.run_id, v.tags["role"]) for v in client.versions
+    } == {
+        "mistral-large-2512": ("Production", "1" * 32, "profil_actif"),
+        "mistral-large-4": ("Staging", "2" * 32, "repli"),
+        "gpt-6-luna": ("Archived", "3" * 32, "repli"),
+        "gpt-6-sol": ("Archived", "4" * 32, "repli"),
+    }
+    assert "mistral-large-2512=1:Production" in sortie_
+
+    # Rejouer ne double rien.
+    journal_mlflow.inscrire(client, charge)
+    assert len(client.versions) == 4 and client.modeles == ["conseiller-manga-reponse"]
+
+    # Requalifié par un autre run : une version de plus, l'ancienne archivée.
+    charge = enregistrement.charge_du_registre(
+        QUALIFIANTS | {"mistral-large-2512": "5" * 32}, "mistral-large-2512"
+    )
+    journal_mlflow.inscrire(client, charge)
+    assert len(client.versions) == 5
+    assert (client.versions[0].stade, client.versions[4].stade) == (
+        "Archived",
+        "Production",
+    )
+
+
+def test_le_script_mlflow_etiquette_et_inscrit(tmp_path, capsys, monkeypatch):
+    client = ClientSimule()
+    module = type("M", (), {"MlflowClient": staticmethod(lambda **_: client)})
+    monkeypatch.setattr(journal_mlflow.importlib, "import_module", lambda _: module)
+    etiquettes = enregistrement.charge_des_etiquettes(
+        {"a" * 32: {"etape": "E3-06"}, "b" * 32: {"statut": "complet"}}
+    )
+    fichier = tmp_path / "charge.json"
+    fichier.write_text(json.dumps(etiquettes), encoding="utf-8")
+
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+    assert client.etiquettes == {
+        "a" * 32: {"etape": "E3-06"},
+        "b" * 32: {"statut": "complet"},
+    }
+    assert "2 runs" in capsys.readouterr().out
+
+    charge = enregistrement.charge_du_registre(QUALIFIANTS, "mistral-large-2512")
+    fichier.write_text(json.dumps(charge), encoding="utf-8")
+    assert journal_mlflow.principal(["script", str(fichier)]) == 0
+    assert len(client.versions) == 4
+
+
+def test_etiqueter_et_inscrire_par_la_ligne_de_commande(tmp_path, capsys, monkeypatch):
+    charges: list[dict[str, Any]] = []
+
+    def executer(commande: list[str]) -> str:
+        charges.append(json.loads(Path(commande[-1]).read_text(encoding="utf-8")))
+        return "un avertissement\nle résumé\n"
+
+    monkeypatch.setattr(enregistrement, "executer", executer)
+    monkeypatch.setattr(enregistrement, "SORTIES", tmp_path)
+    monkeypatch.setattr(cli, "profil_actif_declare", lambda _: "mistral-large-2512")
+    monkeypatch.setattr(
+        enregistrement, "etiquettes_des_runs_faits", lambda _: {"a" * 32: {"x": "y"}}
+    )
+
+    assert cli.principal(["etiqueter"], environ={}) == 0
+    assert charges[-1]["action"] == "etiquettes"
+    assert charges[-1]["runs"] == {"a" * 32: {"x": "y"}}
+
+    couples = [f"{p}={r}" for p, r in QUALIFIANTS.items()]
+    assert cli.principal(["registre", *couples], environ={}) == 0
+    assert charges[-1]["action"] == "registre"
+    assert [v["stade"] for v in charges[-1]["versions"]] == [
+        "Production",
+        "Staging",
+        "Archived",
+        "Archived",
+    ]
+    assert "le résumé" in capsys.readouterr().out
+
+    # Un profil sans son run, un identifiant illisible : refusés, sans écrire.
+    nombre = len(charges)
+    assert cli.principal(["registre", *couples[:3]], environ={}) == 2
+    assert cli.principal(["registre", *couples[:3], "gpt-6-sol=x"], environ={}) == 2
+    assert len(charges) == nombre
+
+
 def test_la_ligne_eval_runs(base_api: BaseApi):
     enregistrement.inscrire_eval_run(
         base_api.dsn_admin, RUN_ID, "v7", base_api.encodage_id, "essai"
@@ -795,6 +1090,21 @@ def test_un_run_complet_par_la_ligne_de_commande(
     # Les pièces de MLflow : des nombres et des noms, aucun texte de réponse.
     (charge,) = charges
     assert TEXTE_REFUS not in json.dumps(charge, ensure_ascii=False)
+    # Les étiquettes, les invites et les réglages en artefacts, leurs empreintes.
+    etiquettes = charge["etiquettes"]
+    assert (etiquettes["etape"], etiquettes["role"], etiquettes["statut"]) == (
+        "E3-06",
+        "profil_actif",
+        "complet",
+    )
+    assert etiquettes["verdict"] == "tenu"
+    assert etiquettes["invite_version"] == "inconnue"  # le commit factice
+    for chemin, parametre in enregistrement.FICHIERS_DU_RUN.items():
+        contenu = charge["pieces_texte"][chemin]
+        assert contenu == (enregistrement.RACINE_MODULE / chemin).read_text("utf-8")
+        assert charge["parametres"][parametre] == (
+            hashlib.sha256(contenu.encode("utf-8")).hexdigest()
+        )
     assert TEXTE_REFUS in (dossier / "reponses.md").read_text(encoding="utf-8")
     with psycopg.connect(base_api.dsn_admin) as cx:
         assert cx.execute(
