@@ -48,9 +48,10 @@ declare -A CLES_ASPECT=(
     [MISTRAL_API_KEY]="[Mm][Ii][Ss][Tt][Rr][Aa][Ll]_[Aa][Pp][Ii]_[Kk][Ee][Yy][\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9]{20,}"
     [OPENAI_API_KEY]='(^|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{40,}'
     [HF_TOKEN]='hf_[A-Za-z0-9]{34}'
-    [API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"']{32,}"
-    [APPLICATION_CLE_API]="APPLICATION_CLE_API[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{32,}"
 )
+# Les clés d'accès à l'API du modèle, à part : ce ne sont pas des clés de fournisseur.
+CLES_ASPECT[API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"']{32,}"
+CLES_ASPECT[APPLICATION_CLE_API]="APPLICATION_CLE_API[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{32,}"
 # Le fichier où l'outil du fournisseur range la valeur du poste.
 declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
 
