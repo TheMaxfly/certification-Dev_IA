@@ -571,8 +571,9 @@ série sous `modele_api`, qui ne lit pas ces tables.
 - **L'âge** : **il n'y a pas de donnée**. La réponse ne dit une série adaptée à un âge ou à
   une contrainte de contenu que si un passage le dit explicitement ; sinon, elle dit qu'elle
   ne peut pas le garantir et signale les thèmes adultes qu'un passage mentionne.
-- **Les auteurs** : ni sur la ligne ni dans la vue : aucune table d'auteurs n'est fiable au
-  grain de la série.
+- **Les auteurs** : pas encore sur la ligne, alors que la fiche du catalogue les porte (14 387
+  séries sur 14 670, 2026-11-03). La migration 026 les ajoute à la vue ; la route ne les lit pas
+  encore.
 
 ### `GET /v1/info`, `GET /v1/sante`
 
