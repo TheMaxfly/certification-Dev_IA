@@ -8,7 +8,8 @@ et les passages cités.
 ## Ce qu'elle fait, et ce qu'elle ne fait pas
 
 - **Elle fait** : une page question → réponse ; une conversation de cinq échanges au plus ;
-  le choix du profil et deux réglages de démonstration ; un écran nommé par cas dégradé ;
+  le choix du profil et deux réglages de démonstration ; un mode démonstration, éteint par
+  défaut, qui montre les scores et la trace de la recherche ; un écran nommé par cas dégradé ;
   la mention « Vous parlez à une IA » sur chaque écran ; un audit d'accessibilité outillé.
 - **Elle ne fait pas** : pas de compte, pas de mémoire côté serveur, aucune écriture, en
   base ou en fichier ; mode strict seul tant que l'API n'en expose pas d'autre ; aucune
@@ -82,10 +83,55 @@ n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans 
 | Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
+| Mode démonstration | coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
 | Mode | affiché seulement si l'API en déclare plus d'un | `strict` |
 
 Le reste (`longueur_max`, `nombre_series`, `passages_par_serie`, `catalogue_seul`) reste aux
 défauts de l'API.
+
+### Le mode démonstration
+
+Une case des réglages, **décochée par défaut** (`[reglages] mode_demonstration_defaut =
+false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
+« Nouvelle conversation » la remet au défaut. Ni cookie, ni variable d'environnement.
+
+**Ce qu'il montre**, coché, tout venant de la même réponse de `/v1/reponse` :
+
+- sur chaque carte, le rang et le score de la série (« rang 3 — score 0,52 ») ; sous chaque
+  passage cité, son score, à côté de son identifiant ; une infobulle dit ce qu'est le score ;
+- une section **Trace de la recherche**, après les cartes : le classement entier (rang,
+  titre, score, *citée* ou *non citée*, nombre de passages), les passages non cités, repliés
+  par série, la question d'origine, sa reformulation et celle qui a cherché, les réglages de
+  la recherche, le modèle (profil, fournisseur, température, longueur, jetons par appel, coût,
+  latences, identifiant de requête). Le bloc « Détails techniques » y est absorbé.
+
+Un score nul ou absent s'écrit « — », jamais une erreur.
+
+**Pourquoi il est éteint par défaut** : c'est la production. Le libraire lit une réponse et
+ses sources ; le classement et ce que le modèle n'a pas retenu servent à montrer comment la
+recherche travaille, pas à conseiller un lecteur. Décoché, rien de cela n'atteint le gabarit :
+ni score, ni rang, ni passage non cité, ni section (tests sur chaque écran, et mutations).
+
+**Ce que le score est, et n'est pas** : le cosinus entre la question et le meilleur fragment
+d'une série, tel que l'API le rend. Il mesure une ressemblance de textes. Ce n'est ni une note
+de la série, ni une preuve que la réponse est vraie : la recherche propose, le modèle choisit
+parmi ces séries et ne peut en citer aucune autre. La page le dit en tête de la section.
+
+**Les passages non cités** : hors de ce mode, aucun texte n'apparaît au-delà des passages
+cités, et cette règle ne change pas. Ce mode en est la seule exception, décidée. Ils viennent
+de la même réponse et du même corpus que les passages cités, sous le même contrôle :
+`make verify-poste` relit les passages rendus sur le jeu d'évaluation (904 passages distincts,
+0 pseudonyme hors des listes connues, 2026-11-03). **Ce contrôle ne veut pas dire « aucune
+mention »** : le texte d'une critique du corpus v2 reste tel qu'il a été écrit, et 20 mentions
+d'un membre, sur 19 critiques, y sont connues et listées. Et l'API ne relit pas les extraits à
+chaque réponse : ses contrôles portent sur le texte du modèle et sur la question reformulée.
+Une page en mode démonstration se relit donc avant toute capture.
+
+**Aucun effet en amont** : la requête envoyée à l'API est la même, coché ou non, et le contrat
+refuserait un champ inconnu. Aucune donnée nouvelle ne sort : le tableau OWASP ne change pas.
+
+**Limite** : l'infobulle n'est pas atteignable au clavier ; la phrase en tête de la section
+dit la même chose, en texte.
 
 ### La conversation
 
@@ -191,7 +237,7 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `[api] identite` | `libraire-demo` | fixe tant qu'il n'y a pas de comptes |
 | `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
 | `[api.attentes]` | 60 s, 2 s | l'attente annoncée sans `Retry-After` lisible |
-| `[reglages]` | température 0, reformulation cochée, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
+| `[reglages]` | température 0, reformulation cochée, mode démonstration éteint, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
 | `[conversation]` | 500 caractères par question, 5 échanges, 10 tours, 4 000 caractères, 2 000 par tour | les bornes de l'API ; celles que `/v1/info` publie l'emportent, un écart est journalisé ; la longueur d'un tour est comparée au contrat par un test |
 | `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
