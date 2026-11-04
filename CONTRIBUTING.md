@@ -56,11 +56,15 @@ commande sur le poste et sur GitHub.
   Compose du module avec `compose.integration.yml` : base jetable, migrations, rôle
   `modele_api` par sa procédure, jeu d'essai promu, doublure du service d'embedding
   (le modèle, à accès contrôlé, ne tourne pas sur GitHub), API réelle, essai HTTP ;
-  elle fait partie de la vérification du 11.
+  elle fait partie de la vérification du 11. Celle du 12 lève l'image de l'application
+  contre la doublure de l'API, conteneurisée, sur un réseau sans sortie, et lit le
+  fichier de fusion sur le Compose du 11 ; elle fait partie de la vérification du 12.
 - Arrêt au premier échec, avec le module et la commande ; une ligne par module :
   passés, sautés, en échec, durée.
 - **Un test sauté n'est pas un test passé** : il est compté. Au-delà du plafond écrit,
-  avec sa raison, dans `verification/sauts_attendus.tsv`, c'est un échec.
+  avec sa raison, dans `verification/sauts_attendus.tsv`, c'est un échec. L'audit
+  d'accessibilité du 12 demande un navigateur : il saute partout, et `make verify-poste`
+  le joue (`AUDIT_AXE=1`) ; il y réécrit `rapport_axe`, et un diff est à commiter.
 - Les volumes Docker créés par la vérification, et eux seuls, sont supprimés.
 
 Avant une demande de fusion vers `develop` : `make verify` (les modules touchés). Vers
