@@ -1,0 +1,7 @@
+id = "APP-29"
+origine = "E3 étape 4, spec 08 (2026-11-04) — la case ne partirait plus sous son nom : le mode serait inatteignable au navigateur"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''id="mode_demonstration" name="mode_demonstration"'''
+apres = '''id="mode_demonstration" name="demonstration"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "part_avec_le_formulaire"]

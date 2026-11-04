@@ -222,6 +222,8 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
     pages: dict[str, dict[str, Any]] = {}
     console: list[str] = []
     sans_focus: list[str] = []
+    #: La case cochée dans le navigateur doit produire la section, et elle seule.
+    ecarts_de_trace: list[str] = []
 
     def adresse_de(reglee: str, **delais: float) -> Any:
         reduits = replace(reglages.delais, **delais)
@@ -261,6 +263,8 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
             ouvrir_ecran(page, base, ecran)
             if page.evaluate(FOCUS) is False:
                 sans_focus.append(ecran.nom)
+            if (page.query_selector("#trace") is not None) != ecran.demonstration:
+                ecarts_de_trace.append(ecran.nom)
             page.evaluate(OUVRIR)
             page.evaluate(source)
             pages[ecran.nom] = resume(page.evaluate(LANCER, ETIQUETTES), base)
@@ -280,6 +284,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
     assert not graves, graves
     assert not console, console
     assert not sans_focus, sans_focus
+    assert not ecarts_de_trace, ecarts_de_trace
     assert len(pages) == len(ECRANS)
 
 

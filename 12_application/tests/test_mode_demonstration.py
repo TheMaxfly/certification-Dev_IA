@@ -11,6 +11,7 @@ import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup, Tag
 from conftest import ENVIRONNEMENT, application_sur
+from ecrans import echanges
 from fastapi.testclient import TestClient
 
 from application.config import FICHIER_REGLAGES, ConfigurationInvalide, charger
@@ -64,6 +65,24 @@ def lignes_du_classement(page: BeautifulSoup) -> list[list[str]]:
     ]
 
 
+def citee(serie_id: int, titre: str, rang: int, fragments: list[int]) -> dict:
+    return {
+        "serie_id": serie_id,
+        "titre": titre,
+        "rang": rang,
+        "fragment_ids": fragments,
+    }
+
+
+def rendre_sur(monkeypatch, **champs) -> None:
+    """Le scénario nominal, certains champs remplacés ; la doublure les valide."""
+    monkeypatch.setitem(
+        d.SCENARIOS_REPONSE,
+        "nominale",
+        lambda: d.Rendu(200, d.reponse_nominale(**champs)),
+    )
+
+
 def valeurs(page: BeautifulSoup) -> dict[str, str]:
     """Les définitions de la section : leur nom → leur valeur."""
     return {
@@ -91,6 +110,18 @@ def test_la_case_a_son_texte_et_vit_dans_les_reglages(navigateur):
     assert plat(page.select_one('label[for="mode_demonstration"]')) == (
         "Mode démonstration : afficher les scores et la trace de la recherche"
     )
+
+
+def test_la_case_part_avec_le_formulaire_de_la_question(navigateur):
+    """Les autres tests postent le champ à la main : ceci est ce qu'un navigateur
+    enverrait."""
+    case = soupe(navigateur.get("/")).select_one("#mode_demonstration")
+    formulaire = case.find_parent("form")
+
+    assert case["name"] == "mode_demonstration"
+    assert case["value"] == "1"
+    assert formulaire["action"] == "/question"
+    assert formulaire["method"] == "post"
 
 
 def test_decoche_le_html_ne_porte_ni_score_ni_rang_ni_non_cite_ni_section(navigateur):
@@ -298,6 +329,99 @@ def test_coche_tous_les_passages_cites_rien_a_replier(
     assert "Aucun passage non cité." in plat(page)
 
 
+def test_coche_une_serie_citee_sans_passage_reste_citee(navigateur, monkeypatch):
+    rendre_sur(
+        monkeypatch,
+        reponse="Série factice A [S:101] convient.",
+        series_citees=[citee(101, "Série factice A", 1, [])],
+        series=[
+            d.serie(101, "Série factice A", [], 1, 0.83),
+            d.serie(103, "Série factice C", [d.passage(31, score=0.64)], 2, 0.64),
+        ],
+    )
+
+    page = soupe(poser(navigateur, coche=True))
+
+    assert lignes_du_classement(page) == [
+        ["1", "Série factice A", "0,83", "citée", "0"],
+        ["2", "Série factice C", "0,64", "non citée", "1"],
+    ]
+    assert page.select_one("#trace ~ table a")["href"] == "#serie-101"
+    assert "Aucun passage cité pour cette série." in plat(page)
+
+
+def test_coche_une_serie_citee_sans_fragment_montre_ses_passages_non_cites(
+    navigateur, doublure
+):
+    doublure.choisir(reponse="sans_fragment")
+
+    page = soupe(poser(navigateur, coche=True))
+
+    assert lignes_du_classement(page)[0][3] == "citée"
+    assert plat(page.select("#trace ~ details")[0].summary) == (
+        "Série factice A : passages non cités (2)"
+    )
+
+
+def test_coche_une_serie_citee_deux_fois_reunit_ses_fragments(navigateur, monkeypatch):
+    rendre_sur(
+        monkeypatch,
+        reponse="Série factice A [S:101] convient.",
+        series_citees=[
+            citee(101, "Série factice A", 1, [11]),
+            citee(101, "Série factice A", 1, [12]),
+        ],
+        series=[
+            d.serie(
+                101,
+                "Série factice A",
+                [d.passage(11, score=0.83), d.passage(12, score=0.47)],
+                1,
+                0.83,
+            ),
+        ],
+    )
+
+    page = soupe(poser(navigateur, coche=True))
+    carte = page.select_one("#serie-101").find_parent("article")
+
+    assert lignes_du_classement(page) == [
+        ["1", "Série factice A", "0,83", "citée", "2"],
+    ]
+    assert [plat(b.p) for b in carte.select("blockquote")] == [
+        "Passage factice n° 11.",
+        "Passage factice n° 12.",
+    ]
+    assert not page.select("#trace ~ details")
+
+
+def test_coche_une_serie_sans_identifiant_est_non_citee_et_sans_ancre(
+    navigateur, monkeypatch
+):
+    sans_identifiant = d.serie(
+        107, "Œuvre factice K", [d.passage(71, "synopsis_kitsu", 0.33)], 3, 0.33
+    )
+    sans_identifiant.update(serie_id=None, entite="kitsu:7", kitsu_id=7)
+    corps = d.reponse_nominale()
+    rendre_sur(monkeypatch, series=[*corps["series"][:2], sans_identifiant])
+
+    page = soupe(poser(navigateur, coche=True))
+
+    lignes = page.select("#trace ~ table tbody tr")
+    assert [plat(td) for td in lignes[2].select("td")] == [
+        "3",
+        "Œuvre factice K",
+        "0,33",
+        "non citée",
+        "1",
+    ]
+    assert lignes[2].select_one("a") is None
+    assert plat(page.select("#trace ~ details")[-1].summary) == (
+        "Œuvre factice K : passages non cités (1)"
+    )
+    assert "Passage factice n° 71." in plat(page)
+
+
 def test_coche_les_reglages_de_la_recherche_et_le_modele_sont_ceux_rendus(navigateur):
     lues = valeurs(soupe(poser(navigateur, coche=True)))
 
@@ -429,6 +553,21 @@ def test_decocher_au_tour_suivant_retire_la_section(navigateur):
 
     assert not case_cochee(second)
     assert second.select_one("#trace") is None
+
+
+@pytest.mark.parametrize(
+    "historique", ["{cassé", echanges(5)], ids=["invalide", "pleine"]
+)
+def test_une_conversation_finie_d_avance_revient_au_defaut(
+    navigateur, doublure, historique
+):
+    """Rien n'est envoyé, et la suite est une nouvelle conversation : comme les autres
+    réglages, la case revient à son défaut."""
+    page = soupe(poser(navigateur, coche=True, historique=historique))
+
+    assert not case_cochee(page)
+    assert page.select_one("#trace") is None
+    assert doublure.corps_recus == []
 
 
 def test_un_cas_degrade_garde_la_case_sans_inventer_de_section(navigateur, doublure):

@@ -27,9 +27,10 @@ navigateur → application (127.0.0.1:8020) → API du modèle (X-API-Key de l'a
                                              └→ fournisseur du profil
 ```
 
-Ce que l'application ne voit jamais : la base, les clés des fournisseurs, les pseudonymes
-(l'API contrôle ses passages et ses sorties ; l'application n'affiche que ce qu'elle rend,
-et aucun chemin ne la contourne).
+Ce que l'application ne voit jamais : la base, les clés des fournisseurs, la liste des
+pseudonymes (l'API contrôle ses sorties ; l'application n'affiche que ce qu'elle rend, et
+aucun chemin ne la contourne). Un passage reste, lui, tel qu'il est au corpus : voir « Le mode
+démonstration ».
 
 **Pilotée par le contrat** : profils disponibles, bornes des réglages, modes et version
 sont lus dans `/v1/info`, relu à chaque page. Le sélecteur de mode n'apparaît que si l'API
@@ -115,7 +116,9 @@ ni score, ni rang, ni passage non cité, ni section (tests sur chaque écran, et
 **Ce que le score est, et n'est pas** : le cosinus entre la question et le meilleur fragment
 d'une série, tel que l'API le rend. Il mesure une ressemblance de textes. Ce n'est ni une note
 de la série, ni une preuve que la réponse est vraie : la recherche propose, le modèle choisit
-parmi ces séries et ne peut en citer aucune autre. La page le dit en tête de la section.
+parmi ces séries. La page le dit en tête de la section. L'API refuse qu'il cite une série hors
+de la recherche ; un titre seulement nommé dans son texte, sans carte, n'est pas contrôlé
+(« Limites déclarées »).
 
 **Les passages non cités** : hors de ce mode, aucun texte n'apparaît au-delà des passages
 cités, et cette règle ne change pas. Ce mode en est la seule exception, décidée. Ils viennent
