@@ -10,6 +10,8 @@
 #   make verify TOUT=1       tous les modules
 #   make verify MODULE=05    un seul module : 01 … 05, 07 … 12, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
+#   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
+#   make app-compose-arret   les arrête
 #   make verify-poste        la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
 #                            harnais du poste seul : fidélité du schéma, équivalence du
@@ -30,7 +32,7 @@ TOUT ?=
 FORCER ?=
 MUTATIONS ?=
 
-.PHONY: verify verify-indicatif verify-poste verify-mutations
+.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -40,6 +42,16 @@ verify-indicatif:
 
 verify-poste:
 	@FORCER=$(FORCER) bash verification/verifier.sh poste
+
+# Le Compose du 11, inchangé, et le fichier de fusion du 12 ; les deux `.env`, nommés.
+APP_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml
+
+app-compose:
+	@$(APP_COMPOSE) up -d --build
+
+app-compose-arret:
+	@$(APP_COMPOSE) down
 
 verify-mutations:
 	@uv run --no-project python -I verification/rejouer_mutations.py $(MUTATIONS)

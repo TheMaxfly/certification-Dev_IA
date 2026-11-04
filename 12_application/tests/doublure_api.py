@@ -716,6 +716,10 @@ class Doublure:
             )
             return {"info": self.scenario_info, "reponse": self.scenario_reponse}
 
+        @app.get("/_essai/ecarts")
+        async def ecarts() -> list[str]:
+            return self.ecarts
+
         @app.get("/v1/info")
         async def route_info(request: Request) -> Response:
             self.cles_recues.append(request.headers.get("X-API-Key"))

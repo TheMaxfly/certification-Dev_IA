@@ -1,0 +1,74 @@
+# L'essai d'intégration de `make verify MODULE=12`, sur le poste comme sur GitHub :
+# l'image de l'application, construite, non root, contre la doublure de l'API,
+# conteneurisée. Aucune API réelle, aucun fournisseur, aucune base ; réseau sans sortie.
+# La clé est jetable, et courte : la doublure ne la juge pas.
+
+name: application-integration
+
+services:
+  doublure:
+    build:
+      context: ..
+      dockerfile: 12_application/Dockerfile
+      target: doublure
+    image: application-conseiller-doublure:essai
+    networks: [essai]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8010/v1/sante', timeout=2)
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+
+  application:
+    build:
+      context: ..
+      dockerfile: 12_application/Dockerfile
+      target: application
+    image: application-conseiller:essai
+    depends_on:
+      doublure:
+        condition: service_healthy
+    environment:
+      APPLICATION_CLE_API: cle-jetable-essai
+      API_MODELE_ADRESSE: http://doublure:8010
+      # L'essai lit /metrics depuis son conteneur : le réseau de l'essai est admis.
+      APPLICATION_METRIQUES_RESEAUX: 0.0.0.0/0
+    networks: [essai]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8020/sante', timeout=2)
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+
+  essai:
+    image: application-conseiller:essai
+    depends_on:
+      application:
+        condition: service_healthy
+    command: ["python", "/essai/essai_http.py"]
+    environment:
+      APPLICATION_URL: http://application:8020
+      DOUBLURE_URL: http://doublure:8010
+    volumes:
+      - ./tests/integration:/essai:ro
+    networks: [essai]
+    healthcheck:
+      disable: true
+
+networks:
+  essai:
+    internal: true

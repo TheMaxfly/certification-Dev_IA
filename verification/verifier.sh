@@ -292,6 +292,10 @@ verifier_module() {
     RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
     echouer "$nom" "intégration Compose" "(11_api_modele/) docker compose ${COMPOSE_11[*]} run --rm -T --build essai"
   fi
+  if [ "$nom" = 12 ] && ! integration_12; then
+    RESUME+=("$nom|$ruff|$format|$passes|$sautes|$plafond|$echecs|$((SECONDS - debut))|$couverture|ÉCHEC")
+    echouer "$nom" "intégration Compose" "(12_application/) docker compose ${COMPOSE_12[*]} run --rm -T --build essai"
+  fi
   local exige=""
   if [ -n "$exigences" ]; then
     if ! exiger "$nom" "$projet" "$exigences"; then
@@ -378,6 +382,21 @@ integration_11() {
   dire "11 — (11_api_modele/) ${cmd[*]}"
   (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/11_api_modele" && "${PROPRE[@]}" docker compose "${COMPOSE_11[@]}" down -v >/dev/null 2>&1)
+  return "$rc"
+}
+
+# L'intégration Compose du 12 (compose.integration.yml) : l'image de l'application contre la
+# doublure de l'API, conteneurisée ; réseau sans sortie, aucune API réelle. Sur le poste
+# comme sur GitHub. Le fichier de fusion sur le Compose du 11 est lu aussi : il doit tenir.
+COMPOSE_12=(--env-file /dev/null -f compose.integration.yml)
+integration_12() {
+  local cmd=(docker compose "${COMPOSE_12[@]}" run --rm -T --build essai) rc
+  dire "12 — (12_application/) docker compose config : le fichier de fusion sur celui du 11"
+  (cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+    -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml config --quiet) || return 1
+  dire "12 — (12_application/) ${cmd[*]}"
+  (cd "$RACINE/12_application" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
+  (cd "$RACINE/12_application" && "${PROPRE[@]}" docker compose "${COMPOSE_12[@]}" down -v >/dev/null 2>&1)
   return "$rc"
 }
 
