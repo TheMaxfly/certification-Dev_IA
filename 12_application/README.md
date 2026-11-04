@@ -187,13 +187,16 @@ par minute du compte (2026-11-03).
   (`-k wcag`) : langue, titres, étiquettes, lien d'évitement, focus, zone annoncée, contraste
   des couleurs du thème calculé.
 - **Ce que l'outil ne couvre pas** : un outil automatique couvre une partie seulement des
-  critères, de l'ordre d'un tiers. Reste une relecture manuelle : parcours complet au
-  clavier, lecture d'une réponse et d'un encart au lecteur d'écran, agrandissement à 200 %,
-  lecture en niveaux de gris.
+  critères, de l'ordre d'un tiers. **Relecture manuelle du 2026-11-05**, dans Firefox, contre
+  la doublure : parcours complet au clavier, agrandissement à 200 %, lecture sans couleur
+  (simulation de Firefox) : sans écart. **Lecteur d'écran** (Orca), sur une réponse et un
+  encart : il lit, mais sa voix est restée inaudible à la relecture : la compréhension à
+  l'oreille **n'est pas jugée**.
 - **Sans JavaScript**, `aria-live` et `role="alert"` n'annoncent rien au chargement d'une
   page : c'est le focus qui annonce, porté sur le titre de la réponse, sur celui de l'encart,
   décrit par son texte, ou sur le champ fautif. L'audit vérifie dans Chromium que le focus y
-  est ; ce qu'en dit un lecteur d'écran reste à la relecture manuelle.
+  est, et l'arbre d'accessibilité porte ces titres et ce texte ; ce qu'en dit un lecteur
+  d'écran n'a pas été jugé à l'oreille.
 
 ## Sécurité et données
 

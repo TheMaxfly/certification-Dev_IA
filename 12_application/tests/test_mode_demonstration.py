@@ -23,7 +23,7 @@ PHRASE = (
     "réponse est vraie : la recherche propose, le modèle choisit parmi ces séries, et "
     "il ne peut en citer aucune autre en carte."
 )
-INFOBULLE = "similarité entre la question et le passage (0 à 1)"
+INFOBULLE = "similarité entre la question et le passage (cosinus, 0 à 1)"
 #: Chaque score de la réponse nominale, tel que l'écran les écrirait.
 SCORES = ("0,83", "0,76", "0,64", "0,52", "0,40", "0,47", "0,61")
 #: Les passages que le modèle n'a pas cités, y compris dans une série citée.
@@ -428,19 +428,19 @@ def test_coche_les_reglages_de_la_recherche_et_le_modele_sont_ceux_rendus(naviga
     assert lues == {
         "Question d'origine": QUESTION,
         "Question reformulée": "sans reformulation",
-        "Partie dans la recherche": "la question d'origine",
-        "nombre_series": "5",
-        "passages_par_serie": "2",
-        "catalogue_seul": "oui",
+        "Envoyée à la recherche": "la question d'origine",
+        "Séries demandées (nombre_series)": "5",
+        "Passages par série (passages_par_serie)": "2",
+        "Catalogue seul (catalogue_seul)": "oui",
         "Modèle d'embedding": "modele-embedding-factice",
         "Révision": "00000000",
-        "corpus_id": "v2",
-        "encodage_id": "3",
+        "Corpus (corpus_id)": "v2",
+        "Encodage (encodage_id)": "3",
         "Profil": "mistral-large-2512",
         "Fournisseur": "mistral",
         "Modèle": "modele-de-mistral-large-2512",
         "Température": "0",
-        "Longueur": "400",
+        "Longueur maximale (jetons)": "400",
         "Coût estimé": "0,000160 $",
         "Latence de la recherche": "100 ms",
         "Latence de la reformulation": "—",
@@ -497,7 +497,7 @@ def test_coche_la_question_dit_laquelle_a_cherche(
 
     assert lues["Question d'origine"] == QUESTION
     assert lues["Question reformulée"] == reformulee
-    assert lues["Partie dans la recherche"] == partie
+    assert lues["Envoyée à la recherche"] == partie
 
 
 def test_coche_catalogue_seul_a_faux_se_dit(navigateur, doublure, monkeypatch):
@@ -518,7 +518,9 @@ def test_coche_catalogue_seul_a_faux_se_dit(navigateur, doublure, monkeypatch):
         ),
     )
 
-    assert valeurs(soupe(poser(navigateur, coche=True)))["catalogue_seul"] == "non"
+    lues = valeurs(soupe(poser(navigateur, coche=True)))
+
+    assert lues["Catalogue seul (catalogue_seul)"] == "non"
 
 
 # --------------------------------------------------------------------------- #
@@ -691,13 +693,13 @@ def test_un_contexte_sans_les_champs_de_la_trace_se_lit_tiret(navigateur, doublu
 
     assert r.status_code == 200
     for nom in (
-        "nombre_series",
-        "passages_par_serie",
-        "catalogue_seul",
+        "Séries demandées (nombre_series)",
+        "Passages par série (passages_par_serie)",
+        "Catalogue seul (catalogue_seul)",
         "Modèle d'embedding",
         "Révision",
         "Température",
-        "Longueur",
+        "Longueur maximale (jetons)",
         "Coût estimé",
         "Latence de la recherche",
         "Latence du modèle",
