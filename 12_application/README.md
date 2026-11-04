@@ -325,10 +325,11 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
   ou après sa marque ; une emphase qui ouvre avant le titre et le ferme après lui
   (`*Un : Titre* [S:1]`) laisse ses astérisques ; un saut de ligne simple ne coupe pas le
   paragraphe. Ces formes n'ont pas été vues dans les réponses mesurées.
-- **La température 0 ne rejoue pas le texte** : aucune graine n'est envoyée. Le 2026-11-04,
-  sur une même question posée quatre fois à 0, les mêmes séries sont revenues en carte, le
-  texte a changé, et le nombre de séries nommées aussi (2, 2, 5, 2). Une seule question :
-  c'est un constat, pas une mesure. L'essai d'une graine par profil reste à mesurer.
+- **La température 0 ne rejoue ni le texte, ni toujours les séries** : aucune graine n'est
+  envoyée. Le 2026-11-04, sur une même question posée cinq fois à 0, le texte a changé chaque
+  fois ; deux séries sont revenues en carte les cinq fois, une troisième s'y est ajoutée la
+  dernière ; séries nommées : 2, 2, 5, 2, 3. Une seule question : c'est un constat, pas une
+  mesure. L'essai d'une graine par profil reste à mesurer.
 - **Une série nommée sans carte** : le modèle peut marquer une série que ses
   `series_citees` ne portent pas, et l'API ne contrôle pas ce cas. La marque est masquée :
   le titre écrit par le modèle reste, sans lien ni carte, non contrôlé ; l'identifiant est

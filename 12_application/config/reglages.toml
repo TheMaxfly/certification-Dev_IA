@@ -31,8 +31,8 @@ motif = "0 : la seule valeur mesurée. mistral-large-4 n'est pas proposé tant q
 [[reglages.positions]]
 valeur = 0.0
 nom = "stable"
-etiquette = "Stable (0) : les mêmes séries reviennent ; le texte peut varier."
-motif = "Le défaut : ce qu'un conseil sourcé veut. Aucune graine n'est envoyée : le 2026-11-04, sur une question posée quatre fois à 0, les mêmes séries sont revenues en carte et le texte a changé."
+etiquette = "Stable (0) : le réglage le plus bas ; séries et texte peuvent varier."
+motif = "Le défaut : ce qu'un conseil sourcé veut. Aucune graine n'est envoyée : le 2026-11-04, sur une question posée cinq fois à 0, le texte a changé chaque fois, et une troisième série est venue en carte à la cinquième."
 
 [[reglages.positions]]
 valeur = 0.3
