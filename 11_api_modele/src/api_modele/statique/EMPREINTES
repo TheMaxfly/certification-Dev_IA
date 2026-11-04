@@ -1,0 +1,6 @@
+# Les ressources vendues, vérifiées par un test.
+# Swagger UI 5.33.1, licence Apache 2.0 (LICENCE-swagger-ui, NOTICE-swagger-ui) : paquet
+# npm swagger-ui-dist, intégrité au registre vérifiée le 2026-11-04 ; ce sont les deux
+# fichiers que la page chargeait d'un CDN, mêmes empreintes d'intégrité.
+050bc415ee7048dcd881682678f720264e7da5e373f7461d7c58c755305255f7  swagger-ui-bundle.js
+1ac324f7dcd27e4b9386b4bd6421271ec147e922a22c05ba24b11515e9aa6321  swagger-ui.css
