@@ -255,7 +255,7 @@ def test_les_limites_configurees_egalent_le_contrat():
 
 
 def test_le_fichier_d_exemple_ne_porte_que_des_noms():
-    texte = (FICHIER_REGLAGES.parents[1] / "env.exemple").read_text(encoding="utf-8")
+    texte = (FICHIER_REGLAGES.parents[1] / ".env.example").read_text(encoding="utf-8")
 
     affectations = re.findall(r"^(\w+)=(.*)$", texte, re.M)
     assert {nom for nom, _ in affectations} == {

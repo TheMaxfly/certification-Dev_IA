@@ -2,7 +2,7 @@
 #
 # Versionné, lu et validé au démarrage par `application.config`, seul lecteur ; une
 # valeur fautive, un texte absent : l'application refuse de démarrer. La clé de l'API
-# vit dans `.env` (hors dépôt, modèle : `env.exemple`), jamais ici.
+# vit dans `.env` (hors dépôt, modèle : `.env.example`), jamais ici.
 
 [api]
 adresse = "http://127.0.0.1:8010"

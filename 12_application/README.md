@@ -197,7 +197,7 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
 | `[textes]` | tous les textes des écrans | une seule source ; un texte absent empêche de démarrer |
 
-| Variable (`env.exemple`) | Rôle |
+| Variable (`.env.example`) | Rôle |
 |---|---|
 | `APPLICATION_CLE_API` | la clé de l'application, obligatoire |
 | `API_MODELE_ADRESSE` | l'adresse de l'API |
@@ -212,7 +212,7 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 Depuis ce dossier :
 
 ```bash
-cp env.exemple .env      # APPLICATION_CLE_API : le secret seul, sans son nom
+cp .env.example .env     # APPLICATION_CLE_API : le secret seul, sans son nom
 uv sync --locked
 uv run --env-file .env python -m application
 ```
