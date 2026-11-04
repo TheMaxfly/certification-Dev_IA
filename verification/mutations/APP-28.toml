@@ -1,0 +1,9 @@
+id = "APP-28"
+origine = "E3 étape 4, spec 08 (2026-11-04) — les passages non cités seraient dépliés d'emblée"
+fichier = "12_application/src/application/gabarits/composants/trace.html"
+avant = '''<details>
+<summary>{{ groupe.resume }}</summary>'''
+apres = '''<details open>
+<summary>{{ groupe.resume }}</summary>'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "replies_par_serie"]

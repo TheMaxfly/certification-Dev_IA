@@ -7824,6 +7824,162 @@
    ],
    "violations": []
   },
+  "refus_demonstration": {
+   "inapplicable": [
+    "accesskeys",
+    "area-alt",
+    "aria-allowed-role",
+    "aria-braille-equivalent",
+    "aria-command-name",
+    "aria-deprecated-role",
+    "aria-dialog-name",
+    "aria-hidden-focus",
+    "aria-input-field-name",
+    "aria-meter-name",
+    "aria-progressbar-name",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-tab-name",
+    "aria-text",
+    "aria-toggle-field-name",
+    "aria-tooltip-name",
+    "aria-treeitem-name",
+    "autocomplete-valid",
+    "avoid-inline-spacing",
+    "blink",
+    "empty-table-header",
+    "frame-focusable-content",
+    "frame-tested",
+    "frame-title",
+    "frame-title-unique",
+    "html-xml-lang-mismatch",
+    "image-alt",
+    "image-redundant-alt",
+    "input-button-name",
+    "input-image-alt",
+    "label-content-name-mismatch",
+    "link-in-text-block",
+    "marquee",
+    "meta-refresh",
+    "no-autoplay-audio",
+    "object-alt",
+    "presentation-role-conflict",
+    "role-img-alt",
+    "scope-attr-valid",
+    "scrollable-region-focusable",
+    "server-side-image-map",
+    "skip-link",
+    "svg-img-alt",
+    "table-duplicate-name",
+    "td-headers-attr",
+    "th-has-data-cells",
+    "valid-lang",
+    "video-caption"
+   ],
+   "incomplete": [
+    {
+     "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": [
+      {
+       "all": [],
+       "any": [
+        {
+         "data": {
+          "bgColor": null,
+          "colorParse": null,
+          "contrastRatio": 0,
+          "expectedContrastRatio": "4.5:1",
+          "fgColor": null,
+          "fontSize": "15.0pt (20px)",
+          "fontWeight": "normal",
+          "messageKey": "bgImage",
+          "shadowColor": null
+         },
+         "id": "color-contrast",
+         "impact": "serious",
+         "message": "Element's background color could not be determined due to a background image",
+         "relatedNodes": [
+          {
+           "html": "<select id=\"profil\" name=\"profil\">",
+           "target": [
+            "#profil"
+           ]
+          }
+         ]
+        }
+       ],
+       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background image",
+       "html": "<select id=\"profil\" name=\"profil\">",
+       "impact": "serious",
+       "none": [],
+       "target": [
+        "#profil"
+       ]
+      }
+     ],
+     "tags": [
+      "cat.color",
+      "wcag2aa",
+      "wcag143",
+      "TTv5",
+      "TT13.c",
+      "EN-301-549",
+      "EN-9.1.4.3",
+      "ACT",
+      "RGAAv4",
+      "RGAA-3.2.1"
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-hidden-body",
+    "aria-prohibited-attr",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "definition-list",
+    "dlitem",
+    "document-title",
+    "duplicate-id-aria",
+    "empty-heading",
+    "form-field-multiple-labels",
+    "heading-order",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "label-title-only",
+    "landmark-banner-is-top-level",
+    "landmark-contentinfo-is-top-level",
+    "landmark-main-is-top-level",
+    "landmark-no-duplicate-banner",
+    "landmark-no-duplicate-contentinfo",
+    "landmark-no-duplicate-main",
+    "landmark-one-main",
+    "landmark-unique",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "meta-viewport-large",
+    "nested-interactive",
+    "page-has-heading-one",
+    "region",
+    "select-name",
+    "summary-name",
+    "tabindex"
+   ],
+   "violations": []
+  },
   "refus_hors_catalogue": {
    "inapplicable": [
     "accesskeys",
@@ -8445,6 +8601,162 @@
     "select-name",
     "summary-name",
     "tabindex"
+   ],
+   "violations": []
+  },
+  "reponse_demonstration": {
+   "inapplicable": [
+    "accesskeys",
+    "area-alt",
+    "aria-allowed-role",
+    "aria-braille-equivalent",
+    "aria-command-name",
+    "aria-deprecated-role",
+    "aria-dialog-name",
+    "aria-hidden-focus",
+    "aria-input-field-name",
+    "aria-meter-name",
+    "aria-progressbar-name",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-tab-name",
+    "aria-text",
+    "aria-toggle-field-name",
+    "aria-tooltip-name",
+    "aria-treeitem-name",
+    "autocomplete-valid",
+    "avoid-inline-spacing",
+    "blink",
+    "frame-focusable-content",
+    "frame-tested",
+    "frame-title",
+    "frame-title-unique",
+    "html-xml-lang-mismatch",
+    "image-alt",
+    "image-redundant-alt",
+    "input-button-name",
+    "input-image-alt",
+    "label-content-name-mismatch",
+    "marquee",
+    "meta-refresh",
+    "no-autoplay-audio",
+    "object-alt",
+    "presentation-role-conflict",
+    "role-img-alt",
+    "scrollable-region-focusable",
+    "server-side-image-map",
+    "skip-link",
+    "svg-img-alt",
+    "valid-lang",
+    "video-caption"
+   ],
+   "incomplete": [
+    {
+     "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+     "id": "color-contrast",
+     "impact": "serious",
+     "nodes": [
+      {
+       "all": [],
+       "any": [
+        {
+         "data": {
+          "bgColor": null,
+          "colorParse": null,
+          "contrastRatio": 0,
+          "expectedContrastRatio": "4.5:1",
+          "fgColor": null,
+          "fontSize": "15.0pt (20px)",
+          "fontWeight": "normal",
+          "messageKey": "bgImage",
+          "shadowColor": null
+         },
+         "id": "color-contrast",
+         "impact": "serious",
+         "message": "Element's background color could not be determined due to a background image",
+         "relatedNodes": [
+          {
+           "html": "<select id=\"profil\" name=\"profil\">",
+           "target": [
+            "#profil"
+           ]
+          }
+         ]
+        }
+       ],
+       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background image",
+       "html": "<select id=\"profil\" name=\"profil\">",
+       "impact": "serious",
+       "none": [],
+       "target": [
+        "#profil"
+       ]
+      }
+     ],
+     "tags": [
+      "cat.color",
+      "wcag2aa",
+      "wcag143",
+      "TTv5",
+      "TT13.c",
+      "EN-301-549",
+      "EN-9.1.4.3",
+      "ACT",
+      "RGAAv4",
+      "RGAA-3.2.1"
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-hidden-body",
+    "aria-prohibited-attr",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "definition-list",
+    "dlitem",
+    "document-title",
+    "duplicate-id-aria",
+    "empty-heading",
+    "empty-table-header",
+    "form-field-multiple-labels",
+    "heading-order",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "label-title-only",
+    "landmark-banner-is-top-level",
+    "landmark-contentinfo-is-top-level",
+    "landmark-main-is-top-level",
+    "landmark-no-duplicate-banner",
+    "landmark-no-duplicate-contentinfo",
+    "landmark-no-duplicate-main",
+    "landmark-one-main",
+    "landmark-unique",
+    "link-in-text-block",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "meta-viewport-large",
+    "nested-interactive",
+    "page-has-heading-one",
+    "region",
+    "scope-attr-valid",
+    "select-name",
+    "summary-name",
+    "tabindex",
+    "table-duplicate-name",
+    "td-headers-attr",
+    "th-has-data-cells"
    ],
    "violations": []
   },

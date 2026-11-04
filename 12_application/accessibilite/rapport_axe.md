@@ -3,7 +3,7 @@
 - **Date** : 2026-11-04.
 - **Outil** : axe-core 4.14.0, dans Chromium 156.0.8078.4.
 - **Niveau visé** : WCAG 2.1 AA (étiquettes : wcag2a, wcag2aa, wcag21a, wcag21aa, best-practice).
-- **Pages auditées** : 61, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
+- **Pages auditées** : 63, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
 - **Violations par gravité** : critical 0, serious 0, moderate 0, minor 0.
 - **Violations de la politique de sécurité en console** : 0.
 
@@ -73,10 +73,12 @@ Aucun.
 | `page_404` | 23 | 0 | 0 | 67 |
 | `page_vide` | 34 | 0 | 1 | 56 |
 | `refus_aucun_passage` | 36 | 0 | 1 | 54 |
+| `refus_demonstration` | 39 | 0 | 1 | 51 |
 | `refus_hors_catalogue` | 37 | 0 | 1 | 53 |
 | `refus_inconnu` | 37 | 0 | 1 | 53 |
 | `reponse` | 40 | 0 | 1 | 50 |
 | `reponse_complement` | 40 | 0 | 1 | 50 |
+| `reponse_demonstration` | 45 | 0 | 1 | 45 |
 | `reponse_metadonnees_nulles` | 39 | 0 | 1 | 51 |
 | `reponse_reformulee` | 40 | 0 | 1 | 50 |
 | `reponse_refus_debit` | 40 | 0 | 1 | 50 |

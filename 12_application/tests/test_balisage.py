@@ -39,16 +39,16 @@ class Page:
 def rendre(client: TestClient, ecran: Ecran) -> httpx.Response:
     if ecran.question is None:
         return client.get(ecran.chemin)
-    return client.post(
-        "/question",
-        data={
-            "question": ecran.question,
-            "profil": ecran.profil,
-            "temperature": ecran.temperature,
-            "reformuler": "1",
-            "historique": ecran.historique,
-        },
-    )
+    donnees = {
+        "question": ecran.question,
+        "profil": ecran.profil,
+        "temperature": ecran.temperature,
+        "reformuler": "1",
+        "historique": ecran.historique,
+    }
+    if ecran.demonstration:
+        donnees["mode_demonstration"] = "1"
+    return client.post("/question", data=donnees)
 
 
 @pytest.fixture(scope="module")
@@ -272,6 +272,53 @@ def test_wcag_1_4_1_chaque_etat_a_un_texte(pages):
         for fautif in page.soupe.select("[aria-invalid=true]"):
             lie = page.soupe.select_one(f"#{fautif['aria-describedby'].split()[-1]}")
             assert lie.get_text(strip=True), page.ecran.nom
+
+
+def test_wcag_1_3_1_le_classement_a_des_en_tetes_de_colonnes(pages):
+    vus = 0
+    for page in pages:
+        for tableau in page.soupe.select("#trace ~ table"):
+            entetes = tableau.select("thead th")
+            assert len(entetes) == 5, page.ecran.nom
+            for entete in entetes:
+                assert entete["scope"] == "col", page.ecran.nom
+                assert entete.get_text(strip=True), page.ecran.nom
+            for ligne in tableau.select("tbody tr"):
+                assert len(ligne.select("td")) == 5, page.ecran.nom
+            vus += 1
+    assert vus == 1, "la réponse en mode démonstration ; le refus n'a aucune série"
+
+
+def test_wcag_4_1_2_chaque_details_a_un_resume_signifiant(pages):
+    for page in pages:
+        for details in page.soupe.select("details"):
+            resume = details.find("summary", recursive=False)
+            assert resume is not None, page.ecran.nom
+            assert resume.get_text(strip=True), page.ecran.nom
+    demonstration = next(p for p in pages if p.ecran.nom == "reponse_demonstration")
+    resumes = [
+        d.summary.get_text(strip=True)
+        for d in demonstration.soupe.select("#trace ~ details")
+    ]
+    assert resumes == [
+        "Série factice A : passages non cités (1)",
+        "Série factice C : passages non cités (1)",
+        "Série factice D : passages non cités (1)",
+        "Série factice E : passages non cités (1)",
+    ]
+
+
+def test_sans_le_mode_aucun_ecran_ne_porte_score_ni_rang_ni_section(pages):
+    """Le seul mot permis : celui de l'étiquette de la case, qu'il faut bien lire."""
+    etiquette = charger(ENVIRONNEMENT).textes["demonstration_etiquette"]
+    for page in pages:
+        if page.ecran.demonstration:
+            continue
+        html = str(page.soupe).replace(etiquette, "").lower()
+        assert "score" not in html, page.ecran.nom
+        assert not re.search(r"\brang\b", html), page.ecran.nom
+        assert "trace de la recherche" not in html, page.ecran.nom
+        assert page.soupe.select_one("#trace") is None, page.ecran.nom
 
 
 def test_nouvelle_conversation_est_un_bouton_en_tete_de_chaque_ecran(pages):

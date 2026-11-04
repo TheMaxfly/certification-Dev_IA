@@ -1,0 +1,7 @@
+id = "APP-26"
+origine = "E3 étape 4, spec 08 (2026-11-04) — le classement suivrait l'ordre reçu, pas le rang"
+fichier = "12_application/src/application/presentation.py"
+avant = '''    series = sorted(corps.series, key=ordre_du_rang)'''
+apres = '''    series = corps.series'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "suit_le_rang"]

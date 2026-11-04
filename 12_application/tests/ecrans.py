@@ -36,6 +36,8 @@ class Ecran:
     neuve: bool = False
     #: Un délai de réponse réduit : la doublure le dépasse.
     delai_court: bool = False
+    #: La case « Mode démonstration », cochée dans le formulaire envoyé.
+    demonstration: bool = False
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -70,6 +72,13 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("refus_aucun_passage", question=QUESTION, reponse="refus_aucun_passage"),
     Ecran("refus_hors_catalogue", question=QUESTION, reponse="refus_hors_catalogue"),
     Ecran("refus_inconnu", question=QUESTION, reponse="refus_inconnu"),
+    Ecran("reponse_demonstration", question=QUESTION, demonstration=True),
+    Ecran(
+        "refus_demonstration",
+        question=QUESTION,
+        reponse="refus_aucun_passage",
+        demonstration=True,
+    ),
     Ecran("conversation_3_tours", question=QUESTION, historique=echanges(1)),
     Ecran("conversation_5_tours", question=QUESTION, historique=echanges(2)),
     Ecran("conversation_close", question=QUESTION, historique=echanges(4)),

@@ -62,6 +62,9 @@ PREPARER = """(valeurs) => {
   }
   const radio = document.querySelector("input[name=temperature]:checked");
   if (radio) radio.value = valeurs.temperature;
+  if (valeurs.demonstration) {
+    document.querySelector("#mode_demonstration").checked = true;
+  }
 }"""
 OUVRIR = "() => document.querySelectorAll('details').forEach((d) => { d.open = true; })"
 LANCER = """(etiquettes) => axe.run(document, {
@@ -82,6 +85,7 @@ def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
             "historique": ecran.historique,
             "profil": ecran.profil,
             "temperature": ecran.temperature,
+            "demonstration": ecran.demonstration,
         },
     )
     with page.expect_navigation():
