@@ -307,7 +307,7 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 | pool de connexions | 1 à 5, attente 5 s | — | — | sous la borne du rôle (10 connexions) |
 | réseaux de `/metrics` | le bouclage | — | `API_MODELE_METRIQUES_RESEAUX` | Prometheus sur le poste ; 404 ailleurs |
 | question au journal | faux | — | `API_MODELE_JOURNAL_QUESTION` | une question peut porter une donnée personnelle |
-| documentation interactive | faux | — | `API_MODELE_DOCUMENTATION` | Swagger UI charge deux fichiers d'un CDN (version exacte, empreinte d'intégrité) |
+| documentation interactive | faux | — | `API_MODELE_DOCUMENTATION` | on l'allume pour la démontrer ou pour essayer les routes ; Swagger UI est servi par l'API, sans ressource réseau |
 | instance du service | `embeddinggemma` | — | `CLIENT_HOTE` (son hôte) | l'instance du 09 qui sert l'encodage en service |
 | table des vecteurs | `bench.vecteurs_embeddinggemma` | `bench.vecteurs_<modèle>` | — | celle de la mesure 8 |
 | besoin de mémoire | 1,9 Go | — | — | le pic mesuré ; ajouté au seuil du service dans `verify-poste` (6,9 Go) |
@@ -1030,9 +1030,10 @@ restent mesurées sur l'invite d'avant.
   disponibles sont exigés par `verify-poste`.
 - **`/metrics` dans le Compose** : vu de l'hôte, le client n'est pas le bouclage du
   conteneur. Admettre le réseau de Prometheus par `API_MODELE_METRIQUES_RESEAUX`.
-- **La documentation interactive** charge Swagger UI depuis un CDN, à version exacte
-  et sous empreinte d'intégrité. Elle est désactivée par défaut. Le contrat, lui, est
-  toujours servi.
+- **La documentation interactive** sert Swagger UI 5.33.1 depuis l'API : les deux
+  fichiers sont vendus dans `src/api_modele/statique/`, avec leurs empreintes et leur
+  licence (Apache 2.0). La page ne charge rien d'ailleurs et fonctionne sans réseau.
+  Elle est désactivée par défaut. Le contrat, lui, est toujours servi.
 
 ## Ajouter un profil, ou un fournisseur
 
