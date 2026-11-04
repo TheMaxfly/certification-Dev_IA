@@ -45,6 +45,20 @@ def test_le_titre_en_emphase_apres_la_marque_garde_son_emphase():
     )
 
 
+def test_l_emphase_apres_la_marque_se_ferme_apres_la_ponctuation_du_titre():
+    assert p.segments_de("[S:102] *Série factice B !* suit.", TITRES)[-2:] == [
+        lien(102, Segment("em", "Série factice B !")),
+        Segment("texte", " suit."),
+    ]
+
+
+def test_une_marque_redite_juste_apres_son_titre_ne_le_double_pas():
+    segments = p.segments_de("[S:101] Série factice A [S:101] convient.", TITRES)
+
+    assert [s.genre for s in segments].count("lien") == 1
+    assert segments[-1] == Segment("texte", " convient.")
+
+
 def test_sans_titre_autour_le_lien_porte_le_titre_du_catalogue():
     assert p.segments_de("Lisez [S:101] sans attendre.", TITRES) == [
         Segment("texte", "Lisez "),
@@ -74,7 +88,8 @@ def test_deux_marques_de_suite_ne_mordent_pas_l_une_sur_l_autre():
         ("un *mot* ici", ["texte", "em", "texte"]),
         ("un **mot** ici", ["texte", "strong", "texte"]),
         ("*seul", ["texte"]),
-        ("2 * 3 * 4", ["texte", "em", "texte"]),
+        ("2 * 3 * 4", ["texte"]),
+        ("4* et 5*", ["texte"]),
         ("", []),
     ],
 )
@@ -118,6 +133,20 @@ def test_les_cartes_ne_portent_que_les_series_et_les_passages_cites(reglages):
         "résumé de série",
         "critique de tome",
     ]
+
+
+def test_une_serie_citee_deux_fois_fait_une_seule_carte(reglages):
+    corps = corps_de("nominale")
+    double = corps.series_citees[0].model_copy(update={"fragment_ids": [12]})
+    corps.series_citees = [corps.series_citees[0], double]
+
+    cartes = p.cartes_de(corps, reglages.textes)
+
+    assert [c.serie_id for c in cartes] == [101]
+    assert {x.texte for x in cartes[0].passages} == {
+        "Passage factice n° 11.",
+        "Passage factice n° 12.",
+    }
 
 
 def test_une_serie_citee_absente_de_series_n_a_pas_de_carte(reglages):

@@ -32,6 +32,10 @@ class Ecran:
     temperature: str = "0.0"
     #: L'application pointe une adresse où rien n'écoute.
     api_fermee: bool = False
+    #: L'application n'a jamais lu de liste : une instance neuve.
+    neuve: bool = False
+    #: Un délai de réponse réduit : la doublure le dépasse.
+    delai_court: bool = False
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -52,7 +56,7 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("page_vide"),
     Ecran("deux_modes", info="deux_modes"),
     Ecran("aucun_profil", info="aucun_profil"),
-    Ecran("cle_refusee", info="cle_invalide"),
+    Ecran("cle_refusee", info="cle_invalide", neuve=True),
     Ecran("api_indisponible", api_fermee=True),
     Ecran("reponse", question=QUESTION),
     Ecran("reponse_reformulee", question=QUESTION, reponse="reformulee"),
@@ -77,6 +81,8 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("erreur_profil", question=QUESTION, profil="profil-inconnu"),
     Ecran("erreur_temperature", question=QUESTION, temperature="0.9"),
     *(Ecran(f"degrade_{nom}", question=QUESTION, reponse=nom) for nom in DEGRADES),
+    Ecran("degrade_api_injoignable", question=QUESTION, api_fermee=True),
+    Ecran("degrade_delai", question=QUESTION, reponse="delai", delai_court=True),
     Ecran("a_propos", chemin="/a-propos"),
     Ecran("a_propos_sans_api", chemin="/a-propos", api_fermee=True),
     Ecran("page_404", chemin="/route-inconnue"),

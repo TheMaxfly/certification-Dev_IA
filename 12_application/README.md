@@ -40,8 +40,8 @@ vendue avec son empreinte) et `theme.css`, des variables seules : l'habillage se
 
 ## Ensembles fonctionnels → écran
 
-Les ensembles fonctionnels de l'expression de besoin, et ce qui les sert. Les mesures sont
-au README de l'API du modèle.
+Les ensembles fonctionnels de l'expression de besoin, et ce qui les sert. Les mesures, par
+famille de questions, sont au README de l'API du modèle.
 
 | Ensemble | Le libraire attend | Écran ou comportement |
 |---|---|---|
@@ -118,8 +118,9 @@ Un refus (`200`, `refus` vrai) n'est pas un cas dégradé : c'est une réponse.
 **Après un 429, le bouton reste actif** : sans JavaScript, un bouton désactivé ne se
 réactive jamais. Le nombre de secondes est affiché parce qu'un clic trop tôt n'est pas
 toujours gratuit : le 429 de l'API l'est, mais avec un historique la reformulation passe
-avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ au plus,
-mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15 par minute du compte.
+avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ au plus, au
+prix du profil actif, mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15
+par minute du compte (2026-11-03).
 
 ## Accessibilité
 
@@ -129,7 +130,8 @@ mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15 par minu
   active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
 - **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
-  sortie brute, `rapport_axe.json` : versionnés, réécrits par le test.
+  sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
+  **Défauts inscrits : aucun.** Une règle reste à relire à l'œil, dite au rapport.
 - **Sans navigateur, sur le poste et sur GitHub** : des tests de balisage par critère
   (`-k wcag`) : langue, titres, étiquettes, lien d'évitement, focus, zone annoncée, contraste
   des couleurs du thème calculé.
@@ -139,15 +141,18 @@ mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15 par minu
   lecture en niveaux de gris.
 - **Sans JavaScript**, `aria-live` et `role="alert"` n'annoncent rien au chargement d'une
   page : c'est le focus qui annonce, porté sur le titre de la réponse, sur celui de l'encart,
-  décrit par son texte, ou sur le champ fautif.
+  décrit par son texte, ou sur le champ fautif. L'audit vérifie dans Chromium que le focus y
+  est ; ce qu'en dit un lecteur d'écran reste à la relecture manuelle.
 
 ## Sécurité et données
 
 - **La clé de l'application** : un consommateur de l'API, `application`, révocable à part.
-  Générée sur le poste, posée dans le `.env` du module de l'API (`API_MODELE_CLES`,
-  `nom:secret`) et dans celui de ce module (`APPLICATION_CLE_API`, le secret seul). Jamais
-  dans un fichier suivi, une page, un journal : un test le vérifie, et les hooks la refusent
-  par valeur et par aspect. Pour la révoquer : la retirer du trousseau, redémarrer l'API.
+  Générée sur le poste, 32 caractères au moins, en ASCII :
+  `uv run --no-project python -c "import secrets; print(secrets.token_urlsafe(32))"`. Posée
+  dans le `.env` du module de l'API (`API_MODELE_CLES`, `nom:secret`) et dans celui de ce
+  module (`APPLICATION_CLE_API`, le secret seul). Jamais dans un fichier suivi, une page, un
+  journal : un test le vérifie, et les hooks la refusent par valeur et par aspect. Pour la
+  révoquer : la retirer du trousseau, redémarrer l'API.
 - **En-têtes** : politique de sécurité du contenu stricte (aucun script, aucune ressource
   externe ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14 occurrences,
   toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
@@ -171,6 +176,7 @@ mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15 par minu
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
 | Authentification, sessions, contrôle d'accès, journalisation des accès | **relèvent de l'épreuve E4** : pas de comptes ici |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
+| Requêtes intersites | **non contrôlées à ce stade** : `POST /question` ne lit ni `Origin` ni `Sec-Fetch-Site`. Sans compte ni cookie, il n'y a rien à voler, mais un site tiers ouvert sur le poste du libraire pourrait déclencher un appel facturé. Limite déclarée, à traiter avec les sessions de l'épreuve E4 |
 
 ## Configuration
 
@@ -181,11 +187,11 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 |---|---|---|
 | `[api] adresse` | `http://127.0.0.1:8010` | l'API du modèle sur le poste |
 | `[api] identite` | `libraire-demo` | fixe tant qu'il n'y a pas de comptes |
-| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s), pas le pire cas théorique de l'API (90 à 240 s) |
+| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
 | `[api.attentes]` | 60 s, 2 s | l'attente annoncée sans `Retry-After` lisible |
 | `[reglages]` | température 0, reformulation cochée, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
 | `[conversation]` | 500 caractères par question, 5 échanges, 10 tours, 4 000 caractères, 2 000 par tour | les bornes de l'API ; celles que `/v1/info` publie l'emportent, un écart est journalisé ; la longueur d'un tour est comparée au contrat par un test |
-| `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ |
+| `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
@@ -197,10 +203,13 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `API_MODELE_ADRESSE` | l'adresse de l'API |
 | `APPLICATION_ECOUTE` | `hôte:port` |
 | `APPLICATION_METRIQUES_RESEAUX` | les réseaux admis à lire `/metrics`, séparés par des virgules |
+| `APPLICATION_PORT_PUBLIE` | le port publié par le Compose ; défaut 8020 |
 
 ## Démarrer
 
 ### Seule, l'API tournant déjà
+
+Depuis ce dossier :
 
 ```bash
 cp env.exemple .env      # APPLICATION_CLE_API : le secret seul, sans son nom
@@ -217,10 +226,15 @@ make app-compose         # depuis la racine du dépôt
 make app-compose-arret
 ```
 
-Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. Il ajoute
-deux réseaux : `applicatif`, l'application et l'API, rien d'autre ; `publication`, le port,
-sur l'adresse locale seule. Dans le `.env` de l'API, ajouter à la ligne `API_MODELE_CLES`,
-séparé par une virgule, `application:<secret>` : une seconde ligne remplacerait la première.
+Il faut les deux `.env`, celui de ce module et celui de l'API. Dans le second, ajouter à la
+ligne `API_MODELE_CLES`, séparé par une virgule, `application:<secret>` : une seconde ligne
+remplacerait la première.
+
+Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **Seule
+l'application est publiée**, sur l'adresse locale ; on atteint l'API par elle. Il ajoute deux
+réseaux : `applicatif`, l'application et l'API, rien d'autre ; `publication`, pour le port :
+Docker ne publie pas sur un réseau interne, celui-ci a donc une route vers l'extérieur, que
+l'application n'emploie pas.
 
 ## Vérifier
 
@@ -231,9 +245,9 @@ make verify-poste        # l'audit d'accessibilité, entre autres
 
 L'essai d'intégration lève l'image de l'application contre la doublure de l'API,
 conteneurisée, sur un réseau sans sortie. Aucun test n'atteint l'API réelle ni un
-fournisseur : une garde coupe toute requête hors du bouclage.
+fournisseur : une garde coupe toute requête du client de l'application hors du bouclage.
 
-Une seule installation, hors de `make verify`, pour l'audit :
+Une seule installation, hors de `make verify`, pour l'audit ; depuis ce dossier :
 
 ```bash
 uv run --locked --extra dev --extra audit playwright install chromium
@@ -243,8 +257,8 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 ## Limites déclarées
 
 - **Une instance**, aucune mémoire partagée.
-- **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute, est rendu
-  à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
+- **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute
+  (2026-11-03), est rendu à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
   quota par poste : épreuve E4.
 - **Aucune personnalisation** : pas de compte.
 - **Un seul écran.**
@@ -252,6 +266,10 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 - **Au-delà de 75 s**, l'écran dit « délai dépassé » pendant que l'API peut continuer, et
   l'appel peut être facturé.
 - **Un texte presque tout en japonais** peut dépasser les 16 Kio du corps : page d'erreur.
+- **Le texte du modèle** : `*x*` et `**x**` sont rendus en emphase, et un titre repéré avant
+  ou après sa marque ; une emphase qui ouvre avant le titre et le ferme après lui
+  (`*Un : Titre* [S:1]`) laisse ses astérisques ; un saut de ligne simple ne coupe pas le
+  paragraphe. Ces formes n'ont pas été vues dans les réponses mesurées.
 
 ## Ce que l'épreuve E4 ajoute
 

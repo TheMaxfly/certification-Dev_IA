@@ -53,7 +53,7 @@ class Metriques:
         )
         self.api_disponible = Gauge(
             "application_api_disponible",
-            "1 si l'API du modèle répondait à la dernière lecture, 0 sinon.",
+            "1 si la dernière lecture de l'API a réussi (description, état), sinon 0.",
             registry=self.registre,
         )
 

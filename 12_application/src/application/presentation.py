@@ -103,6 +103,17 @@ def modes_proposes(info: Info | None) -> list[str]:
     return [] if info is None else info.modele_langage.reglages_reponse.mode.valeurs
 
 
+def mode_par_defaut(info: Info | None) -> str | None:
+    return None if info is None else info.modele_langage.reglages_reponse.mode.defaut
+
+
+def reformuler_par_defaut(info: Info | None, reglages: Reglages) -> bool:
+    """Le défaut publié par l'API ; sans elle, celui de la configuration."""
+    if info is None:
+        return reglages.reformuler_defaut
+    return info.modele_langage.reglages_reponse.reformuler.defaut
+
+
 def etat_du_service(etat: EtatApi, info: Info | None, reglages: Reglages) -> str:
     t = reglages.textes
     if etat == "cle":
@@ -157,7 +168,8 @@ def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
 #  Le texte de la réponse : marques, titres, emphase
 # --------------------------------------------------------------------------- #
 MARQUE_SERIE = re.compile(r"\[S:(\d+)\]")
-EMPHASE = re.compile(r"\*\*([^*\n]+)\*\*|\*([^*\n]+)\*")
+#: Une emphase colle à son texte : `4* et 5*` n'en est pas une.
+EMPHASE = re.compile(r"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*|\*(?=\S)([^*\n]+?)(?<=\S)\*")
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,8 +228,13 @@ def fin_du_titre(apres: str, cle: str) -> tuple[int, int] | None:
         debut += 1
     for j in range(debut + 1, len(apres) + 1):
         if plat(apres[debut:j]) == cle:
-            while j < len(apres) and apres[j] == "*":
-                j += 1
+            if apres[debut] == "*":
+                # L'emphase ouverte se ferme après la ponctuation du titre.
+                fin = j
+                while fin < len(apres) and not apres[fin].isalnum():
+                    if apres[fin] == "*":
+                        j = fin + 1
+                    fin += 1
             return debut, j
     return None  # pragma: no cover : `startswith` garantit qu'un indice convient
 
@@ -236,6 +253,15 @@ def segments_de(texte: str, titres: Mapping[int, str]) -> list[Segment]:
             continue
         cle = plat(titre)
         avant = texte[curseur : marque.start()]
+        if (
+            not avant.strip()
+            and segments
+            and segments[-1].genre == "lien"
+            and segments[-1].cible == cible
+        ):
+            # La même série, marquée de nouveau juste après son titre : un seul lien.
+            curseur = marque.end()
+            continue
         debut = debut_du_titre(avant, cle)
         suite = marque.end()
         if debut is not None:
@@ -343,11 +369,17 @@ def cartes_de(corps: Reponse, t: Mapping[str, str]) -> tuple[Carte, ...]:
         "synopsis_kitsu": t["passage_synopsis"],
     }
     index = {s.serie_id: s for s in corps.series if s.serie_id is not None}
+    # L'API ne dédoublonne pas : une série citée deux fois fait une seule carte.
+    fragments: dict[int, set[int]] = {}
+    for citee in corps.series_citees:
+        fragments.setdefault(citee.serie_id, set()).update(citee.fragment_ids)
+    vues: set[int] = set()
     cartes: list[Carte] = []
     for citee in corps.series_citees:
         serie = index.get(citee.serie_id)
-        if serie is None:
+        if serie is None or citee.serie_id in vues:
             continue
+        vues.add(citee.serie_id)
         cartes.append(
             Carte(
                 serie_id=citee.serie_id,
@@ -356,7 +388,7 @@ def cartes_de(corps: Reponse, t: Mapping[str, str]) -> tuple[Carte, ...]:
                 passages=tuple(
                     PassageCite(genres[p.type_document], p.extrait)
                     for p in serie.passages
-                    if p.fragment_id in citee.fragment_ids
+                    if p.fragment_id in fragments[citee.serie_id]
                 ),
             )
         )
@@ -457,7 +489,7 @@ def affichage_de(question: str, corps: Reponse, reglages: Reglages) -> Affichage
             identifiant=corps.contexte.identifiant_requete,
         ),
         complement=corps.complement,
-        complement_titres=tuple(corps.complement_titres),
+        complement_titres=tuple(corps.complement_titres or ()),
     )
 
 
@@ -473,6 +505,8 @@ class Encart:
     retry_after: int | None = None
     #: La liste des profils a pu changer : retour au profil par défaut.
     profil_a_revoir: bool = False
+    #: La conversation s'arrête là : le lien vers une nouvelle est proposé.
+    nouvelle_conversation: bool = False
 
 
 CODES_RECHERCHE = frozenset(

@@ -20,7 +20,9 @@
 <div role="alert">
 <h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ t.encart_titre }}</h2>
 <p id="encart-texte">{{ encart.texte }}</p>
+{% if encart.nouvelle_conversation %}
 <p><a href="/">{{ t.nouvelle_conversation }}</a></p>
+{% endif %}
 </div>
 </article>
 {% elif affichage %}

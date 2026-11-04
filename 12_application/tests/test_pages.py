@@ -10,7 +10,7 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup
-from conftest import ENVIRONNEMENT, application_sur
+from conftest import ENVIRONNEMENT, application_sur, journal_complet
 from fastapi.testclient import TestClient
 
 import application
@@ -90,7 +90,8 @@ def test_sans_profil_proposable_le_formulaire_est_inactif(navigateur, doublure):
     page = soupe(navigateur.get("/"))
 
     assert page.select_one("select#profil") is None
-    assert "Aucun profil de modèle de langage" in page.get_text()
+    message = page.find(string=re.compile("Aucun profil de modèle de langage"))
+    assert message is not None and message.find_parent("details") is None
     assert page.select_one("button[type=submit]").has_attr("disabled")
 
 
@@ -329,6 +330,41 @@ def test_un_client_sans_adresse_n_a_pas_les_metrics(doublure, reglages):
 # --------------------------------------------------------------------------- #
 #  Pages d'erreur
 # --------------------------------------------------------------------------- #
+def test_un_formulaire_illisible_rend_la_page_400(navigateur):
+    r = navigateur.post(
+        "/question",
+        content=b"illisible",
+        headers={"content-type": "multipart/form-data; boundary=x"},
+    )
+
+    assert r.status_code == 400
+    assert "Demande illisible" in r.text
+    assert "Erreur de l" not in r.text
+
+
+def test_un_ecart_aux_bornes_publiees_se_journalise_des_le_demarrage(
+    doublure, reglages, caplog
+):
+    caplog.set_level(logging.INFO, logger="application")
+    doublure.choisir(info="bornes_differentes")
+    application_, _ = application_sur(doublure, reglages)
+
+    with TestClient(application_, client=("127.0.0.1", 50000)):
+        pass
+
+    assert [r for r in caplog.records if r.getMessage() == "ecart_bornes"]
+
+
+def test_le_defaut_de_reformulation_est_celui_de_l_api(
+    navigateur, doublure, monkeypatch
+):
+    corps = d.info()
+    corps["modele_langage"]["reglages_reponse"]["reformuler"]["defaut"] = False
+    monkeypatch.setitem(d.SCENARIOS_INFO, "nominale", lambda: d.Rendu(200, corps))
+
+    assert not soupe(navigateur.get("/")).select_one("#reformuler").has_attr("checked")
+
+
 def test_une_route_inconnue_rend_la_page_404_avec_son_identifiant(navigateur):
     r = navigateur.get("/route-inconnue")
 
@@ -522,12 +558,27 @@ def test_wcag_1_4_3_contraste_des_couleurs_du_theme(texte, fond):
     assert contraste(valeurs[texte], valeurs[fond]) >= 4.5, (texte, fond)
 
 
+@pytest.mark.parametrize(
+    ("element", "fond"),
+    [
+        ("--pico-form-element-border-color", "--pico-form-element-background-color"),
+        ("--pico-primary-focus", "--pico-background-color"),
+        ("--pico-primary-border", "--pico-background-color"),
+    ],
+)
+def test_wcag_1_4_11_les_bordures_et_le_focus_se_distinguent(element, fond):
+    feuille = (STATIQUE / "theme.css").read_text(encoding="utf-8")
+    valeurs = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", feuille))
+
+    assert contraste(valeurs[element], valeurs[fond]) >= 3.0, (element, fond)
+
+
 def test_la_cle_n_apparait_nulle_part(navigateur, caplog):
     caplog.set_level(logging.DEBUG)
     corps = [navigateur.get(c).text for c in (*PAGES, "/sante", "/metrics")]
 
     assert not any(d.CLE_ATTENDUE in texte for texte in corps)
-    assert d.CLE_ATTENDUE not in caplog.text
+    assert d.CLE_ATTENDUE not in journal_complet(caplog)
 
 
 def test_les_gabarits_echappent_le_texte_venu_de_l_api(

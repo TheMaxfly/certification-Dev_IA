@@ -7,6 +7,9 @@
 {% if formulaire.champ_fautif == "question" %}
 <p id="question-erreur">{{ formulaire.erreur }}</p>
 {% endif %}
+{% if info_connue and not options %}
+<p>{{ t.aucun_profil }}</p>
+{% endif %}
 <details{% if formulaire.champ_fautif in ("profil", "temperature") %} open{% endif %}>
 <summary>{{ t.reglages_titre }}</summary>
 {% if options %}
@@ -19,13 +22,11 @@
 {% if formulaire.champ_fautif == "profil" %}
 <p id="profil-erreur">{{ formulaire.erreur }}</p>
 {% endif %}
-{% elif info_connue %}
-<p>{{ t.aucun_profil }}</p>
 {% endif %}
 <fieldset{% if formulaire.champ_fautif == "temperature" %} aria-describedby="temperature-erreur"{% endif %}>
 <legend>{{ t.temperature_legende }}</legend>
 {% for position in positions %}
-<label for="temperature-{{ loop.index }}"><input type="radio" id="temperature-{{ loop.index }}" name="temperature" value="{{ position.valeur }}"{% if position.valeur == temperature %} checked{% endif %}{% if formulaire.champ_fautif == "temperature" and loop.first %} autofocus{% endif %}> {{ position.etiquette }}</label>
+<label for="temperature-{{ loop.index }}"><input type="radio" id="temperature-{{ loop.index }}" name="temperature" value="{{ position.valeur }}"{% if position.valeur == temperature %} checked{% endif %}{% if formulaire.champ_fautif == "temperature" and loop.first %} aria-invalid="true" aria-describedby="temperature-erreur" autofocus{% endif %}> {{ position.etiquette }}</label>
 {% endfor %}
 {% if formulaire.champ_fautif == "temperature" %}
 <p id="temperature-erreur">{{ formulaire.erreur }}</p>

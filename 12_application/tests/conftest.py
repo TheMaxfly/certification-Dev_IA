@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from application.app import creer_application
 from application.config import Reglages, charger
+from application.journal import FormatJson
 
 BOUCLAGE = ("127.0.0.1", "localhost", "::1")
 ADRESSE_MEMOIRE = "http://127.0.0.1:8010"
@@ -47,6 +48,12 @@ def aucun_appel_hors_du_bouclage(
     monkeypatch.setattr(httpx.AsyncClient, "send", garder)
     yield hors
     assert not hors, f"appels hors du bouclage : {hors}"
+
+
+def journal_complet(caplog: pytest.LogCaptureFixture) -> str:
+    """Ce que le journal écrirait, champs compris : `caplog.text` n'a que le message."""
+    forme = FormatJson()
+    return "\n".join(forme.format(r) for r in caplog.records)
 
 
 @pytest.fixture

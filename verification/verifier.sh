@@ -391,9 +391,13 @@ integration_11() {
 COMPOSE_12=(--env-file /dev/null -f compose.integration.yml)
 integration_12() {
   local cmd=(docker compose "${COMPOSE_12[@]}" run --rm -T --build essai) rc
+  local fusion publies
   dire "12 — (12_application/) docker compose config : le fichier de fusion sur celui du 11"
-  (cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
-    -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml config --quiet) || return 1
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+    -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml config)" || return 1
+  # Seule l'application est publiée, en fusion comme écrit.
+  publies="$(grep -c 'published:' <<<"$fusion")"
+  [ "$publies" = 1 ] || { echo "fusion : $publies ports publiés, un seul attendu" >&2; return 1; }
   dire "12 — (12_application/) ${cmd[*]}"
   (cd "$RACINE/12_application" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/12_application" && "${PROPRE[@]}" docker compose "${COMPOSE_12[@]}" down -v >/dev/null 2>&1)

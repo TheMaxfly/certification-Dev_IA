@@ -442,6 +442,9 @@ SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
             complement_titres=["Titre factice hors catalogue"],
         ),
     ),
+    "complement_nul": lambda: Rendu(
+        200, reponse_nominale(complement="Complément factice.", complement_titres=None)
+    ),
     "refus_aucun_passage": lambda: Rendu(
         200,
         reponse_refus(
@@ -653,6 +656,7 @@ class Doublure:
         self.scenario_reponse = "nominale"
         self.corps_recus: list[dict[str, Any]] = []
         self.cles_recues: list[str | None] = []
+        self.cles_sante: list[str | None] = []
         self.ecarts: list[str] = []
         self.app = self._creer()
 
@@ -727,7 +731,8 @@ class Doublure:
             return await self._rendre("/v1/info", "get", nom, SCENARIOS_INFO[nom]())
 
         @app.get("/v1/sante")
-        async def route_sante() -> Response:
+        async def route_sante(request: Request) -> Response:
+            self.cles_sante.append(request.headers.get("X-API-Key"))
             nom = self.scenario_sante
             return await self._rendre("/v1/sante", "get", nom, SCENARIOS_SANTE[nom]())
 

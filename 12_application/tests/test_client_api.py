@@ -8,6 +8,7 @@ import logging
 import doublure_api as d
 import httpx
 import pytest
+from conftest import journal_complet
 
 from application.client_api import (
     ApiDelai,
@@ -107,6 +108,20 @@ def test_info_rend_ses_erreurs(doublure, scenario, attendu):
     assert exc.value.code == attendu
 
 
+def test_la_route_sans_cle_ne_recoit_pas_la_cle(doublure):
+    jouer(client_sur(doublure).sante())
+
+    assert doublure.cles_sante == [None]
+
+
+def test_des_titres_nuls_du_mode_enrichi_sont_admis(doublure):
+    doublure.choisir(reponse="complement_nul")
+
+    resultat = jouer(client_sur(doublure).reponse({"question": "x"}))
+
+    assert resultat.corps.complement_titres is None
+
+
 def test_sante_dit_ok_ou_non(doublure):
     client = client_sur(doublure)
 
@@ -158,6 +173,20 @@ class TransportCoupe(httpx.AsyncBaseTransport):
         raise httpx.RemoteProtocolError("coupé", request=request)
 
 
+class TransportIllisible(httpx.AsyncBaseTransport):
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        raise httpx.DecodingError("corps illisible", request=request)
+
+
+def test_un_corps_illisible_en_transport_est_injoignable():
+    client = ClientApi(
+        ADRESSE, d.CLE_ATTENDUE, DELAIS, Metriques(), TransportIllisible()
+    )
+
+    with pytest.raises(ApiInjoignable):
+        jouer(client.info())
+
+
 def test_une_connexion_coupee_est_injoignable():
     client = ClientApi(ADRESSE, d.CLE_ATTENDUE, DELAIS, Metriques(), TransportCoupe())
 
@@ -186,6 +215,7 @@ def test_le_client_ne_journalise_ni_la_question_ni_la_reponse(doublure, caplog):
 
     jouer(client_sur(doublure).reponse({"question": "Question factice secrète ?"}))
 
-    assert "Question factice secrète" not in caplog.text
-    assert "Passage factice" not in caplog.text
-    assert d.CLE_ATTENDUE not in caplog.text
+    journal = journal_complet(caplog)
+    assert "Question factice secrète" not in journal
+    assert "Passage factice" not in journal
+    assert d.CLE_ATTENDUE not in journal

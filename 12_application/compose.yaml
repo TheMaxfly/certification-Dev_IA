@@ -11,14 +11,17 @@
 # `.env` sont nommés, sinon celui du 12 n'arriverait pas au service.
 #
 # Trois services : le service d'embedding, l'API, l'application. Deux réseaux de plus :
-#   - `applicatif` : l'application et l'API, rien d'autre. L'application ne joint ni le
-#     service d'embedding (`interne`) ni la base de l'hôte (`sortie`) ;
+#   - `applicatif` : l'application et l'API, rien d'autre. L'application n'est ni sur le
+#     réseau du service d'embedding (`interne`) ni sur celui de la base (`sortie`) ;
 #   - `publication` : le port publié, sur l'adresse locale seule. Docker ne publie pas sur
-#     un réseau `internal`.
+#     un réseau `internal` : celui-ci a donc une route vers l'extérieur, que l'application
+#     n'emploie pas (elle n'appelle que l'API, par son code).
 
 services:
   api:
     networks: [interne, sortie, applicatif]
+    # Seule l'application est publiée : on atteint l'API par elle.
+    ports: !reset []
 
   application:
     build:

@@ -53,7 +53,8 @@ RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin application
 USER 10001
 WORKDIR /app/12_application
 EXPOSE 8020
-# Sain = l'application répond ; elle sert sans l'API, et le dit à l'écran.
+# Sain = l'application écoute. Pas `/sante`, qui attend l'API : elle sert sans l'API, et le
+# dit à l'écran.
 HEALTHCHECK --interval=5s --timeout=3s --start-period=20s --retries=3 \
-  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/sante', timeout=2)"]
+  CMD ["python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8020), 2).close()"]
 CMD ["python", "-m", "application"]

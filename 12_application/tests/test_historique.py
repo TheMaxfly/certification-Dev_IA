@@ -60,8 +60,15 @@ def test_ecrire_un_historique_vide_rend_un_champ_vide():
             [{"role": "juge", "contenu": "x"}, {"role": "assistant", "contenu": "y"}]
         ),
         json.dumps([{"role": "libraire", "contenu": "x", "autre": 1}]),
-        json.dumps(paire(6)),
-        json.dumps(paire(2, "y" * 1001)),
+        json.dumps(paire(5) + paire(1)[:1]),
+        json.dumps(
+            [
+                {"role": "libraire", "contenu": "y" * 2000},
+                {"role": "assistant", "contenu": "y" * 1999},
+                {"role": "libraire", "contenu": "y"},
+                {"role": "assistant", "contenu": "y"},
+            ]
+        ),
         json.dumps(
             [
                 {"role": "libraire", "contenu": "y" * 2001},
@@ -71,6 +78,13 @@ def test_ecrire_un_historique_vide_rend_un_champ_vide():
         json.dumps(paire(1)[::-1]),
         json.dumps(paire(1) + paire(1)[1:]),
         json.dumps(paire(1)[:1]),
+        "[" * 100000,
+        json.dumps(
+            [
+                {"role": "libraire", "contenu": "\ud800"},
+                {"role": "assistant", "contenu": "z"},
+            ]
+        ),
     ],
     ids=[
         "json_casse",
@@ -81,12 +95,14 @@ def test_ecrire_un_historique_vide_rend_un_champ_vide():
         "contenu_non_texte",
         "role_inconnu",
         "champ_de_plus",
-        "onze_tours_et_plus",
-        "plus_de_4000_caracteres",
+        "onze_tours",
+        "4001_caracteres",
         "un_tour_de_plus_de_2000",
         "premier_tour_assistant",
         "roles_non_alternes",
         "dernier_tour_libraire",
+        "json_trop_profond",
+        "texte_non_encodable",
     ],
 )
 def test_un_historique_invalide_est_refuse(brut):

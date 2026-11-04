@@ -2,7 +2,7 @@
 #
 # Versionné, lu et validé au démarrage par `application.config`, seul lecteur ; une
 # valeur fautive, un texte absent : l'application refuse de démarrer. La clé de l'API
-# vit dans `.env` (hors dépôt, modèle : `.env.example`), jamais ici.
+# vit dans `.env` (hors dépôt, modèle : `env.exemple`), jamais ici.
 
 [api]
 adresse = "http://127.0.0.1:8010"
@@ -55,7 +55,7 @@ motif = "Les bornes de l'API, recopiées : celles que /v1/info publie sont revé
 
 [corps]
 octets_max = 16384
-motif = "Une question et un historique plein, encodés en formulaire, tiennent en 6,5 Kio environ pour un texte français ; au-delà de 16 Kio, le corps est refusé avant d'être lu."
+motif = "Une question et un historique plein, encodés en formulaire, tiennent en 6,5 Kio environ pour un texte français (estimation) ; au-delà de 16 Kio, le corps est refusé avant d'être lu."
 
 [ecoute]
 hote = "127.0.0.1"
@@ -194,6 +194,8 @@ apropos_registre = "Ce traitement sera inscrit au registre des traitements du pr
 apropos_licences_titre = "Licences"
 apropos_licences = "Feuille de style : Pico CSS (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
 # Pages d'erreur
+erreur_400_titre = "Demande illisible"
+erreur_400_texte = "Le formulaire reçu n'a pas pu être lu."
 erreur_404_titre = "Page introuvable"
 erreur_404_texte = "Cette adresse n'existe pas."
 erreur_405_titre = "Action non permise"

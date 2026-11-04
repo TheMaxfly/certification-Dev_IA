@@ -9,5 +9,5 @@ __pycache__/
 coverage.xml
 htmlcov/
 
-# Secrets et adresses : seul `.env.example` est versionné.
+# Secrets et adresses : seul `env.exemple` est versionné.
 .env

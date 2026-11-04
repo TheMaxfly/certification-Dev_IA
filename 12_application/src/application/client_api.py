@@ -20,7 +20,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from application import journal
 from application.config import Delais, Limites
@@ -152,7 +152,7 @@ class Reponse(BaseModel):
     contexte: ContexteReponse
     #: Le mode enrichi, quand l'API le publiera : l'écran l'accueille sans retouche.
     complement: str | None = None
-    complement_titres: list[str] = Field(default_factory=list[str])
+    complement_titres: list[str] | None = None
 
 
 class CorpsErreur(BaseModel):
@@ -224,11 +224,9 @@ class ClientApi:
         self.adresse = adresse
         self._delais = delais
         self._metriques = metriques
+        self._entetes = {ENTETE_CLE: cle}
         self._http = httpx.AsyncClient(
-            base_url=adresse,
-            headers={ENTETE_CLE: cle},
-            transport=transport,
-            follow_redirects=False,
+            base_url=adresse, transport=transport, follow_redirects=False
         )
 
     def __repr__(self) -> str:
@@ -238,7 +236,13 @@ class ClientApi:
         await self._http.aclose()
 
     async def _appeler(
-        self, methode: str, route: str, delai_s: float, corps: object | None = None
+        self,
+        methode: str,
+        route: str,
+        delai_s: float,
+        corps: object | None = None,
+        *,
+        avec_cle: bool = True,
     ) -> httpx.Response:
         """La requête ; ses échecs de transport en deux exceptions, sans leur cause. Le
         délai borne l'appel entier, pas seulement chaque lecture."""
@@ -247,7 +251,11 @@ class ClientApi:
         try:
             async with asyncio.timeout(connexion + delai_s):
                 reponse = await self._http.request(
-                    methode, route, json=corps, timeout=delais
+                    methode,
+                    route,
+                    json=corps,
+                    timeout=delais,
+                    headers=self._entetes if avec_cle else None,
                 )
         except (httpx.ConnectError, httpx.ConnectTimeout):
             self._noter(route, "injoignable", "api_injoignable")
@@ -255,7 +263,7 @@ class ClientApi:
         except (httpx.TimeoutException, TimeoutError):
             self._noter(route, "delai", "api_delai")
             raise ApiDelai from None
-        except httpx.TransportError:
+        except httpx.HTTPError:
             self._noter(route, "injoignable", "api_injoignable")
             raise ApiInjoignable from None
         self._metriques.api_appels.labels(
@@ -314,7 +322,10 @@ class ClientApi:
     async def sante(self) -> bool:
         """Vrai si l'API est vivante et en bon état ; un 503, une panne : faux."""
         try:
-            reponse = await self._appeler("GET", ROUTE_SANTE, self._delais.sante_s)
+            # La route est sans clé : elle ne la reçoit pas.
+            reponse = await self._appeler(
+                "GET", ROUTE_SANTE, self._delais.sante_s, avec_cle=False
+            )
         except (ApiInjoignable, ApiDelai):
             return False
         return reponse.status_code == 200

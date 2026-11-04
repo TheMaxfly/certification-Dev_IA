@@ -1,7 +1,7 @@
 id = "APP-5"
 origine = "E3 étape 4, spec 04 (2026-11-04) — un passage non cité s'afficherait sur la carte"
 fichier = "12_application/src/application/presentation.py"
-avant = '''                    if p.fragment_id in citee.fragment_ids
+avant = '''                    if p.fragment_id in fragments[citee.serie_id]
 '''
 apres = ''''''
 dossier = "12_application"

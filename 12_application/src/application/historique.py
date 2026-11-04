@@ -43,6 +43,11 @@ def _tour_de(element: object) -> Tour:
         raise HistoriqueInvalide("role")
     if not isinstance(contenu, str) or not contenu:
         raise HistoriqueInvalide("contenu")
+    try:
+        contenu.encode("utf-8")
+    except UnicodeEncodeError:
+        # `\\ud800` se lit en JSON, mais ne part pas vers l'API.
+        raise HistoriqueInvalide("contenu") from None
     return Tour(cast(Role, role), contenu)
 
 
@@ -52,7 +57,7 @@ def lire(brut: str, limites: Limites) -> list[Tour]:
         return []
     try:
         donnees: object = json.loads(brut)
-    except ValueError:
+    except (ValueError, RecursionError):
         raise HistoriqueInvalide("json") from None
     if not isinstance(donnees, list):
         raise HistoriqueInvalide("liste")

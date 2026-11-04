@@ -56,9 +56,10 @@ def pages() -> Iterator[list[Page]]:
     """Chaque écran, rendu une fois : les tests relisent le HTML."""
     doublure = Doublure()
     reglages = replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE)
-    avec_api = creer_application(
-        reglages, transport=httpx.ASGITransport(app=doublure.app)
-    )
+    transport = httpx.ASGITransport(app=doublure.app)
+    avec_api = creer_application(reglages, transport=transport)
+    delais = replace(reglages.delais, connexion_s=0.05, reponse_s=0.05)
+    pressee = creer_application(replace(reglages, delais=delais), transport=transport)
     with socket.socket() as prise:
         prise.bind(("127.0.0.1", 0))
         fermee = f"http://127.0.0.1:{prise.getsockname()[1]}"
@@ -68,10 +69,18 @@ def pages() -> Iterator[list[Page]]:
     with (
         TestClient(avec_api, client=client_) as client,
         TestClient(sans_api, client=client_) as client_sans_api,
+        TestClient(pressee, client=client_) as client_presse,
     ):
         for ecran in ECRANS:
             doublure.choisir(info=ecran.info, reponse=ecran.reponse)
-            r = rendre(client_sans_api if ecran.api_fermee else client, ecran)
+            if ecran.neuve:
+                neuve = creer_application(reglages, transport=transport)
+                with TestClient(neuve, client=client_) as client_neuf:
+                    r = rendre(client_neuf, ecran)
+            elif ecran.delai_court:
+                r = rendre(client_presse, ecran)
+            else:
+                r = rendre(client_sans_api if ecran.api_fermee else client, ecran)
             rendues.append(
                 Page(
                     ecran,
@@ -97,6 +106,10 @@ def test_le_catalogue_couvre_chaque_cas_et_rend_ce_qui_est_attendu(pages):
     assert statuts["conversation_invalide"] == statuts["erreur_question_vide"] == 422
     assert statuts["degrade_debit_depasse"] == 429
     assert statuts["degrade_base_indisponible"] == 503
+    assert statuts["degrade_api_injoignable"] == statuts["degrade_delai"] == 503
+    cle = next(p for p in pages if p.ecran.nom == "cle_refusee").soupe
+    assert "refuse l'accès" in cle.get_text()
+    assert not cle.select_one("button[type=submit]").has_attr("disabled")
 
 
 def test_wcag_3_1_1_la_langue_de_la_page_est_dite(pages):
@@ -155,7 +168,7 @@ def test_wcag_3_3_1_les_erreurs_de_champ_sont_liees(pages):
             for identifiant in lies:
                 assert page.soupe.select_one(f"#{identifiant}"), page.ecran.nom
             vues += 1
-    assert vues == 3, "question vide, question longue, profil"
+    assert vues == 4, "question vide, question longue, profil, température"
     fautive = next(p for p in pages if p.ecran.nom == "erreur_temperature")
     assert fautive.soupe.select_one("fieldset")["aria-describedby"] == (
         "temperature-erreur"
@@ -174,7 +187,7 @@ def test_wcag_4_1_3_les_encarts_ont_le_role_alert(pages):
             assert page.soupe.select_one("[role=alert]") is not None, page.ecran.nom
 
 
-def test_wcag_4_1_3_la_zone_de_reponse_est_annoncee(pages):
+def test_wcag_4_1_3_la_zone_de_reponse_porte_aria_live(pages):
     for page in principales(pages):
         assert page.soupe.select_one("section[aria-live=polite]"), page.ecran.nom
 
@@ -221,7 +234,7 @@ def test_wcag_2_4_4_les_liens_ont_un_texte_et_les_ancres_une_cible(pages):
     assert vues > len(pages)
 
 
-def test_wcag_2_4_3_le_focus_va_au_titre_ou_au_champ_fautif(pages):
+def test_wcag_2_4_3_le_focus_est_prevu_sur_le_titre_ou_le_champ_fautif(pages):
     for page in pages:
         foyers = page.soupe.select("[autofocus]")
         assert len(foyers) <= 1, page.ecran.nom
@@ -252,7 +265,7 @@ def test_wcag_1_4_4_aucune_largeur_fixe_sur_les_conteneurs_de_texte():
         assert not re.search(r"\s(width|height)=", texte), fichier.name
 
 
-def test_wcag_1_4_1_un_etat_n_est_jamais_porte_par_la_seule_couleur(pages):
+def test_wcag_1_4_1_chaque_etat_a_un_texte(pages):
     for page in pages:
         for encart in page.soupe.select("[role=alert]"):
             assert encart.get_text(strip=True), page.ecran.nom

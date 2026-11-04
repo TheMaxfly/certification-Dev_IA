@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from python_multipart.exceptions import FormParserError
 from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -38,6 +39,7 @@ GABARITS = ICI / "gabarits"
 STATIQUE = ICI / "statique"
 #: Le statut d'une page d'erreur → ses textes.
 PAGES_ERREUR = {
+    400: ("erreur_400_titre", "erreur_400_texte"),
     404: ("erreur_404_titre", "erreur_404_texte"),
     405: ("erreur_405_titre", "erreur_405_texte"),
     413: ("erreur_413_titre", "erreur_413_texte"),
@@ -92,6 +94,7 @@ def creer_application(
     @asynccontextmanager
     async def cycle(_app: FastAPI) -> AsyncGenerator[None]:
         await vue.rafraichir()
+        vue.limites()  # un écart aux bornes publiées se journalise dès le démarrage
         journal.evenement(
             "demarrage",
             {
@@ -186,10 +189,12 @@ def creer_application(
                     else f.temperature
                 ),
                 reformuler=(
-                    reglages.reformuler_defaut if f.reformuler is None else f.reformuler
+                    presentation.reformuler_par_defaut(info, reglages)
+                    if f.reformuler is None
+                    else f.reformuler
                 ),
                 modes=presentation.modes_proposes(info),
-                mode_choisi=f.mode,
+                mode_choisi=f.mode or presentation.mode_par_defaut(info),
                 question_max=limites.question_caracteres_max,
                 question_aide=presentation.dire(
                     t, "question_aide", max=limites.question_caracteres_max
@@ -253,6 +258,9 @@ def creer_application(
             return lu, "temperature", t["erreur_temperature"]
         if vue.info is not None:
             noms = [p.nom for p in presentation.profils_proposes(vue.info, reglages)]
+            # Sans champ (page rendue sans liste) : le défaut, jamais un profil exclu.
+            profil = profil or presentation.profil_par_defaut(vue.info, reglages) or ""
+            lu = replace(lu, profil=profil or None)
             if profil not in noms:
                 return lu, "profil", t["erreur_profil"]
         return lu, None, None
@@ -262,13 +270,19 @@ def creer_application(
         await vue.rafraichir()
         limites = vue.limites()
         identifiant = str(request.state.identifiant_requete)
-        donnees = await request.form()
+        try:
+            donnees = await request.form()
+        except FormParserError:
+            # Un corps qu'un navigateur n'écrit pas : pas une erreur de l'API.
+            raise StarletteHTTPException(status_code=400) from None
         try:
             tours = historique.lire(champ(donnees, "historique"), limites)
         except historique.HistoriqueInvalide:
             # Rien n'est envoyé ; le texte porté par la page n'est pas repris.
             request.state.code_erreur = "historique_invalide"
-            encart = presentation.Encart(t["conversation_invalide"], 422)
+            encart = presentation.Encart(
+                t["conversation_invalide"], 422, nouvelle_conversation=True
+            )
             return page_principale(request, 422, encart=encart)
         request.state.nb_tours_historique = len(tours)
         request.state.taille_historique = historique.taille(tours)
@@ -276,7 +290,8 @@ def creer_application(
             texte = presentation.dire(
                 t, "conversation_terminee", echanges=limites.echanges
             )
-            return page_principale(request, encart=presentation.Encart(texte, 200))
+            encart = presentation.Encart(texte, 200, nouvelle_conversation=True)
+            return page_principale(request, encart=encart)
 
         lu, fautif, message = lire_formulaire(donnees)
         if fautif is not None:

@@ -11,6 +11,7 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 
+from application import journal
 from application.__main__ import principal
 from application.config import (
     FICHIER_REGLAGES,
@@ -37,7 +38,14 @@ def test_sans_cle_l_application_refuse_de_demarrer(environ):
     assert len(ecarts) == 1 and ecarts[0].startswith("APPLICATION_CLE_API :")
 
 
+def test_une_cle_hors_ascii_empeche_de_demarrer_sans_la_montrer():
+    ecarts = ecarts_de({"APPLICATION_CLE_API": "clé-factice-accentuée"})
+
+    assert ecarts == ["APPLICATION_CLE_API : caractères hors ASCII — clé illisible"]
+
+
 def test_le_lancement_sans_cle_nomme_la_variable_et_rend_2(monkeypatch, capsys):
+    monkeypatch.setattr("application.__main__.journal.configurer", lambda: None)
     monkeypatch.delenv("APPLICATION_CLE_API", raising=False)
 
     assert principal() == 2
@@ -46,6 +54,7 @@ def test_le_lancement_sans_cle_nomme_la_variable_et_rend_2(monkeypatch, capsys):
 
 def test_le_lancement_avec_cle_sert_sur_l_ecoute_configuree(monkeypatch):
     vu: dict[str, object] = {}
+    monkeypatch.setattr("application.__main__.journal.configurer", lambda: None)
     monkeypatch.setenv("APPLICATION_CLE_API", d.CLE_ATTENDUE)
     monkeypatch.setattr(
         "application.__main__.uvicorn.run", lambda _app, **kw: vu.update(kw)
@@ -53,6 +62,31 @@ def test_le_lancement_avec_cle_sert_sur_l_ecoute_configuree(monkeypatch):
 
     assert principal() == 0
     assert (vu["host"], vu["port"]) == ("127.0.0.1", 8020)
+
+
+def test_le_journal_est_du_json_avec_ses_champs(capsys):
+    journal_racine = journal.JOURNAL
+    sorties, niveau, propage = (
+        journal_racine.handlers[:],
+        journal_racine.level,
+        journal_racine.propagate,
+    )
+    try:
+        journal.configurer()
+        journal.evenement("essai", {"nombre": 3})
+        try:
+            raise ValueError("détail")
+        except ValueError:
+            journal_racine.exception("rate", extra={"champs": {}})
+    finally:
+        journal_racine.handlers = sorties
+        journal_racine.setLevel(niveau)
+        journal_racine.propagate = propage
+
+    lignes = [json.loads(x) for x in capsys.readouterr().err.splitlines()]
+    assert lignes[0]["evenement"] == "essai" and lignes[0]["nombre"] == 3
+    assert lignes[0]["niveau"] == "INFO" and lignes[0]["horodatage"]
+    assert "ValueError" in lignes[1]["trace"]
 
 
 def test_le_repr_ne_montre_pas_la_cle():

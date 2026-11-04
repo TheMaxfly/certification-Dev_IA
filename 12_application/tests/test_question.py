@@ -10,6 +10,7 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup
+from conftest import journal_complet
 
 QUESTION = "Un manga factice pour débuter ?"
 
@@ -393,17 +394,17 @@ def test_dix_tours_en_entree_rien_n_est_envoye(navigateur, doublure):
     [
         "{cassé",
         json.dumps([{"role": "assistant", "contenu": "x"}]),
-        echanges(6),
+        json.dumps(json.loads(echanges(5)) + [{"role": "libraire", "contenu": "x"}]),
         json.dumps(
             [
                 {"role": "libraire", "contenu": "y" * 2000},
-                {"role": "assistant", "contenu": "y" * 2000},
+                {"role": "assistant", "contenu": "y" * 1999},
                 {"role": "libraire", "contenu": "y"},
                 {"role": "assistant", "contenu": "y"},
             ]
         ),
     ],
-    ids=["json_casse", "premier_assistant", "douze_tours", "4002_caracteres"],
+    ids=["json_casse", "premier_assistant", "onze_tours", "4001_caracteres"],
 )
 def test_un_historique_invalide_n_envoie_rien_et_le_dit(
     navigateur, doublure, historique
@@ -485,7 +486,27 @@ def test_une_question_longue_garde_sa_valeur(navigateur):
     assert page.select_one("textarea#question").get_text() == "x" * 501
 
 
-@pytest.mark.parametrize("profil", ["mistral-large-4", "profil-inconnu", ""])
+def test_sans_champ_de_profil_le_defaut_part_jamais_un_profil_exclu(
+    navigateur, doublure
+):
+    doublure.choisir(info="large_4_actif")
+
+    r = poser(navigateur, profil="")
+
+    assert r.status_code == 200
+    assert doublure.corps_recus[0]["profil"] == "mistral-large-2512"
+
+
+def test_sans_profil_proposable_rien_ne_part(navigateur, doublure):
+    doublure.choisir(info="aucun_profil")
+
+    r = poser(navigateur, profil="")
+
+    assert r.status_code == 422
+    assert doublure.corps_recus == []
+
+
+@pytest.mark.parametrize("profil", ["mistral-large-4", "profil-inconnu"])
 def test_un_profil_hors_liste_est_refuse(navigateur, doublure, profil):
     r = poser(navigateur, profil=profil)
     page = soupe(r)
@@ -661,6 +682,8 @@ def test_chaque_cas_degrade_a_son_encart(
     titre = encart.select_one("h2")
     assert titre.has_attr("autofocus") and titre["aria-describedby"] == "encart-texte"
     assert [e.name for e in page.select("[autofocus]")] == ["h2"]
+    # La conversation continue : pas de lien vers une nouvelle dans l'encart.
+    assert encart.select_one("a") is None
 
 
 def test_la_matrice_s_ecrit_depuis_les_pages_rendues(navigateur, doublure):
@@ -800,10 +823,11 @@ def test_le_journal_ne_porte_ni_la_question_ni_l_historique_ni_la_reponse(
 
     poser(navigateur, historique=echanges(2))
 
-    assert QUESTION not in caplog.text
-    assert "Question 0" not in caplog.text and "Réponse 0" not in caplog.text
-    assert "Passage factice" not in caplog.text
-    assert d.CLE_ATTENDUE not in caplog.text
+    journal = journal_complet(caplog)
+    assert QUESTION not in journal
+    assert "Question 0" not in journal and "Réponse 0" not in journal
+    assert "Passage factice" not in journal and "factice A" not in journal
+    assert d.CLE_ATTENDUE not in journal
     ligne = [c for c in lignes_requetes(caplog) if c["route"] == "/question"][-1]
     assert ligne["nb_tours_historique"] == 4
     assert ligne["taille_historique"] == sum(

@@ -54,7 +54,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " apropos_colonne_hebergement apropos_liste_inconnue"
             " apropos_conserve_titre apropos_conserve apropos_registre_titre"
             " apropos_registre apropos_licences_titre apropos_licences"
-            " erreur_404_titre erreur_404_texte erreur_405_titre erreur_405_texte"
+            " erreur_400_titre erreur_400_texte erreur_404_titre erreur_404_texte"
+            " erreur_405_titre erreur_405_texte"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour"
         ).split()
@@ -277,6 +278,9 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     cle = environ.get(VARIABLE_CLE, "").strip()
     if not cle:
         ecarts.append(f"{VARIABLE_CLE} : absente ou vide — aucun accès à l'API")
+    elif not cle.isascii():
+        # Elle part dans un en-tête : le refus vient d'ici, sans la montrer.
+        ecarts.append(f"{VARIABLE_CLE} : caractères hors ASCII — clé illisible")
 
     api = lecteur.table(donnees, "api")
     delais = lecteur.table(api, "delais", "api.")

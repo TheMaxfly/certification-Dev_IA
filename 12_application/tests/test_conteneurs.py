@@ -40,7 +40,7 @@ def test_le_contexte_est_une_liste_blanche_sans_secret():
 def test_le_compose_ne_publie_que_sur_le_bouclage_et_ne_porte_aucune_cle():
     assert '"127.0.0.1:${APPLICATION_PORT_PUBLIE:-8020}:8020"' in FUSION
     assert "APPLICATION_CLE_API: ${APPLICATION_CLE_API:-}" in FUSION
-    assert FUSION.count("ports:") == 1
+    assert FUSION.count("ports:") == 2 and "ports: !reset []" in FUSION
 
 
 def test_l_application_ne_joint_que_l_api():
