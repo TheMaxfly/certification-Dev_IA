@@ -104,7 +104,7 @@ def test_les_valeurs_par_defaut_sont_celles_decidees():
     assert r.identite == "libraire-demo"
     assert r.profils_exclus == {"mistral-large-4"}
     assert [(p.valeur, p.nom) for p in r.positions] == [
-        (0.0, "rejouable"),
+        (0.0, "stable"),
         (0.3, "modérée"),
         (0.7, "variée"),
     ]

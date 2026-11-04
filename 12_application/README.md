@@ -78,7 +78,7 @@ n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
 | Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
-| Température | 0 « rejouable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
+| Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
 | Mode | affiché seulement si l'API en déclare plus d'un | `strict` |
 
@@ -107,10 +107,10 @@ conservés, sauf mention.
 | 503 `fournisseur_injoignable`, `fournisseur_delai`, `fournisseur_refus` autre statut | Le modèle de langage ne répond pas (profil X). L'exploitant peut changer de profil |
 | 503 `fournisseur_refus`, motif `longueur_atteinte` | Le modèle de langage n'a pas terminé sa réponse (profil X) |
 | 503 `sortie_modele_invalide` | La réponse du modèle a été refusée par nos contrôles (motif, en français) ; jamais la sortie |
-| 503 `service_embedding_*`, `base_indisponible`, `encodage_en_service_change` | La recherche est indisponible |
-| 422 `profil_indisponible`, `profil_inconnu` | Le profil X n'est pas disponible ; la liste est rechargée |
-| 422 `reglage_non_expose` | Le profil X n'accepte pas le réglage Y |
-| 422 autre, 401, 413, 5xx imprévu, corps hors contrat | Erreur du service (identifiant) |
+| 503 `service_embedding_*`, `base_indisponible`, `encodage_en_service_change` | La recherche est indisponible ; vous pouvez réessayer |
+| 422 `profil_indisponible`, `profil_inconnu` | Le profil X n'est pas disponible ; la liste est rechargée, choisissez-en un autre |
+| 422 `reglage_non_expose` | Le profil X n'accepte pas le réglage Y ; changez de profil ou de réglage |
+| 422 autre, 401, 413, 5xx imprévu, corps hors contrat | Erreur du service ; réessayer, ou donner l'identifiant à l'exploitant |
 | Historique invalide | Cette conversation n'est plus valide ; formulaire vide, rien n'est envoyé |
 
 Un refus (`200`, `refus` vrai) n'est pas un cas dégradé : c'est une réponse.
@@ -270,6 +270,18 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
   ou après sa marque ; une emphase qui ouvre avant le titre et le ferme après lui
   (`*Un : Titre* [S:1]`) laisse ses astérisques ; un saut de ligne simple ne coupe pas le
   paragraphe. Ces formes n'ont pas été vues dans les réponses mesurées.
+- **La température 0 ne rejoue pas le texte** : aucune graine n'est envoyée. Le 2026-11-04,
+  sur une même question posée quatre fois à 0, les mêmes séries sont revenues en carte, le
+  texte a changé, et le nombre de séries nommées aussi (2, 2, 5, 2). Une seule question :
+  c'est un constat, pas une mesure. L'essai d'une graine par profil reste à mesurer.
+- **Une série nommée sans carte** : le modèle peut marquer une série que ses
+  `series_citees` ne portent pas, et l'API ne contrôle pas ce cas. La marque est masquée :
+  le titre écrit par le modèle reste, sans lien ni carte, non contrôlé ; l'identifiant est
+  dans les détails techniques et dans le champ caché.
+- **Quitter la page perd la conversation** : « À propos et données » s'ouvre dans le même
+  onglet, et revenir par « Précédent » peut demander de renvoyer le formulaire, donc un
+  nouvel appel. C'est la conséquence de « rien n'est gardé » ; l'épreuve E4 la règle avec
+  les sessions.
 
 ## Ce que l'épreuve E4 ajoute
 

@@ -29,20 +29,20 @@ motif = "0 : la seule valeur mesurée. mistral-large-4 n'est pas proposé tant q
 
 [[reglages.positions]]
 valeur = 0.0
-nom = "rejouable"
-etiquette = "Rejouable (0) : la même question donne la même réponse ; seule valeur mesurée."
-motif = "Le défaut : ce qu'un conseil sourcé veut."
+nom = "stable"
+etiquette = "Stable (0) : les mêmes séries reviennent ; le texte peut varier."
+motif = "Le défaut : ce qu'un conseil sourcé veut. Aucune graine n'est envoyée : le 2026-11-04, sur une question posée quatre fois à 0, les mêmes séries sont revenues en carte et le texte a changé."
 
 [[reglages.positions]]
 valeur = 0.3
 nom = "modérée"
-etiquette = "Modérée (0,3) : varie un peu ; non mesurée."
+etiquette = "Modérée (0,3) : varie un peu."
 motif = "La candidate pour la production de l'épreuve E4 ; elle ne devient défaut qu'après un rejeu des 26 questions à cette température."
 
 [[reglages.positions]]
 valeur = 0.7
 nom = "variée"
-etiquette = "Variée (0,7) : varie d'un essai à l'autre ; non mesurée, pour la démonstration."
+etiquette = "Variée (0,7) : varie d'un essai à l'autre."
 motif = "Le contraste avec 0, à montrer ; élevé pour un usage réel."
 
 [conversation]
@@ -163,10 +163,10 @@ degrade_saturation = "Le modèle de langage est saturé. Réessayez dans {n} sec
 degrade_modele = "Le modèle de langage ne répond pas (profil {profil}). L'exploitant peut changer de profil."
 degrade_longueur = "Le modèle de langage n'a pas terminé sa réponse (profil {profil}). Posez la question autrement ou changez de profil."
 degrade_sortie = "La réponse du modèle a été refusée par nos contrôles (motif : {motif}). Posez la question autrement ou changez de profil."
-degrade_recherche = "La recherche est indisponible."
-degrade_profil = "Le profil {profil} n'est pas disponible. La liste des profils a été rechargée."
-degrade_reglage = "Le profil {profil} n'accepte pas le réglage {reglage}."
-degrade_service = "Erreur du service (identifiant {identifiant})."
+degrade_recherche = "La recherche est indisponible. Vous pouvez réessayer."
+degrade_profil = "Le profil {profil} n'est pas disponible. La liste des profils a été rechargée : choisissez-en un autre."
+degrade_reglage = "Le profil {profil} n'accepte pas le réglage {reglage}. Changez de profil ou de réglage."
+degrade_service = "Erreur du service. Vous pouvez réessayer ; si elle revient, donnez à l'exploitant l'identifiant {identifiant}."
 conversation_invalide = "Cette conversation n'est plus valide. Commencez-en une nouvelle."
 conversation_terminee = "Conversation terminée ({echanges} échanges). Commencez une nouvelle conversation."
 conversation_longueur = "Conversation terminée (longueur maximale atteinte). Commencez une nouvelle conversation."

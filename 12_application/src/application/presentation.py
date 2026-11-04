@@ -580,6 +580,8 @@ def encart_erreur(
         )
     if code == "reglage_non_expose":
         reglage = str(details.get("reglage", ""))
+        if reglage == "temperature":
+            reglage = t["temperature_legende"].lower()
         return Encart(
             dire(t, "degrade_reglage", profil=nom_profil, reglage=reglage), 422
         )
