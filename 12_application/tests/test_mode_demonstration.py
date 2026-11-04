@@ -21,7 +21,7 @@ PHRASE = (
     "Le score est la similarité entre la question et le meilleur passage d'une série "
     "(cosinus, 0 à 1). Il dit à quel point un texte ressemble à la question, pas si la "
     "réponse est vraie : la recherche propose, le modèle choisit parmi ces séries, et "
-    "il ne peut en citer aucune autre."
+    "il ne peut en citer aucune autre en carte."
 )
 INFOBULLE = "similarité entre la question et le passage (0 à 1)"
 #: Chaque score de la réponse nominale, tel que l'écran les écrirait.

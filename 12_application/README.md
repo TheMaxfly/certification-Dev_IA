@@ -121,14 +121,14 @@ de la recherche ; un titre seulement nommé dans son texte, sans carte, n'est pa
 (« Limites déclarées »).
 
 **Les passages non cités** : hors de ce mode, aucun texte n'apparaît au-delà des passages
-cités, et cette règle ne change pas. Ce mode en est la seule exception, décidée. Ils viennent
-de la même réponse et du même corpus que les passages cités, sous le même contrôle :
-`make verify-poste` relit les passages rendus sur le jeu d'évaluation (904 passages distincts,
-0 pseudonyme hors des listes connues, 2026-11-03). **Ce contrôle ne veut pas dire « aucune
-mention »** : le texte d'une critique du corpus v2 reste tel qu'il a été écrit, et 20 mentions
-d'un membre, sur 19 critiques, y sont connues et listées. Et l'API ne relit pas les extraits à
-chaque réponse : ses contrôles portent sur le texte du modèle et sur la question reformulée.
-Une page en mode démonstration se relit donc avant toute capture.
+cités, et cette règle ne change pas. Ce mode en est la seule exception, décidée :
+**les passages ne portent aucun pseudonyme autre que les mentions connues du corpus v2
+(décision D2)**. Le texte d'une critique y reste tel qu'il a été écrit, et 20 mentions d'un
+membre, sur 19 critiques, sont connues et listées. `make verify-poste` le relit sur les
+passages rendus pour le jeu d'évaluation (904 passages distincts, 0 hors des listes, 2026-11-03)
+; l'API ne relit pas les extraits à chaque réponse : ses contrôles portent sur le texte du
+modèle et sur la question reformulée. Une page en mode démonstration se relit donc avant toute
+capture. Le masquage de ces mentions à l'affichage est prévu pour l'épreuve E4.
 
 **Aucun effet en amont** : la requête envoyée à l'API est la même, coché ou non, et le contrat
 refuserait un champ inconnu. Aucune donnée nouvelle ne sort : le tableau OWASP ne change pas.
@@ -349,5 +349,5 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 Comptes avec mot de passe haché et sessions signées à expiration ; trois rôles (client,
 libraire, administrateur) ; page de série ; critique de libraire signée, entrant dans le
-corpus ; administrateur (profil actif, comptes, état des services) ; serveur avec préproduction
+corpus ; masquage à l'affichage des mentions de membres connues du corpus ; administrateur (profil actif, comptes, état des services) ; serveur avec préproduction
 et production ; identité visuelle, sur `theme.css`.
