@@ -15,12 +15,17 @@ from typing import Literal
 
 from application import __version__
 from application.client_api import (
+    ContexteReponse,
     ErreurApi,
     EtatApi,
     Info,
     Metadonnees,
+    Passage,
     ProfilDecrit,
+    ReglagesAppliques,
+    ReglagesReponseAppliques,
     Reponse,
+    Serie,
 )
 from application.config import Fournisseur, Position, Reglages
 
@@ -306,6 +311,16 @@ def segments_d_un_tour(contenu: str) -> list[Segment]:
 class PassageCite:
     genre: str
     texte: str
+    #: Le mode démonstration seul : hors de lui, la valeur n'atteint pas le gabarit.
+    score: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Mesure:
+    """Le mode démonstration, sur une carte : le rang et le score de la série."""
+
+    rang: str
+    score: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -314,6 +329,38 @@ class Carte:
     titre: str
     metadonnees: tuple[tuple[str, str], ...]
     passages: tuple[PassageCite, ...]
+    mesure: Mesure | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LigneClassement:
+    rang: str
+    titre: str
+    score: str
+    etat: str
+    passages: int
+    #: La carte à viser : une série citée seulement.
+    cible: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class NonCites:
+    """Les passages non cités d'une série, repliés."""
+
+    resume: str
+    passages: tuple[PassageCite, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Trace:
+    """Le mode démonstration : ce que l'API a rendu, rien de calculé ici."""
+
+    phrase: tuple[Segment, ...]
+    classement: tuple[LigneClassement, ...]
+    non_cites: tuple[NonCites, ...]
+    question: tuple[tuple[str, str], ...]
+    recherche: tuple[tuple[str, str], ...]
+    modele: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,6 +378,8 @@ class Affichage:
     sans_carte: str | None
     complement: str | None
     complement_titres: tuple[str, ...]
+    #: None hors du mode démonstration : la section n'existe pas.
+    trace: Trace | None = None
 
 
 def tomes_de(m: Metadonnees, t: Mapping[str, str]) -> str:
@@ -362,19 +411,58 @@ def metadonnees_de(m: Metadonnees, t: Mapping[str, str]) -> tuple[tuple[str, str
     )
 
 
-def cartes_de(corps: Reponse, t: Mapping[str, str]) -> tuple[Carte, ...]:
-    """Une carte par série citée, dans l'ordre ; ses seuls passages cités. `series`
-    porte toutes les séries de la recherche : le reste ne s'affiche pas."""
+def decimales(valeur: float | None, t: Mapping[str, str], n: int = 2) -> str:
+    """Un nombre à la française ; absent ou nul : le tiret, jamais une erreur."""
+    if valeur is None:
+        return t["demo_absent"]
+    return f"{valeur:.{n}f}".replace(".", ",")
+
+
+def ou_absent(valeur: object, t: Mapping[str, str]) -> str:
+    return t["demo_absent"] if valeur is None else str(valeur)
+
+
+def mesure_de(serie: Serie, t: Mapping[str, str]) -> Mesure:
+    return Mesure(ou_absent(serie.rang, t), decimales(serie.score, t))
+
+
+def passage_en_forme(
+    passage: Passage, t: Mapping[str, str], score: str | None
+) -> PassageCite:
     genres = {
         "critique": t["passage_critique"],
         "resume_serie": t["passage_resume"],
         "synopsis_kitsu": t["passage_synopsis"],
     }
-    index = {s.serie_id: s for s in corps.series if s.serie_id is not None}
-    # L'API ne dédoublonne pas : une série citée deux fois fait une seule carte.
-    fragments: dict[int, set[int]] = {}
+    return PassageCite(
+        dire(
+            t,
+            "passage_extrait",
+            genre=genres[passage.type_document],
+            fragment=passage.fragment_id,
+        ),
+        passage.extrait,
+        score,
+    )
+
+
+def fragments_cites(corps: Reponse) -> dict[int | None, set[int]]:
+    """Par série citée, ses fragments. L'API ne dédoublonne pas : une série citée deux
+    fois les réunit."""
+    fragments: dict[int | None, set[int]] = {}
     for citee in corps.series_citees:
         fragments.setdefault(citee.serie_id, set()).update(citee.fragment_ids)
+    return fragments
+
+
+def cartes_de(
+    corps: Reponse, t: Mapping[str, str], demonstration: bool = False
+) -> tuple[Carte, ...]:
+    """Une carte par série citée, dans l'ordre ; ses seuls passages cités. `series`
+    porte toutes les séries de la recherche : le reste ne s'affiche pas. Rang et
+    scores : le mode démonstration seul."""
+    index = {s.serie_id: s for s in corps.series if s.serie_id is not None}
+    fragments = fragments_cites(corps)
     vues: set[int] = set()
     cartes: list[Carte] = []
     for citee in corps.series_citees:
@@ -388,21 +476,150 @@ def cartes_de(corps: Reponse, t: Mapping[str, str]) -> tuple[Carte, ...]:
                 titre=citee.titre,
                 metadonnees=metadonnees_de(serie.metadonnees, t),
                 passages=tuple(
-                    PassageCite(
-                        dire(
-                            t,
-                            "passage_extrait",
-                            genre=genres[p.type_document],
-                            fragment=p.fragment_id,
-                        ),
-                        p.extrait,
+                    passage_en_forme(
+                        p, t, decimales(p.score, t) if demonstration else None
                     )
                     for p in serie.passages
                     if p.fragment_id in fragments[citee.serie_id]
                 ),
+                mesure=mesure_de(serie, t) if demonstration else None,
             )
         )
     return tuple(cartes)
+
+
+def ordre_du_rang(serie: Serie) -> tuple[bool, int]:
+    """Le rang rendu par l'API ; sans rang, en dernier."""
+    return serie.rang is None, serie.rang or 0
+
+
+def classement_de(
+    series: list[Serie],
+    fragments: Mapping[int | None, set[int]],
+    t: Mapping[str, str],
+) -> tuple[LigneClassement, ...]:
+    """Toutes les séries de la recherche ; citée ou non se dit en texte."""
+    return tuple(
+        LigneClassement(
+            rang=ou_absent(serie.rang, t),
+            titre=serie.titre,
+            score=decimales(serie.score, t),
+            etat=t["trace_citee" if serie.serie_id in fragments else "trace_non_citee"],
+            passages=len(serie.passages),
+            cible=serie.serie_id if serie.serie_id in fragments else None,
+        )
+        for serie in series
+    )
+
+
+def non_cites_de(
+    series: list[Serie],
+    fragments: Mapping[int | None, set[int]],
+    t: Mapping[str, str],
+) -> tuple[NonCites, ...]:
+    """Par série, ce que la recherche a retrouvé et que le modèle n'a pas cité."""
+    groupes: list[NonCites] = []
+    for serie in series:
+        cites = fragments.get(serie.serie_id, set[int]())
+        restes = [p for p in serie.passages if p.fragment_id not in cites]
+        if restes:
+            groupes.append(
+                NonCites(
+                    dire(t, "trace_non_cites_resume", titre=serie.titre, n=len(restes)),
+                    tuple(
+                        passage_en_forme(p, t, decimales(p.score, t)) for p in restes
+                    ),
+                )
+            )
+    return tuple(groupes)
+
+
+def lignes_question(
+    question: str, c: ContexteReponse, t: Mapping[str, str]
+) -> tuple[tuple[str, str], ...]:
+    """L'origine, la reformulée s'il y en a une, et celle qui a cherché : l'API cherche
+    sur la reformulée quand elle existe ; une reformulation ignorée n'en rend pas."""
+    if c.question_reformulee is not None:
+        reformulee, partie = c.question_reformulee, t["trace_partie_reformulee"]
+    elif c.reformulation_ignoree is not None:
+        reformulee, partie = t["reformulation_ignoree"], t["trace_partie_origine"]
+    else:
+        reformulee, partie = t["reformulation_sans"], t["trace_partie_origine"]
+    return (
+        (t["trace_question_origine"], question),
+        (t["trace_question_reformulee"], reformulee),
+        (t["trace_question_partie"], partie),
+    )
+
+
+def lignes_recherche(
+    c: ContexteReponse, t: Mapping[str, str]
+) -> tuple[tuple[str, str], ...]:
+    r = c.reglages or ReglagesAppliques()
+    seul = {True: t["trace_oui"], False: t["trace_non"], None: t["demo_absent"]}
+    return (
+        (t["trace_nombre_series"], ou_absent(r.nombre_series, t)),
+        (t["trace_passages_par_serie"], ou_absent(r.passages_par_serie, t)),
+        (t["trace_catalogue_seul"], seul[r.catalogue_seul]),
+        (t["trace_modele_embedding"], ou_absent(c.modele, t)),
+        (t["trace_revision"], ou_absent(c.revision, t)),
+        (t["trace_corpus"], c.corpus_id),
+        (t["trace_encodage"], str(c.encodage_id)),
+    )
+
+
+def lignes_modele(
+    c: ContexteReponse, t: Mapping[str, str]
+) -> tuple[tuple[str, str], ...]:
+    r = c.reglages_appliques or ReglagesReponseAppliques()
+    temps = c.latences_ms
+
+    def latence(valeur: float | None) -> str:
+        if valeur is None:
+            return t["demo_absent"]
+        return dire(t, "ligne_latence", latence=round(valeur))
+
+    cout = c.cout_estime_usd
+    return (
+        (t["trace_profil"], c.profil),
+        (t["trace_fournisseur"], c.fournisseur),
+        (t["trace_modele"], c.modele_langage),
+        (
+            t["trace_temperature"],
+            (
+                t["demo_absent"]
+                if r.temperature is None
+                else f"{r.temperature:g}".replace(".", ",")
+            ),
+        ),
+        (t["trace_longueur"], ou_absent(r.longueur_max, t)),
+        (
+            t["trace_cout"],
+            (
+                t["demo_absent"]
+                if cout is None
+                else dire(t, "trace_cout_valeur", cout=decimales(cout, t, 6))
+            ),
+        ),
+        (t["trace_latence_recherche"], latence(temps.recherche)),
+        (t["trace_latence_reformulation"], latence(temps.reformulation)),
+        (t["trace_latence_modele"], latence(temps.modele)),
+        (t["trace_latence_totale"], latence(temps.totale)),
+        (t["trace_identifiant"], c.identifiant_requete),
+    )
+
+
+def trace_de(question: str, corps: Reponse, t: Mapping[str, str]) -> Trace:
+    fragments = fragments_cites(corps)
+    series = sorted(corps.series, key=ordre_du_rang)
+    return Trace(
+        phrase=tuple(avec_emphase(t["trace_phrase"])),
+        classement=classement_de(series, fragments, t),
+        non_cites=non_cites_de(series, fragments, t),
+        question=lignes_question(question, corps.contexte, t),
+        recherche=lignes_recherche(corps.contexte, t),
+        modele=lignes_modele(corps.contexte, t),
+    )
 
 
 def date_lisible(valeur: str) -> str:
@@ -469,14 +686,22 @@ def appels_de(corps: Reponse, t: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(lignes)
 
 
-def affichage_de(question: str, corps: Reponse, reglages: Reglages) -> Affichage:
+def affichage_de(
+    question: str,
+    corps: Reponse,
+    reglages: Reglages,
+    *,
+    demonstration: bool = False,
+) -> Affichage:
+    """La zone de réponse ; le mode démonstration n'ajoute que ce que l'API a déjà
+    rendu, et, éteint, rien de cela n'atteint le gabarit."""
     t = reglages.textes
     motifs = {
         "aucun_passage": t["motif_aucun_passage"],
         "hors_catalogue": t["motif_hors_catalogue"],
         "inconnu": t["motif_inconnu"],
     }
-    cartes = cartes_de(corps, t)
+    cartes = cartes_de(corps, t, demonstration)
     avec_carte = {c.serie_id for c in cartes}
     sans_carte = [
         i
@@ -511,6 +736,7 @@ def affichage_de(question: str, corps: Reponse, reglages: Reglages) -> Affichage
         ),
         complement=corps.complement,
         complement_titres=tuple(corps.complement_titres or ()),
+        trace=trace_de(question, corps, t) if demonstration else None,
     )
 
 

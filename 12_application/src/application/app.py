@@ -56,6 +56,7 @@ class Formulaire:
     profil: str | None = None
     temperature: float | None = None
     reformuler: bool | None = None
+    mode_demonstration: bool | None = None
     mode: str | None = None
     champ_fautif: str | None = None
     erreur: str | None = None
@@ -193,6 +194,11 @@ def creer_application(
                     if f.reformuler is None
                     else f.reformuler
                 ),
+                mode_demonstration=(
+                    reglages.mode_demonstration_defaut
+                    if f.mode_demonstration is None
+                    else f.mode_demonstration
+                ),
                 modes=presentation.modes_proposes(info),
                 mode_choisi=f.mode or presentation.mode_par_defaut(info),
                 question_max=limites.question_caracteres_max,
@@ -242,6 +248,7 @@ def creer_application(
             profil=profil or None,
             temperature=temperature if admise else None,
             reformuler="reformuler" in donnees,
+            mode_demonstration="mode_demonstration" in donnees,
             mode=champ(donnees, "mode") or None,
         )
         if not question:
@@ -369,7 +376,12 @@ def creer_application(
             request,
             formulaire=f,
             tours=tours,
-            affichage=presentation.affichage_de(lu.question, corps, reglages),
+            affichage=presentation.affichage_de(
+                lu.question,
+                corps,
+                reglages,
+                demonstration=bool(lu.mode_demonstration),
+            ),
             cloture=cloture,
         )
 

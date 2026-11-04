@@ -4,7 +4,8 @@ Trois appels : `info()`, `sante()`, `reponse(demande)`. Les erreurs sont typées
 le modèle d'erreur de l'API : `ErreurApi`, `ApiInjoignable`, `ApiDelai`. Un corps qui ne
 tient pas le contrat devient `ErreurApi(statut, "corps_inattendu")`. Les formes
 ci-dessous ne retiennent que ce que l'application emploie : un champ de plus de l'API
-est ignoré (le contrat ne reçoit que des ajouts).
+est ignoré (le contrat ne reçoit que des ajouts). Ce que seul le mode démonstration
+affiche est facultatif ici : son absence ne coûte jamais une réponse à la production.
 
 Aucune question, aucun historique, aucune réponse n'est journalisé ici. Une exception de
 httpx porte la requête, donc l'en-tête de la clé : elle ne sort jamais d'ici, ni comme
@@ -96,6 +97,7 @@ class Passage(BaseModel):
     fragment_id: int
     type_document: Literal["critique", "resume_serie", "synopsis_kitsu"]
     extrait: str
+    score: float | None = None
 
 
 class Metadonnees(BaseModel):
@@ -112,6 +114,8 @@ class Serie(BaseModel):
     titre: str
     passages: list[Passage]
     metadonnees: Metadonnees
+    rang: int | None = None
+    score: float | None = None
 
 
 class AppelModele(BaseModel):
@@ -126,6 +130,20 @@ class AppelModele(BaseModel):
 
 class Latences(BaseModel):
     totale: float
+    recherche: float | None = None
+    reformulation: float | None = None
+    modele: float | None = None
+
+
+class ReglagesAppliques(BaseModel):
+    nombre_series: int | None = None
+    passages_par_serie: int | None = None
+    catalogue_seul: bool | None = None
+
+
+class ReglagesReponseAppliques(BaseModel):
+    temperature: float | None = None
+    longueur_max: int | None = None
 
 
 class ContexteReponse(BaseModel):
@@ -141,6 +159,10 @@ class ContexteReponse(BaseModel):
     appels: list[AppelModele]
     cout_estime_usd: float | None
     latences_ms: Latences
+    reglages: ReglagesAppliques | None = None
+    reglages_appliques: ReglagesReponseAppliques | None = None
+    modele: str | None = None
+    revision: str | None = None
 
 
 class Reponse(BaseModel):

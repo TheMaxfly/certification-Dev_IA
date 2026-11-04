@@ -154,12 +154,14 @@ def info(
     }
 
 
-def passage(fragment_id: int, type_document: str = "critique") -> dict[str, Any]:
+def passage(
+    fragment_id: int, type_document: str = "critique", score: float = 0.5
+) -> dict[str, Any]:
     return {
         "fragment_id": fragment_id,
         "doc_key": f"doc-factice-{fragment_id}",
         "type_document": type_document,
-        "score": 0.5,
+        "score": score,
         "extrait": f"Passage factice n° {fragment_id}.",
     }
 
@@ -182,6 +184,7 @@ def serie(
     titre: str,
     passages: list[dict[str, Any]],
     rang: int = 1,
+    score: float = 0.5,
     **meta: Any,
 ) -> dict[str, Any]:
     return {
@@ -190,7 +193,7 @@ def serie(
         "serie_id": serie_id,
         "kitsu_id": None,
         "titre": titre,
-        "score": 0.5,
+        "score": score,
         "passages": passages,
         "metadonnees": metadonnees(**meta),
     }
@@ -279,22 +282,24 @@ def reponse_nominale(**valeurs: Any) -> dict[str, Any]:
             serie(
                 101,
                 "Série factice A",
-                [passage(11), passage(12, "synopsis_kitsu")],
+                [passage(11, score=0.83), passage(12, "synopsis_kitsu", 0.47)],
                 rang=1,
+                score=0.83,
             ),
             serie(
                 102,
                 "Série factice B",
-                [passage(21, "resume_serie"), passage(22)],
+                [passage(21, "resume_serie", 0.76), passage(22, score=0.612)],
                 rang=2,
+                score=0.76,
                 disponibilite="seulement_au_japon",
                 nb_volumes=3,
                 nb_volumes_source="divergent",
                 statut="en_cours",
             ),
-            serie(103, "Série factice C", [passage(31)], rang=3),
-            serie(104, "Série factice D", [passage(41)], rang=4),
-            serie(105, "Série factice E", [passage(51)], rang=5),
+            serie(103, "Série factice C", [passage(31, score=0.64)], 3, 0.64),
+            serie(104, "Série factice D", [passage(41, score=0.52)], 4, 0.52),
+            serie(105, "Série factice E", [passage(51, score=0.4)], 5, 0.4),
         ],
         "contexte": contexte(),
         **valeurs,
@@ -302,14 +307,21 @@ def reponse_nominale(**valeurs: Any) -> dict[str, Any]:
 
 
 def reponse_refus(
-    motif: str, texte: str = "Refus factice.", **ctx: Any
+    motif: str,
+    texte: str = "Refus factice.",
+    series: list[dict[str, Any]] | None = None,
+    **ctx: Any,
 ) -> dict[str, Any]:
     return {
         "refus": True,
         "motif_refus": motif,
         "reponse": texte,
         "series_citees": [],
-        "series": [serie(103, "Série factice C", [passage(31)], rang=1)],
+        "series": (
+            [serie(103, "Série factice C", [passage(31)], rang=1)]
+            if series is None
+            else series
+        ),
         "contexte": contexte(**ctx),
     }
 
@@ -374,6 +386,43 @@ def reponse_texte(texte: str) -> dict[str, Any]:
     return reponse_nominale(reponse=texte)
 
 
+def reponse_sans_scores(*, nuls: bool) -> dict[str, Any]:
+    """Hors contrat, exprès : scores nuls ou absents, le mode démonstration tient."""
+    corps = reponse_nominale()
+    for une_serie in corps["series"]:
+        for objet in (une_serie, *une_serie["passages"]):
+            if nuls:
+                objet["score"] = None
+            else:
+                del objet["score"]
+    return corps
+
+
+def reponse_contexte_minimal() -> dict[str, Any]:
+    """Hors contrat, exprès : tout ce que seul le mode démonstration lit est absent."""
+    garde = contexte(cout_estime_usd=None, latences_ms={"totale": 1200.0})
+    for cle in ("reglages", "reglages_appliques", "modele", "revision"):
+        del garde[cle]
+    corps = reponse_nominale(contexte=garde)
+    for une_serie in corps["series"]:
+        del une_serie["rang"]
+    return corps
+
+
+def reponse_dans_le_desordre() -> dict[str, Any]:
+    corps = reponse_nominale()
+    corps["series"].reverse()
+    return corps
+
+
+def reponse_non_citee_piegee() -> dict[str, Any]:
+    corps = reponse_nominale()
+    non_citee = corps["series"][2]
+    non_citee["titre"] = "<b>Titre piégé</b>"
+    non_citee["passages"][0]["extrait"] = "<script>alert(2)</script> Extrait piégé."
+    return corps
+
+
 SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
     "nominale": lambda: Rendu(200, reponse_nominale()),
     "metadonnees_nulles": lambda: Rendu(200, reponse_metadonnees_nulles()),
@@ -435,6 +484,11 @@ SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
             "et **un mot appuyé** pour finir."
         ),
     ),
+    "series_dans_le_desordre": lambda: Rendu(200, reponse_dans_le_desordre()),
+    "non_citee_piegee": lambda: Rendu(200, reponse_non_citee_piegee()),
+    "scores_nuls": lambda: Rendu(200, reponse_sans_scores(nuls=True)),
+    "scores_absents": lambda: Rendu(200, reponse_sans_scores(nuls=False)),
+    "contexte_minimal": lambda: Rendu(200, reponse_contexte_minimal()),
     "complement": lambda: Rendu(
         200,
         reponse_nominale(
@@ -449,6 +503,7 @@ SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
         200,
         reponse_refus(
             "aucun_passage",
+            series=[],
             date_appel=None,
             appels=[],
             cout_estime_usd=0.0,
@@ -637,7 +692,13 @@ SCENARIOS_SANTE: dict[str, Callable[[], Rendu]] = {
     "delai": lambda: Rendu(200, SANTE_OK, attente_s=5.0),
 }
 #: Hors contrat, exprès : le client doit le lire comme `corps_inattendu`.
-HORS_CONTRAT = {"corps_hors_contrat", "reponse_hors_contrat"}
+HORS_CONTRAT = {
+    "corps_hors_contrat",
+    "reponse_hors_contrat",
+    "scores_nuls",
+    "scores_absents",
+    "contexte_minimal",
+}
 
 
 def connu(nom: str, scenarios: Mapping[str, Any]) -> str:

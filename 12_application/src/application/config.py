@@ -57,7 +57,20 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " erreur_400_titre erreur_400_texte erreur_404_titre erreur_404_texte"
             " erreur_405_titre erreur_405_texte"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
-            " erreur_retour"
+            " erreur_retour demonstration_etiquette demo_rang demo_score"
+            " demo_infobulle demo_absent trace_titre trace_phrase"
+            " trace_classement_titre trace_colonne_rang trace_colonne_titre"
+            " trace_colonne_score trace_colonne_citee trace_colonne_passages"
+            " trace_citee trace_non_citee trace_aucune_serie trace_non_cites_titre"
+            " trace_aucun_non_cite trace_question_titre trace_question_origine"
+            " trace_question_reformulee trace_question_partie trace_partie_origine"
+            " trace_partie_reformulee trace_reglages_titre trace_nombre_series"
+            " trace_passages_par_serie trace_catalogue_seul trace_modele_embedding"
+            " trace_revision trace_corpus trace_encodage trace_oui trace_non"
+            " trace_modele_titre trace_profil trace_fournisseur trace_modele"
+            " trace_temperature trace_longueur trace_cout trace_latence_recherche"
+            " trace_latence_reformulation trace_latence_modele trace_latence_totale"
+            " trace_identifiant trace_appels_titre"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -88,6 +101,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "degrade_service": frozenset({"identifiant"}),
     "conversation_terminee": frozenset({"echanges"}),
     "erreur_identifiant": frozenset({"identifiant"}),
+    "trace_non_cites_resume": frozenset({"titre", "n"}),
+    "trace_cout_valeur": frozenset({"cout"}),
 }
 
 
@@ -143,6 +158,7 @@ class Reglages:
     attente_fournisseur_defaut_s: int
     temperature_defaut: float
     reformuler_defaut: bool
+    mode_demonstration_defaut: bool
     profils_exclus: frozenset[str]
     positions: tuple[Position, ...]
     limites: Limites
@@ -363,6 +379,9 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         ),
         temperature_defaut=temperature,
         reformuler_defaut=lecteur.booleen(reglages, "reformuler_defaut", "reglages"),
+        mode_demonstration_defaut=lecteur.booleen(
+            reglages, "mode_demonstration_defaut", "reglages"
+        ),
         profils_exclus=frozenset(
             lecteur.textes(reglages, "profils_exclus", "reglages")
         ),

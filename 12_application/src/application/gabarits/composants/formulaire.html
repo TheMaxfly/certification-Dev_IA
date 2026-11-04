@@ -34,6 +34,7 @@
 </fieldset>
 <label for="reformuler"><input type="checkbox" id="reformuler" name="reformuler" value="1" aria-describedby="reformuler-aide"{% if reformuler %} checked{% endif %}> {{ t.reformuler_etiquette }}</label>
 <small id="reformuler-aide">{{ t.reformuler_aide }}</small>
+<label for="mode_demonstration"><input type="checkbox" id="mode_demonstration" name="mode_demonstration" value="1"{% if mode_demonstration %} checked{% endif %}> {{ t.demonstration_etiquette }}</label>
 {% if modes|length > 1 %}
 <label for="mode">{{ t.mode_etiquette }}</label>
 <select id="mode" name="mode">

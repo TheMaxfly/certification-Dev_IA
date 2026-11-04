@@ -32,6 +32,9 @@
 {% for carte in affichage.cartes %}
 <article>
 <h3 id="serie-{{ carte.serie_id }}">{{ carte.titre }}</h3>
+{% if carte.mesure %}
+<p><small>{{ t.demo_rang }} {{ carte.mesure.rang }} — {{ texte.score(carte.mesure.score, t) }}</small></p>
+{% endif %}
 <dl>
 {% for nom, valeur in carte.metadonnees %}
 <dt>{{ nom }}</dt>
@@ -41,7 +44,7 @@
 {% for passage in carte.passages %}
 <blockquote>
 <p>{{ passage.texte }}</p>
-<footer><small>{{ passage.genre }}</small></footer>
+<footer><small>{{ passage.genre }}{% if passage.score is not none %} — {{ texte.score(passage.score, t) }}{% endif %}</small></footer>
 </blockquote>
 {% else %}
 <p>{{ t.carte_sans_passage }}</p>
@@ -49,6 +52,9 @@
 <p><small>{{ t.mention_carte }} {{ t.mention_dispo }}</small></p>
 </article>
 {% endfor %}
+{% if affichage.trace %}
+{% include "composants/trace.html" %}
+{% else %}
 <details>
 <summary>{{ t.details_titre }}</summary>
 <ul>
@@ -61,3 +67,4 @@
 <p>{{ affichage.sans_carte }}</p>
 {% endif %}
 </details>
+{% endif %}
