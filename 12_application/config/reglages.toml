@@ -149,6 +149,7 @@ details_appel = "{role} : {entree} jetons en entrée, {sortie} en sortie, {raiso
 details_refus_debit = "{role} : refusé pour débit, non facturé, rejoué une fois"
 details_estimes = "(jetons estimés)"
 details_ids = "Corpus {corpus_id} · encodage {encodage_id} · identifiant {identifiant}"
+details_sans_carte = "Marques de séries sans carte : {ids}"
 role_appel_reformulation = "reformulation"
 role_appel_reponse = "réponse"
 non_verifie = "Non vérifié — connaissances du modèle, sans source"

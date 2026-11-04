@@ -168,6 +168,7 @@ def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
 #  Le texte de la réponse : marques, titres, emphase
 # --------------------------------------------------------------------------- #
 MARQUE_SERIE = re.compile(r"\[S:(\d+)\]")
+MARQUE_ET_ESPACE = re.compile(r"\s*\[S:(\d+)\]")
 #: Une emphase colle à son texte : `4* et 5*` n'en est pas une.
 EMPHASE = re.compile(r"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*|\*(?=\S)([^*\n]+?)(?<=\S)\*")
 
@@ -243,15 +244,15 @@ def segments_de(texte: str, titres: Mapping[int, str]) -> list[Segment]:
     """Le texte d'une réponse : chaque marque `[S:<id>]` d'une série citée devient un
     lien vers sa carte, qui enveloppe le titre écrit par le modèle, juste avant ou juste
     après (la règle de l'API, réécrite) ; sinon, il porte le titre du catalogue. Une
-    marque sans carte reste du texte."""
+    marque sans carte ne s'affiche pas : le texte du modèle reste, sans lien."""
+    texte = MARQUE_ET_ESPACE.sub(
+        lambda m: m.group(0) if int(m.group(1)) in titres else "", texte
+    )
     segments: list[Segment] = []
     curseur = 0
     for marque in MARQUE_SERIE.finditer(texte):
         cible = int(marque.group(1))
-        titre = titres.get(cible)
-        if titre is None:
-            continue
-        cle = plat(titre)
+        cle = plat(titres[cible])
         avant = texte[curseur : marque.start()]
         if (
             not avant.strip()
@@ -277,7 +278,7 @@ def segments_de(texte: str, titres: Mapping[int, str]) -> list[Segment]:
                 )
                 suite = marque.end() + apres[1]
             else:
-                interieur = [Segment("texte", titre)]
+                interieur = [Segment("texte", titres[cible])]
         segments.append(Segment("lien", cible=cible, enfants=tuple(interieur)))
         curseur = suite
     segments += avec_emphase(texte[curseur:])
@@ -295,7 +296,7 @@ def paragraphes_de(texte: str, titres: Mapping[int, str]) -> list[list[Segment]]
 def segments_d_un_tour(contenu: str) -> list[Segment]:
     """Un tour précédent : aucune carte à viser, les marques ne s'affichent pas ; le
     champ caché, lui, garde le texte brut."""
-    return avec_emphase(re.sub(r"\s*\[S:\d+\]", "", contenu))
+    return avec_emphase(MARQUE_ET_ESPACE.sub("", contenu))
 
 
 # --------------------------------------------------------------------------- #
@@ -327,6 +328,7 @@ class Affichage:
     ligne: str
     appels: tuple[str, ...]
     identifiants: str
+    sans_carte: str | None
     complement: str | None
     complement_titres: tuple[str, ...]
 
@@ -467,6 +469,12 @@ def affichage_de(question: str, corps: Reponse, reglages: Reglages) -> Affichage
         "inconnu": t["motif_inconnu"],
     }
     cartes = cartes_de(corps, t)
+    avec_carte = {c.serie_id for c in cartes}
+    sans_carte = [
+        i
+        for i in dict.fromkeys(MARQUE_SERIE.findall(corps.reponse))
+        if int(i) not in avec_carte
+    ]
     return Affichage(
         question=question,
         refus=corps.refus,
@@ -487,6 +495,11 @@ def affichage_de(question: str, corps: Reponse, reglages: Reglages) -> Affichage
             corpus_id=corps.contexte.corpus_id,
             encodage_id=corps.contexte.encodage_id,
             identifiant=corps.contexte.identifiant_requete,
+        ),
+        sans_carte=(
+            dire(t, "details_sans_carte", ids=", ".join(sans_carte))
+            if sans_carte
+            else None
         ),
         complement=corps.complement,
         complement_titres=tuple(corps.complement_titres or ()),

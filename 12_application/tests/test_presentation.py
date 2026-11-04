@@ -67,10 +67,17 @@ def test_sans_titre_autour_le_lien_porte_le_titre_du_catalogue():
     ]
 
 
-def test_une_marque_sans_carte_reste_du_texte():
+def test_une_marque_sans_carte_ne_s_affiche_pas():
     assert p.segments_de("Une marque [S:999].", TITRES) == [
-        Segment("texte", "Une marque [S:999]."),
+        Segment("texte", "Une marque."),
     ]
+
+
+def test_masquer_une_marque_sans_carte_laisse_le_lien_de_celle_qui_en_a_une():
+    segments = p.segments_de("Inconnue [S:999], puis Série factice A [S:101].", TITRES)
+
+    assert segments[0] == Segment("texte", "Inconnue, puis ")
+    assert segments[1].genre == "lien" and segments[1].cible == 101
 
 
 def test_deux_marques_de_suite_ne_mordent_pas_l_une_sur_l_autre():

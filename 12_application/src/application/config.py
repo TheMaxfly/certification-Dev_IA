@@ -76,6 +76,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "details_appel": frozenset({"role", "entree", "sortie", "raisonnement", "latence"}),
     "details_refus_debit": frozenset({"role"}),
     "details_ids": frozenset({"corpus_id", "encodage_id", "identifiant"}),
+    "details_sans_carte": frozenset({"ids"}),
     "degrade_debit": frozenset({"n"}),
     "degrade_saturation": frozenset({"n"}),
     "degrade_modele": frozenset({"profil"}),

@@ -175,19 +175,33 @@ def test_les_ancres_du_texte_visent_les_cartes(navigateur):
         assert page.select_one(a["href"]) is not None
 
 
-def test_le_texte_piege_est_echappe_et_les_marques_sans_carte_restent_du_texte(
+def test_le_texte_piege_est_echappe_et_les_marques_sans_carte_sont_masquees(
     navigateur, doublure
 ):
     doublure.choisir(reponse="texte_piege")
 
     r = poser(navigateur)
-    zone = soupe(r).select_one("section[aria-live=polite]")
+    page = soupe(r)
+    zone = page.select_one("section[aria-live=polite]")
 
     assert "<script>" not in r.text
     assert "&lt;script&gt;" in r.text
-    assert "[S:999]" in zone.get_text() and "[S:103]" in zone.get_text()
+    assert "[S:" not in zone.get_text()
+    assert "une marque inconnue, une série non citée." in zone.get_text()
     assert not zone.select('a[href="#serie-999"]')
     assert not zone.select('a[href="#serie-103"]')
+    # L'identifiant reste dans les détails techniques et dans le champ caché.
+    assert "sans carte : 999, 103" in zone.select_one("details").get_text()
+    historique = page.select_one("input[name=historique]")["value"]
+    assert "[S:999]" in historique and "[S:103]" in historique
+
+
+def test_une_reponse_dont_toutes_les_marques_ont_leur_carte_n_en_dit_rien(
+    navigateur, doublure
+):
+    zone = soupe(poser(navigateur)).select_one("section[aria-live=polite]")
+
+    assert "sans carte" not in zone.select_one("details").get_text()
 
 
 def test_l_emphase_et_les_titres_ecrits_autrement(navigateur, doublure):
