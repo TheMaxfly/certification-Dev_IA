@@ -77,6 +77,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "details_refus_debit": frozenset({"role"}),
     "details_ids": frozenset({"corpus_id", "encodage_id", "identifiant"}),
     "details_sans_carte": frozenset({"ids"}),
+    "passage_extrait": frozenset({"genre", "fragment"}),
     "degrade_debit": frozenset({"n"}),
     "degrade_saturation": frozenset({"n"}),
     "degrade_modele": frozenset({"profil"}),

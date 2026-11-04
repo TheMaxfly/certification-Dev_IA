@@ -284,6 +284,13 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
   `series_citees` ne portent pas, et l'API ne contrôle pas ce cas. La marque est masquée :
   le titre écrit par le modèle reste, sans lien ni carte, non contrôlé ; l'identifiant est
   dans les détails techniques et dans le champ caché.
+- **Un passage est un extrait** : le fragment que la recherche a retrouvé, 1 200 caractères
+  au plus, rendu en entier tel que l'API le donne ; c'est aussi ce que le modèle a lu. Une
+  critique se lit donc souvent en partie (corpus v2, 2026-11-04 : 9 644 critiques sur 11 041
+  tiennent en plusieurs fragments). D'autres « … » viennent de la collecte : le champ d'un
+  résumé de série peut porter, après le résumé, des aperçus de critiques coupés vers 400
+  caractères (constaté sur une série, 2026-11-04) ; 5 039 résumés sur 8 685 finissent par des
+  points de suspension.
 - **Quitter la page perd la conversation** : « À propos et données » s'ouvre dans le même
   onglet, et revenir par « Précédent » peut demander de renvoyer le formulaire, donc un
   nouvel appel. C'est la conséquence de « rien n'est gardé » ; l'épreuve E4 la règle avec

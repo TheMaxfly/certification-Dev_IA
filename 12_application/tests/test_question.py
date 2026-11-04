@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import doublure_api as d
@@ -173,6 +174,23 @@ def test_les_ancres_du_texte_visent_les_cartes(navigateur):
     assert "[S:" not in zone.get_text()
     for a in liens:
         assert page.select_one(a["href"]) is not None
+
+
+def test_chaque_passage_se_dit_extrait_et_s_affiche_en_entier(navigateur):
+    zone = soupe(poser(navigateur)).select_one("section[aria-live=polite]")
+    citations = zone.select("blockquote")
+
+    assert citations
+    for citation in citations:
+        fragment = re.search(
+            r"extrait \(fragment n° (\d+)\)", citation.select_one("small").get_text()
+        )
+        assert fragment is not None
+        assert (
+            citation.select_one("p").get_text()
+            == f"Passage factice n° {fragment.group(1)}."
+        )
+    assert "extrait de 1 200 caractères au plus" in zone.get_text()
 
 
 def test_le_texte_piege_est_echappe_et_les_marques_sans_carte_sont_masquees(

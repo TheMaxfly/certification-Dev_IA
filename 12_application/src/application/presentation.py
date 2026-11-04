@@ -388,7 +388,15 @@ def cartes_de(corps: Reponse, t: Mapping[str, str]) -> tuple[Carte, ...]:
                 titre=citee.titre,
                 metadonnees=metadonnees_de(serie.metadonnees, t),
                 passages=tuple(
-                    PassageCite(genres[p.type_document], p.extrait)
+                    PassageCite(
+                        dire(
+                            t,
+                            "passage_extrait",
+                            genre=genres[p.type_document],
+                            fragment=p.fragment_id,
+                        ),
+                        p.extrait,
+                    )
                     for p in serie.passages
                     if p.fragment_id in fragments[citee.serie_id]
                 ),

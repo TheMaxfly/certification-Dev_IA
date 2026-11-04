@@ -136,10 +136,27 @@ def test_les_cartes_ne_portent_que_les_series_et_les_passages_cites(reglages):
 
     assert [c.serie_id for c in cartes] == [101, 102]
     assert [x.texte for x in cartes[0].passages] == ["Passage factice n° 11."]
-    assert [x.genre for x in cartes[1].passages] == [
-        "résumé de série",
-        "critique de tome",
+    genres = [x.genre for x in cartes[1].passages]
+    assert genres[0].startswith("résumé de série — extrait (fragment n° ")
+    assert genres[1].startswith("critique de tome — extrait (fragment n° ")
+
+
+def test_un_passage_est_rendu_tel_que_l_api_le_donne(reglages):
+    # 1 200 caractères, le plafond d'un fragment, et ce qu'une coupe pourrait masquer.
+    extrait = ("Début <b> & « fin »… " * 60)[:1200]
+    corps = corps_de("nominale")
+    fragment = corps.series_citees[0].fragment_ids[0]
+    serie = corps.series[0]
+    serie.passages = [
+        x.model_copy(update={"extrait": extrait}) if x.fragment_id == fragment else x
+        for x in serie.passages
     ]
+
+    cartes = p.cartes_de(corps, reglages.textes)
+
+    assert len(extrait) == 1200
+    assert cartes[0].passages[0].texte == extrait
+    assert f"(fragment n° {fragment})" in cartes[0].passages[0].genre
 
 
 def test_une_serie_citee_deux_fois_fait_une_seule_carte(reglages):
