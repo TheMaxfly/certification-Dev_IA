@@ -12,7 +12,10 @@
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
 #   make app-compose-arret   les arrête
-#   make verify-poste        la mémoire d'abord ; make verify complet, sauf si l'arbre,
+#   make demo-direct         la démonstration en direct : l'application, le Swagger de
+#                            l'API et MLflow (CONSTRUIRE=1 reconstruit les images d'abord) ;
+#                            demo-direct-etat dit ce qui répond, demo-direct-arret arrête
+#   make verify-poste       la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
 #                            harnais du poste seul : fidélité du schéma, équivalence du
 #                            service d'embedding et de l'API du modèle, état d'apimanga
@@ -31,8 +34,10 @@ MODULE ?=
 TOUT ?=
 FORCER ?=
 MUTATIONS ?=
+CONSTRUIRE ?=
 
-.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret
+.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret \
+	demo-direct demo-direct-etat demo-direct-arret
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -52,6 +57,18 @@ app-compose:
 
 app-compose-arret:
 	@$(APP_COMPOSE) down
+
+# Le même Compose, plus le fichier du mode démonstration, et MLflow à côté.
+DEMO_COMPOSE = $(APP_COMPOSE) -f 12_application/compose.demo.yaml
+
+demo-direct:
+	@CONSTRUIRE=$(CONSTRUIRE) bash demo/en_direct.sh lancer $(DEMO_COMPOSE)
+
+demo-direct-etat:
+	@bash demo/en_direct.sh etat
+
+demo-direct-arret:
+	@bash demo/en_direct.sh arreter $(DEMO_COMPOSE)
 
 verify-mutations:
 	@uv run --no-project python -I verification/rejouer_mutations.py $(MUTATIONS)

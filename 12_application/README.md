@@ -238,6 +238,10 @@ réseaux : `applicatif`, l'application et l'API, rien d'autre ; `publication`, p
 Docker ne publie pas sur un réseau interne, celui-ci a donc une route vers l'extérieur, que
 l'application n'emploie pas.
 
+Pour montrer aussi le Swagger de l'API et MLflow : `make demo-direct`, qui ajoute
+`compose.demo.yaml` et publie alors le port de l'API sur l'adresse locale. Voir
+[../demo/README.md](../demo/README.md).
+
 ## Vérifier
 
 ```bash

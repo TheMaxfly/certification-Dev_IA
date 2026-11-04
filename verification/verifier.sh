@@ -398,6 +398,13 @@ integration_12() {
   # Seule l'application est publiée, en fusion comme écrit.
   publies="$(grep -c 'published:' <<<"$fusion")"
   [ "$publies" = 1 ] || { echo "fusion : $publies ports publiés, un seul attendu" >&2; return 1; }
+  # Le mode démonstration ajoute le port de l'API, et rien d'autre.
+  dire "12 — (12_application/) docker compose config : le mode démonstration, en plus"
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+    -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml \
+    -f 12_application/compose.demo.yaml config)" || return 1
+  publies="$(grep -c 'published:' <<<"$fusion")"
+  [ "$publies" = 2 ] || { echo "démonstration : $publies ports publiés, deux attendus" >&2; return 1; }
   dire "12 — (12_application/) ${cmd[*]}"
   (cd "$RACINE/12_application" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/12_application" && "${PROPRE[@]}" docker compose "${COMPOSE_12[@]}" down -v >/dev/null 2>&1)
@@ -437,7 +444,7 @@ verifier_statique() {
     .githooks/controler-texte \
     verification/verifier.sh verification/etat_apimanga.sh verification/tester_perimetre.sh \
     verification/tester_verifier.sh verification/controler_workflows.sh \
-    sauvegarde/sauvegarder.sh sauvegarde/tester_sauvegarde.sh
+    sauvegarde/sauvegarder.sh sauvegarde/tester_sauvegarde.sh demo/en_direct.sh
   # tester.sh : ses `eval '…'` sont voulus (SC2016), et ses variables ne servent que
   # dans ces chaînes (SC2034).
   controle "shellcheck de tester.sh" uvx --from "shellcheck-py==$SHELLCHECK" \

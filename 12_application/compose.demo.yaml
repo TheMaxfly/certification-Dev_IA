@@ -1,0 +1,19 @@
+# La démonstration en direct : un fichier de fusion de plus, lu après `compose.yaml`.
+#
+#   make demo-direct          # et make demo-direct-etat, make demo-direct-arret
+#
+# `make app-compose` ne le lit pas : hors démonstration, l'API reste non publiée et sa
+# documentation interactive fermée. Ici, seulement :
+#   - le port de l'API revient, sur l'adresse locale seule, pour le Swagger ;
+#   - la documentation interactive est ouverte (`/v1/docs`) ;
+#   - le contrôle d'exploitation des modèles au démarrage est coupé : aucun appel au
+#     fournisseur au lancement, et un lancement qui ne dépend pas du réseau.
+# Aucune valeur secrète ici : elles restent dans les fichiers d'environnement des modules.
+
+services:
+  api:
+    environment:
+      API_MODELE_DOCUMENTATION: "vrai"
+      API_MODELE_VERIFIER_MODELES: "false"
+    ports:
+      - "127.0.0.1:8010:8010"

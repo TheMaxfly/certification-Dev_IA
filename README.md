@@ -334,6 +334,8 @@ son README.
 L'application du libraire, `12_application/`, est le consommateur de cette API : elle ne
 parle ni a la base ni a un fournisseur, et ne connait l'API que par HTTP et par son contrat.
 Le service d'embedding, l'API et l'application se levent ensemble par `make app-compose`.
+Pour une demonstration en direct, avec le Swagger de l'API et MLflow : `make demo-direct`
+(`demo/README.md`).
 
 Demarrage local :
 

@@ -21,6 +21,50 @@ uv run manga-pipeline --etat     # écran d'état seul, puis sortie
 uv run manga-pipeline --ecriture # débloque les actions qui écrivent en base
 ```
 
+## La démonstration en direct : application, Swagger, MLflow
+
+Cette console déroule la chaîne de données. Pour montrer le service qu'elle alimente, une
+commande, à la racine du dépôt :
+
+```bash
+make demo-direct                # lance les trois, attend qu'ils répondent, donne les adresses
+make demo-direct-etat           # dit ce qui répond
+make demo-direct-arret          # arrête les trois
+make demo-direct CONSTRUIRE=1   # reconstruit d'abord les images : à faire avant le jour J
+```
+
+| Accès | Adresse | Ce qu'on y montre | Clé |
+|---|---|---|---|
+| Application | <http://127.0.0.1:8020/> | l'écran du libraire | aucune |
+| Swagger de l'API | <http://127.0.0.1:8010/v1/docs> | routes, schémas, requêtes et réponses JSON | bouton **Authorize**, sauf `GET /v1/sante` |
+| MLflow | <http://127.0.0.1:5000/> | expériences, runs, métriques, pièces | aucune |
+
+Relevé le 2026-11-04, images déjà construites : 44 s à froid, 1,7 Go de mémoire pour
+l'ensemble, dont environ 0,5 Go pour MLflow.
+
+À savoir avant de montrer :
+
+- **Ce qui coûte.** Lancer n'appelle pas le fournisseur. « Demander » dans l'application et
+  `POST /v1/reponse` dans le Swagger l'appellent, environ 0,002 $ par réponse.
+  `POST /v1/recherche`, `GET /v1/info` et `GET /v1/sante` ne coûtent rien.
+- **La clé.** Le Swagger la montre en clair, dans le champ d'**Authorize** et dans le bloc
+  Curl après **Execute**. Devant un public : une clé dédiée, `demonstration:<secret>` ajoutée
+  à `API_MODELE_CLES`, retirée ensuite.
+- **Le réseau.** Sans internet, seul le modèle de langage manque : « Demander » et
+  `POST /v1/reponse` échouent, et l'écran le dit. Le Swagger, la recherche et MLflow tournent
+  sur le poste.
+- **MLflow** lit une copie du magasin, refaite à chaque lancement : ce qu'on y clique ne
+  touche pas aux mesures. Un panneau d'assistant s'ouvre à la première visite : sa croix le
+  ferme, pour ce navigateur.
+- **Le code montré.** Sans `CONSTRUIRE=1`, aucune image n'est reconstruite : le lancement ne
+  dépend pas du réseau, mais une modification du code n'y paraît pas.
+- **Le journal.** Recréer les conteneurs remet à zéro le journal et les compteurs de l'API.
+
+`make app-compose` ne change pas : hors démonstration, l'API n'est pas publiée et sa
+documentation interactive reste fermée. Les deux commandes emploient les mêmes conteneurs :
+la dernière lancée remplace l'autre. `make verify-poste` et la sauvegarde refusent un service
+d'embedding en marche : `make demo-direct-arret` avant.
+
 ## Sécurité de démonstration
 
 | Garde-fou | Mise en œuvre |

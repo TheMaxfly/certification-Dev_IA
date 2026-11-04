@@ -11,6 +11,7 @@ RACINE = Path(__file__).resolve().parents[1]
 DOCKERFILE = (RACINE / "Dockerfile").read_text(encoding="utf-8")
 FUSION = (RACINE / "compose.yaml").read_text(encoding="utf-8")
 ESSAI = (RACINE / "compose.integration.yml").read_text(encoding="utf-8")
+DEMO = (RACINE / "compose.demo.yaml").read_text(encoding="utf-8")
 IGNORE = (RACINE / "Dockerfile.dockerignore").read_text(encoding="utf-8")
 
 
@@ -41,6 +42,20 @@ def test_le_compose_ne_publie_que_sur_le_bouclage_et_ne_porte_aucune_cle():
     assert '"127.0.0.1:${APPLICATION_PORT_PUBLIE:-8020}:8020"' in FUSION
     assert "APPLICATION_CLE_API: ${APPLICATION_CLE_API:-}" in FUSION
     assert FUSION.count("ports:") == 2 and "ports: !reset []" in FUSION
+
+
+def test_le_mode_demonstration_ne_publie_l_api_que_sur_le_bouclage():
+    assert DEMO.count("ports:") == 1
+    assert '- "127.0.0.1:8010:8010"' in DEMO
+    assert 'API_MODELE_DOCUMENTATION: "vrai"' in DEMO
+    # Aucun appel au fournisseur au lancement.
+    assert 'API_MODELE_VERIFIER_MODELES: "false"' in DEMO
+
+
+def test_le_mode_demonstration_ne_porte_aucune_cle():
+    variables = re.findall(r"^ +(\w+): \S", DEMO, re.M)
+
+    assert variables == ["API_MODELE_DOCUMENTATION", "API_MODELE_VERIFIER_MODELES"]
 
 
 def test_l_application_ne_joint_que_l_api():
