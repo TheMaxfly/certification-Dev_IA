@@ -274,6 +274,26 @@ def test_wcag_1_4_1_chaque_etat_a_un_texte(pages):
             assert lie.get_text(strip=True), page.ecran.nom
 
 
+def test_nouvelle_conversation_est_un_bouton_en_tete_de_chaque_ecran(pages):
+    for page in pages:
+        formulaire = page.soupe.select_one("header form")
+        assert formulaire is not None, page.ecran.nom
+        assert formulaire["method"] == "get", page.ecran.nom
+        assert formulaire["action"] == "/", page.ecran.nom
+        bouton = formulaire.select_one("button")
+        assert bouton.get_text(strip=True) == "Nouvelle conversation", page.ecran.nom
+        # Sans attribut type : Pico n'élargit que button[type=submit].
+        assert not bouton.has_attr("type"), page.ecran.nom
+        # Aucun champ : l'historique ne le suit pas, la page d'arrivée est vide.
+        assert not formulaire.select("input, select, textarea"), page.ecran.nom
+
+
+def test_les_positions_de_temperature_ne_parlent_pas_de_mesure(pages):
+    for page in pages:
+        for groupe in page.soupe.select("fieldset"):
+            assert "mesur" not in groupe.get_text().lower(), page.ecran.nom
+
+
 def test_la_mention_ia_est_sur_chaque_ecran(pages):
     for page in pages:
         texte = page.soupe.get_text()

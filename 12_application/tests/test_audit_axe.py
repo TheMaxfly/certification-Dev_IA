@@ -47,7 +47,7 @@ FOCUS = """() => {
   return attendu === null ? null : attendu === document.activeElement;
 }"""
 PREPARER = """(valeurs) => {
-  const form = document.querySelector("form");
+  const form = document.querySelector("main form");
   form.noValidate = true;
   const question = document.querySelector("#question");
   question.removeAttribute("maxlength");

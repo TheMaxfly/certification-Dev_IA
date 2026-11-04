@@ -21,8 +21,8 @@ Aucun.
 
 | Page | Règles passées | Violées | À revoir | Non applicables |
 |---|---:|---:|---:|---:|
-| `a_propos` | 26 | 0 | 0 | 64 |
-| `a_propos_sans_api` | 21 | 0 | 0 | 69 |
+| `a_propos` | 28 | 0 | 0 | 62 |
+| `a_propos_sans_api` | 23 | 0 | 0 | 67 |
 | `api_indisponible` | 33 | 0 | 0 | 57 |
 | `aucun_profil` | 33 | 0 | 0 | 57 |
 | `cle_refusee` | 33 | 0 | 0 | 57 |
@@ -70,7 +70,7 @@ Aucun.
 | `erreur_question_longue` | 34 | 0 | 1 | 56 |
 | `erreur_question_vide` | 34 | 0 | 1 | 56 |
 | `erreur_temperature` | 34 | 0 | 1 | 56 |
-| `page_404` | 21 | 0 | 0 | 69 |
+| `page_404` | 23 | 0 | 0 | 67 |
 | `page_vide` | 34 | 0 | 1 | 56 |
 | `refus_aucun_passage` | 36 | 0 | 1 | 54 |
 | `refus_hors_catalogue` | 37 | 0 | 1 | 53 |

@@ -60,7 +60,9 @@ administrateur.
 
 Un seul écran, `/`, dans l'ordre de lecture :
 
-1. le lien d'évitement ; le nom de la librairie, fictive ; la mention courte ;
+1. le lien d'évitement ; le nom de la librairie, fictive ; la mention courte ; le bouton
+   **Nouvelle conversation**, sur chaque écran : un formulaire `GET /` sans champ, donc sans
+   script, et l'historique ne le suit pas ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
 4. le formulaire : la question ; les **Réglages**, repliés ; le champ caché de l'historique ;
