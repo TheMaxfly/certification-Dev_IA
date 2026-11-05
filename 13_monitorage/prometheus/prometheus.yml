@@ -1,0 +1,30 @@
+# La collecte : cinq cibles, relevées toutes les 15 s. La rétention, 15 jours, est un
+# argument de lancement (compose.yaml). Aucune adresse hors des noms de services Compose.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - regles/enregistrement.yml
+
+scrape_configs:
+  # Le service d'embedding : ses métriques sont sur son port, à /metrics.
+  - job_name: embedding
+    static_configs:
+      - targets: ["embedding:8082"]
+  # L'API du modèle : /metrics n'admet que le réseau de collecte.
+  - job_name: api
+    static_configs:
+      - targets: ["api:8010"]
+  # L'application : même règle.
+  - job_name: application
+    static_configs:
+      - targets: ["application:8020"]
+  # La machine.
+  - job_name: machine
+    static_configs:
+      - targets: ["node-exporter:9100"]
+  # La qualité du modèle : la sonde d'équivalence et l'exporteur.
+  - job_name: qualite
+    static_configs:
+      - targets: ["sonde:9108"]

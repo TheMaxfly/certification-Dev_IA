@@ -1,0 +1,135 @@
+# Le monitorage : un fichier de fusion, sur ceux des modules 11 et 12, qui ne changent que
+# par leur en-tête.
+#
+#   make monitorage          # et make monitorage-etat, make monitorage-arret
+#
+# soit, depuis la racine du dépôt, avec les fichiers d'environnement des trois modules :
+#
+#   docker compose --env-file … -f 11_api_modele/docker-compose.yml \
+#     -f 12_application/compose.yaml -f 13_monitorage/compose.yaml up -d --build
+#
+# Les chemins relatifs partent du dossier du PREMIER fichier (11_api_modele/).
+#
+# Quatre services de plus : Prometheus, Grafana, l'exporteur de machine, la sonde. Trois
+# réseaux de plus :
+#   - `collecte_embedding` (interne) : le service d'embedding, Prometheus, la sonde. Le
+#     service reste sans accès sortant, et l'application n'y est pas ;
+#   - `collecte` (interne, sous-réseau fixe) : l'API, l'application, Prometheus, la sonde,
+#     l'exporteur de machine. C'est le seul réseau admis à lire `/metrics` de l'API et de
+#     l'application ;
+#   - `publication_monitorage` (non interne, sous-réseau fixe) : Docker ne publie pas sur un
+#     réseau interne. Grafana et Prometheus y publient sur l'adresse locale seule ; Grafana
+#     y sort vers le canal d'alerte ; la sonde y joindra la base de l'hôte.
+#
+# Avant `make verify-poste` ou une sauvegarde : `make monitorage-arret`. Elles refusent
+# une instance `tei-*` en marche.
+
+services:
+  embedding:
+    networks: [interne, collecte_embedding]
+
+  api:
+    environment:
+      API_MODELE_METRIQUES_RESEAUX: "172.30.13.0/24"
+      # Le monitorage n'appelle jamais un fournisseur, pas même au démarrage de l'API.
+      API_MODELE_VERIFIER_MODELES: "false"
+    networks: [interne, sortie, applicatif, collecte]
+
+  application:
+    environment:
+      APPLICATION_METRIQUES_RESEAUX: "172.30.13.0/24"
+    networks: [applicatif, publication, collecte]
+
+  prometheus:
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ../13_monitorage/prometheus:/etc/prometheus:ro
+      - prometheus_donnees:/prometheus
+    networks: [collecte_embedding, collecte, publication_monitorage]
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: "no"
+
+  grafana:
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    depends_on: [prometheus]
+    # L'utilisateur de l'hôte, seul lecteur du fichier de mot de passe (mode 600). Les
+    # données de Grafana ne durent pas : tout ce qu'il montre est provisionné.
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    tmpfs:
+      - /var/lib/grafana:uid=${HOTE_UID:-1000},gid=${HOTE_GID:-1000},mode=0750,size=256m
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_mot_de_passe
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_LOG_MODE: console
+      # Rien ne sort de ce poste que le canal d'alerte.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      # L'adresse du canal, hors dépôt ; sans elle, le webhook d'essai de la sonde.
+      MONITORAGE_WEBHOOK_DISCORD: ${MONITORAGE_WEBHOOK_DISCORD:-http://sonde:9108/webhook-essai}
+    secrets: [grafana_mot_de_passe]
+    volumes:
+      - ../13_monitorage/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../13_monitorage/grafana/tableaux:/etc/grafana/tableaux:ro
+    networks: [publication_monitorage]
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: "no"
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|run|var/lib/docker)($$|/)
+    # Aucun port publié : Prometheus le lit par le réseau de collecte.
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+    networks: [collecte]
+    restart: "no"
+
+  sonde:
+    build:
+      context: ..
+      dockerfile: 13_monitorage/Dockerfile
+    image: monitorage-sonde:0.1.0
+    depends_on:
+      embedding:
+        condition: service_healthy
+    # L'utilisateur de l'hôte, propriétaire de l'échantillon et du journal.
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    networks: [collecte_embedding, collecte, publication_monitorage]
+    restart: "no"
+
+networks:
+  collecte_embedding:
+    internal: true
+  collecte:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.13.0/24
+  publication_monitorage:
+    ipam:
+      config:
+        - subnet: 172.30.14.0/24
+
+secrets:
+  grafana_mot_de_passe:
+    file: ${GRAFANA_MOT_DE_PASSE_FICHIER:-../13_monitorage/.secrets/grafana_mot_de_passe}
+
+volumes:
+  prometheus_donnees:

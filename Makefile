@@ -15,6 +15,9 @@
 #   make demo-direct         la démonstration en direct : l'application, le Swagger de
 #                            l'API et MLflow (CONSTRUIRE=1 reconstruit les images d'abord) ;
 #                            demo-direct-etat dit ce qui répond, demo-direct-arret arrête
+#   make monitorage          l'application et le monitorage : Prometheus, Grafana, la
+#                            sonde ; monitorage-etat dit ce qui répond, monitorage-arret
+#                            arrête tout (avant verify-poste ou une sauvegarde)
 #   make verify-poste       la mémoire d'abord ; make verify complet, sauf si l'arbre,
 #                            propre, est déjà vert (FORCER=1 pour le rejouer) ; puis les
 #                            harnais du poste seul : fidélité du schéma, équivalence du
@@ -37,7 +40,7 @@ MUTATIONS ?=
 CONSTRUIRE ?=
 
 .PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret \
-	demo-direct demo-direct-etat demo-direct-arret
+	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -69,6 +72,23 @@ demo-direct-etat:
 
 demo-direct-arret:
 	@bash demo/en_direct.sh arreter $(DEMO_COMPOSE)
+
+# Le monitorage, un fichier de fusion de plus. APP_COMPOSE et DEMO_COMPOSE ne le lisent pas.
+# Le fichier d'environnement du 13 est facultatif : sans lui, le canal d'essai.
+MONITORAGE_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	$(if $(wildcard 13_monitorage/.env),--env-file 13_monitorage/.env) \
+	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml -f 13_monitorage/compose.yaml
+
+monitorage:
+	@$(MONITORAGE_COMPOSE) up -d --build
+
+monitorage-etat:
+	@docker ps --filter label=com.docker.compose.project=api-modele --format 'table {{.Names}}\t{{.Status}}'
+	@curl -sf -m 5 http://127.0.0.1:9090/api/v1/targets | \
+		jq -r '.data.activeTargets[] | [.labels.job, .health] | @tsv' || echo "Prometheus ne répond pas"
+
+monitorage-arret:
+	@$(MONITORAGE_COMPOSE) down
 
 verify-mutations:
 	@uv run --no-project python -I verification/rejouer_mutations.py $(MUTATIONS)

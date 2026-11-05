@@ -1,0 +1,3 @@
+# Aucune règle d'enregistrement pour l'instant : les alertes sont portées par Grafana
+# (grafana/provisioning/alerting/). Le fichier existe pour que `promtool check rules` joue.
+groups: []

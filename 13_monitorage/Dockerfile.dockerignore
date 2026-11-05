@@ -1,0 +1,12 @@
+# Contexte de construction : la RACINE du dépôt, à cause du module 09. Liste blanche : ce
+# que l'image exécute, ni données, ni rapports, ni secrets, ni environnement. BuildKit lit
+# ce fichier parce qu'il porte le nom du Dockerfile.
+*
+!09_service_embedding/config/
+!09_service_embedding/src/service_embedding/
+!13_monitorage/README.md
+!13_monitorage/pyproject.toml
+!13_monitorage/src/
+!13_monitorage/uv.lock
+**/__pycache__
+**/*.egg-info
