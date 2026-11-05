@@ -1,0 +1,7 @@
+id = "MON-08"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — la connexion anonyme de Grafana serait ouverte"
+fichier = "13_monitorage/compose.yaml"
+avant = '''      GF_AUTH_ANONYMOUS_ENABLED: "false"'''
+apres = '''      GF_AUTH_ANONYMOUS_ENABLED: "true"'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_configurations.py"]

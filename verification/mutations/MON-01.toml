@@ -1,0 +1,7 @@
+id = "MON-01"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — une jauge publiée avant la première mesure vaudrait 0, et l'alerte d'équivalence partirait au démarrage"
+fichier = "13_monitorage/src/monitorage/metriques.py"
+avant = '''        self.sonde: EtatSonde | None = None'''
+apres = '''        self.sonde: EtatSonde | None = EtatSonde(0, 0.0, 0.0, 0, 0.0, 0.0)'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sonde.py"]
