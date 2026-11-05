@@ -23,7 +23,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from api_modele import journal
 from api_modele.erreurs import ENTETE_IDENTIFIANT, Erreur
-from api_modele.metriques import Metriques
+from api_modele.metriques import Metriques, methode_fermee
 
 ROUTE_INCONNUE = "inconnue"
 
@@ -129,7 +129,7 @@ class Enveloppe:
         methode = str(scope.get("method", ""))
         code = etat.get("code_erreur")
         self.metriques.requetes.labels(
-            route=route, methode=methode, statut=str(statut)
+            route=route, methode=methode_fermee(methode), statut=str(statut)
         ).inc()
         self.metriques.duree.labels(route=route).observe(duree_s)
         if code is not None:

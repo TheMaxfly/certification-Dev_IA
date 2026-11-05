@@ -526,6 +526,9 @@ async def repondre(
 
     cout = deroulement.cout()
     suivi.update(refus=refus, nb_series_citees=len(citees), cout_estime_usd=cout)
+    etat.metriques.reponses.labels(
+        refus="vrai" if refus else "faux", motif=motif or "aucun"
+    ).inc()
     totale = round((time.perf_counter() - debut) * 1000, 1)
     derniere = deroulement.sorties[-1][1].date_appel if deroulement.sorties else None
     c = resultat.contexte

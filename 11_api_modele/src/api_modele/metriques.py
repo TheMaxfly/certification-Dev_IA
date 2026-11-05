@@ -6,7 +6,12 @@ Les routes inconnues comptent sous une seule étiquette : `inconnue`.
 
 Le modèle de langage (E3, étape 3) : appels, jetons, coût estimé et latence par profil
 et rôle d'appel, profil actif et profils disponibles — étiquettes bornées par les
-profils déclarés. Les tableaux de bord et les alertes viendront à l'étape 5.
+profils déclarés. Les réponses servies, par refus et motif.
+
+Pour la collecte (E3, étape 5) : les étiquettes sont fermées, la méthode HTTP comprise ;
+et les séries du modèle de langage sont créées à 0 dès le démarrage. Sans cela, le
+premier appel d'un profil ne se verrait pas : `increase()` ne compte pas le passage
+d'une série absente à sa première valeur.
 """
 
 from __future__ import annotations
@@ -29,6 +34,21 @@ from api_modele.configuration import Reseau
 SEUILS_S = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 #: Celles d'un appel au modèle de langage : de 0,25 s à 30 s (le délai par défaut).
 SEUILS_LLM_S = (0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0)
+#: Les méthodes comptées telles quelles ; toute autre compte sous `autre`.
+METHODES = frozenset({"GET", "POST", "HEAD", "OPTIONS"})
+ROLES = ("reformulation", "reponse")
+TYPES_DE_JETONS = ("entree", "sortie", "raisonnement")
+#: Les motifs de `/v1/reponse`, ceux de `sortie_invalide` et de `motif_refus`.
+MOTIFS_SORTIE = (
+    "schema",
+    "serie_inconnue",
+    "fragment_inconnu",
+    "refus_incoherent",
+    "pseudonyme",
+    "disponibilite",
+    "demographie",
+)
+MOTIFS_REFUS = ("aucun_passage", "hors_catalogue", "inconnu")
 
 
 class Metriques:
@@ -109,9 +129,36 @@ class Metriques:
             ["motif"],
             registry=self.registre,
         )
+        self.reponses = Counter(
+            "api_modele_reponses",
+            "Réponses rendues par /v1/reponse (statut 200) : refus (vrai, faux), et son"
+            " motif (aucun si ce n'est pas un refus).",
+            ["refus", "motif"],
+            registry=self.registre,
+        )
+
+    def precreer(self, profils: Iterable[str]) -> None:
+        """Les séries du modèle de langage, à 0 : le premier appel se voit."""
+        for profil in profils:
+            self.llm_cout.labels(profil=profil)
+            for role in ROLES:
+                self.llm_appels.labels(profil=profil, role=role, statut="ok")
+                self.llm_latence.labels(profil=profil, role=role)
+                for type_ in TYPES_DE_JETONS:
+                    self.llm_jetons.labels(profil=profil, role=role, type=type_)
+        for motif in MOTIFS_SORTIE:
+            self.sortie_invalide.labels(motif=motif)
+        self.reponses.labels(refus="faux", motif="aucun")
+        for motif in MOTIFS_REFUS:
+            self.reponses.labels(refus="vrai", motif=motif)
 
     def exposer(self) -> tuple[bytes, str]:
         return generate_latest(self.registre), CONTENT_TYPE_LATEST
+
+
+def methode_fermee(methode: str) -> str:
+    """L'étiquette d'une méthode HTTP : le serveur en admet de quelconques."""
+    return methode if methode in METHODES else "autre"
 
 
 def autorisee(adresse: str | None, reseaux: Iterable[Reseau]) -> bool:

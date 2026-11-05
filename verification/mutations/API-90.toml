@@ -1,0 +1,7 @@
+id = "API-90"
+origine = "E3 étape 5, spec 02, métriques pour la collecte (2026-11-05) — sans séries créées au démarrage, le premier appel d'un profil ne se voit pas"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''        self._metriques.precreer(self.profils)'''
+apres = '''        pass'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_metriques.py"]
