@@ -1,0 +1,7 @@
+id = "APP-31"
+origine = "E3 étape 5, spec 02, jauges d'état de l'API (2026-11-05) — les feuilles de style retomberaient sous la route inconnue"
+fichier = "12_application/src/application/enveloppe.py"
+avant = '''            route = ROUTE_STATIQUE'''
+apres = '''            route = ROUTE_INCONNUE'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages.py"]

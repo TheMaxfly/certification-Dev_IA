@@ -183,7 +183,10 @@ def test_api_injoignable_l_application_demarre_et_le_dit(demarrer, port_ferme):
         "api": "indisponible",
         "version": application.__version__,
     }
-    assert "application_api_disponible 0.0" in navigateur.get("/metrics").text
+    sortie = navigateur.get("/metrics").text
+    assert 'application_api_info_etat{etat="ko"} 1.0' in sortie
+    assert 'application_api_info_etat{etat="ok"} 0.0' in sortie
+    assert "application_api_sante_ok 0.0" in sortie
     assert "Liste inconnue" in navigateur.get("/a-propos").text
 
 
@@ -244,7 +247,7 @@ def test_le_service_revient_quand_l_api_revient(navigateur, doublure):
     doublure.choisir(info="nominale")
 
     assert "Service disponible" in navigateur.get("/").text
-    assert "application_api_disponible 1.0" in navigateur.get("/metrics").text
+    assert 'application_api_info_etat{etat="ok"} 1.0' in navigateur.get("/metrics").text
 
 
 # --------------------------------------------------------------------------- #
@@ -301,7 +304,11 @@ def test_metrics_apres_une_sequence_connue(navigateur):
     assert (
         'application_api_appels_total{route_api="/v1/info",statut="200"} 3.0' in sortie
     )
-    assert "application_api_disponible 1.0" in sortie
+    assert 'application_api_info_etat{etat="ok"} 1.0' in sortie
+    assert 'application_api_info_etat{etat="ko"} 0.0' in sortie
+    assert 'application_api_info_etat{etat="cle"} 0.0' in sortie
+    assert "application_api_sante_ok 1.0" in sortie
+    assert "application_api_disponible" not in sortie
 
 
 def test_metrics_compte_les_erreurs_de_l_api_par_code(navigateur, doublure):
@@ -311,6 +318,30 @@ def test_metrics_compte_les_erreurs_de_l_api_par_code(navigateur, doublure):
     sortie = navigateur.get("/metrics").text
 
     assert 'application_api_erreurs_total{code="cle_invalide"} 1.0' in sortie
+    assert 'application_api_info_etat{etat="cle"} 1.0' in sortie
+    assert 'application_api_info_etat{etat="ok"} 0.0' in sortie
+
+
+def test_les_feuilles_de_style_comptent_sous_statique(navigateur):
+    assert navigateur.get("/statique/theme.css").status_code == 200
+    navigateur.get("/statique/absente.css")
+    navigateur.get("/route-inconnue")
+
+    sortie = navigateur.get("/metrics").text
+
+    assert 'application_requetes_total{route="statique",statut="200"} 1.0' in sortie
+    assert 'application_requetes_total{route="statique",statut="404"} 1.0' in sortie
+    assert 'application_requetes_total{route="inconnue",statut="404"} 1.0' in sortie
+
+
+def test_la_sante_de_l_api_est_lue_au_demarrage_puis_a_chaque_sante(
+    navigateur, doublure
+):
+    assert "application_api_sante_ok 1.0" in navigateur.get("/metrics").text
+
+    doublure.choisir(sante="degrade")
+    assert navigateur.get("/sante").json()["api"] == "indisponible"
+    assert "application_api_sante_ok 0.0" in navigateur.get("/metrics").text
 
 
 def test_metrics_n_est_servi_qu_au_bouclage(doublure, reglages):

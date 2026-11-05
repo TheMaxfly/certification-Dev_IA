@@ -24,6 +24,9 @@ from application.metriques import Metriques
 
 ENTETE_IDENTIFIANT = "X-Identifiant-Requete"
 ROUTE_INCONNUE = "inconnue"
+#: Les feuilles de style : un `Mount`, qui ne pose pas de route dans le scope.
+ROUTE_STATIQUE = "statique"
+PREFIXE_STATIQUE = "/statique/"
 #: Aucun script, aucune ressource externe : les deux choses que la politique protège.
 #: `data:` pour les images seules : Pico dessine ses coches et ses chevrons ainsi (14
 #: occurrences, toutes `image/svg+xml`), et une image n'exécute rien.
@@ -124,7 +127,12 @@ class Enveloppe:
     ) -> None:
         # La route trouvée par le routeur (son gabarit), sinon une seule étiquette.
         chemin: object = getattr(scope.get("route"), "path", None)
-        route = chemin if isinstance(chemin, str) else ROUTE_INCONNUE
+        if isinstance(chemin, str):
+            route = chemin
+        elif str(scope.get("path", "")).startswith(PREFIXE_STATIQUE):
+            route = ROUTE_STATIQUE
+        else:
+            route = ROUTE_INCONNUE
         self.metriques.requetes.labels(route=route, statut=str(statut)).inc()
         self.metriques.latence.labels(route=route).observe(duree_s)
         champs: dict[str, object] = {

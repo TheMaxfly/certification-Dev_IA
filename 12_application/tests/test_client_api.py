@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+from pathlib import Path
 
 import doublure_api as d
 import httpx
@@ -11,6 +13,7 @@ import pytest
 from conftest import journal_complet
 
 from application.client_api import (
+    CODES_API,
     ApiDelai,
     ApiInjoignable,
     ClientApi,
@@ -20,6 +23,9 @@ from application.client_api import (
 from application.config import Delais
 from application.metriques import Metriques
 
+CONTRAT = Path(__file__).resolve().parents[2] / "11_api_modele/contrat/openapi_v1.json"
+#: Nommé par le contrat entre accents graves, sans être un code : un motif de `details`.
+NON_CODES = {"refus_debit"}
 DELAIS = Delais(connexion_s=1.0, reponse_s=5.0, info_s=5.0, sante_s=5.0)
 ADRESSE = "http://127.0.0.1:8010"
 
@@ -219,3 +225,58 @@ def test_le_client_ne_journalise_ni_la_question_ni_la_reponse(doublure, caplog):
     assert "Question factice secrète" not in journal
     assert "Passage factice" not in journal
     assert d.CLE_ATTENDUE not in journal
+
+
+def test_les_codes_nommes_par_le_contrat_sont_dans_la_liste():
+    texte = CONTRAT.read_text(encoding="utf-8")
+    nommes = set(re.findall(r"`([a-z]+(?:_[a-z]+)+)`", texte)) - NON_CODES
+    assert nommes
+    assert nommes <= CODES_API, sorted(nommes - CODES_API)
+
+
+def test_un_code_hors_de_la_liste_compte_sous_corps_inattendu():
+    def repondre(_requete: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            503,
+            json={
+                "code": "valeur_libre_venue_d_ailleurs",
+                "message": "m",
+                "details": None,
+                "identifiant_requete": "i",
+            },
+        )
+
+    metriques = Metriques()
+    client = ClientApi(
+        ADRESSE, d.CLE_ATTENDUE, DELAIS, metriques, httpx.MockTransport(repondre)
+    )
+    with pytest.raises(ErreurApi) as exc:
+        jouer(client.info())
+
+    # L'écran garde le code rendu ; seule l'étiquette de la métrique est fermée.
+    assert exc.value.code == "valeur_libre_venue_d_ailleurs"
+    sortie = metriques.exposer()[0].decode()
+    assert 'application_api_erreurs_total{code="corps_inattendu"} 1.0' in sortie
+    assert "valeur_libre_venue_d_ailleurs" not in sortie
+
+
+def test_un_code_de_la_liste_garde_son_nom():
+    def repondre(_requete: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            401,
+            json={
+                "code": "cle_invalide",
+                "message": "m",
+                "details": None,
+                "identifiant_requete": "i",
+            },
+        )
+
+    metriques = Metriques()
+    client = ClientApi(
+        ADRESSE, d.CLE_ATTENDUE, DELAIS, metriques, httpx.MockTransport(repondre)
+    )
+    with pytest.raises(ErreurApi):
+        jouer(client.info())
+    sortie = metriques.exposer()[0].decode()
+    assert 'application_api_erreurs_total{code="cle_invalide"} 1.0' in sortie

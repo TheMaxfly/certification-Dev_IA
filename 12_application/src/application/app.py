@@ -95,6 +95,7 @@ def creer_application(
     @asynccontextmanager
     async def cycle(_app: FastAPI) -> AsyncGenerator[None]:
         await vue.rafraichir()
+        metriques.api_sante_ok.set(1 if await client.sante() else 0)
         vue.limites()  # un écart aux bornes publiées se journalise dès le démarrage
         journal.evenement(
             "demarrage",
@@ -401,7 +402,7 @@ def creer_application(
     async def sante() -> JSONResponse:
         """Toujours 200 : l'application est vivante, et elle sert sans l'API."""
         api_ok = await client.sante()
-        metriques.api_disponible.set(1 if api_ok else 0)
+        metriques.api_sante_ok.set(1 if api_ok else 0)
         return JSONResponse(
             {
                 "application": "ok",
