@@ -111,6 +111,18 @@ services:
         condition: service_healthy
     # L'utilisateur de l'hôte, propriétaire de l'échantillon et du journal.
     user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    environment:
+      SONDE_ENCODAGE: "3"
+      SONDE_PERIODE_S: "900"
+      SONDE_HOTE_SERVICE: embedding
+      # Éteinte tant que la base n'est pas joignable d'un conteneur. L'activer : ces deux
+      # variables, le pgpass monté, une ligne de pg_hba.conf (README).
+      MONITORAGE_LECTURE_BASE: ${MONITORAGE_LECTURE_BASE:-0}
+      MONITORAGE_DSN_LECTURE: ${MONITORAGE_DSN_LECTURE:-}
+    volumes:
+      # Hors dépôt : l'échantillon exporté, en lecture seule, et le journal de la sonde.
+      - ../09_service_embedding/mesures/equivalence/encodage_3.json:/app/09_service_embedding/mesures/equivalence/encodage_3.json:ro
+      - ../09_service_embedding/mesures/equivalence/journal_sonde.jsonl:/app/09_service_embedding/mesures/equivalence/journal_sonde.jsonl
     networks: [collecte_embedding, collecte, publication_monitorage]
     restart: "no"
 

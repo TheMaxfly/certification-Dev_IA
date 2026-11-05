@@ -79,7 +79,9 @@ MONITORAGE_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_
 	$(if $(wildcard 13_monitorage/.env),--env-file 13_monitorage/.env) \
 	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml -f 13_monitorage/compose.yaml
 
+# Le journal de la sonde : hors dépôt ; il doit exister pour être monté comme un fichier.
 monitorage:
+	@touch 09_service_embedding/mesures/equivalence/journal_sonde.jsonl
 	@$(MONITORAGE_COMPOSE) up -d --build
 
 monitorage-etat:
