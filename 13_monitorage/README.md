@@ -91,6 +91,31 @@ dans les réglages du tableau, travailler sur une copie, et recopier le JSON dan
 Chaque panneau dit dans sa description ce qu'il montre, sa valeur normale, ce qu'on fait si elle
 bouge. Les seuils sont des séries tracées et nommées ; les états sont en toutes lettres.
 
+## Les alertes
+
+Grafana évalue quatre règles toutes les 30 s (`grafana/provisioning/alerting/regles.yml`) ; aucun
+Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce fichier.
+
+| Règle | Requête | Condition | Durée | Sans donnée | Pourquoi ce seuil |
+|---|---|---|---|---|---|
+| **A — service ou API indisponible** | `up{job=~"embedding\|api"}` | `< 1` | 1 min | Alerting | plus long qu'un redémarrage volontaire ; une cible disparue est une panne |
+| **B — sorties invalides** | `sum(increase(api_modele_sortie_invalide_total[15m]))` | `> 3` | 0 | OK | quelques refus isolés sont le contrôle qui travaille ; au-delà, le modèle dérive |
+| **C — coût** | `sum(increase(api_modele_llm_cout_usd_total[1h]))` | `> 0,50 $` | 0 | OK | le plafond d'un run de mesure ; **elle prévient, rien ne bloque côté API** |
+| **D — équivalence** | `modele_sonde_equivalence_cosinus_min` | `< 0,999` | 20 min | OK | deux sondes de suite : un écart isolé vers 0,9988 revient sans panne |
+
+- **A ne filtre pas sur `== 0`** : en marche normale, le résultat serait vide, et la règle
+  passerait en « No Data ». Le seuil est porté par Grafana.
+- **Les essais, sans coût** : A, arrêter puis relancer le service `api` ; C, seuil abaissé une fois
+  qu'un coût existe ; D, seuil porté au-dessus de 1, durée réduite, le temps de l'essai, puis remis.
+  **B n'a pas de geste de démonstration** : la doublure du fournisseur ne rend que des sorties
+  conformes. Sa règle est lue par un test ; son déclenchement réel n'est pas éprouvé.
+- **Le canal** : deux points de contact, `discord-exploitation` et `webhook-essai`, servi par la
+  sonde : un compteur et une ligne de journal, le titre seul. Le passage au canal réel :
+  `MONITORAGE_WEBHOOK_DISCORD` dans le fichier d'environnement du module, hors dépôt, et une ligne de
+  `politiques.yml`. **Cette adresse vaut un secret** : les hooks la refusent dans un fichier suivi.
+- **Si A tombe** : lire `make monitorage-etat` et `/v1/sante` ; relancer le service ; si c'est le
+  fournisseur, changer de profil. Une panne se voit sur le tableau « Service », panneau « Cibles ».
+
 ## Licences
 
 Prometheus et l'exporteur de machine : Apache 2.0. Grafana : AGPL v3, usage interne, non
