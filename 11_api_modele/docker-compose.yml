@@ -97,7 +97,8 @@ services:
     restart: "no"
 
 networks:
-  # Le service d'embedding n'est joignable que de l'API, et ne joint rien d'autre.
+  # Le service d'embedding n'est joignable que de l'API et de la collecte (fichier de
+  # fusion du module 13), et ne joint rien d'autre.
   interne:
     internal: true
   # La base de l'hôte et le port publié de l'API. Sous-réseau fixe : le serveur
