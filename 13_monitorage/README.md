@@ -17,9 +17,10 @@ make monitorage-arret  # tout s'arrête ; les données de Prometheus restent sur
   instance `tei-*` en marche.
 - Grafana : `http://127.0.0.1:3000`, utilisateur `admin` ; Prometheus :
   `http://127.0.0.1:9090`. Sur l'adresse locale seule.
-- **Les deux mots de passe sont dans des fichiers hors dépôt**, mode 600, requis au lancement :
-  `13_monitorage/.secrets/grafana_mot_de_passe` et `smtp_mot_de_passe`, ou les chemins de
-  `GRAFANA_MOT_DE_PASSE_FICHIER` et `GRAFANA_SMTP_MOT_DE_PASSE_FICHIER`. Les données de Grafana ne durent pas (`tmpfs`) : tout ce qu'il
+- **Trois fichiers de secrets hors dépôt**, mode 600, requis au lancement, dans
+  `13_monitorage/.secrets/` : `grafana_mot_de_passe`, `smtp_mot_de_passe`, `pgpass_lecture`. Leurs
+  chemins se changent par `GRAFANA_MOT_DE_PASSE_FICHIER`, `GRAFANA_SMTP_MOT_DE_PASSE_FICHIER`,
+  `MONITORAGE_PGPASS_FICHIER`. Les données de Grafana ne durent pas (`tmpfs`) : tout ce qu'il
   montre est provisionné, et un nouveau mot de passe vaut au redémarrage suivant.
 - Besoin : environ 5,3 Go de mémoire vive avec l'application, 1,5 Go de mémoire vidéo.
 
@@ -70,14 +71,16 @@ docker exec api-modele-sonde-1 python -m monitorage mesurer   # un passage à la
 l'encodage en service, lue dans `bench.eval_mesures`, toutes les 5 minutes. **Un chiffre qui ne
 bouge qu'à une nouvelle mesure, pas un signal vivant.**
 
-**Éteint par défaut** (`modele_exporteur_base_activee` à 0, et les deux jauges absentes) : un
-conteneur ne joint pas la base de l'hôte sans une ligne de `pg_hba.conf`. Pour l'activer :
+**Éteint sans sa configuration** (`modele_exporteur_base_activee` à 0, et les deux jauges absentes).
+Pour le lire, trois choses, toutes hors dépôt ou sur le serveur :
 
-1. une ligne `verif_lecture` sur `172.30.14.0/24`, le réseau `publication_monitorage`, le seul de
-   la sonde à sortir ;
-2. `MONITORAGE_LECTURE_BASE=1` et `MONITORAGE_DSN_LECTURE`, **sans mot de passe**, au fichier
-   d'environnement du module : un DSN qui en porte un empêche de démarrer ;
-3. un pgpass monté en lecture seule, et `host.docker.internal` ajouté au service.
+1. une ligne `host apimanga verif_lecture 172.30.14.0/24 scram-sha-256` à `pg_hba.conf` :
+   `172.30.14.0/24` est `publication_monitorage`, le seul réseau de la sonde à sortir ;
+2. `MONITORAGE_LECTURE_BASE=1` et
+   `MONITORAGE_DSN_LECTURE=postgresql://verif_lecture@host.docker.internal:5432/apimanga` au fichier
+   d'environnement du module : **un DSN qui porte un mot de passe empêche de démarrer** ;
+3. le pgpass, `13_monitorage/.secrets/pgpass_lecture`, mode 600, requis au lancement, sa ligne
+   commençant par `host.docker.internal:5432:`.
 
 La session est en lecture seule et membre de `verif_ro`, ou la lecture est refusée.
 

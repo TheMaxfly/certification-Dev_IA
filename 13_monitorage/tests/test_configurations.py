@@ -22,7 +22,7 @@ SOUS_RESEAU = "172.30.13.0/24"
 #: Les aspects de secrets : ceux des hooks, et une adresse de courriel réelle.
 SECRETS = re.compile(
     r"hf_[A-Za-z0-9]{34}|sk-[A-Za-z0-9_-]{40,}"
-    r"|[A-Za-z0-9._-]+@(?!exemple\.invalid)[A-Za-z0-9-]+\.[a-z]{2,}"
+    r"|[A-Za-z0-9._-]+@(?!exemple\.invalid|host\.docker\.internal)[A-Za-z0-9-]+\.[a-z]{2,}"
     r"|(?:password|mot_de_passe)\s*[:=]\s*['\"]?[A-Za-z0-9+/_-]{8,}",
     re.IGNORECASE,
 )
@@ -32,7 +32,7 @@ SUIVIS = (
     "prometheus/regles/enregistrement.yml",
     "grafana/provisioning/datasources/prometheus.yml",
     "grafana/provisioning/dashboards/tableaux.yml",
-    "env.exemple",
+    ".env.example",
     "README.md",
 )
 
@@ -53,6 +53,7 @@ def fusion() -> dict[str, Any]:
         "API_MODELE_PGPASS": "/dev/null",
         "GRAFANA_MOT_DE_PASSE_FICHIER": "/dev/null",
         "GRAFANA_SMTP_MOT_DE_PASSE_FICHIER": "/dev/null",
+        "MONITORAGE_PGPASS_FICHIER": "/dev/null",
     }
     sortie = subprocess.run(
         [
@@ -215,6 +216,18 @@ def test_le_courriel_passe_par_un_fichier_de_mot_de_passe_et_une_adresse_hors_de
         assert environnement[variable].startswith("${MONITORAGE_COURRIEL:-")
 
 
+def test_la_sonde_lit_la_base_par_un_pgpass_et_un_dsn_sans_mot_de_passe():
+    service = fichier_compose()["services"]["sonde"]
+    environnement = service["environment"]
+    assert environnement["PGPASSFILE"] == "/run/secrets/pgpass_lecture"
+    assert environnement["MONITORAGE_LECTURE_BASE"] == "${MONITORAGE_LECTURE_BASE:-0}"
+    assert environnement["MONITORAGE_DSN_LECTURE"] == "${MONITORAGE_DSN_LECTURE:-}"
+    assert "pgpass_lecture" in service["secrets"]
+    assert "host.docker.internal:host-gateway" in service["extra_hosts"]
+    reseau = fusion()["networks"]["publication_monitorage"]
+    assert reseau["ipam"]["config"][0]["subnet"] == "172.30.14.0/24"
+
+
 def test_discord_est_ecarte():
     for relatif in (*SUIVIS, "grafana/provisioning/alerting/canaux.yml"):
         texte = (MODULE / relatif).read_text(encoding="utf-8").lower()
@@ -245,7 +258,7 @@ def test_aucun_secret_dans_les_fichiers_du_module(relatif: str):
 def test_le_fichier_d_exemple_ne_porte_que_des_noms():
     lignes = [
         ligne
-        for ligne in (MODULE / "env.exemple").read_text(encoding="utf-8").splitlines()
+        for ligne in (MODULE / ".env.example").read_text(encoding="utf-8").splitlines()
         if ligne and not ligne.startswith("#")
     ]
     assert all(re.fullmatch(r"[A-Z_]+=", ligne) for ligne in lignes), lignes
@@ -255,7 +268,9 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
     }
 
 
-@pytest.mark.parametrize("fichier", ["grafana_mot_de_passe", "smtp_mot_de_passe"])
+@pytest.mark.parametrize(
+    "fichier", ["grafana_mot_de_passe", "smtp_mot_de_passe", "pgpass_lecture"]
+)
 def test_les_mots_de_passe_ne_sont_pas_suivis(fichier: str):
     fini = subprocess.run(
         ["git", "check-ignore", "-q", f"13_monitorage/.secrets/{fichier}"],

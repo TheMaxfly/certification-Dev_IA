@@ -124,10 +124,14 @@ services:
       SONDE_ENCODAGE: "3"
       SONDE_PERIODE_S: "900"
       SONDE_HOTE_SERVICE: embedding
-      # Éteinte tant que la base n'est pas joignable d'un conteneur. L'activer : ces deux
-      # variables, le pgpass monté, une ligne de pg_hba.conf (README).
+      # La dernière mesure, lue sous verif_lecture : ces deux variables, le pgpass monté,
+      # une ligne de pg_hba.conf sur le réseau publication_monitorage (README).
       MONITORAGE_LECTURE_BASE: ${MONITORAGE_LECTURE_BASE:-0}
       MONITORAGE_DSN_LECTURE: ${MONITORAGE_DSN_LECTURE:-}
+      PGPASSFILE: /run/secrets/pgpass_lecture
+    secrets: [pgpass_lecture]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Hors dépôt : l'échantillon exporté, en lecture seule, et le journal de la sonde.
       - ../09_service_embedding/mesures/equivalence/encodage_3.json:/app/09_service_embedding/mesures/equivalence/encodage_3.json:ro
@@ -153,6 +157,8 @@ secrets:
     file: ${GRAFANA_MOT_DE_PASSE_FICHIER:-../13_monitorage/.secrets/grafana_mot_de_passe}
   smtp_mot_de_passe:
     file: ${GRAFANA_SMTP_MOT_DE_PASSE_FICHIER:-../13_monitorage/.secrets/smtp_mot_de_passe}
+  pgpass_lecture:
+    file: ${MONITORAGE_PGPASS_FICHIER:-../13_monitorage/.secrets/pgpass_lecture}
 
 volumes:
   prometheus_donnees:
