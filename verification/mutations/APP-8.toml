@@ -1,0 +1,7 @@
+id = "APP-8"
+origine = "E3 étape 4, spec 04 (2026-11-04) — le Retry-After de l'API serait ignoré : l'écran annoncerait le délai par défaut"
+fichier = "12_application/src/application/presentation.py"
+avant = '''        n = erreur.retry_after or reglages.attente_debit_defaut_s'''
+apres = '''        n = reglages.attente_debit_defaut_s'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_presentation.py", "-k", "encarts_d_attente"]

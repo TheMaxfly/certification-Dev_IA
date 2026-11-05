@@ -1,0 +1,8 @@
+id = "APP-4"
+origine = "E3 étape 4, spec 03 (2026-11-03) — une borne publiée par l'API ne l'emporterait plus sur la configuration"
+fichier = "12_application/src/application/client_api.py"
+avant = '''            question_caracteres_max=self.info.question.longueur_max_caracteres,
+'''
+apres = ''''''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages.py", "-k", "bornes_publiees"]

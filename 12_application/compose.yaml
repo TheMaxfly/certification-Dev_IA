@@ -1,0 +1,48 @@
+# L'application : un fichier de fusion, sur le Compose du module 11, qui ne change pas.
+#
+#   make app-compose
+#
+# soit, depuis la racine du dépôt :
+#
+#   docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+#     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml up -d --build
+#
+# Les chemins relatifs partent du dossier du PREMIER fichier (11_api_modele/) ; les deux
+# `.env` sont nommés, sinon celui du 12 n'arriverait pas au service.
+#
+# Trois services : le service d'embedding, l'API, l'application. Deux réseaux de plus :
+#   - `applicatif` : l'application et l'API, rien d'autre. L'application n'est ni sur le
+#     réseau du service d'embedding (`interne`) ni sur celui de la base (`sortie`) ;
+#   - `publication` : le port publié, sur l'adresse locale seule. Docker ne publie pas sur
+#     un réseau `internal` : celui-ci a donc une route vers l'extérieur, que l'application
+#     n'emploie pas (elle n'appelle que l'API, par son code).
+
+services:
+  api:
+    networks: [interne, sortie, applicatif]
+    # Seule l'application est publiée : on atteint l'API par elle.
+    ports: !reset []
+
+  application:
+    build:
+      context: ..
+      dockerfile: 12_application/Dockerfile
+      target: application
+    image: application-conseiller:0.1.0
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Vide : l'application refuse de démarrer. Aucune valeur n'est écrite ici.
+      APPLICATION_CLE_API: ${APPLICATION_CLE_API:-}
+      API_MODELE_ADRESSE: http://api:8010
+      APPLICATION_METRIQUES_RESEAUX: ${APPLICATION_METRIQUES_RESEAUX:-}
+    networks: [applicatif, publication]
+    ports:
+      - "127.0.0.1:${APPLICATION_PORT_PUBLIE:-8020}:8020"
+    restart: "no"
+
+networks:
+  applicatif:
+    internal: true
+  publication: {}

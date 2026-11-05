@@ -1,0 +1,13 @@
+# Contexte de construction : la RACINE du dépôt, à cause du contrat que la doublure lit.
+# Liste blanche : ce que les images exécutent, ni données, ni rapports, ni secrets, ni
+# environnement. BuildKit lit ce fichier parce qu'il porte le nom du Dockerfile.
+*
+!11_api_modele/contrat/openapi_v1.json
+!12_application/README.md
+!12_application/config/
+!12_application/pyproject.toml
+!12_application/src/
+!12_application/tests/doublure_api.py
+!12_application/uv.lock
+**/__pycache__
+**/*.egg-info

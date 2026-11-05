@@ -1,0 +1,7 @@
+id = "APP-1"
+origine = "E3 étape 4, spec 03 (2026-11-03) — la clé de l'API paraîtrait dans le repr des réglages"
+fichier = "12_application/src/application/config.py"
+avant = '''    cle_api: str = field(repr=False)'''
+apres = '''    cle_api: str'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_configuration.py", "-k", "repr_ne_montre_pas"]

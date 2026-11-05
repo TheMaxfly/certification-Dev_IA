@@ -59,7 +59,7 @@ motif = "Le texte d'une question peut porter une donnée personnelle : absent du
 
 [documentation]
 interactive = false
-motif = "La documentation interactive (Swagger UI, /v1/docs) charge deux fichiers d'un CDN tiers, à version exacte et sous empreinte d'intégrité : désactivée par défaut, on l'allume pour la démontrer ou pour essayer les routes. Le contrat, lui, est toujours servi (/v1/openapi.json). Surchargeable : API_MODELE_DOCUMENTATION (vrai ou faux)."
+motif = "La documentation interactive (Swagger UI, /v1/docs), servie par l'API sans ressource réseau : désactivée par défaut, on l'allume pour la démontrer ou pour essayer les routes. Le contrat, lui, est toujours servi (/v1/openapi.json). Surchargeable : API_MODELE_DOCUMENTATION (vrai ou faux)."
 
 [service]
 instance = "embeddinggemma"

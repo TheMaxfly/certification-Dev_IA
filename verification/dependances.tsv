@@ -17,6 +17,8 @@
 #   11     ← `database/`, le module 09 (dépendance par chemin), le paquet du 10 et son
 #            verrou (chargé par son chemin ; versions du calcul comparées), et
 #            `atteignabilite.py` du 05, que le 10 charge
+#   12     ← le contrat du 11 (la doublure de l'API est validée contre lui) et son Compose
+#            (le fichier de fusion du 12 s'y ajoute) ; aucun code
 #   demo   ← 04, 05, 07 (états et actions), `database/`
 #
 # module	chemins
@@ -30,6 +32,7 @@
 09	09_service_embedding/ database/
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 11	11_api_modele/ database/ 09_service_embedding/ 10_mesures_recherche/src/ 10_mesures_recherche/uv.lock 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
+12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml
 database	database/ sauvegarde/sauvegarder.sh
 demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
 statique	(toujours)

@@ -29,17 +29,29 @@
 #   - Hugging Face : « hf_ » suivi de 34 caractères alphanumériques ; la valeur du
 #     poste est aussi lue dans le fichier où `huggingface-cli login` la range.
 #
+#
+# Les clés d'accès à l'API du modèle, propres au dépôt (E3, étape 4) :
+#   - API_MODELE_CLES : le trousseau, « nom:secret,nom:secret », secret de 32 caractères
+#     au moins. Chaque secret est une valeur à comparer (cles_decouper) ; le motif voit
+#     une affectation littérale, y compris d'un secret en second élément ;
+#   - APPLICATION_CLE_API : le secret seul, côté application. Motif : une affectation
+#     littérale de 32 caractères au moins ; une référence (« ${…} ») n'en est pas une.
+#
 # Ajouter un fournisseur : son nom de variable dans CLES_VARIABLES, une entrée dans
 # CLES_FOURNISSEUR et dans CLES_ASPECT (et, s'il y a lieu, CLES_NATURE, CLES_FICHIER).
 
-CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN)
-declare -A CLES_FOURNISSEUR=([MISTRAL_API_KEY]=Mistral [OPENAI_API_KEY]=OpenAI [HF_TOKEN]="Hugging Face")
+CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN API_MODELE_CLES APPLICATION_CLE_API)
+declare -A CLES_FOURNISSEUR=([MISTRAL_API_KEY]=Mistral [OPENAI_API_KEY]=OpenAI [HF_TOKEN]="Hugging Face"
+    [API_MODELE_CLES]="du trousseau de l'API" [APPLICATION_CLE_API]="de l'application")
 declare -A CLES_NATURE=([HF_TOKEN]=jeton)  # « clé » sinon
 declare -A CLES_ASPECT=(
     [MISTRAL_API_KEY]="[Mm][Ii][Ss][Tt][Rr][Aa][Ll]_[Aa][Pp][Ii]_[Kk][Ee][Yy][\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9]{20,}"
     [OPENAI_API_KEY]='(^|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{40,}'
     [HF_TOKEN]='hf_[A-Za-z0-9]{34}'
 )
+# Les clés d'accès à l'API du modèle, à part : ce ne sont pas des clés de fournisseur.
+CLES_ASPECT[API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"']{32,}"
+CLES_ASPECT[APPLICATION_CLE_API]="APPLICATION_CLE_API[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{32,}"
 # Le fichier où l'outil du fournisseur range la valeur du poste.
 declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
 
@@ -57,6 +69,14 @@ cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
     printf '%s' "$v"
 }
 
+cles_decouper() { # <variable> ; entrée : ses valeurs, une par ligne ; sortie : à comparer
+    if [ "$1" = API_MODELE_CLES ]; then
+        tr ',' '\n' | sed -E 's/^[[:space:]]*[^:]*://'
+    else
+        cat
+    fi
+}
+
 cles_valeurs() { # <variable> : ses valeurs sur le poste, une par ligne, sans vide
     local racine fichier
     racine=$(git rev-parse --show-toplevel) || return 0
@@ -71,7 +91,7 @@ cles_valeurs() { # <variable> : ses valeurs sur le poste, une par ligne, sans vi
             printf '\n'
         done < <(find "$racine" -maxdepth 3 \( -name .git -o -name .venv -o -name node_modules \) \
             -prune -o -name .env \( -type f -o -type l \) -print0)
-    } | grep -v '^[[:space:]]*$' | sort -u
+    } | cles_decouper "$1" | grep -v '^[[:space:]]*$' | sort -u
 }
 
 declare -A CLES_VALEURS=()

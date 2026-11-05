@@ -382,9 +382,17 @@ def creer_application(
         @app.get(f"{prefixe}/docs", include_in_schema=False)
         def documenter() -> HTMLResponse:
             contenu, politique = documentation.page(
-                app.title, f"{prefixe}/openapi.json"
+                app.title, f"{prefixe}/openapi.json", f"{prefixe}/docs"
             )
             return HTMLResponse(contenu, headers={"Content-Security-Policy": politique})
+
+        @app.get(f"{prefixe}/docs/{{fichier}}", include_in_schema=False)
+        def fichier_de_documentation(fichier: str) -> Response:
+            trouve = documentation.ressource(fichier)
+            if trouve is None:
+                raise ErreurApi(404, "route_inconnue", "Route inconnue.")
+            contenu, type_ = trouve
+            return Response(content=contenu, media_type=type_)
 
     @app.get("/metrics", include_in_schema=False)
     def exposer_metriques(request: Request) -> Response:

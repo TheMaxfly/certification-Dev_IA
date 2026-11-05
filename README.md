@@ -51,6 +51,7 @@ Le depot est organise par etapes numerotees.
 | `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus, test d'equivalence du service. | Trois encodages float32 dans `bench` (pgvector) : BGE-M3 (1 024 d) et EmbeddingGemma (768 d) sur le corpus `v1`, 66 290 vecteurs chacun (2026-10-07) ; EmbeddingGemma sur le corpus `v2`, 77 006 vecteurs (2026-10-10). Reprise et rejeu sans ecriture ; 72 tests. |
 | `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : 17 configurations en trois tours (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, TF-IDF, fusions, classement limite au catalogue, representation de l'oeuvre), metriques au grain entite, MLflow ; regle de promotion et journal des promotions. | 18 runs enregistres (MLflow local, `bench.eval_mesures`, 1 872 lignes) : les 17 mesures sur le corpus `v1`, puis la mesure 8 sur le corpus `v2`. Mesure 8 : 31 questions reussies sur 59, sur l'un comme sur l'autre. Encodage du `v2` en service depuis le 2026-10-10 ; 120 tests. |
 | `11_api_modele/` | API REST du modele : la **recherche** (une question, les series du catalogue classees et les passages qui les justifient) et la **reponse redigee** par un modele de langage choisi par profil (Mistral, OpenAI), tiree des seuls passages, sorties controlees. FastAPI, une cle d'acces par application, debit par cle, contrat `/v1/` versionne, Compose avec le service d'embedding. | Version 1.3.1 : le classement du banc (mesure 8, encodage en service), egal au run de reference sur les 69 questions du jeu gele (69 / 69) ; `/v1/reponse` (quatre profils dans `reglages.toml`, changement par la seule configuration, « aucun nom de membre », metadonnees et auteurs des series sur la ligne de titre, disponibilite et public controles) ; lecture seule sous `modele_ro` (migrations `023` a `026`) ; 634 tests, couverture 98 %, essai d'integration du Compose (doublure du fournisseur) dans `make verify`. |
+| `12_application/` | Application du libraire, rendue par le serveur (FastAPI, Jinja2, sans JavaScript) : une question, la reponse de l'API du modele, les series citees, leurs metadonnees et leurs passages, une conversation de cinq echanges, un ecran par cas degrade, la mention IA. | Prototype, tronc de l'epreuve E4 : parle a l'API seule, par sa cle ; 388 tests, couverture 99 %, audit axe-core de 61 pages sans defaut, essai d'integration du Compose (doublure de l'API) dans `make verify`. |
 | `database/` | Migrations PostgreSQL partagees et versionnees. | 27 migrations (`000` a `026`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 390 tests sur base jetable. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
 
@@ -330,6 +331,12 @@ des seuls passages de la recherche, et, depuis 1.2.0, les metadonnees de chaque 
 (disponibilite, tomes, statut, public) ; demarrage, profils, securite, cout et contrat dans
 son README.
 
+L'application du libraire, `12_application/`, est le consommateur de cette API : elle ne
+parle ni a la base ni a un fournisseur, et ne connait l'API que par HTTP et par son contrat.
+Le service d'embedding, l'API et l'application se levent ensemble par `make app-compose`.
+Pour une demonstration en direct, avec le Swagger de l'API et MLflow : `make demo-direct`
+(`demo/README.md`).
+
 Demarrage local :
 
 ```bash
@@ -454,7 +461,7 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_ro`, et
   l'equivalence de l'API du modele sous `modele_api`.
 - Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
-  `statique` (actionlint, shellcheck, essais des hooks) : 13 controles,
+  `statique` (actionlint, shellcheck, essais des hooks) : 14 controles,
   obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
   par les changements reussit sans rien faire.
 - `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture

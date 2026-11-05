@@ -33,7 +33,7 @@ else
   ok "un module absent du graphe est refusé"
 fi
 # Mutation : un nom inconnu dans le graphe doit être vu.
-{ cat "$ICI/dependances.tsv"; printf '12\t12_inconnu/\n'; } >"$TRAVAIL/en_trop.tsv"
+{ cat "$ICI/dependances.tsv"; printf '99\t99_inconnu/\n'; } >"$TRAVAIL/en_trop.tsv"
 if VERIFY_GRAPHE="$TRAVAIL/en_trop.tsv" bash "$VERIFIER" graphe >/dev/null 2>&1; then
   ko "un module inconnu du graphe passe inaperçu"
 else
@@ -55,13 +55,16 @@ cas "le code du 10"                    "10 11 statique"                        1
 cas "le verrou du 10"                  "10 11 statique"                        10_mesures_recherche/uv.lock
 cas "un autre fichier du 10"           "10 statique"                           10_mesures_recherche/README.md
 cas "un fichier du 11"                 "11 statique"                           11_api_modele/src/api_modele/x.py
+cas "le contrat du 11"                 "11 12 statique"                        11_api_modele/contrat/openapi_v1.json
+cas "le Compose du 11"                 "11 12 statique"                        11_api_modele/docker-compose.yml
+cas "un fichier du 12"                 "12 statique"                           12_application/src/application/x.py
 cas "une migration"                    "02 05 08 09 10 11 database demo statique" database/migrations/099_x.sql
 cas "un outil de database"             "05 08 09 10 11 database demo statique" database/outils/x.sh
 cas "un autre workflow"                "statique"                              .github/workflows/indicatif.yml
-cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 database demo statique" .github/workflows/verify.yml
-cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 database demo statique" verification/verifier.sh
+cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 12 database demo statique" .github/workflows/verify.yml
+cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 12 database demo statique" verification/verifier.sh
 cas "plusieurs modules"                "01 04 demo statique"                   01_scraping_manganews/a 04_scraping_manga_sanctuary/b
-attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 11 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
+attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 11 12 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
 obtenu_tout="$(: | TOUT=1 bash "$VERIFIER" perimetre)"
 if [ "$obtenu_tout" = "$attendu_tout" ]; then ok "TOUT=1 → tous les modules"; else ko "TOUT=1 : obtenu $obtenu_tout"; fi
 

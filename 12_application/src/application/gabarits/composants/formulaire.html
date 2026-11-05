@@ -1,0 +1,50 @@
+<section>
+<h2>{{ t.question_titre }}</h2>
+<form method="post" action="/question">
+<label for="question">{{ t.question_etiquette }}</label>
+<textarea id="question" name="question" rows="3" maxlength="{{ question_max }}" required aria-describedby="question-aide{% if formulaire.champ_fautif == "question" %} question-erreur{% endif %}"{% if formulaire.champ_fautif == "question" %} aria-invalid="true" autofocus{% endif %}>{{ formulaire.question }}</textarea>
+<small id="question-aide">{{ question_aide }}</small>
+{% if formulaire.champ_fautif == "question" %}
+<p id="question-erreur">{{ formulaire.erreur }}</p>
+{% endif %}
+{% if info_connue and not options %}
+<p>{{ t.aucun_profil }}</p>
+{% endif %}
+<details{% if formulaire.champ_fautif in ("profil", "temperature") %} open{% endif %}>
+<summary>{{ t.reglages_titre }}</summary>
+{% if options %}
+<label for="profil">{{ t.profil_etiquette }}</label>
+<select id="profil" name="profil"{% if formulaire.champ_fautif == "profil" %} aria-invalid="true" aria-describedby="profil-erreur" autofocus{% endif %}>
+{% for option in options %}
+<option value="{{ option.nom }}"{% if option.choisi %} selected{% endif %}>{{ option.etiquette }}</option>
+{% endfor %}
+</select>
+{% if formulaire.champ_fautif == "profil" %}
+<p id="profil-erreur">{{ formulaire.erreur }}</p>
+{% endif %}
+{% endif %}
+<fieldset{% if formulaire.champ_fautif == "temperature" %} aria-describedby="temperature-erreur"{% endif %}>
+<legend>{{ t.temperature_legende }}</legend>
+{% for position in positions %}
+<label for="temperature-{{ loop.index }}"><input type="radio" id="temperature-{{ loop.index }}" name="temperature" value="{{ position.valeur }}"{% if position.valeur == temperature %} checked{% endif %}{% if formulaire.champ_fautif == "temperature" and loop.first %} aria-invalid="true" aria-describedby="temperature-erreur" autofocus{% endif %}> {{ position.etiquette }}</label>
+{% endfor %}
+{% if formulaire.champ_fautif == "temperature" %}
+<p id="temperature-erreur">{{ formulaire.erreur }}</p>
+{% endif %}
+</fieldset>
+<label for="reformuler"><input type="checkbox" id="reformuler" name="reformuler" value="1" aria-describedby="reformuler-aide"{% if reformuler %} checked{% endif %}> {{ t.reformuler_etiquette }}</label>
+<small id="reformuler-aide">{{ t.reformuler_aide }}</small>
+<label for="mode_demonstration"><input type="checkbox" id="mode_demonstration" name="mode_demonstration" value="1"{% if mode_demonstration %} checked{% endif %}> {{ t.demonstration_etiquette }}</label>
+{% if modes|length > 1 %}
+<label for="mode">{{ t.mode_etiquette }}</label>
+<select id="mode" name="mode">
+{% for mode in modes %}
+<option value="{{ mode }}"{% if mode == mode_choisi %} selected{% endif %}>{{ mode }}</option>
+{% endfor %}
+</select>
+{% endif %}
+</details>
+<input type="hidden" name="historique" value="{{ formulaire.historique }}">
+<button type="submit"{% if info_connue and not options %} disabled{% endif %}>{{ t.bouton }}</button>
+</form>
+</section>

@@ -1,0 +1,7 @@
+id = "APP-21"
+origine = "E3 étape 4, spec 08 (2026-11-04) — le score des passages cités s'afficherait en production"
+fichier = "12_application/src/application/presentation.py"
+avant = '''                        p, t, decimales(p.score, t) if demonstration else None'''
+apres = '''                        p, t, decimales(p.score, t)'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "decoche_le_html"]

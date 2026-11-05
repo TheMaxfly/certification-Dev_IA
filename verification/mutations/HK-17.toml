@@ -1,0 +1,9 @@
+id = "HK-17"
+origine = "E3 étape 4, spec 03 (2026-11-03) — le trousseau de l'API n'est plus découpé : un secret seul, à côté de son nom, passerait"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''        tr ',' '\n' | sed -E 's/^[[:space:]]*[^:]*://'
+'''
+apres = '''        cat
+'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

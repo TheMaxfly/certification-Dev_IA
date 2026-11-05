@@ -1,0 +1,7 @@
+id = "APP-22"
+origine = "E3 étape 4, spec 08 (2026-11-04) — la section et les passages non cités s'afficheraient en production"
+fichier = "12_application/src/application/presentation.py"
+avant = '''        trace=trace_de(question, corps, t) if demonstration else None,'''
+apres = '''        trace=trace_de(question, corps, t),'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "decoche_le_html"]

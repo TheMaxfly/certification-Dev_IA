@@ -1,0 +1,7 @@
+id = "APP-20"
+origine = "E3 étape 4, spec 08 (2026-11-04) — le rang et le score de la série s'afficheraient en production"
+fichier = "12_application/src/application/presentation.py"
+avant = '''                mesure=mesure_de(serie, t) if demonstration else None,'''
+apres = '''                mesure=mesure_de(serie, t),'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "decoche_le_html"]

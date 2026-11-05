@@ -1,0 +1,7 @@
+id = "APP-13"
+origine = "E3 étape 4, spec 04 (2026-11-04) — le bouton se désactiverait après un cas dégradé : sans JavaScript, il ne se réactive jamais"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''{% if info_connue and not options %} disabled{% endif %}'''
+apres = ''' disabled'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_question.py", "-k", "chaque_cas_degrade"]

@@ -1,0 +1,7 @@
+id = "APP-12"
+origine = "E3 étape 4, spec 04 (2026-11-04) — un titre écrit après sa marque ne serait plus repéré : le lien porterait le titre deux fois"
+fichier = "12_application/src/application/presentation.py"
+avant = '''            apres = fin_du_titre(texte[marque.end() :], cle)'''
+apres = '''            apres = None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_presentation.py", "-k", "titre_apres"]

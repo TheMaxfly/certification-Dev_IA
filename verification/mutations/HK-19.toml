@@ -1,0 +1,7 @@
+id = "HK-19"
+origine = "E3 étape 4, spec 03 (2026-11-03) — la clé de l'application n'est plus contrôlée"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN API_MODELE_CLES APPLICATION_CLE_API)'''
+apres = '''CLES_VARIABLES=(MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN API_MODELE_CLES)'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]
