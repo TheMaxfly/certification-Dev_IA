@@ -28,16 +28,16 @@ def test_empreinte_stable():
 @pytest.mark.parametrize(
     ("texte", "trouve"),
     [
-        ("Merci à Tori pour cette critique", True),
-        ("merci à TORI.", True),
-        ("(par Tori)", True),
-        ("Toriko est un manga", False),
-        ("Satori", False),
-        ("Tori_2", False),
+        ("Merci à Mirb pour cette critique", True),
+        ("merci à MIRB.", True),
+        ("(par Mirb)", True),
+        ("Mirbko est un manga", False),
+        ("Samirb", False),
+        ("Mirb_2", False),
     ],
 )
 def test_mot_entier_casse_ignoree(texte, trouve):
-    assert bool(p.motif("Tori").search(texte)) is trouve
+    assert bool(p.motif("Mirb").search(texte)) is trouve
 
 
 def test_pseudonyme_avec_ponctuation_echappee():
@@ -46,8 +46,8 @@ def test_pseudonyme_avec_ponctuation_echappee():
 
 
 def test_masquer_remplace_toutes_les_occurrences():
-    texte, n = p.masquer("Tori, puis tori et Toriko.", "Tori")
-    assert (texte, n) == (f"{p.JETON}, puis {p.JETON} et Toriko.", 2)
+    texte, n = p.masquer("Mirb, puis mirb et Mirbko.", "Mirb")
+    assert (texte, n) == (f"{p.JETON}, puis {p.JETON} et Mirbko.", 2)
 
 
 # --------------------------------------------------------------------------- #
@@ -100,7 +100,7 @@ def ecrire(chemin: Path, entete: list[str], lignes: list[tuple]) -> Path:
         ),
         (
             ["doc_key", "empreinte_pseudo", "nature"],
-            [("ms_review:1", "Tori", "signature")],
+            [("ms_review:1", "Mirb", "signature")],
             "empreinte mal formée",
         ),
         (
@@ -134,19 +134,19 @@ def test_couple_masque_et_admis_refuse(tmp_path):
 
 def test_masquage_perime_refuse():
     docs = {"ms_review:1": {"doc_text": "rien à masquer", "title": "t"}}
-    entree = p.Entree("ms_review:1", p.empreinte("Tori"), "signature")
+    entree = p.Entree("ms_review:1", p.empreinte("Mirb"), "signature")
     with pytest.raises(p.ListeInvalide, match="n'y figure plus"):
-        p.appliquer_masquage(docs, [entree], {p.empreinte("Tori"): "Tori"})
+        p.appliquer_masquage(docs, [entree], {p.empreinte("Mirb"): "Mirb"})
     with pytest.raises(p.ListeInvalide, match="absent"):
-        p.appliquer_masquage({}, [entree], {p.empreinte("Tori"): "Tori"})
+        p.appliquer_masquage({}, [entree], {p.empreinte("Mirb"): "Mirb"})
     with pytest.raises(p.ListeInvalide, match="sans pseudonyme"):
         p.appliquer_masquage(docs, [entree], {})
 
 
 def test_homonyme_perime_refuse():
     docs = {"kitsu:1": {"doc_text": "a bird", "title": "Birds"}}
-    entree = p.Entree("kitsu:1", p.empreinte("Tori"), "provenance_kitsu")
+    entree = p.Entree("kitsu:1", p.empreinte("Mirb"), "provenance_kitsu")
     with pytest.raises(p.ListeInvalide, match="n'y figure plus"):
-        p.verifier_homonymes(docs, [entree], {p.empreinte("Tori"): "Tori"})
-    docs["kitsu:1"]["title"] = "Tori"
-    p.verifier_homonymes(docs, [entree], {p.empreinte("Tori"): "Tori"})
+        p.verifier_homonymes(docs, [entree], {p.empreinte("Mirb"): "Mirb"})
+    docs["kitsu:1"]["title"] = "Mirb"
+    p.verifier_homonymes(docs, [entree], {p.empreinte("Mirb"): "Mirb"})

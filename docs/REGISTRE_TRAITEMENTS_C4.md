@@ -29,7 +29,7 @@ tomaison).
 
 **Point de qualification retenu.** La signature des critiques Manga Sanctuary
 **n'est pas collective**. Chaque critique porte un pseudonyme individuel assorti
-d'un badge « STAFF » (exemple observé : `MassLunar`, 16 août 2026). Il s'agit
+d'un badge « STAFF » (constaté sur le site le 16 août 2026). Il s'agit
 donc de 54 personnes physiques identifiables indirectement, dont la base
 conserve les **opinions et appréciations** — un traitement plus intrusif que le
 seul rattachement d'un nom d'auteur à une œuvre.
