@@ -236,6 +236,7 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 | clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
 | trousseau de l'API du modèle | `API_MODELE_CLES`, `nom:secret,nom:secret`, dans le `.env` du module de l'API | `pre-commit` et `pre-push` : la valeur de chaque secret ; une affectation littérale d'un secret de 32 caractères au moins, à toute place |
 | clé de l'application | `APPLICATION_CLE_API`, le secret seul, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` n'en est pas une) |
+| adresse du canal d'alerte | `MONITORAGE_WEBHOOK_DISCORD`, dans le `.env` du module 13 (monitorage) | `pre-commit` et `pre-push` : sa valeur ; l'aspect d'une adresse de webhook Discord ; une référence `${…}` passe |
 
 - Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
   elle. Une variable absente ou vide ne compare rien.

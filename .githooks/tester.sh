@@ -17,6 +17,7 @@ CO="Co-Author$(printf e)d-By"
 # vraies variables du poste n'entrent pas dans l'essai : un HOME jetable porte un
 # jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
 unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME API_MODELE_CLES APPLICATION_CLE_API
+unset MONITORAGE_WEBHOOK_DISCORD
 export HOME="$TRAVAIL/maison"
 mkdir -p "$HOME/.cache/huggingface"
 JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
@@ -29,6 +30,8 @@ HORS_MOTIF_O="autre-valeur-factice-hors-motif-0043"
 HORS_MOTIF_A="valeur-factice-de-l-application-0044"
 HORS_MOTIF_T="valeur-factice-du-trousseau-0045"
 CLE_ACCES_FACTICE="$(printf 'a1B2c3%.0s' $(seq 1 7))"  # 42 caractères
+# Écrite en morceaux : ce fichier ne porte pas lui-même l'aspect qu'il essaie.
+WEBHOOK_FACTICE="https://discord.com/api/web$(printf hooks)/123456789/$CLE_ACCES_FACTICE"
 echecs=0
 
 git init -q --bare -b main "$TRAVAIL/distant.git"
@@ -299,6 +302,18 @@ essai passe  "référence à une variable, pas une valeur" eval '
     ecrire pc_kr2.yml "API_MODELE_CLES: \${API_MODELE_CLES:-}" && git commit -q -m kr'
 essai passe  "valeur courte, jetable" eval '
     ecrire pc_kc.yml "APPLICATION_CLE_API: cle-jetable-essai" && git commit -q -m kc'
+# L'adresse du canal d'alerte : par valeur et par aspect ; une référence passe, et le
+# webhook d'essai local aussi.
+essai refuse "adresse du canal d'alerte du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "MONITORAGE_WEBHOOK_DISCORD=%s\n" "$HORS_MOTIF_A" >mod/.env &&
+    ecrire pc_kw.txt "note : $HORS_MOTIF_A" && git commit -q -m kw'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : adresse de webhook" eval '
+    ecrire pc_kw2.yml "url: $WEBHOOK_FACTICE" && git commit -q -m kw2'
+essai passe  "référence à la variable du canal, webhook d'essai local" eval '
+    ecrire pc_kw3.yml "url: \${MONITORAGE_WEBHOOK_DISCORD:-http://sonde:9108/webhook-essai}" &&
+    git commit -q -m kw3'
 essai refuse "mention dans un texte non UTF-8" eval '
     export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >pc_nu.txt &&
     git add pc_nu.txt && git commit -q -m nu'

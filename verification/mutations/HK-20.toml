@@ -1,0 +1,7 @@
+id = "HK-20"
+origine = "E3 étape 5, spec 05 (2026-11-05) — l'adresse du canal d'alerte n'est plus contrôlée"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''CLES_VARIABLES+=(MONITORAGE_WEBHOOK_DISCORD)'''
+apres = '''CLES_VARIABLES+=()'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]
