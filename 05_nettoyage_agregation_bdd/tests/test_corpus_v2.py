@@ -247,7 +247,7 @@ def test_un_v2_clos_ne_se_reconstruit_pas_autrement(jeu_v2, tmp_path):
 def test_un_pseudonyme_inconnu_dans_une_critique_arrete_tout(jeu_v2):
     with psycopg.connect(jeu_v2["url"]) as cx:
         cx.execute(
-            "UPDATE manga.ms_reviews_all SET review_body = review_body || ' Tori'"
+            "UPDATE manga.ms_reviews_all SET review_body = review_body || ' Mirb'"
             " WHERE review_url LIKE '%%id=102'"
         )
     with pytest.raises(construire.ErreurChargement, match="pseudonymes"):

@@ -9,10 +9,10 @@ chose à écarter, et chaque contrôle du §7 quelque chose à voir :
   105  hors snapshot                         → écartée (S2)
   106  corps long, coupure à 1 200 au milieu d'un mot qui commence comme un
        pseudonyme                           → retenue, COUPURE rapportée
-  107  auteur « Tori », hors snapshot        → fournit un pseudonyme homonyme
+  107  auteur « Mirb », hors snapshot        → fournit un pseudonyme homonyme
 
   La part Kitsu vient d'un run miniature, manifeste compris (règle K1) :
-  kitsu:7   manga, « Tori » est un oiseau, auteur, « (Source: MU) »
+  kitsu:7   manga, « Mirb » est un oiseau, auteur, « (Source: MU) »
                                              → retenu, homonyme ADMIS
   kitsu:8   manga, synopsis de 6 caractères  → retenu, sans fragment (plancher 50)
   kitsu:9   roman non rattaché               → écarté (type)
@@ -41,7 +41,7 @@ from corpus.pseudonymes import JETON, empreinte  # noqa: E402
 URL = "https://www.manga-sanctuary.com/fiche_serie_critique.php?id="
 #: 29 caractères de préfixe (« Critique Manga Serie Deux #3\n ») + 1 167 : le mot
 #: commence au caractère 1 196, la coupure à 1 200 en garde quatre lettres.
-CORPS_LONG = "x" * 1166 + " Toriko" + " suite" * 20
+CORPS_LONG = "x" * 1166 + " Mirbko" + " suite" * 20
 
 CRITIQUES = [
     (101, 1, 1, "Plume", "Belle critique. Merci a Zorglub pour cette critique"),
@@ -50,7 +50,7 @@ CRITIQUES = [
     (104, 2, 1, "Zorglub", "   "),
     (105, 2, 1, "Plume", "Hors snapshot"),
     (106, 2, 3, "Plume", CORPS_LONG),
-    (107, 1, 3, "Tori", "Une critique hors snapshot"),
+    (107, 1, 3, "Mirb", "Une critique hors snapshot"),
 ]
 SNAPSHOT = [101, 102, 103, 104, 106]
 KITSU = [
@@ -59,7 +59,7 @@ KITSU = [
         "manga",
         "Birds",
         {"en": "Birds"},
-        "The bird Tori flies over the sea every morning, a long synopsis. (Source: MU)",
+        "The bird Mirb flies over the sea every morning, a long synopsis. (Source: MU)",
         ["Fantasy"],
         [],
     ),
@@ -87,7 +87,7 @@ KITSU = [
 ]
 STAFF = {7: [("Naoki Urasawa", "Story & Art")]}
 MASQUAGE = [("ms_review:101", empreinte("Zorglub"), "remerciement")]
-HOMONYMES = [("kitsu:7", empreinte("Tori"), "provenance_kitsu")]
+HOMONYMES = [("kitsu:7", empreinte("Mirb"), "provenance_kitsu")]
 
 
 def peupler(dsn: str, critiques=CRITIQUES) -> None:
@@ -224,9 +224,9 @@ def test_coupure_de_fragment_rapportee_sans_bloquer(jeu):
         jeu["url"],
         "SELECT doc_text FROM bench.corpus_docs WHERE doc_key = 'ms_review:106'",
     )
-    assert decoupage.decouper(texte)[0][2].endswith(" Tori")  # la prémisse du test
+    assert decoupage.decouper(texte)[0][2].endswith(" Mirb")  # la prémisse du test
     assert r["controles"]["7.4 coupures de fragment"] == [
-        ("ms_review:106", empreinte("Tori"))
+        ("ms_review:106", empreinte("Mirb"))
     ]
     assert r["issue"].endswith("VALIDÉ")
 
@@ -377,7 +377,7 @@ def test_document_kitsu_au_gabarit_de_decembre(jeu):
         "Titres: Birds | Birds\n"
         "Auteurs: Naoki Urasawa (Scénario & Dessin)\n"
         'Tags: ["Fantasy"]\n'
-        "Synopsis: The bird Tori flies over the sea every morning, a long synopsis."
+        "Synopsis: The bird Mirb flies over the sea every morning, a long synopsis."
     )
     assert meta["source_citee"] == ["MU"]
     assert boost is None and "trending_pos" not in meta

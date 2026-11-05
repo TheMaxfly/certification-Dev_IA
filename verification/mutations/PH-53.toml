@@ -1,0 +1,7 @@
+id = "PH-53"
+origine = "E3, pseudonymes des fichiers suivis (2026-11-05) — une occurrence hors de la liste admise doit échouer"
+fichier = "verification/pseudonymes_fichiers.py"
+avant = '''        if (nom, empreinte) not in admises'''
+apres = '''        if (nom, empreinte) in admises'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_pseudonymes_passages.py"]
