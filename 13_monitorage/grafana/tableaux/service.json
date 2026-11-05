@@ -1,0 +1,874 @@
+{
+  "uid": "service",
+  "title": "Service",
+  "description": "La disponibilité, le trafic, les erreurs et la latence du service d'embedding, de l'API, de l'application et de la machine.",
+  "tags": [
+    "monitorage",
+    "modele"
+  ],
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source de données",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 2
+      },
+      {
+        "name": "profil",
+        "label": "Profil",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${source}"
+        },
+        "query": {
+          "query": "label_values(api_modele_llm_appels_total, profil)",
+          "refId": "profil"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "intervalle",
+        "label": "Intervalle",
+        "type": "interval",
+        "query": "1m,5m,15m,1h",
+        "auto": false,
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Cibles",
+      "description": "Ce qu'il montre : chaque cible de la collecte répond-elle ? Normal : les cinq en marche. Si l'embedding ou l'API s'arrête : une alerte part après une minute, vérifier /v1/sante, relancer.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "up",
+          "legendFormat": "{{job}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "en marche",
+                  "index": 0
+                },
+                "0": {
+                  "text": "arrêtée",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requêtes de l'API par route et statut",
+      "description": "Ce qu'il montre : le trafic de l'API, sans compter la collecte. Normal : proportionnel aux questions. S'il tombe à zéro alors que l'application sert : le lien est coupé.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (route, statut) (rate(api_modele_requetes_total{route!=\"/metrics\"}[$intervalle])) * 60",
+          "legendFormat": "{{route}} {{statut}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: req/min",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Erreurs de l'API par code",
+      "description": "Ce qu'il montre : les réponses d'erreur par cause stable, sur l'heure. Normal : peu. S'il monte : lire le code ; les codes du fournisseur renvoient au tableau Modèle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (code) (increase(api_modele_erreurs_total[1h]))",
+          "legendFormat": "{{code}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: erreurs/h",
+          "noValue": "aucune erreur",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence de l'API, p95",
+      "description": "Ce qu'il montre : la durée vue par l'API, par route ; la recherche et la réponse n'ont pas la même échelle. Normal : quelques centaines de ms pour la recherche. S'il monte sur la recherche : le service d'embedding ou la base.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(api_modele_duree_requete_secondes_bucket[$intervalle])))",
+          "legendFormat": "{{route}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Débit refusé par clé",
+      "description": "Ce qu'il montre : les requêtes refusées parce que la limite est dépassée ; le nom de la clé, jamais sa valeur. Normal : aucune. S'il monte : un client tourne trop vite.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (cle) (increase(api_modele_debit_refuse_total[1h]))",
+          "legendFormat": "{{cle}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: refus/h",
+          "noValue": "aucun refus",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requêtes de l'application",
+      "description": "Ce qu'il montre : le trafic des pages, par route et statut ; statique pour les feuilles de style. Normal : quelques requêtes par page. S'il montre des 5xx : lire le journal.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (route, statut) (rate(application_requetes_total{route!=\"/metrics\"}[$intervalle])) * 60",
+          "legendFormat": "{{route}} {{statut}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: req/min",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence de l'application, p95",
+      "description": "Ce qu'il montre : ce que le libraire ressent, modèle compris. Normal : quelques secondes sur /question, presque rien ailleurs. S'il monte seul : l'API ou le modèle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(application_latence_secondes_bucket[$intervalle])))",
+          "legendFormat": "{{route}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Erreurs vues de l'application",
+      "description": "Ce qu'il montre : le même incident vu du client de l'API, par code. Normal : aucune. Avec cle_invalide : la clé de l'application est refusée.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (code) (increase(application_api_erreurs_total[1h]))",
+          "legendFormat": "{{code}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: erreurs/h",
+          "noValue": "aucune erreur",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Service d'embedding : requêtes et file",
+      "description": "Ce qu'il montre : les requêtes reçues et les textes en attente. Normal : la sonde en fait 13 toutes les 15 min, elle se voit ; file à 0. Si la file monte : le service ne suit plus.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum(rate(te_request_count[$intervalle])) * 60",
+          "legendFormat": "requêtes/min",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "te_queue_size",
+          "legendFormat": "textes en file",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Service d'embedding : durée moyenne",
+      "description": "Ce qu'il montre : la durée moyenne d'une requête réussie. Normal : quelques dizaines de ms par lot. Si elle monte : la carte est occupée ailleurs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "rate(te_request_duration_sum[$intervalle]) / rate(te_request_duration_count[$intervalle])",
+          "legendFormat": "durée moyenne",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucune requête",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Refus du service d'embedding",
+      "description": "Ce qu'il montre : les requêtes refusées par cause ; pas de troncature silencieuse, un texte trop long est refusé. Normal : aucun. S'il monte : un texte hors des bornes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (err) (increase(te_request_failure[1h]))",
+          "legendFormat": "{{err}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: refus/h",
+          "noValue": "aucun refus",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 8,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Machine : mémoire et processeur",
+      "description": "Ce qu'il montre : la mémoire disponible du poste, avec le repère de verify-poste, et le processeur. Pas la mémoire vidéo. Normal : au-dessus du repère pile arrêtée. Si elle manque : arrêter ce qui ne sert pas, ne pas lancer de seconde instance.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "node_memory_MemAvailable_bytes",
+          "legendFormat": "mémoire disponible",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(6900000000)",
+          "legendFormat": "Repère : 6,9 Go",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$intervalle]))",
+          "legendFormat": "processeur occupé",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 16,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Machine : disque",
+      "description": "Ce qu'il montre : l'espace libre du disque de l'hôte. Normal : plusieurs dizaines de Go ; la collecte en prend quelques centaines de Mo sur 15 jours. S'il baisse vite : chercher ce qui écrit, avant que Prometheus ne manque de place.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"}",
+          "legendFormat": "disque libre",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 8,
+        "h": 8
+      }
+    }
+  ]
+}

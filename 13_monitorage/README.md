@@ -81,6 +81,16 @@ conteneur ne joint pas la base de l'hôte sans une ligne de `pg_hba.conf`. Pour 
 
 La session est en lecture seule et membre de `verif_ro`, ou la lecture est refusée.
 
+## Les tableaux de bord
+
+`grafana/tableaux/modele.json` et `service.json`, chargés par provisionnement : **ce qu'on montre
+est ce qui est versionné**. L'écran ne les modifie pas (`allowUiUpdates: false`). Pour changer un
+tableau : modifier le JSON et attendre 30 s ; ou, pour le faire à l'écran, ouvrir « Modèle JSON »
+dans les réglages du tableau, travailler sur une copie, et recopier le JSON dans le dépôt.
+
+Chaque panneau dit dans sa description ce qu'il montre, sa valeur normale, ce qu'on fait si elle
+bouge. Les seuils sont des séries tracées et nommées ; les états sont en toutes lettres.
+
 ## Licences
 
 Prometheus et l'exporteur de machine : Apache 2.0. Grafana : AGPL v3, usage interne, non
