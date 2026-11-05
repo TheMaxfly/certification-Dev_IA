@@ -52,15 +52,16 @@ declare -A CLES_ASPECT=(
 # Les clés d'accès à l'API du modèle, à part : ce ne sont pas des clés de fournisseur.
 CLES_ASPECT[API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"']{32,}"
 CLES_ASPECT[APPLICATION_CLE_API]="APPLICATION_CLE_API[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{32,}"
-# L'adresse du canal d'alerte (E3, étape 5) : qui la lit peut écrire sur le canal, elle vaut
-# un secret. MONITORAGE_WEBHOOK_DISCORD, dans le `.env` du module 13 ; la valeur du poste,
-# et l'aspect d'une adresse de webhook. Une référence (« ${…} ») n'en est pas une.
-CLES_VARIABLES+=(MONITORAGE_WEBHOOK_DISCORD)
-CLES_FOURNISSEUR[MONITORAGE_WEBHOOK_DISCORD]="du canal d'alerte"
-CLES_NATURE[MONITORAGE_WEBHOOK_DISCORD]=adresse
-CLES_ASPECT[MONITORAGE_WEBHOOK_DISCORD]='discord(app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+'
+# Le mot de passe d'application du canal d'alerte (E3, étape 5), dans son fichier hors
+# dépôt : sa valeur, avec et sans les espaces qui la groupent à l'affichage ; et une
+# affectation littérale à GF_SMTP_PASSWORD. Le chemin (GF_SMTP_PASSWORD__FILE) n'en est pas une.
+CLES_VARIABLES+=(GRAFANA_SMTP_MOT_DE_PASSE)
+CLES_FOURNISSEUR[GRAFANA_SMTP_MOT_DE_PASSE]="du canal d'alerte"
+CLES_NATURE[GRAFANA_SMTP_MOT_DE_PASSE]="mot de passe"
+CLES_ASPECT[GRAFANA_SMTP_MOT_DE_PASSE]="GF_SMTP_PASSWORD[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{8,}"
 # Le fichier où l'outil du fournisseur range la valeur du poste.
 declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
+CLES_FICHIER[GRAFANA_SMTP_MOT_DE_PASSE]="$(git rev-parse --show-toplevel 2>/dev/null)/13_monitorage/.secrets/smtp_mot_de_passe"
 
 cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
     local v
@@ -79,6 +80,8 @@ cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
 cles_decouper() { # <variable> ; entrée : ses valeurs, une par ligne ; sortie : à comparer
     if [ "$1" = API_MODELE_CLES ]; then
         tr ',' '\n' | sed -E 's/^[[:space:]]*[^:]*://'
+    elif [ "$1" = GRAFANA_SMTP_MOT_DE_PASSE ]; then
+        sed -E 'p; s/[[:space:]]+//g'
     else
         cat
     fi

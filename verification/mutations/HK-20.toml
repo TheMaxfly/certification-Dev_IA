@@ -1,7 +1,7 @@
 id = "HK-20"
-origine = "E3 étape 5, spec 05 (2026-11-05) — l'adresse du canal d'alerte n'est plus contrôlée"
+origine = "E3 étape 5, spec 05 (2026-11-05) — le mot de passe du canal d'alerte n'est plus contrôlé"
 fichier = ".githooks/cles-fournisseurs"
-avant = '''CLES_VARIABLES+=(MONITORAGE_WEBHOOK_DISCORD)'''
+avant = '''CLES_VARIABLES+=(GRAFANA_SMTP_MOT_DE_PASSE)'''
 apres = '''CLES_VARIABLES+=()'''
 dossier = "."
 commande = ["bash", ".githooks/tester.sh"]
