@@ -26,7 +26,7 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
 | `make verify TOUT=1` | tous les modules |
-| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `12`, `database`, `demo`, `statique` |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `13`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
 | `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : accessibilité de l'application (axe-core dans Chromium, `rapport_axe` réécrit), fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
@@ -38,7 +38,7 @@ commande sur le poste et sur GitHub.
   strict sur `src/`, Bandit sur `src/`, pip-audit sur le verrou, après ses tests, dans
   `make verify` ; un constat est un échec, et la couverture est mesurée. Elles se
   déclarent dans le 9e champ de sa ligne de `MODULES` (`verification/verifier.sh`) ;
-  le module 11 (API du modèle) et le module 12 (application) les portent. Pour les modules d'avant, Bandit et
+  le module 11 (API du modèle), le module 12 (application) et le module 13 (monitorage) les portent. Pour les modules d'avant, Bandit et
   pip-audit restent indicatifs.
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
