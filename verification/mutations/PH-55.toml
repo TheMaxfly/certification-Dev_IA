@@ -1,0 +1,7 @@
+id = "PH-55"
+origine = "E3, pseudonymes des fichiers suivis (2026-11-05) — un pseudonyme dans le chemin d'un fichier suivi compte"
+fichier = "verification/pseudonymes_fichiers.py"
+avant = '''            nombre = len(m.findall(texte)) + len(m.findall(nom))'''
+apres = '''            nombre = len(m.findall(texte))'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_pseudonymes_passages.py"]
