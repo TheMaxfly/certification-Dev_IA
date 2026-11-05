@@ -1,0 +1,164 @@
+# Les quatre alertes, évaluées par Grafana toutes les 30 s. Les seuils et les durées sont
+# écrits une fois, ici, avec leur motif. Un essai qui les change les remet, et le dit.
+#
+# A : `up` sans `== 0`, le seuil porté par Grafana : `== 0` rendrait un vecteur vide en
+#     marche normale. Une minute : plus long qu'un redémarrage volontaire du service, assez
+#     court pour une démonstration. Sans donnée : Alerting, une cible disparue est une panne.
+# B : plus de 3 sorties refusées en 15 min : quelques refus isolés sont le contrôle qui
+#     travaille ; au-delà, le modèle dérive. Sans donnée : OK.
+# C : plus de 0,50 $ sur l'heure : le plafond d'un run de mesure. Rien ne bloque côté API ;
+#     c'est la seule alerte de coût. Sans donnée : OK.
+# D : sous 0,999 (registre 2.12) sur deux sondes de suite, 20 min à 15 min d'intervalle :
+#     l'écart connu vers 0,9988 revient isolément. Sans donnée : OK, la jauge n'existe qu'après
+#     la première mesure.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: modele
+    folder: Monitorage
+    interval: 30s
+    rules:
+      - uid: alerte-a-disponibilite
+        title: "A — service ou API indisponible"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'up{job=~"embedding|api"}'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [1]}
+        for: 1m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "{{ $labels.job }} ne répond plus depuis une minute. Vérifier /v1/sante, relancer le service ; si c'est le fournisseur, changer de profil."
+      - uid: alerte-b-sorties-invalides
+        title: "B — sorties invalides"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: "sum(increase(api_modele_sortie_invalide_total[15m]))"
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [3]}
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: attention
+        annotations:
+          summary: "Le modèle produit des sorties refusées par nos contrôles ({{ index $values \"B\" }} en 15 min). Lire les motifs sur le tableau Modèle ; envisager un changement de profil."
+      - uid: alerte-c-cout
+        title: "C — coût"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 3600, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: "sum(increase(api_modele_llm_cout_usd_total[1h]))"
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0.5]}
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: attention
+        annotations:
+          summary: "Plus de 0,50 $ de modèle sur l'heure. Vérifier le trafic ; c'est le plafond d'un run de mesure."
+      - uid: alerte-d-equivalence
+        title: "D — équivalence"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 3600, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: "modele_sonde_equivalence_cosinus_min"
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [0.999]}
+        for: 20m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "Le service d'embedding n'encode plus comme à la mesure (cosinus minimal {{ index $values \"B\" }}). Lire le journal de la sonde ; ne pas promouvoir ; prévenir avant toute démonstration."

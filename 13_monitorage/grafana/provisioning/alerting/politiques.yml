@@ -1,0 +1,10 @@
+# Tout vers un seul point de contact : regroupement 30 s, répétition 4 h. Le webhook d'essai
+# tant que le canal réel n'est pas posé ; passer à discord-exploitation est une ligne.
+apiVersion: 1
+policies:
+  - orgId: 1
+    receiver: webhook-essai
+    group_by: ["alertname"]
+    group_wait: 30s
+    group_interval: 1m
+    repeat_interval: 4h

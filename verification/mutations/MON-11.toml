@@ -1,0 +1,9 @@
+id = "MON-11"
+origine = "E3 étape 5, spec 05 (2026-11-05) — sans `noDataState: OK`, le coût passerait en No Data sans aucun appel"
+fichier = "13_monitorage/grafana/provisioning/alerting/regles.yml"
+avant = '''        for: 20m
+        noDataState: OK'''
+apres = '''        for: 20m
+        noDataState: NoData'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_regles.py"]

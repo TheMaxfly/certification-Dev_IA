@@ -1,0 +1,20 @@
+# Deux points de contact : le canal réel, et le webhook d'essai servi par la sonde.
+# L'adresse du canal réel n'est jamais ici : MONITORAGE_WEBHOOK_DISCORD, hors dépôt ; sans
+# elle, le Compose lui donne le webhook d'essai. La politique (politiques.yml) choisit.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: discord-exploitation
+    receivers:
+      - uid: discord-exploitation
+        type: discord
+        settings:
+          url: $MONITORAGE_WEBHOOK_DISCORD
+  - orgId: 1
+    name: webhook-essai
+    receivers:
+      - uid: webhook-essai
+        type: webhook
+        settings:
+          url: http://sonde:9108/webhook-essai
+          httpMethod: POST
