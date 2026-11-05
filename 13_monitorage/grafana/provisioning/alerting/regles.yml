@@ -8,9 +8,9 @@
 #     travaille ; au-delà, le modèle dérive. Sans donnée : OK.
 # C : plus de 0,50 $ sur l'heure : le plafond d'un run de mesure. Rien ne bloque côté API ;
 #     c'est la seule alerte de coût. Sans donnée : OK.
-# D : sous 0,999 (registre 2.12) sur deux sondes de suite, 20 min à 15 min d'intervalle :
-#     l'écart connu vers 0,9988 revient isolément. Sans donnée : OK, la jauge n'existe qu'après
-#     la première mesure.
+# D : sous 0,999 (registre 2.12) sur deux sondes de suite, 20 min à 15 min d'intervalle. Un
+#     état connu : intermittent, 6 sur 38, deux fragments, valeur identique, cause non établie.
+#     Sans donnée : OK, la jauge n'existe qu'après la première mesure.
 apiVersion: 1
 groups:
   - orgId: 1
@@ -161,4 +161,4 @@ groups:
         labels:
           severite: critique
         annotations:
-          summary: "Le service d'embedding n'encode plus comme à la mesure (cosinus minimal {{ index $values \"B\" }}). Lire le journal de la sonde ; ne pas promouvoir ; prévenir avant toute démonstration."
+          summary: "Cosinus minimal {{ index $values \"B\" }}, sous 0,999 sur deux sondes de suite. Lire le journal de la sonde : si ce sont les fragments 487295 et 491847, à 0,998797, c'est l'état connu, intermittent, cause non établie ; sinon, le service n'encode plus comme à la mesure. Ne pas promouvoir ; prévenir avant toute démonstration."

@@ -99,23 +99,31 @@ def test_les_etiquettes_sont_fermees():
         assert regle["labels"]["severite"] in {"critique", "attention"}
 
 
-def test_le_canal_reel_lit_sa_variable_et_ne_porte_aucune_adresse():
+def test_le_courriel_lit_sa_variable_et_ne_porte_aucune_adresse():
     points = {p["name"]: p for p in lire("canaux.yml")["contactPoints"]}
-    assert set(points) == {"discord-exploitation", "webhook-essai"}
-    (discord,) = points["discord-exploitation"]["receivers"]
-    assert discord["type"] == "discord"
-    assert discord["settings"]["url"] == "$MONITORAGE_WEBHOOK_DISCORD"
+    assert set(points) == {"courriel-exploitation", "webhook-essai"}
+    (courriel,) = points["courriel-exploitation"]["receivers"]
+    assert courriel["type"] == "email"
+    assert courriel["settings"]["addresses"] == "$MONITORAGE_COURRIEL"
     (essai,) = points["webhook-essai"]["receivers"]
     assert essai["type"] == "webhook"
     assert essai["settings"]["url"] == "http://sonde:9108/webhook-essai"
+
+
+def test_le_resume_de_l_equivalence_nomme_l_etat_connu():
+    (regle,) = [r for r in regles() if r["title"].startswith("D ")]
+    resume = regle["annotations"]["summary"]
+    assert "487295" in resume
+    assert "491847" in resume
+    assert "état connu" in resume
+    assert "cause non établie" in resume
 
 
 def test_la_politique_regroupe_30_s_et_repete_4_h():
     (politique,) = lire("politiques.yml")["policies"]
     assert politique["group_wait"] == "30s"
     assert politique["repeat_interval"] == "4h"
-    noms = {p["name"] for p in lire("canaux.yml")["contactPoints"]}
-    assert politique["receiver"] in noms
+    assert politique["receiver"] == "courriel-exploitation"
 
 
 @pytest.mark.parametrize("nom", ["regles.yml", "canaux.yml", "politiques.yml"])
@@ -124,5 +132,4 @@ def test_aucune_adresse_autre_que_la_sonde_et_aucun_secret(nom: str):
     assert set(re.findall(r"https?://[^\s\"']+", texte)) <= {
         "http://sonde:9108/webhook-essai"
     }
-    assert "discord.com" not in texte
-    assert "discordapp.com" not in texte
+    assert not re.search(r"[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[a-z]{2,}", texte)

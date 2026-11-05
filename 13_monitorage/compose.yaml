@@ -19,7 +19,7 @@
 #     l'application ;
 #   - `publication_monitorage` (non interne, sous-réseau fixe) : Docker ne publie pas sur un
 #     réseau interne. Grafana et Prometheus y publient sur l'adresse locale seule ; Grafana
-#     y sort vers le canal d'alerte ; la sonde y joindra la base de l'hôte.
+#     y sort vers le serveur de courriel ; la sonde y joindra la base de l'hôte.
 #
 # Avant `make verify-poste` ou une sauvegarde : `make monitorage-arret`. Elles refusent
 # une instance `tei-*` en marche.
@@ -75,9 +75,17 @@ services:
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
       GF_PLUGINS_PREINSTALL_DISABLED: "true"
-      # L'adresse du canal, hors dépôt ; sans elle, le webhook d'essai de la sonde.
-      MONITORAGE_WEBHOOK_DISCORD: ${MONITORAGE_WEBHOOK_DISCORD:-http://sonde:9108/webhook-essai}
-    secrets: [grafana_mot_de_passe]
+      # Le canal d'alerte : un courriel. L'adresse et le mot de passe d'application sont
+      # hors dépôt ; le mot de passe n'est lu que dans son fichier.
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: smtp.gmail.com:587
+      GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
+      GF_SMTP_USER: ${MONITORAGE_COURRIEL:-exploitation@exemple.invalid}
+      GF_SMTP_FROM_ADDRESS: ${MONITORAGE_COURRIEL:-exploitation@exemple.invalid}
+      GF_SMTP_FROM_NAME: Monitorage du modèle
+      GF_SMTP_PASSWORD__FILE: /run/secrets/smtp_mot_de_passe
+      MONITORAGE_COURRIEL: ${MONITORAGE_COURRIEL:-exploitation@exemple.invalid}
+    secrets: [grafana_mot_de_passe, smtp_mot_de_passe]
     volumes:
       - ../13_monitorage/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../13_monitorage/grafana/tableaux:/etc/grafana/tableaux:ro
@@ -143,6 +151,8 @@ networks:
 secrets:
   grafana_mot_de_passe:
     file: ${GRAFANA_MOT_DE_PASSE_FICHIER:-../13_monitorage/.secrets/grafana_mot_de_passe}
+  smtp_mot_de_passe:
+    file: ${GRAFANA_SMTP_MOT_DE_PASSE_FICHIER:-../13_monitorage/.secrets/smtp_mot_de_passe}
 
 volumes:
   prometheus_donnees:

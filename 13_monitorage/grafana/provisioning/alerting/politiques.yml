@@ -1,9 +1,9 @@
-# Tout vers un seul point de contact : regroupement 30 s, répétition 4 h. Le webhook d'essai
-# tant que le canal réel n'est pas posé ; passer à discord-exploitation est une ligne.
+# Tout vers un seul point de contact : regroupement 30 s, répétition 4 h. Le courriel
+# d'exploitation ; pour un essai sans sortie, webhook-essai sur cette même ligne.
 apiVersion: 1
 policies:
   - orgId: 1
-    receiver: webhook-essai
+    receiver: courriel-exploitation
     group_by: ["alertname"]
     group_wait: 30s
     group_interval: 1m

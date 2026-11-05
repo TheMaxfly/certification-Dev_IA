@@ -1,15 +1,16 @@
-# Deux points de contact : le canal réel, et le webhook d'essai servi par la sonde.
-# L'adresse du canal réel n'est jamais ici : MONITORAGE_WEBHOOK_DISCORD, hors dépôt ; sans
-# elle, le Compose lui donne le webhook d'essai. La politique (politiques.yml) choisit.
+# Deux points de contact : le courriel d'exploitation, et le webhook d'essai servi par la
+# sonde, pour les essais sans sortie. L'adresse n'est jamais ici : MONITORAGE_COURRIEL, hors
+# dépôt. La politique (politiques.yml) choisit.
 apiVersion: 1
 contactPoints:
   - orgId: 1
-    name: discord-exploitation
+    name: courriel-exploitation
     receivers:
-      - uid: discord-exploitation
-        type: discord
+      - uid: courriel-exploitation
+        type: email
         settings:
-          url: $MONITORAGE_WEBHOOK_DISCORD
+          addresses: $MONITORAGE_COURRIEL
+          singleEmail: true
   - orgId: 1
     name: webhook-essai
     receivers:

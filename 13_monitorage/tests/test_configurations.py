@@ -19,10 +19,10 @@ import yaml
 from conftest import MODULE, RACINE
 
 SOUS_RESEAU = "172.30.13.0/24"
-#: Les aspects de secrets : ceux des hooks, plus l'adresse d'un webhook réel.
+#: Les aspects de secrets : ceux des hooks, et une adresse de courriel réelle.
 SECRETS = re.compile(
     r"hf_[A-Za-z0-9]{34}|sk-[A-Za-z0-9_-]{40,}"
-    r"|discord(?:app)?\.com/api/webhooks"
+    r"|[A-Za-z0-9._-]+@(?!exemple\.invalid)[A-Za-z0-9-]+\.[a-z]{2,}"
     r"|(?:password|mot_de_passe)\s*[:=]\s*['\"]?[A-Za-z0-9+/_-]{8,}",
     re.IGNORECASE,
 )
@@ -52,6 +52,7 @@ def fusion() -> dict[str, Any]:
         **os.environ,
         "API_MODELE_PGPASS": "/dev/null",
         "GRAFANA_MOT_DE_PASSE_FICHIER": "/dev/null",
+        "GRAFANA_SMTP_MOT_DE_PASSE_FICHIER": "/dev/null",
     }
     sortie = subprocess.run(
         [
@@ -202,11 +203,22 @@ def test_grafana_ne_telephone_a_personne():
     assert environnement["GF_PLUGINS_PREINSTALL_DISABLED"] == "true"
 
 
-def test_le_canal_par_defaut_est_le_webhook_d_essai_local():
-    environnement = fichier_compose()["services"]["grafana"]["environment"]
-    assert environnement["MONITORAGE_WEBHOOK_DISCORD"] == (
-        "${MONITORAGE_WEBHOOK_DISCORD:-http://sonde:9108/webhook-essai}"
-    )
+def test_le_courriel_passe_par_un_fichier_de_mot_de_passe_et_une_adresse_hors_depot():
+    service = fichier_compose()["services"]["grafana"]
+    environnement = service["environment"]
+    assert environnement["GF_SMTP_ENABLED"] == "true"
+    assert environnement["GF_SMTP_STARTTLS_POLICY"] == "MandatoryStartTLS"
+    assert environnement["GF_SMTP_PASSWORD__FILE"] == "/run/secrets/smtp_mot_de_passe"
+    assert "GF_SMTP_PASSWORD" not in environnement
+    assert "smtp_mot_de_passe" in service["secrets"]
+    for variable in ("GF_SMTP_USER", "GF_SMTP_FROM_ADDRESS", "MONITORAGE_COURRIEL"):
+        assert environnement[variable].startswith("${MONITORAGE_COURRIEL:-")
+
+
+def test_discord_est_ecarte():
+    for relatif in (*SUIVIS, "grafana/provisioning/alerting/canaux.yml"):
+        texte = (MODULE / relatif).read_text(encoding="utf-8").lower()
+        assert "discord" not in texte, relatif
 
 
 def test_la_source_de_donnees_est_provisionnee_par_le_nom_du_service():
@@ -236,16 +248,17 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
         for ligne in (MODULE / "env.exemple").read_text(encoding="utf-8").splitlines()
         if ligne and not ligne.startswith("#")
     ]
-    assert lignes == [
-        "MONITORAGE_WEBHOOK_DISCORD=",
-        "GRAFANA_MOT_DE_PASSE_FICHIER=",
-        "MONITORAGE_DSN_LECTURE=",
-    ]
+    assert all(re.fullmatch(r"[A-Z_]+=", ligne) for ligne in lignes), lignes
+    assert {ligne.removesuffix("=") for ligne in lignes} >= {
+        "GRAFANA_MOT_DE_PASSE_FICHIER",
+        "MONITORAGE_DSN_LECTURE",
+    }
 
 
-def test_le_mot_de_passe_jetable_n_est_pas_suivi():
+@pytest.mark.parametrize("fichier", ["grafana_mot_de_passe", "smtp_mot_de_passe"])
+def test_les_mots_de_passe_ne_sont_pas_suivis(fichier: str):
     fini = subprocess.run(
-        ["git", "check-ignore", "-q", "13_monitorage/.secrets/grafana_mot_de_passe"],
+        ["git", "check-ignore", "-q", f"13_monitorage/.secrets/{fichier}"],
         cwd=RACINE,
     )
     assert fini.returncode == 0

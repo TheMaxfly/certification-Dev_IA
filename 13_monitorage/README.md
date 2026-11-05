@@ -17,9 +17,9 @@ make monitorage-arret  # tout s'arrête ; les données de Prometheus restent sur
   instance `tei-*` en marche.
 - Grafana : `http://127.0.0.1:3000`, utilisateur `admin` ; Prometheus :
   `http://127.0.0.1:9090`. Sur l'adresse locale seule.
-- **Le mot de passe de Grafana** est dans un fichier hors dépôt, mode 600 :
-  `13_monitorage/.secrets/grafana_mot_de_passe`, ou le chemin de
-  `GRAFANA_MOT_DE_PASSE_FICHIER`. Les données de Grafana ne durent pas (`tmpfs`) : tout ce qu'il
+- **Les deux mots de passe sont dans des fichiers hors dépôt**, mode 600, requis au lancement :
+  `13_monitorage/.secrets/grafana_mot_de_passe` et `smtp_mot_de_passe`, ou les chemins de
+  `GRAFANA_MOT_DE_PASSE_FICHIER` et `GRAFANA_SMTP_MOT_DE_PASSE_FICHIER`. Les données de Grafana ne durent pas (`tmpfs`) : tout ce qu'il
   montre est provisionné, et un nouveau mot de passe vaut au redémarrage suivant.
 - Besoin : environ 5,3 Go de mémoire vive avec l'application, 1,5 Go de mémoire vidéo.
 
@@ -109,10 +109,16 @@ Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce f
   qu'un coût existe ; D, seuil porté au-dessus de 1, durée réduite, le temps de l'essai, puis remis.
   **B n'a pas de geste de démonstration** : la doublure du fournisseur ne rend que des sorties
   conformes. Sa règle est lue par un test ; son déclenchement réel n'est pas éprouvé.
-- **Le canal** : deux points de contact, `discord-exploitation` et `webhook-essai`, servi par la
-  sonde : un compteur et une ligne de journal, le titre seul. Le passage au canal réel :
-  `MONITORAGE_WEBHOOK_DISCORD` dans le fichier d'environnement du module, hors dépôt, et une ligne de
-  `politiques.yml`. **Cette adresse vaut un secret** : les hooks la refusent dans un fichier suivi.
+- **Le canal : un courriel**, par Gmail en SMTP (`smtp.gmail.com:587`, STARTTLS obligatoire). Deux
+  choses hors dépôt : l'adresse, `MONITORAGE_COURRIEL`, dans le fichier d'environnement du module ;
+  le mot de passe d'application, dans `13_monitorage/.secrets/smtp_mot_de_passe`, mode 600, lu par
+  `GF_SMTP_PASSWORD__FILE`. **Les hooks refusent sa valeur dans un fichier suivi.** Un second
+  point de contact, `webhook-essai`, servi par la sonde, reste pour les essais sans sortie : un
+  compteur et une ligne de journal, le titre seul ; une ligne de `politiques.yml` le désigne.
+- **L'état connu de D** : **intermittent, 6 sur 38, deux fragments, valeur identique, cause non
+  établie** (`487295` et `491847`, 0,998797, mesuré le 2026-11-05). `make verify-poste` reste vert
+  dans cet état, le test passe entre 0,99 et 0,999. Une alerte D sur ces deux fragments est donc
+  cet état, pas une panne nouvelle ; sur d'autres fragments, c'en est une.
 - **Si A tombe** : lire `make monitorage-etat` et `/v1/sante` ; relancer le service ; si c'est le
   fournisseur, changer de profil. Une panne se voit sur le tableau « Service », panneau « Cibles ».
 
