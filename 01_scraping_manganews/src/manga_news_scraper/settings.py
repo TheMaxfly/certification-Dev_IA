@@ -7,8 +7,8 @@ NEWSPIDER_MODULE = "manga_news_scraper.spiders"
 
 ROBOTSTXT_OBEY = True
 
-# Ne pas usurper un navigateur. En cas d'autorisation explicite de Manga-News,
-# définir un User-Agent identifiable avec une adresse de contact.
+# Ne pas usurper un navigateur. Par défaut, le User-Agent nomme le scraper et sa
+# version, sans contact ; MANGANEWS_USER_AGENT le remplace en entier.
 USER_AGENT = os.getenv("MANGANEWS_USER_AGENT", "manga-news-scraper/0.2")
 
 # Politeness + stabilité
