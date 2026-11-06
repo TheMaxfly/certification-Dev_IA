@@ -1,0 +1,7 @@
+id = "API-89"
+origine = "E3 étape 5, spec 02, métriques pour la collecte (2026-11-05) — une méthode HTTP quelconque deviendrait une étiquette"
+fichier = "11_api_modele/src/api_modele/metriques.py"
+avant = '''    return methode if methode in METHODES else "autre"'''
+apres = '''    return methode'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_metriques.py"]

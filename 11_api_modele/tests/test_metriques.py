@@ -3,11 +3,25 @@
 from __future__ import annotations
 
 import ipaddress
+import re
+from pathlib import Path
+from typing import get_args
 
 from conftest import entetes
 from fastapi.testclient import TestClient
 
-from api_modele.metriques import autorisee
+from api_modele import reponse
+from api_modele.affirmations import Motif
+from api_modele.fournisseurs import Role
+from api_modele.metriques import (
+    MOTIFS_REFUS,
+    MOTIFS_SORTIE,
+    ROLES,
+    TYPES_DE_JETONS,
+    autorisee,
+    methode_fermee,
+)
+from api_modele.modeles import MotifRefus
 
 
 def test_metriques_du_bouclage(api, base_api):
@@ -65,3 +79,44 @@ def test_autorisee():
     assert not autorisee("127.0.0.2", reseaux)
     assert not autorisee("testclient", reseaux)
     assert not autorisee(None, reseaux)
+
+
+def test_la_methode_est_une_liste_fermee():
+    for methode in ("GET", "POST", "HEAD", "OPTIONS"):
+        assert methode_fermee(methode) == methode
+    assert methode_fermee("PROPFIND") == "autre"
+    assert methode_fermee("") == "autre"
+
+
+def test_une_methode_quelconque_compte_sous_autre(api):
+    assert api.request("PROPFIND", "/v1/sante").status_code == 405
+    texte = api.get("/metrics").text
+    assert 'api_modele_requetes_total{methode="autre",' in texte
+    assert "PROPFIND" not in texte
+
+
+def test_les_series_du_modele_de_langage_existent_des_le_demarrage(api):
+    """Aucun appel, aucune réponse : chaque série est là, à 0, sans clé comprise."""
+    texte = api.get("/metrics").text
+    for profil in ("mistral-large-2512", "mistral-large-4", "gpt-6-luna", "gpt-6-sol"):
+        assert f'api_modele_llm_cout_usd_total{{profil="{profil}"}} 0.0' in texte
+        for role in ROLES:
+            a = f'profil="{profil}",role="{role}"'
+            assert f'api_modele_llm_appels_total{{{a},statut="ok"}} 0.0' in texte
+            assert f"api_modele_llm_latence_secondes_count{{{a}}} 0.0" in texte
+            for type_ in TYPES_DE_JETONS:
+                assert f'api_modele_llm_jetons_total{{{a},type="{type_}"}} 0.0' in texte
+    for motif in MOTIFS_SORTIE:
+        assert f'api_modele_sortie_invalide_total{{motif="{motif}"}} 0.0' in texte
+    assert 'api_modele_reponses_total{motif="aucun",refus="faux"} 0.0' in texte
+    for motif in MOTIFS_REFUS:
+        assert f'api_modele_reponses_total{{motif="{motif}",refus="vrai"}} 0.0' in texte
+
+
+def test_les_listes_fermees_suivent_le_code():
+    """Un motif ou un rôle de plus au code doit entrer dans la liste des séries."""
+    assert ROLES == get_args(Role.__value__)
+    assert MOTIFS_REFUS == get_args(MotifRefus)
+    source = Path(reponse.__file__).read_text(encoding="utf-8")
+    motifs = set(re.findall(r'sortie_invalide\(etat, "([a-z_]+)"', source))
+    assert motifs | set(get_args(Motif.__value__)) == set(MOTIFS_SORTIE)

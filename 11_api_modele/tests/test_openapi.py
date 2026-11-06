@@ -133,15 +133,27 @@ def test_exporter_ecrit_le_contrat(tmp_path):
     assert fichier.read_text(encoding="utf-8") == serialiser(contrat())
 
 
+def test_le_503_de_la_reponse_documente_retry_after_et_lui_seul():
+    """Un en-tête documenté, sans champ nouveau ; la recherche n'appelle aucun
+    fournisseur : son 503 n'en a pas."""
+    chemins = contrat()["paths"]
+    reponses = chemins["/v1/reponse"]["post"]["responses"]
+
+    assert set(reponses["503"]["headers"]) == {"Retry-After"}
+    entete = reponses["503"]["headers"]["Retry-After"]
+    assert entete["schema"] == {"type": "integer", "minimum": 1}
+    assert "headers" not in chemins["/v1/recherche"]["post"]["responses"]["503"]
+
+
 def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seuls `Info`
     (`modele_langage`) et `Serie` (`metadonnees`) gagnent un champ ; la route de
     réponse, ses schémas, `Metadonnees` et l'exemple du 503 de `/v1/sante` s'ajoutent ;
-    la version passe à 1.3.0 (mineure)."""
+    la version passe à 1.3.1."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.3.0")
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.3.1")
     assert apres["info"]["title"] == avant["info"]["title"]
     assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (

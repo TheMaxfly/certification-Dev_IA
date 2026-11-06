@@ -1,0 +1,7 @@
+id = "MON-09"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — l'application pourrait joindre le service d'embedding"
+fichier = "13_monitorage/compose.yaml"
+avant = '''    networks: [applicatif, publication, collecte]'''
+apres = '''    networks: [applicatif, publication, collecte, collecte_embedding]'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_configurations.py"]

@@ -1,0 +1,7 @@
+id = "APP-10"
+origine = "E3 étape 4, spec 04 (2026-11-04) — l'échappement des gabarits serait désactivé : un texte venu de l'API s'exécuterait"
+fichier = "12_application/src/application/app.py"
+avant = '''        autoescape=True,'''
+apres = '''        autoescape=False,'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_question.py", "-k", "texte_piege"]

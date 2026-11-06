@@ -1,0 +1,13 @@
+# Les homonymes de pseudonymes admis dans les fichiers suivis, contrôlés par
+# verification/pseudonymes_fichiers.py (étape « état d'apimanga » de make verify-poste).
+# Aucun nom ici : son empreinte seule, 16 caractères du SHA-256. Une ligne ne se pose que
+# si l'occurrence ne désigne pas un lecteur ; le nombre doit rester exact.
+chemin	empreinte_pseudo	nombre	motif
+05_nettoyage_agregation_bdd/Preparation_weekly/data/most_popular.json	3d1d43362cdd96c2	1	mangaka
+05_nettoyage_agregation_bdd/Preparation_weekly/data/top_publishing.json	3d1d43362cdd96c2	2	mangaka
+05_nettoyage_agregation_bdd/Preparation_weekly/export/kitsu_rag_documents.csv	3d1d43362cdd96c2	1	mangaka
+05_nettoyage_agregation_bdd/Preparation_weekly/export/kitsu_series_authors.csv	3d1d43362cdd96c2	1	mangaka
+05_nettoyage_agregation_bdd/Preparation_weekly/notebooks/kitsu_weekly_prepare_postgres.ipynb	4b0e43111fab8afc	1	mot_courant
+database/donnees/jeu_evaluation/v2/attendus.csv	d46372597e0063f7	2	titre_oeuvre
+database/donnees/jeu_evaluation/v2/jeu_evaluation_recherche.csv	0b291e34ec53bc5b	1	titre_oeuvre
+database/donnees/jeu_evaluation/v2/questions.csv	0b291e34ec53bc5b	1	titre_oeuvre

@@ -24,6 +24,8 @@
 # d'équivalence, qui précède celle-ci dans verify-poste (règle 3.1 de l'étape 1 :
 # hors des occurrences connues, aucune) — `verification/pseudonymes_passages.py`. Sans
 # ces passages, refus : le contrôle ne peut pas conclure.
+# Puis les pseudonymes des fichiers suivis par git (dépôt public) : hors des homonymes
+# admis, aucun — `verification/pseudonymes_fichiers.py`.
 #
 # Une nouvelle mesure, une promotion ou une migration change l'état : on relève la
 # référence (--relever) et on la commite avec ce qui l'a changée.
@@ -187,4 +189,12 @@ dire "pseudonymes des passages rendus par l'API (étape d'équivalence)"
   uv run --locked python "$RACINE/verification/pseudonymes_passages.py" "$BILAN_API") ||
   echouer "pseudonymes des passages rendus par l'API : occurrence hors de la liste connue, ou contrôle impossible"
 
-dire "conforme : état égal à la référence, contrôle du 09, 11 tests sur la base réelle, pseudonymes des passages de l'API"
+# --------------------------------------------------------------------------- #
+#  Les pseudonymes des fichiers suivis (dépôt public)
+# --------------------------------------------------------------------------- #
+dire "pseudonymes des fichiers suivis par git"
+(cd "$RACINE/database" && "${PROPRE[@]}" APIMANGA_VERIF_DSN="$DSN" \
+  uv run --locked python "$RACINE/verification/pseudonymes_fichiers.py") ||
+  echouer "pseudonymes des fichiers suivis : occurrence hors de la liste admise, ou contrôle impossible"
+
+dire "conforme : état égal à la référence, contrôle du 09, 11 tests sur la base réelle, pseudonymes des passages de l'API et des fichiers suivis"

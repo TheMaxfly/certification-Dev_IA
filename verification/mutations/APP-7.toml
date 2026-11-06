@@ -1,0 +1,7 @@
+id = "APP-7"
+origine = "E3 étape 4, spec 04 (2026-11-04) — la cinquième réponse ne clôt plus la conversation"
+fichier = "12_application/src/application/app.py"
+avant = '''        if len(suivants) // 2 >= limites.echanges:'''
+apres = '''        if False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_question.py", "-k", "cinquieme_reponse"]

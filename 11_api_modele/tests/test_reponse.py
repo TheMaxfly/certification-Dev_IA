@@ -134,7 +134,7 @@ def test_une_reponse_avec_ses_sources_et_son_contexte(
     assert c["cout_estime_usd"] == pytest.approx((100 * 2 + 20 * 8) / 1e6)
     assert c["question_reformulee"] is None and c["reformulation_ignoree"] is None
     assert c["date_appel"].endswith("+00:00")
-    assert c["version_api"] == "1.3.0"
+    assert c["version_api"] == "1.3.1"
     assert set(c["latences_ms"]) == {"recherche", "reformulation", "modele", "totale"}
     assert c["latences_ms"]["reformulation"] is None
 
@@ -461,6 +461,27 @@ def test_une_reformulation_hors_schema(api_reponse, doublures):
 
     assert r.status_code == 503
     assert r.json()["details"] == {"motif": "schema", "role": "reformulation"}
+
+
+def test_les_reponses_sont_comptees_par_refus_et_motif(
+    api_reponse, doublures, monkeypatch
+):
+    conforme(repondre(api_reponse))
+    texte = api_reponse.get("/metrics").text
+    assert 'api_modele_reponses_total{motif="aucun",refus="faux"} 1.0' in texte
+    assert 'api_modele_reponses_total{motif="aucun_passage",refus="vrai"} 0.0' in texte
+
+    vraie = recherche.rechercher
+
+    def sans_passage(*args: Any) -> Resultat:
+        r = vraie(*args)
+        return r.model_copy(update={"series": []})
+
+    monkeypatch.setattr(recherche, "rechercher", sans_passage)
+    conforme(repondre(api_reponse))
+    texte = api_reponse.get("/metrics").text
+    assert 'api_modele_reponses_total{motif="aucun",refus="faux"} 1.0' in texte
+    assert 'api_modele_reponses_total{motif="aucun_passage",refus="vrai"} 1.0' in texte
 
 
 # --------------------------------------------------------------------------- #
@@ -947,6 +968,107 @@ def test_le_profil_sans_type_de_debit_ne_rejoue_pas(api_reponse, doublures, atte
 
 
 # --------------------------------------------------------------------------- #
+#  L'attente rendue à l'appelant : `Retry-After` sur le 503 d'un 429 (dette 42)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("entete", "rendu", "attente"),
+    [
+        ("7", "7", 7.0),
+        (None, "2", 2.0),
+        ("1.5", "2", 1.5),
+        ("0", "2", 0.0),
+        ("illisible", "2", 2.0),
+    ],
+)
+def test_le_503_d_un_refus_de_debit_qui_dure_porte_retry_after(
+    api_reponse, doublures, attentes_sans_rendu, entete, rendu, attente
+):
+    """La valeur du fournisseur si elle est entière et d'au moins 1 s, sinon l'attente
+    du nouvel essai ; le corps ne change pas."""
+    poser_le_refus()
+    if entete is not None:
+        DoublureFournisseur.en_tetes = {"Retry-After": entete}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503 and conforme(r)["code"] == "fournisseur_refus"
+    assert attentes_sans_rendu == [attente]
+    assert r.headers["Retry-After"] == rendu
+    assert r.json()["details"]["statut"] == 429
+
+
+def test_un_retry_after_trop_long_est_rendu_tel_quel(api_reponse, doublures, attentes):
+    poser_le_refus()
+    DoublureFournisseur.en_tetes = {"Retry-After": "60"}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503 and attentes == []
+    assert r.headers["Retry-After"] == "60"
+
+
+@pytest.mark.parametrize(
+    ("type_", "profil"), [("autre", "factice-a"), ("rate_limited", "factice-b")]
+)
+@pytest.mark.parametrize(("entete", "rendu"), [("5", "5"), (None, "2")])
+def test_un_429_sans_nouvel_essai_porte_aussi_retry_after(
+    api_reponse, doublures, attentes, type_, profil, entete, rendu
+):
+    """Tout 429 du fournisseur, qu'il soit un refus de débit reconnu ou non."""
+    poser_le_refus(429, type_)
+    if entete is not None:
+        DoublureFournisseur.en_tetes = {"Retry-After": entete}
+
+    r = repondre(api_reponse, profil=profil)
+
+    assert r.status_code == 503 and attentes == []
+    assert r.headers["Retry-After"] == rendu
+
+
+def test_le_refus_de_debit_de_la_reformulation_porte_retry_after(
+    api_reponse, doublures, attentes_sans_rendu
+):
+    poser_le_refus()
+    DoublureFournisseur.en_tetes = {"Retry-After": "7"}
+
+    r = repondre(
+        api_reponse,
+        historique=[
+            {"role": "libraire", "contenu": "Un manga ?"},
+            {"role": "assistant", "contenu": "Une série."},
+        ],
+    )
+
+    assert r.status_code == 503 and r.json()["details"]["role"] == "reformulation"
+    assert r.headers["Retry-After"] == "7"
+
+
+@pytest.mark.parametrize("statut", [500, 400])
+def test_seul_un_429_du_fournisseur_porte_retry_after(
+    api_reponse, doublures, attentes, statut
+):
+    poser_le_refus(statut)
+    DoublureFournisseur.en_tetes = {"Retry-After": "7"}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 503 and conforme(r)["code"] == "fournisseur_refus"
+    assert "Retry-After" not in r.headers
+
+
+def test_un_refus_de_debit_suivi_d_une_reponse_ne_porte_pas_retry_after(
+    api_reponse, doublures, attentes
+):
+    poser_le_refus()
+    DoublureFournisseur.en_tetes = {"Retry-After": "7"}
+
+    r = repondre(api_reponse)
+
+    assert r.status_code == 200
+    assert "Retry-After" not in r.headers
+
+
+# --------------------------------------------------------------------------- #
 #  Les 503 de la route
 # --------------------------------------------------------------------------- #
 def test_le_fournisseur_refuse(api_reponse):
@@ -1059,7 +1181,7 @@ def test_la_ligne_de_journal_de_la_requete(api_reponse, caplog):
 
 def test_info_annonce_la_1_2_0_et_v2_n_existe_pas(api_reponse):
     assert (
-        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.3.0"
+        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.3.1"
     )
     assert (
         api_reponse.post("/v2/reponse", json={"question": QUESTION}).status_code == 404

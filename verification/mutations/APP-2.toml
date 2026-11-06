@@ -1,0 +1,7 @@
+id = "APP-2"
+origine = "E3 étape 4, spec 03 (2026-11-03) — mistral-large-4 ne serait plus retiré du sélecteur (dette 46)"
+fichier = "12_application/src/application/presentation.py"
+avant = '''        if profil.disponible and profil.nom not in reglages.profils_exclus'''
+apres = '''        if profil.disponible'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages.py", "-k", "mistral_large_4"]

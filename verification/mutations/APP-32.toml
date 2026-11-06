@@ -1,0 +1,7 @@
+id = "APP-32"
+origine = "E3 étape 5, spec 02, jauges d'état de l'API (2026-11-05) — sans lecture au démarrage, la jauge resterait à 0 sur une API saine"
+fichier = "12_application/src/application/app.py"
+avant = '''        metriques.api_sante_ok.set(1 if await client.sante() else 0)'''
+apres = '''        pass'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages.py"]

@@ -1,0 +1,70 @@
+<h2 tabindex="-1" autofocus>{% if affichage.refus %}{{ t.refus_titre }}{% else %}{{ t.reponse_titre }}{% endif %}</h2>
+<p><strong>{{ t.role_libraire }} :</strong> {{ affichage.question }}</p>
+{% for paragraphe in affichage.paragraphes %}
+<p>{{ texte.segments(paragraphe) }}</p>
+{% endfor %}
+{% if affichage.motif %}
+<p>{{ affichage.motif }}</p>
+{% endif %}
+<p><small>{{ affichage.ligne }}</small></p>
+{% if cloture %}
+<article>
+<div role="alert">
+<p>{{ cloture }}</p>
+<p><a href="/"><strong>{{ t.nouvelle_conversation }}</strong></a></p>
+</div>
+</article>
+{% endif %}
+{% if affichage.complement %}
+<article>
+<p><strong>{{ t.non_verifie }}</strong></p>
+<p>{{ affichage.complement }}</p>
+{% if affichage.complement_titres %}
+<p>{{ t.non_verifie_titres }}</p>
+<ul>
+{% for titre in affichage.complement_titres %}
+<li>{{ titre }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</article>
+{% endif %}
+{% for carte in affichage.cartes %}
+<article>
+<h3 id="serie-{{ carte.serie_id }}">{{ carte.titre }}</h3>
+{% if carte.mesure %}
+<p><small>{{ t.demo_rang }} {{ carte.mesure.rang }} — {{ texte.score(carte.mesure.score, t) }}</small></p>
+{% endif %}
+<dl>
+{% for nom, valeur in carte.metadonnees %}
+<dt>{{ nom }}</dt>
+<dd>{{ valeur }}</dd>
+{% endfor %}
+</dl>
+{% for passage in carte.passages %}
+<blockquote>
+<p>{{ passage.texte }}</p>
+<footer><small>{{ passage.genre }}{% if passage.score is not none %} — {{ texte.score(passage.score, t) }}{% endif %}</small></footer>
+</blockquote>
+{% else %}
+<p>{{ t.carte_sans_passage }}</p>
+{% endfor %}
+<p><small>{{ t.mention_carte }} {{ t.mention_dispo }}</small></p>
+</article>
+{% endfor %}
+{% if affichage.trace %}
+{% include "composants/trace.html" %}
+{% else %}
+<details>
+<summary>{{ t.details_titre }}</summary>
+<ul>
+{% for appel in affichage.appels %}
+<li>{{ appel }}</li>
+{% endfor %}
+</ul>
+<p>{{ affichage.identifiants }}</p>
+{% if affichage.sans_carte %}
+<p>{{ affichage.sans_carte }}</p>
+{% endif %}
+</details>
+{% endif %}

@@ -1,0 +1,7 @@
+id = "MON-10"
+origine = "E3 étape 5, spec 05 (2026-11-05) — l'alerte du direct filtrerait sur zéro : No Data en marche normale"
+fichier = "13_monitorage/grafana/provisioning/alerting/regles.yml"
+avant = '''              expr: 'up{job=~"embedding|api"}''''
+apres = '''              expr: 'up{job=~"embedding|api"} == 0''''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_regles.py"]

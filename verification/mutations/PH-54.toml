@@ -1,0 +1,7 @@
+id = "PH-54"
+origine = "E3, pseudonymes des fichiers suivis (2026-11-05) — une occurrence de plus que le nombre admis doit échouer"
+fichier = "verification/pseudonymes_fichiers.py"
+avant = '''        if comptes.get((nom, empreinte), 0) != attendu'''
+apres = '''        if comptes.get((nom, empreinte), 0) < attendu'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_pseudonymes_passages.py"]

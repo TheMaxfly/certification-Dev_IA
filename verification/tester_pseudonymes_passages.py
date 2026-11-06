@@ -1,4 +1,5 @@
-"""Essais du contrôle des pseudonymes des passages (`pseudonymes_passages.py`).
+"""Essais du contrôle des pseudonymes : les passages (`pseudonymes_passages.py`) et les
+fichiers suivis (`pseudonymes_fichiers.py`).
 
     uv run --no-project python -I verification/tester_pseudonymes_passages.py
 
@@ -23,6 +24,13 @@ pp = importlib.util.module_from_spec(_spec)
 sys.modules["pseudonymes_passages"] = pp
 _spec.loader.exec_module(pp)
 methode = pp.charger_methode()
+
+CHEMIN_F = Path(__file__).resolve().parent / "pseudonymes_fichiers.py"
+_spec_f = importlib.util.spec_from_file_location("pseudonymes_fichiers", CHEMIN_F)
+assert _spec_f is not None and _spec_f.loader is not None
+pf = importlib.util.module_from_spec(_spec_f)
+sys.modules["pseudonymes_fichiers"] = pf
+_spec_f.loader.exec_module(pf)
 
 #: Des pseudonymes inventés, et leur empreinte.
 PSEUDOS = {methode.empreinte(p): p for p in ("Zorglub", "Plume42")}
@@ -144,6 +152,96 @@ class Listes(unittest.TestCase):
         masquage, homonymes = methode.lire_listes(pp.DONNEES)
         self.assertTrue(masquage)
         self.assertTrue(homonymes)
+
+
+class ControleDesFichiers(unittest.TestCase):
+    """Des fichiers et des pseudonymes inventés : aucune base, aucun nom réel."""
+
+    def comptes(self, fichiers):
+        return pf.compter(fichiers, PSEUDOS, methode.motif)
+
+    def controle(self, fichiers, admises):
+        return pf.controler(self.comptes(fichiers), admises, len(fichiers), 2)
+
+    def test_un_fichier_sans_occurrence_passe(self):
+        bilan = self.controle({"a.md": "Rien ici, Zorglubine non plus."}, {})
+        self.assertEqual((bilan["hors_liste"], bilan["ecarts"]), ([], []))
+
+    def test_une_occurrence_hors_de_la_liste_echoue(self):
+        bilan = self.controle({"a.ipynb": "<td>zorglub</td>"}, {})
+        self.assertEqual(bilan["hors_liste"], [["a.ipynb", ZORGLUB, 1]])
+
+    def test_un_homonyme_admis_au_bon_nombre_passe(self):
+        bilan = self.controle({"t.csv": "Zorglub, Zorglub"}, {("t.csv", ZORGLUB): 2})
+        self.assertEqual((bilan["hors_liste"], bilan["ecarts"]), ([], []))
+        self.assertEqual(bilan["occurrences"], 2)
+
+    def test_une_occurrence_de_plus_que_le_nombre_admis_echoue(self):
+        bilan = self.controle({"t.csv": "Zorglub, Zorglub"}, {("t.csv", ZORGLUB): 1})
+        self.assertEqual(bilan["ecarts"], [["t.csv", ZORGLUB, 1, 2]])
+
+    def test_une_entree_qui_ne_correspond_plus_echoue(self):
+        bilan = self.controle({"t.csv": "rien"}, {("t.csv", ZORGLUB): 1})
+        self.assertEqual(bilan["ecarts"], [["t.csv", ZORGLUB, 1, 0]])
+
+    def test_admis_dans_un_fichier_ne_vaut_pas_pour_un_autre(self):
+        bilan = self.controle(
+            {"t.csv": "Zorglub", "u.md": "Zorglub"}, {("t.csv", ZORGLUB): 1}
+        )
+        self.assertEqual(bilan["hors_liste"], [["u.md", ZORGLUB, 1]])
+
+    def test_le_chemin_du_fichier_compte(self):
+        bilan = self.controle({"docs/Plume42.md": "rien"}, {})
+        self.assertEqual(bilan["hors_liste"], [["docs/Plume42.md", PLUME, 1]])
+
+    def test_la_sortie_ne_porte_que_des_empreintes(self):
+        bilan = self.controle({"a.md": "Merci à Zorglub et Plume42."}, {})
+        sortie = json.dumps(bilan)
+        self.assertNotIn("Zorglub", sortie)
+        self.assertNotIn("Plume42", sortie)
+
+    def test_aucun_pseudonyme_lu_ne_conclut_pas(self):
+        with self.assertRaises(pp.ControleImpossible):
+            pf.controler({}, {}, 3, 0)
+
+    def test_aucun_fichier_ne_conclut_pas(self):
+        with self.assertRaises(pp.ControleImpossible):
+            pf.controler({}, {}, 0, 2)
+
+    def test_les_octets_hors_utf8_ne_cachent_pas_le_texte(self):
+        with tempfile.TemporaryDirectory() as d:
+            racine = Path(d)
+            (racine / "b.bin").write_bytes(b"\xff\xfe Zorglub \x00")
+            (racine / "lien").symlink_to(racine / "b.bin")
+            textes = pf.lire_fichiers(racine, ["b.bin", "lien", "absent"])
+        self.assertEqual(list(textes), ["b.bin"])
+        self.assertEqual(self.comptes(textes), {("b.bin", ZORGLUB): 1})
+
+    def test_la_liste_versionnee_se_lit(self):
+        admises = pf.lire_admises(pf.FICHIER_ADMIS)
+        self.assertTrue(admises)
+        suivis = set(pf.fichiers_suivis(pf.RACINE))
+        self.assertEqual({nom for nom, _ in admises} - suivis, set())
+
+    def test_une_liste_mal_formee_est_refusee(self):
+        entete = "\t".join(pf.COLONNES)
+        bon = f"a\t{ZORGLUB}\t1\tmangaka"
+        for contenu in (
+            "# rien\n",
+            "autre\tentete\n",
+            f"{entete}\na\tb\n",
+            f"{entete}\na\tpas-une-empreinte\t1\tmangaka\n",
+            f"{entete}\na\t{ZORGLUB}\t0\tmangaka\n",
+            f"{entete}\na\t{ZORGLUB}\t1\tmembre\n",
+            f"{entete}\n{bon}\n{bon}\n",
+        ):
+            with tempfile.TemporaryDirectory() as d:
+                chemin = Path(d) / "admis.tsv"
+                chemin.write_text(contenu, encoding="utf-8")
+                with self.assertRaises(pp.ControleImpossible, msg=contenu):
+                    pf.lire_admises(chemin)
+        with self.assertRaises(pp.ControleImpossible):
+            pf.lire_admises(Path("/inexistant/admis.tsv"))
 
 
 if __name__ == "__main__":

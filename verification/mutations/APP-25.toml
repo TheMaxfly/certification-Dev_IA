@@ -1,0 +1,7 @@
+id = "APP-25"
+origine = "E3 étape 4, spec 08 (2026-11-04) — la case retomberait à chaque tour : le réglage ne serait plus porté par le formulaire"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''{% if mode_demonstration %} checked{% endif %}'''
+apres = ''''''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_demonstration.py", "-k", "conserve_au_tour_suivant"]

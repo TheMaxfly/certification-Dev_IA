@@ -1,0 +1,7 @@
+id = "API-88"
+origine = "E3 étape 4, spec 02, dette 42 (2026-11-03) — un Retry-After du fournisseur à 0 passerait tel quel : l'écran dirait « réessayez dans 0 secondes »"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''        if secondes is None or secondes < 1 or not secondes.is_integer():'''
+apres = '''        if secondes is None or not secondes.is_integer():'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py", "-k", "refus_de_debit_qui_dure_porte_retry_after"]

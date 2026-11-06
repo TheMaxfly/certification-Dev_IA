@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titre %}{{ t.apropos_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.apropos_titre }}</h1>
+<section>
+<h2>{{ t.apropos_quoi_titre }}</h2>
+<p>{{ t.apropos_quoi }}</p>
+</section>
+<section>
+<h2>{{ t.apropos_transmis_titre }}</h2>
+<p>{{ t.apropos_transmis }}</p>
+</section>
+<section>
+<h2>{{ t.apropos_profils_titre }}</h2>
+{% if info_connue %}
+<table>
+<thead>
+<tr><th scope="col">{{ t.apropos_colonne_profil }}</th><th scope="col">{{ t.apropos_colonne_fournisseur }}</th><th scope="col">{{ t.apropos_colonne_hebergement }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr><td>{{ ligne.nom }}{% if ligne.actif %} {{ t.suffixe_actif }}{% endif %}</td><td>{{ ligne.fournisseur }}</td><td>{{ ligne.hebergement }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p>{{ t.apropos_liste_inconnue }}</p>
+{% endif %}
+</section>
+<section>
+<h2>{{ t.apropos_conserve_titre }}</h2>
+<p>{{ t.apropos_conserve }}</p>
+</section>
+<section>
+<h2>{{ t.apropos_registre_titre }}</h2>
+<p>{{ t.apropos_registre }}</p>
+</section>
+<section>
+<h2>{{ t.apropos_licences_titre }}</h2>
+<p>{{ t.apropos_licences }}</p>
+</section>
+{% endblock %}

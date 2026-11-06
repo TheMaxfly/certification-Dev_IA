@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "composants/texte.html" as texte %}
+{% block contenu %}
+<h1>{{ t.titre_application }}</h1>
+<p>{{ etat }}</p>
+{% if tours %}
+<section>
+<h2>{{ t.conversation_titre }}</h2>
+<ol>
+{% for tour in tours %}
+<li><strong>{{ tour.role }} :</strong> {{ texte.segments(tour.segments) }}</li>
+{% endfor %}
+</ol>
+</section>
+{% endif %}
+{% include "composants/formulaire.html" %}
+<section aria-live="polite">
+{% if encart %}
+<article>
+<div role="alert">
+<h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ t.encart_titre }}</h2>
+<p id="encart-texte">{{ encart.texte }}</p>
+{% if encart.nouvelle_conversation %}
+<p><a href="/">{{ t.nouvelle_conversation }}</a></p>
+{% endif %}
+</div>
+</article>
+{% elif affichage %}
+{% include "composants/reponse.html" %}
+{% endif %}
+</section>
+{% endblock %}

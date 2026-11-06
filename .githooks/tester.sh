@@ -16,7 +16,8 @@ CO="Co-Author$(printf e)d-By"
 # Clés factices de la bonne forme, et valeurs « du poste » hors de tout motif. Les
 # vraies variables du poste n'entrent pas dans l'essai : un HOME jetable porte un
 # jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
-unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME
+unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME API_MODELE_CLES APPLICATION_CLE_API
+unset GRAFANA_SMTP_MOT_DE_PASSE
 export HOME="$TRAVAIL/maison"
 mkdir -p "$HOME/.cache/huggingface"
 JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
@@ -26,6 +27,9 @@ MISTRAL_FACTICE="Mq7$(printf 'Ab3dEf%.0s' $(seq 1 4))Zz9x5"            # 32 alph
 OPENAI_FACTICE="sk-proj-$(printf 'Ab3dEf9h_K-%.0s' $(seq 1 14))Xy"   # sk-proj- + 156
 HORS_MOTIF_M="valeur-factice-hors-motif-0042"
 HORS_MOTIF_O="autre-valeur-factice-hors-motif-0043"
+HORS_MOTIF_A="valeur-factice-de-l-application-0044"
+HORS_MOTIF_T="valeur-factice-du-trousseau-0045"
+CLE_ACCES_FACTICE="$(printf 'a1B2c3%.0s' $(seq 1 7))"  # 42 caractères
 echecs=0
 
 git init -q --bare -b main "$TRAVAIL/distant.git"
@@ -276,6 +280,41 @@ essai refuse "fin de ligne CRLF dans le .env" eval '
     printf "MISTRAL_API_KEY=%s\r\n" "$HORS_MOTIF_M" >.env &&
     ecrire pc_k4d.txt "note : $HORS_MOTIF_M" && git commit -q -m k4d'
 rm -rf .env mod a .venv # ignorés : git clean ne les ôte pas
+# Les clés d'accès à l'API du modèle : par valeur, le trousseau découpé ; par aspect, sans
+# exception ; une référence à une variable et une valeur courte passent.
+essai refuse "clé de l'application du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_API=%s\n" "$HORS_MOTIF_A" >mod/.env &&
+    ecrire pc_ka.txt "note : $HORS_MOTIF_A" && git commit -q -m ka'
+essai refuse "secret du trousseau du poste, en second élément" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "API_MODELE_CLES=banc:%s,application:%s\n" "$HORS_MOTIF_O" "$HORS_MOTIF_T" >mod/.env &&
+    ecrire pc_kt.txt "note : $HORS_MOTIF_T" && git commit -q -m kt'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : secret du trousseau en second élément" eval '
+    ecrire pc_kt2.env "API_MODELE_CLES=a:court,application:$CLE_ACCES_FACTICE" && git commit -q -m kt2'
+essai refuse "aspect : clé de l'application" eval '
+    ecrire pc_ka2.env "APPLICATION_CLE_API=$CLE_ACCES_FACTICE" && git commit -q -m ka2'
+essai passe  "référence à une variable, pas une valeur" eval '
+    ecrire pc_kr.yml "APPLICATION_CLE_API: \${APPLICATION_CLE_API:-}" &&
+    ecrire pc_kr2.yml "API_MODELE_CLES: \${API_MODELE_CLES:-}" && git commit -q -m kr'
+essai passe  "valeur courte, jetable" eval '
+    ecrire pc_kc.yml "APPLICATION_CLE_API: cle-jetable-essai" && git commit -q -m kc'
+# Le mot de passe du canal d'alerte : la valeur de son fichier, avec et sans ses espaces, et
+# une affectation littérale ; le chemin passe.
+essai refuse "mot de passe du canal d'alerte du poste" eval '
+    printf "13_monitorage/\n" >.gitignore && git add .gitignore && mkdir -p 13_monitorage/.secrets &&
+    printf "abcd efgh ijkl mnop\n" >13_monitorage/.secrets/smtp_mot_de_passe &&
+    ecrire pc_ks.txt "note : abcd efgh ijkl mnop" && git commit -q -m ks'
+essai refuse "le même, sans ses espaces" eval '
+    printf "13_monitorage/\n" >.gitignore && git add .gitignore && mkdir -p 13_monitorage/.secrets &&
+    printf "abcd efgh ijkl mnop\n" >13_monitorage/.secrets/smtp_mot_de_passe &&
+    ecrire pc_ks2.txt "note : abcdefghijklmnop" && git commit -q -m ks2'
+rm -rf 13_monitorage # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : mot de passe du canal d'alerte en clair" eval '
+    ecrire pc_ks3.yml "GF_SMTP_PASSWORD: $HORS_MOTIF_A" && git commit -q -m ks3'
+essai passe  "le chemin du mot de passe, pas sa valeur" eval '
+    ecrire pc_ks4.yml "GF_SMTP_PASSWORD__FILE: /run/secrets/smtp_mot_de_passe" && git commit -q -m ks4'
 essai refuse "mention dans un texte non UTF-8" eval '
     export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >pc_nu.txt &&
     git add pc_nu.txt && git commit -q -m nu'

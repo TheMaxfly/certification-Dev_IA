@@ -1,0 +1,8 @@
+id = "APP-15"
+origine = "E3 étape 4, spec 05 (2026-11-04) — un champ perdrait son étiquette"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''<label for="question">{{ t.question_etiquette }}</label>
+'''
+apres = ''''''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_balisage.py", "-k", "chaque_champ_a_son_etiquette"]

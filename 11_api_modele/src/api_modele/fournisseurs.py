@@ -322,6 +322,7 @@ class Fournisseurs:
         await self._client.aclose()
 
     def publier(self) -> None:
+        self._metriques.precreer(self.profils)
         for nom, profil in self.profils.items():
             self._metriques.profil_actif.labels(profil=nom).set(
                 1 if nom == self.profil_actif else 0

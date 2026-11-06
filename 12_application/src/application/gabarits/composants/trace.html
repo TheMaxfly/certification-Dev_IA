@@ -1,0 +1,61 @@
+{% set trace = affichage.trace %}
+<h2 id="trace">{{ t.trace_titre }}</h2>
+<p>{{ texte.segments(trace.phrase) }}</p>
+<h3>{{ t.trace_classement_titre }}</h3>
+{% if trace.classement %}
+<table>
+<thead>
+<tr>
+<th scope="col">{{ t.trace_colonne_rang }}</th>
+<th scope="col">{{ t.trace_colonne_titre }}</th>
+<th scope="col"><abbr title="{{ t.demo_infobulle }}">{{ t.trace_colonne_score }}</abbr></th>
+<th scope="col">{{ t.trace_colonne_citee }}</th>
+<th scope="col">{{ t.trace_colonne_passages }}</th>
+</tr>
+</thead>
+<tbody>
+{% for ligne in trace.classement %}
+<tr>
+<td>{{ ligne.rang }}</td>
+<td>{% if ligne.cible is not none %}<a href="#serie-{{ ligne.cible }}">{{ ligne.titre }}</a>{% else %}{{ ligne.titre }}{% endif %}</td>
+<td>{{ ligne.score }}</td>
+<td>{{ ligne.etat }}</td>
+<td>{{ ligne.passages }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p>{{ t.trace_aucune_serie }}</p>
+{% endif %}
+<h3>{{ t.trace_non_cites_titre }}</h3>
+{% for groupe in trace.non_cites %}
+<details>
+<summary>{{ groupe.resume }}</summary>
+{% for passage in groupe.passages %}
+<blockquote>
+<p>{{ passage.texte }}</p>
+<footer><small>{{ passage.genre }} — {{ texte.score(passage.score, t) }}</small></footer>
+</blockquote>
+{% endfor %}
+</details>
+{% else %}
+<p>{{ t.trace_aucun_non_cite }}</p>
+{% endfor %}
+<h3>{{ t.trace_question_titre }}</h3>
+{{ texte.lignes(trace.question) }}
+<h3>{{ t.trace_reglages_titre }}</h3>
+{{ texte.lignes(trace.recherche) }}
+<h3>{{ t.trace_modele_titre }}</h3>
+{{ texte.lignes(trace.modele) }}
+<p>{{ t.trace_appels_titre }}</p>
+<ul>
+{% for appel in affichage.appels %}
+<li>{{ appel }}</li>
+{% else %}
+<li>{{ t.ligne_sans_appel }}</li>
+{% endfor %}
+</ul>
+{% if affichage.sans_carte %}
+<p>{{ affichage.sans_carte }}</p>
+{% endif %}

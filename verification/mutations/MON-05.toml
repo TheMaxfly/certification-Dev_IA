@@ -1,0 +1,7 @@
+id = "MON-05"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — un DSN avec mot de passe passerait"
+fichier = "13_monitorage/src/monitorage/configuration.py"
+avant = '''    if champs.get("password"):'''
+apres = '''    if False:'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_configuration.py"]

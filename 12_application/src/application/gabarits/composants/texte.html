@@ -1,0 +1,8 @@
+{% macro segments(liste) %}{% for s in liste %}{% if s.genre == "lien" %}<a href="#serie-{{ s.cible }}">{{ segments(s.enfants) }}</a>{% elif s.genre == "em" %}<em>{{ s.texte }}</em>{% elif s.genre == "strong" %}<strong>{{ s.texte }}</strong>{% else %}{{ s.texte }}{% endif %}{% endfor %}{% endmacro %}
+{% macro score(valeur, t) %}<abbr title="{{ t.demo_infobulle }}">{{ t.demo_score }}</abbr> {{ valeur }}{% endmacro %}
+{% macro lignes(liste) %}<dl>
+{% for nom, valeur in liste %}
+<dt>{{ nom }}</dt>
+<dd>{{ valeur }}</dd>
+{% endfor %}
+</dl>{% endmacro %}

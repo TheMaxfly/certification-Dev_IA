@@ -1,0 +1,7 @@
+id = "APP-16"
+origine = "E3 étape 4, spec 05 (2026-11-04) — un encart dégradé perdrait son rôle d'alerte"
+fichier = "12_application/src/application/gabarits/index.html"
+avant = '''<div role="alert">'''
+apres = '''<div>'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_balisage.py", "-k", "encarts_ont_le_role_alert"]

@@ -1,0 +1,11 @@
+# Les tableaux de bord sont des fichiers du dépôt : ce qu'on montre est ce qui est versionné.
+# Un tableau modifié à l'écran se réexporte dans grafana/tableaux/ (README).
+apiVersion: 1
+providers:
+  - name: tableaux
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/tableaux
