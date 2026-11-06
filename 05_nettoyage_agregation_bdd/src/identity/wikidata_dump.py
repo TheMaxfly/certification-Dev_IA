@@ -31,7 +31,7 @@ import requests
 
 # --- Configuration ---------------------------------------------------------
 
-CONTACT = "maxime.mcfly@gmail.com"  # requis par la politique Wikimedia
+CONTACT = "https://github.com/TheMaxfly/certification-Dev_IA"  # requis par Wikimedia
 USER_AGENT = f"MangaAdvisorBot/0.1 (contact: {CONTACT}) python-requests"
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
