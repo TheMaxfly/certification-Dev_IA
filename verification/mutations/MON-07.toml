@@ -1,0 +1,7 @@
+id = "MON-07"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — une panne du service ferait tomber la sonde au lieu d'être comptée"
+fichier = "13_monitorage/src/monitorage/sonde.py"
+avant = '''            self._echec("service_injoignable", "le service ne répond pas")'''
+apres = '''            raise'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sonde.py"]

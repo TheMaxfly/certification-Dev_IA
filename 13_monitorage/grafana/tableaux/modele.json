@@ -1,0 +1,1074 @@
+{
+  "uid": "modele",
+  "title": "Modèle",
+  "description": "Le modèle de langage et la qualité de la recherche : ce que le libraire reçoit, ce que cela coûte, ce qui a été refusé. Preuve 14.",
+  "tags": [
+    "monitorage",
+    "modele"
+  ],
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source de données",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 2
+      },
+      {
+        "name": "profil",
+        "label": "Profil",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${source}"
+        },
+        "query": {
+          "query": "label_values(api_modele_llm_appels_total, profil)",
+          "refId": "profil"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "intervalle",
+        "label": "Intervalle",
+        "type": "interval",
+        "query": "1m,5m,15m,1h",
+        "auto": false,
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Profil par défaut",
+      "description": "Ce qu'il montre : le profil de l'API quand la demande n'en choisit pas ; pas forcément celui qui rédige (voir « qui rédige vraiment »). Normal : mistral-large-2512. S'il bouge : la configuration a changé, le vérifier.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "api_modele_profil_actif == 1",
+          "legendFormat": "{{profil}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Profils disponibles",
+      "description": "Ce qu'il montre : les profils dont la clé est présente. Normal : ceux qu'on a configurés. S'il bouge : une clé manque, on ne peut plus replier sur ce profil.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "api_modele_profil_disponible",
+          "legendFormat": "{{profil}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "disponible",
+                  "index": 0
+                },
+                "0": {
+                  "text": "absent",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Appels par profil et rôle — qui rédige vraiment",
+      "description": "Ce qu'il montre : les appels au modèle ; role=reponse dit qui rédige, reformulation n'a lieu que sur une question de suite. Normal : proportionnel aux questions. S'il bouge sans trafic : chercher qui appelle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (profil, role) (rate(api_modele_llm_appels_total{profil=~\"$profil\"}[$intervalle])) * 60",
+          "legendFormat": "{{profil}} — {{role}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: appels/min",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Appels en échec par statut",
+      "description": "Ce qu'il montre : les appels au fournisseur qui n'ont pas abouti, par code. Normal : aucun. S'il bouge : le fournisseur a un souci, changer de profil si cela dure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (statut) (increase(api_modele_llm_appels_total{statut!=\"ok\",profil=~\"$profil\"}[1h]))",
+          "legendFormat": "{{statut}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: appels/h",
+          "noValue": "aucun échec",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Jetons par profil et type",
+      "description": "Ce qu'il montre : les jetons d'entrée, de sortie et de raisonnement sur l'heure, ce qui fait le coût. Normal : suit le nombre de questions. S'il bouge seul : le contexte envoyé a grossi.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (profil, type) (increase(api_modele_llm_jetons_total{profil=~\"$profil\"}[1h]))",
+          "legendFormat": "{{profil}} — {{type}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: jetons/h",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Coût estimé par heure",
+      "description": "Ce qu'il montre : le coût estimé par nos tarifs, pas la facture ; il repart de zéro quand l'API redémarre. Normal : quelques centimes en démonstration. Au-dessus du seuil : une alerte part, vérifier le trafic ; rien ne bloque côté API.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (profil) (increase(api_modele_llm_cout_usd_total{profil=~\"$profil\"}[1h]))",
+          "legendFormat": "{{profil}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(0.5)",
+          "legendFormat": "Seuil : 0,50 $",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence du modèle, p50 et p95",
+      "description": "Ce qu'il montre : ce que le libraire attend du modèle, par profil et rôle ; plafonne à 30 s, dernier seau. Normal : quelques secondes. S'il monte : fournisseur lent, changer de profil si cela dure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, profil, role) (rate(api_modele_llm_latence_secondes_bucket{profil=~\"$profil\"}[$intervalle])))",
+          "legendFormat": "p95 {{profil}} — {{role}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le, profil, role) (rate(api_modele_llm_latence_secondes_bucket{profil=~\"$profil\"}[$intervalle])))",
+          "legendFormat": "p50 {{profil}} — {{role}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucun appel",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Sorties invalides par motif",
+      "description": "Ce qu'il montre : les sorties du modèle refusées par nos contrôles, sur 15 min : une série absente, un nom de membre… Refusées, jamais affichées. Normal : 0. Au-dessus du seuil : une alerte part, lire le motif, envisager un autre profil.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (motif) (increase(api_modele_sortie_invalide_total[15m]))",
+          "legendFormat": "{{motif}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(3)",
+          "legendFormat": "Seuil : 3 en 15 min",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: sorties",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Réponses et refus",
+      "description": "Ce qu'il montre : les réponses rendues sur l'heure, refus ou non, et le motif du refus. Normal : des refus sur les questions hors catalogue. S'il bouge : trop de refus à tort, à relire avant de conclure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (refus, motif) (increase(api_modele_reponses_total[1h]))",
+          "legendFormat": "refus {{refus}} — {{motif}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: réponses/h",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Sonde d'équivalence : cosinus minimal",
+      "description": "Ce qu'il montre : le service encode-t-il encore comme à la mesure ? Un échantillon fixe est réencodé toutes les 15 min. Normal : au-dessus de 0,9999. Sous le seuil : une alerte part après deux sondes, lire le journal, ne pas promouvoir.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "modele_sonde_equivalence_cosinus_min",
+          "legendFormat": "cosinus minimal",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(0.999)",
+          "legendFormat": "Seuil : 0,999",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          },
+          "min": 0.99,
+          "max": 1,
+          "decimals": 5
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Âge et échecs de la sonde",
+      "description": "Ce qu'il montre : depuis quand la sonde n'a pas réussi, ses tranches sous le seuil et ses échecs. Normal : moins de 15 min, 0, 0. Une sonde muette ne prouve rien : si l'âge monte, lire ses échecs et le service.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "time() - modele_sonde_derniere_execution_timestamp",
+          "legendFormat": "âge du passage",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "modele_sonde_tranches_sous_seuil",
+          "legendFormat": "tranches sous le seuil",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum(increase(modele_sonde_erreurs_total[1h]))",
+          "legendFormat": "échecs sur l'heure",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 8,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Dernière mesure : taux de réussite à 10",
+      "description": "Ce qu'il montre : la qualité de référence de l'encodage en service, lue en base ; un chiffre qui ne bouge qu'à une nouvelle mesure, pas un signal vivant. Normal : 52,5 %. Sans valeur : la lecture de la base n'est pas activée.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "modele_derniere_mesure_hit_rate_10",
+          "legendFormat": "dernière mesure",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(0.5254)",
+          "legendFormat": "Référence : 31 / 59 = 52,5 %",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "lecture de la base non activée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 16,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Âge de la dernière mesure et lecture de la base",
+      "description": "Ce qu'il montre : depuis quand la qualité n'a pas été remesurée, et si l'exporteur lit la base. Normal : l'âge grandit jusqu'à la prochaine mesure. Une mesure vieille est une information : le modèle a pu changer sans être remesuré.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "(time() - modele_derniere_mesure_timestamp) / 86400",
+          "legendFormat": "âge, en jours",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "modele_exporteur_base_activee",
+          "legendFormat": "lecture de la base",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "activée",
+                  "index": 0
+                },
+                "0": {
+                  "text": "non activée",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "unit": "none",
+          "noValue": "non activée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Encodage en service",
+      "description": "Ce qu'il montre : le corpus et l'encodage que l'API sert vraiment. Normal : corpus v2, encodage 3. S'il bouge : une promotion a eu lieu, ou l'API a démarré sur autre chose.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "api_modele_encodage_en_service == 1",
+          "legendFormat": "corpus {{corpus_id}}, encodage {{encodage_id}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 8,
+        "y": 32,
+        "w": 8,
+        "h": 8
+      }
+    }
+  ]
+}

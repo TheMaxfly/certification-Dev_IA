@@ -1,0 +1,7 @@
+id = "MON-03"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — sans les fragments sous le seuil, le journal ne dirait pas quel lot revient"
+fichier = "13_monitorage/src/monitorage/sonde.py"
+avant = '''                for s in resultat["sous_equivalent"]'''
+apres = '''                for s in []'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sonde.py"]

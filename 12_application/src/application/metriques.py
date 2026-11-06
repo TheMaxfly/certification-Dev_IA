@@ -1,7 +1,9 @@
 """Les métriques : un registre propre au module, `/metrics` sur le bouclage seulement.
 
 Matière de l'étape de surveillance : requêtes par route et statut, appels à l'API et
-leurs erreurs par code, latence, disponibilité de l'API vue d'ici.
+leurs erreurs par code, latence, et l'état de l'API vu d'ici : deux lectures, deux
+jauges, écrites à une page ou à un `/sante`. Aucune ne se relit seule : la panne de
+l'API se lit sur la cible de Prometheus, pas ici.
 """
 
 from __future__ import annotations
@@ -21,6 +23,8 @@ from prometheus_client import (
 from application.config import Reseau
 
 SEAUX_LATENCE = (0.05, 0.25, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 45.0, 75.0)
+#: Les états de l'API vus d'ici : `VueApi.etat`.
+ETATS_API = ("ok", "ko", "cle")
 
 
 class Metriques:
@@ -51,9 +55,16 @@ class Metriques:
             buckets=SEAUX_LATENCE,
             registry=self.registre,
         )
-        self.api_disponible = Gauge(
-            "application_api_disponible",
-            "1 si la dernière lecture de l'API a réussi (description, état), sinon 0.",
+        self.api_info_etat = Gauge(
+            "application_api_info_etat",
+            "L'état de l'API à la dernière lecture de /v1/info (1 sur l'état constaté)"
+            " : ok, ko (elle ne répond pas), cle (clé refusée).",
+            ["etat"],
+            registry=self.registre,
+        )
+        self.api_sante_ok = Gauge(
+            "application_api_sante_ok",
+            "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
             registry=self.registre,
         )
 

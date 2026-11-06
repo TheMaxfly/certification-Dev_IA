@@ -1,0 +1,3 @@
+# Aucun greffon : ce fichier évite une ligne d'erreur au démarrage de Grafana.
+apiVersion: 1
+apps: []

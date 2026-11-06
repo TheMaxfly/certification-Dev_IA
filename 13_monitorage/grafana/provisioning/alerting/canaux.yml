@@ -1,0 +1,21 @@
+# Deux points de contact : le courriel d'exploitation, et le webhook d'essai servi par la
+# sonde, pour les essais sans sortie. L'adresse n'est jamais ici : MONITORAGE_COURRIEL, hors
+# dépôt. La politique (politiques.yml) choisit.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: courriel-exploitation
+    receivers:
+      - uid: courriel-exploitation
+        type: email
+        settings:
+          addresses: $MONITORAGE_COURRIEL
+          singleEmail: true
+  - orgId: 1
+    name: webhook-essai
+    receivers:
+      - uid: webhook-essai
+        type: webhook
+        settings:
+          url: http://sonde:9108/webhook-essai
+          httpMethod: POST

@@ -972,8 +972,13 @@ restent mesurées sur l'invite d'avant.
   `api_modele_llm_appels_total{profil, role, statut}`,
   `api_modele_llm_jetons_total{profil, role, type}`,
   `api_modele_llm_cout_usd_total{profil}`, `api_modele_llm_latence_secondes{profil,
-  role}`, `api_modele_profil_actif{profil}`, `api_modele_profil_disponible{profil}`,
-  `api_modele_sortie_invalide_total{motif}`.
+  role}`, `api_modele_profil_actif{profil}` (le profil **par défaut** : une demande peut
+  en choisir un autre), `api_modele_profil_disponible{profil}`,
+  `api_modele_sortie_invalide_total{motif}`, `api_modele_reponses_total{refus, motif}`
+  (les réponses rendues, `motif` valant `aucun` hors d'un refus). Les séries du modèle de
+  langage sont créées à 0 au démarrage, pour chaque profil déclaré : `increase()` voit
+  ainsi le premier appel. La méthode HTTP de `api_modele_requetes_total` est une liste
+  fermée (`GET`, `POST`, `HEAD`, `OPTIONS`, `autre`).
 
 ## Limites déclarées
 

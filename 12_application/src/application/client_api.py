@@ -25,7 +25,7 @@ from pydantic import BaseModel, ValidationError
 
 from application import journal
 from application.config import Delais, Limites
-from application.metriques import Metriques
+from application.metriques import ETATS_API, Metriques
 
 ENTETE_CLE = "X-API-Key"
 ENTETE_IDENTIFIANT = "X-Identifiant-Requete"
@@ -177,6 +177,37 @@ class Reponse(BaseModel):
     complement_titres: list[str] | None = None
 
 
+#: L'étiquette des erreurs est fermée : le contrat type `code` en simple texte, sans
+#: énumération. Ceux qu'il nomme et les génériques de l'API ; tout autre compte sous
+#: `corps_inattendu`. Un test confronte cette liste aux codes nommés par le contrat.
+CODES_API = frozenset(
+    {
+        "api_non_prete",
+        "base_indisponible",
+        "cle_invalide",
+        "corps_trop_volumineux",
+        "debit_depasse",
+        "encodage_en_service_change",
+        "entree_invalide",
+        "erreur_interne",
+        "fournisseur_delai",
+        "fournisseur_injoignable",
+        "fournisseur_refus",
+        "historique_invalide",
+        "json_invalide",
+        "methode_non_permise",
+        "profil_inconnu",
+        "profil_indisponible",
+        "question_trop_longue",
+        "reglage_non_expose",
+        "route_inconnue",
+        "service_embedding_incoherent",
+        "service_embedding_indisponible",
+        "sortie_modele_invalide",
+    }
+)
+
+
 class CorpsErreur(BaseModel):
     code: str
     message: str
@@ -319,7 +350,8 @@ class ClientApi:
                 corps.identifiant_requete,
                 lire_retry_after(reponse.headers.get("Retry-After")),
             )
-        self._metriques.api_erreurs.labels(code=erreur.code).inc()
+        code = erreur.code if erreur.code in CODES_API else "corps_inattendu"
+        self._metriques.api_erreurs.labels(code=code).inc()
         return erreur
 
     def _inattendu(self, reponse: httpx.Response) -> ErreurApi:
@@ -400,7 +432,10 @@ class VueApi:
                 self.etat = "ko"
         except (ApiInjoignable, ApiDelai):
             self.etat = "ko"
-        self._metriques.api_disponible.set(1 if self.etat == "ok" else 0)
+        for etat in ETATS_API:
+            self._metriques.api_info_etat.labels(etat=etat).set(
+                1 if self.etat == etat else 0
+            )
 
     def limites(self) -> Limites:
         """Les bornes en vigueur : celles que l'API publie l'emportent sur la

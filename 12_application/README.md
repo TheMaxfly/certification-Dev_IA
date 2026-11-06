@@ -75,7 +75,14 @@ Un seul écran, `/`, dans l'ordre de lecture :
 
 `/a-propos` : ce qui est transmis, tous les profils proposés et leur hébergement, ce qui
 n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API.
-`/metrics` : Prometheus, sur le bouclage.
+`/metrics` : Prometheus, sur le bouclage, ou le réseau de collecte déclaré
+(`APPLICATION_METRIQUES_RESEAUX`). `application_requetes_total{route, statut}` : `route` est
+le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour le reste.
+`application_api_erreurs_total{code}` : une liste fermée, `corps_inattendu` hors d'elle.
+**Deux jauges pour l'état de l'API** : `application_api_info_etat{etat}` (`ok`, `ko`, `cle` : la
+clé est refusée), lue au démarrage et à chaque page ; `application_api_sante_ok`, lue au
+démarrage et à chaque `/sante`. Aucune ne se relit seule : une panne de l'API se lit sur la
+cible de Prometheus.
 
 ### Les réglages
 

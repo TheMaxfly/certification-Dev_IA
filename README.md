@@ -29,9 +29,15 @@ Sources externes
   -> collecte Scrapy / API
   -> nettoyage, enrichissement, validation
   -> PostgreSQL schema manga
-  -> FastAPI + recherche plein texte
+  -> FastAPI + recherche plein texte (API de donnees, module 02)
   -> corpus de recherche versionne (schema bench)
   -> encodage (pgvector) et mesure de la recherche
+  -> API du modele : recherche et reponse redigee (module 11)
+  -> application du libraire (module 12)
+
+A cote de la chaine, en lecture seule :
+  monitorage (module 13) : Prometheus collecte, Grafana restitue et alerte,
+  une sonde d'equivalence publie la qualite du modele comme metrique
 ```
 
 Le depot est organise par etapes numerotees.
@@ -44,16 +50,17 @@ Le depot est organise par etapes numerotees.
 | `02_api_manga/` | API FastAPI en lecture seule sur PostgreSQL : metadonnees, corpus RAG et recherche plein texte. | MVP teste, avec Compose d'integration. |
 | `03_kitsu_api_exports/` | Client Kitsu et collecteur exhaustif reprenable. | Catalogue, mappings et staff termines ; characters hors perimetre actuel. |
 | `04_scraping_manga_sanctuary/` | Scraping Manga Sanctuary : series, tomes et critiques staff. | Snapshot 2026-07 promu : 103 811 volumes et 11 052 critiques. |
-| `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source, corpus de recherche et jeu d'evaluation. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2). Package `corpus` : deux corpus clos dans `bench`, `v1` (48 090 documents, 66 290 fragments) et `v2` (56 775 documents, 77 006 fragments). Package `evaluation` : jeu d'evaluation `v2` gele (69 questions, 11 familles). 542 tests. |
+| `05_nettoyage_agregation_bdd/` | Nettoyage, normalisation, identite multi-source, corpus de recherche et jeu d'evaluation. | Package `identity` : cascade complete (etages 0 a R) et promotion decisionnelle (run 2). Package `corpus` : deux corpus clos dans `bench`, `v1` (48 090 documents, 66 290 fragments) et `v2` (56 775 documents, 77 006 fragments). Package `evaluation` : jeu d'evaluation `v2` gele (69 questions, 11 familles). 570 tests. |
 | `06_benchmark_embeddings_llm/` | Premier benchmark : embeddings, FAISS, recall@K, MRR et evaluation LLM. | Scripts experimentaux. Remplace, pour l'encodage et la mesure de la recherche, par les modules 09 et 10 ; ses tables restent dans `bench`, non utilisees par la chaine actuelle. |
 | `07_databricks_manga_export/` | Lakehouse Spark + Delta conteneurise : medaillon bronze / silver / gold sur le raw multi-snapshots, controles qualite historises. | v2 livree : 4 sources en bronze, silver Manga Sanctuary, 5 tables gold ; 18 tests, 12 / 12 verifications en conteneur. Couche consultative, hors chemin critique. |
-| `08_enrichissement_personnages/` | Personnages : collectes Wikipedia francais et AniList sur une ossature commune, chargeurs Kitsu et Wikipedia vers les tables `manga.character*`. | Charges : 34 293 personnages et 105 048 formes (Kitsu), 13 101 personnages et 21 398 formes (Wikipedia francais) ; 90 tests. |
-| `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus, test d'equivalence du service. | Trois encodages float32 dans `bench` (pgvector) : BGE-M3 (1 024 d) et EmbeddingGemma (768 d) sur le corpus `v1`, 66 290 vecteurs chacun (2026-10-07) ; EmbeddingGemma sur le corpus `v2`, 77 006 vecteurs (2026-10-10). Reprise et rejeu sans ecriture ; 72 tests. |
-| `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : 17 configurations en trois tours (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, TF-IDF, fusions, classement limite au catalogue, representation de l'oeuvre), metriques au grain entite, MLflow ; regle de promotion et journal des promotions. | 18 runs enregistres (MLflow local, `bench.eval_mesures`, 1 872 lignes) : les 17 mesures sur le corpus `v1`, puis la mesure 8 sur le corpus `v2`. Mesure 8 : 31 questions reussies sur 59, sur l'un comme sur l'autre. Encodage du `v2` en service depuis le 2026-10-10 ; 120 tests. |
-| `11_api_modele/` | API REST du modele : la **recherche** (une question, les series du catalogue classees et les passages qui les justifient) et la **reponse redigee** par un modele de langage choisi par profil (Mistral, OpenAI), tiree des seuls passages, sorties controlees. FastAPI, une cle d'acces par application, debit par cle, contrat `/v1/` versionne, Compose avec le service d'embedding. | Version 1.3.1 : le classement du banc (mesure 8, encodage en service), egal au run de reference sur les 69 questions du jeu gele (69 / 69) ; `/v1/reponse` (quatre profils dans `reglages.toml`, changement par la seule configuration, « aucun nom de membre », metadonnees et auteurs des series sur la ligne de titre, disponibilite et public controles) ; lecture seule sous `modele_ro` (migrations `023` a `026`) ; 634 tests, couverture 98 %, essai d'integration du Compose (doublure du fournisseur) dans `make verify`. |
-| `12_application/` | Application du libraire, rendue par le serveur (FastAPI, Jinja2, sans JavaScript) : une question, la reponse de l'API du modele, les series citees, leurs metadonnees et leurs passages, une conversation de cinq echanges, un ecran par cas degrade, la mention IA. | Prototype, tronc de l'epreuve E4 : parle a l'API seule, par sa cle ; 388 tests, couverture 99 %, audit axe-core de 61 pages sans defaut, essai d'integration du Compose (doublure de l'API) dans `make verify`. |
+| `08_enrichissement_personnages/` | Personnages : collectes Wikipedia francais et AniList sur une ossature commune, chargeurs Kitsu et Wikipedia vers les tables `manga.character*`. | Charges : 34 293 personnages et 105 048 formes (Kitsu), 13 101 personnages et 21 398 formes (Wikipedia francais) ; 110 tests. |
+| `09_service_embedding/` | Service d'embedding Text Embeddings Inference (image officielle, GPU) : deux instances, BGE-M3 et EmbeddingGemma, configuration commentee, client qui applique les prefixes, encodeur du corpus, test d'equivalence du service. | Trois encodages float32 dans `bench` (pgvector) : BGE-M3 (1 024 d) et EmbeddingGemma (768 d) sur le corpus `v1`, 66 290 vecteurs chacun (2026-10-07) ; EmbeddingGemma sur le corpus `v2`, 77 006 vecteurs (2026-10-10). Reprise et rejeu sans ecriture ; 96 tests. |
+| `10_mesures_recherche/` | Banc de mesure de la recherche sur le jeu d'evaluation gele : 17 configurations en trois tours (sens BGE-M3 et EmbeddingGemma, plein texte PostgreSQL, TF-IDF, fusions, classement limite au catalogue, representation de l'oeuvre), metriques au grain entite, MLflow ; regle de promotion et journal des promotions. | 18 runs enregistres (MLflow local, `bench.eval_mesures`, 1 872 lignes) : les 17 mesures sur le corpus `v1`, puis la mesure 8 sur le corpus `v2`. Mesure 8 : 31 questions reussies sur 59, sur l'un comme sur l'autre. Encodage du `v2` en service depuis le 2026-10-10 ; 185 tests. |
+| `11_api_modele/` | API REST du modele : la **recherche** (une question, les series du catalogue classees et les passages qui les justifient) et la **reponse redigee** par un modele de langage choisi par profil (Mistral, OpenAI), tiree des seuls passages, sorties controlees. FastAPI, une cle d'acces par application, debit par cle, contrat `/v1/` versionne, Compose avec le service d'embedding. | Version 1.3.1 : le classement du banc (mesure 8, encodage en service), egal au run de reference sur les 69 questions du jeu gele (69 / 69) ; `/v1/reponse` (quatre profils dans `reglages.toml`, changement par la seule configuration, « aucun nom de membre », metadonnees et auteurs des series sur la ligne de titre, disponibilite et public controles) ; l'attente d'un 429 du fournisseur rendue a l'appelant par `Retry-After` (1.3.1) ; Swagger UI servi par l'API, sans ressource reseau, sur reglage ; `/metrics` pour Prometheus, aux seules adresses admises : requetes, appels, jetons, cout et latence par profil, sorties invalides, reponses et refus ; lecture seule sous `modele_ro` (migrations `023` a `026`) ; 649 tests, couverture 98 %, essai d'integration du Compose (doublure du fournisseur) dans `make verify`. |
+| `12_application/` | Application du libraire, rendue par le serveur (FastAPI, Jinja2, sans JavaScript) : une question, la reponse de l'API du modele, les series citees, leurs metadonnees et leurs passages, une conversation de cinq echanges, un ecran par cas degrade, la mention IA. | Prototype, tronc de l'epreuve E4 : parle a l'API seule, par sa cle ; mode demonstration, eteint par defaut (rang, scores et trace de la recherche, sans rien changer a la requete) ; jauges de l'etat de l'API pour la collecte (`/v1/info`, `/sante`) ; 454 tests, couverture 100 % arrondie, audit axe-core de 63 pages sans defaut, essai d'integration du Compose (doublure de l'API) dans `make verify`. |
+| `13_monitorage/` | Monitorage du modele : Prometheus collecte, Grafana restitue et alerte, sonde d'equivalence et exporteur de qualite. Lance par Compose, sur le poste, avec l'application, l'API et le service d'embedding. | Cinq cibles collectees (service d'embedding, API, application, machine, qualite) ; deux tableaux de bord versionnes, « Modele » et « Service », charges par provisionnement ; sonde d'equivalence toutes les 15 min et derniere mesure lue en base, en lecture seule ; quatre alertes (indisponibilite, sorties invalides, cout, equivalence), canal courriel ; alerte d'indisponibilite provoquee et recue par courriel en 2 min 02 s, et premiere alerte reelle recue, sur l'equivalence (2026-11-06) ; 116 tests, couverture 99 %, essai du Compose reel sur le poste seul. |
 | `database/` | Migrations PostgreSQL partagees et versionnees. | 27 migrations (`000` a `026`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 390 tests sur base jetable. |
-| `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 78 tests. |
+| `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 76 tests. |
 
 ## Sources de donnees
 
@@ -337,6 +344,17 @@ Le service d'embedding, l'API et l'application se levent ensemble par `make app-
 Pour une demonstration en direct, avec le Swagger de l'API et MLflow : `make demo-direct`
 (`demo/README.md`).
 
+Le monitorage se leve avec eux, par un fichier de fusion de plus (`13_monitorage/README.md`) :
+
+```bash
+make monitorage        # application, API, service d'embedding, Prometheus, Grafana, sonde
+make monitorage-etat   # les conteneurs et l'etat des cibles de Prometheus
+make monitorage-arret  # tout s'arrete ; les donnees de Prometheus restent sur leur volume
+```
+
+**Avant `make verify-poste` ou une sauvegarde : `make monitorage-arret`.** Elles refusent
+un service d'embedding deja en marche.
+
 Demarrage local :
 
 ```bash
@@ -447,7 +465,7 @@ Une seule commande verifie le depot, sur le poste comme sur GitHub :
 ```bash
 make verify              # les modules touches depuis origin/develop et ceux qui en
                          # dependent, plus la tache statique ; TOUT=1 pour tout
-make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 11, database, demo, statique
+make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 13, database, demo, statique
 make verify-indicatif    # Bandit et pip-audit, jamais exiges
 make verify-poste        # la memoire d'abord ; make verify complet sauf arbre deja
                          # vert ; puis les harnais du poste seul
@@ -458,14 +476,19 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   `verification/sauts_attendus.tsv`. Au-dela du plafond, la verification echoue.
 - Aucune suite ne recoit l'adresse de la base reelle : les tests qui ont besoin
   de PostgreSQL lancent une base jetable par Docker. Deux exceptions, deux etapes de
-  `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_ro`, et
-  l'equivalence de l'API du modele sous `modele_api`.
+  `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_lecture`
+  (membre de `verif_ro`), et l'equivalence de l'API du modele sous `modele_api`.
 - Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
-  `statique` (actionlint, shellcheck, essais des hooks) : 14 controles,
+  `statique` (actionlint, shellcheck, essais des hooks) : 15 controles,
   obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
   par les changements reussit sans rien faire.
 - `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture
-  seule et l'equivalence du service d'embedding, puis de l'API du modele.
+  seule et l'equivalence du service d'embedding, puis de l'API du modele. L'etat
+  d'`apimanga` relit aussi chaque fichier suivi, chemin et contenu, contre les 54 noms
+  de membres du corpus : un homonyme admis est inscrit dans une liste versionnee, par
+  fichier, empreinte et nombre ; tout autre est une erreur.
+- **La pile du monitorage s'arrete avant** : `make monitorage-arret`, puis
+  `make verify-poste`.
 
 ## Demonstration
 
@@ -502,8 +525,16 @@ DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' uv run manga-pipeli
   l'arbitrage des cas residuels (undecidable, conflits multi-candidats, collisions
   d'identite), la decision sur les `same_work` de confiance moyenne, une eventuelle
   v2. Le doute n'est jamais une decision automatique.
-- L'API ne sert pas encore le corpus `v2` : `/rag/export` lit la vue
-  `manga.rag_export_docs` (51 880 documents), qui ne lit pas `bench`.
+- L'API de donnees du module 02 ne sert pas encore le corpus `v2` : `/rag/export` lit
+  la vue `manga.rag_export_docs` (51 880 documents), qui ne lit pas `bench`.
+- La sonde d'equivalence releve un etat connu : **intermittent, 16 passages sur 111 sous
+  0,999 (≈ 14 %) au 2026-11-06, deux fragments, valeur identique (0,998797), cause non
+  etablie** ; la serie complete est dans le journal de la sonde. `make verify-poste`
+  reste vert dans cet etat, son test n'echouant que sous 0,99 ; l'alerte d'equivalence
+  le signale. Etablir la cause reste a faire (piste : la composition des lots).
+- Deux pseudonymes de membres figuraient dans des fichiers suivis : retires des fichiers
+  courants le 2026-11-05 ; l'historique du depot les conserve, par regle. Depuis,
+  `make verify-poste` relit chaque fichier suivi.
 - Le renommage des dossiers et du package `api_manga` est gele jusqu'a une fenetre
   atomique dediee, avant l'orchestrateur.
 - Les rapports de validation doivent etre regeneres apres chaque collecte

@@ -1,0 +1,7 @@
+id = "APP-30"
+origine = "E3 étape 5, spec 02, jauges d'état de l'API (2026-11-05) — un code libre rendu par l'API deviendrait une étiquette"
+fichier = "12_application/src/application/client_api.py"
+avant = '''        code = erreur.code if erreur.code in CODES_API else "corps_inattendu"'''
+apres = '''        code = erreur.code'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_client_api.py"]

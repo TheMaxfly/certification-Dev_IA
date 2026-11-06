@@ -463,6 +463,27 @@ def test_une_reformulation_hors_schema(api_reponse, doublures):
     assert r.json()["details"] == {"motif": "schema", "role": "reformulation"}
 
 
+def test_les_reponses_sont_comptees_par_refus_et_motif(
+    api_reponse, doublures, monkeypatch
+):
+    conforme(repondre(api_reponse))
+    texte = api_reponse.get("/metrics").text
+    assert 'api_modele_reponses_total{motif="aucun",refus="faux"} 1.0' in texte
+    assert 'api_modele_reponses_total{motif="aucun_passage",refus="vrai"} 0.0' in texte
+
+    vraie = recherche.rechercher
+
+    def sans_passage(*args: Any) -> Resultat:
+        r = vraie(*args)
+        return r.model_copy(update={"series": []})
+
+    monkeypatch.setattr(recherche, "rechercher", sans_passage)
+    conforme(repondre(api_reponse))
+    texte = api_reponse.get("/metrics").text
+    assert 'api_modele_reponses_total{motif="aucun",refus="faux"} 1.0' in texte
+    assert 'api_modele_reponses_total{motif="aucun_passage",refus="vrai"} 1.0' in texte
+
+
 # --------------------------------------------------------------------------- #
 #  Aucun passage : refus, sans appel
 # --------------------------------------------------------------------------- #

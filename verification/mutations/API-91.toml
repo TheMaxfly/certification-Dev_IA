@@ -1,0 +1,7 @@
+id = "API-91"
+origine = "E3 étape 5, spec 02, métriques pour la collecte (2026-11-05) — une réponse rendue ne serait pas comptée"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''        refus="vrai" if refus else "faux", motif=motif or "aucun"'''
+apres = '''        refus="faux", motif="aucun"'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_reponse.py"]

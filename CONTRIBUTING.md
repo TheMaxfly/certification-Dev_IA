@@ -26,7 +26,7 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
 | `make verify TOUT=1` | tous les modules |
-| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `12`, `database`, `demo`, `statique` |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `13`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
 | `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : accessibilité de l'application (axe-core dans Chromium, `rapport_axe` réécrit), fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
@@ -38,7 +38,7 @@ commande sur le poste et sur GitHub.
   strict sur `src/`, Bandit sur `src/`, pip-audit sur le verrou, après ses tests, dans
   `make verify` ; un constat est un échec, et la couverture est mesurée. Elles se
   déclarent dans le 9e champ de sa ligne de `MODULES` (`verification/verifier.sh`) ;
-  le module 11 (API du modèle) et le module 12 (application) les portent. Pour les modules d'avant, Bandit et
+  le module 11 (API du modèle), le module 12 (application) et le module 13 (monitorage) les portent. Pour les modules d'avant, Bandit et
   pip-audit restent indicatifs.
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
@@ -71,6 +71,10 @@ Avant une demande de fusion vers `develop` : `make verify` (les modules touchés
 `main` : `make verify-poste`, `make verify-mutations`, et une sauvegarde de ce qui vit
 hors du dépôt ; si le harnais a changé (`verification/`, `Makefile`, workflows),
 `make verify TOUT=1` d'abord.
+
+**La pile du monitorage s'arrête avant `make verify-poste` et avant une sauvegarde** :
+`make monitorage-arret`. Elle fait tourner une instance du service d'embedding, et toutes
+deux en refusent une déjà en marche.
 
 ### Les mutations versionnées
 
@@ -236,6 +240,7 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 | clé OpenAI | `OPENAI_API_KEY`, dans le `.env` du module qui l'emploie | `pre-commit` et `pre-push` : sa valeur ; `sk-` suivi d'au moins 40 caractères |
 | trousseau de l'API du modèle | `API_MODELE_CLES`, `nom:secret,nom:secret`, dans le `.env` du module de l'API | `pre-commit` et `pre-push` : la valeur de chaque secret ; une affectation littérale d'un secret de 32 caractères au moins, à toute place |
 | clé de l'application | `APPLICATION_CLE_API`, le secret seul, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` n'en est pas une) |
+| mot de passe du canal d'alerte | le fichier `13_monitorage/.secrets/smtp_mot_de_passe`, hors dépôt, lu par `GF_SMTP_PASSWORD__FILE` | `pre-commit` et `pre-push` : sa valeur, avec et sans ses espaces ; une affectation littérale à `GF_SMTP_PASSWORD` ; le chemin passe |
 
 - Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
   elle. Une variable absente ou vide ne compare rien.

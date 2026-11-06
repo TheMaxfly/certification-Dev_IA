@@ -33,6 +33,7 @@
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 11	11_api_modele/ database/ 09_service_embedding/ 10_mesures_recherche/src/ 10_mesures_recherche/uv.lock 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml
+13	13_monitorage/ 09_service_embedding/src/ 09_service_embedding/config/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml 11_api_modele/src/api_modele/metriques.py 12_application/compose.yaml 12_application/src/application/metriques.py
 database	database/ sauvegarde/sauvegarder.sh
 demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
 statique	(toujours)

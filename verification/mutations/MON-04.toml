@@ -1,0 +1,7 @@
+id = "MON-04"
+origine = "E3 étape 5, specs 02 et 03 (2026-11-05) — le corps entier d'une alerte finirait au journal"
+fichier = "13_monitorage/src/monitorage/serveur.py"
+avant = '''            titre = titre_de(self.rfile.read(longueur))'''
+apres = '''            titre = self.rfile.read(longueur).decode()'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_serveur.py"]
