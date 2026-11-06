@@ -98,6 +98,8 @@ commentaire du code l'énonce comme un choix, pas comme un effet de bord.
 | Pause entre appels | `PAUSE_S = 1.5` s | [`:42`](../../../src/identity/wikidata_dump.py#L42) |
 | Tentatives | `MAX_RETRIES = 5`, backoff honorant `Retry-After` | [`:43`](../../../src/identity/wikidata_dump.py#L43), [`:69-74`](../../../src/identity/wikidata_dump.py#L69-L74) |
 
+6 novembre 2026 : le contact du script est désormais l'URL du dépôt ; la collecte du 14 juillet a été faite avec une adresse courriel.
+
 ## Date de collecte
 
 Portée par le **nom des dossiers** — `2026-07-14` pour le pivot et les œuvres,
