@@ -28,7 +28,7 @@ commande sur le poste et sur GitHub.
 | `make verify TOUT=1` | tous les modules |
 | `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `13`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
-| `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : accessibilité de l'application (axe-core dans Chromium, `rapport_axe` réécrit), fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
+| `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : accessibilité de l'application (axe-core dans Chromium, `rapport_axe` réécrit), fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre et des fichiers suivis compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
 - Chaque module tourne avec son verrou (`uv run --locked`), dans un environnement
   vidé. **Jamais de DSN réel pour les tests, sauf deux étapes de `verify-poste`, en
@@ -124,6 +124,12 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   aucune n'est admise ; un témoin retrouve d'abord chaque référence connue dans son
   document. Sans passages rendus, refus. La sortie ne porte que des nombres, des
   identifiants et des empreintes.
+- **Les pseudonymes des fichiers suivis** : `verification/pseudonymes_fichiers.py`
+  relit chaque fichier suivi, chemin et contenu, contre les 54 noms, par la même
+  méthode. Un homonyme admis est inscrit dans
+  `verification/pseudonymes_fichiers_admis.tsv`, par fichier, empreinte et nombre ;
+  une entrée qui ne tient plus est une erreur, tout autre nom aussi. La sortie ne
+  porte aucun nom.
 - **Une mesure, une promotion ou une migration change l'état** : relever la référence
   (`bash verification/etat_apimanga.sh --relever`) et la commiter avec ce qui l'a
   changée.
