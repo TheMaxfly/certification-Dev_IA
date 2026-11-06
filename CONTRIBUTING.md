@@ -72,6 +72,10 @@ Avant une demande de fusion vers `develop` : `make verify` (les modules touchés
 hors du dépôt ; si le harnais a changé (`verification/`, `Makefile`, workflows),
 `make verify TOUT=1` d'abord.
 
+**La pile du monitorage s'arrête avant `make verify-poste` et avant une sauvegarde** :
+`make monitorage-arret`. Elle fait tourner une instance du service d'embedding, et toutes
+deux en refusent une déjà en marche.
+
 ### Les mutations versionnées
 
 Une mutation casse le code exprès pour prouver qu'un test le voit. Chacune est un

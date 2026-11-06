@@ -118,8 +118,9 @@ Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce f
   `GF_SMTP_PASSWORD__FILE`. **Les hooks refusent sa valeur dans un fichier suivi.** Un second
   point de contact, `webhook-essai`, servi par la sonde, reste pour les essais sans sortie : un
   compteur et une ligne de journal, le titre seul ; une ligne de `politiques.yml` le désigne.
-- **L'état connu de D** : **intermittent, 6 sur 38, deux fragments, valeur identique, cause non
-  établie** (`487295` et `491847`, 0,998797, mesuré le 2026-11-05). `make verify-poste` reste vert
+- **L'état connu de D** : **intermittent, 16 sur 111 (≈ 14 %) au 2026-11-06, deux fragments,
+  valeur identique, cause non établie** (`487295` et `491847`, 0,998797) ; la série complète est
+  dans le journal de la sonde. `make verify-poste` reste vert
   dans cet état, le test passe entre 0,99 et 0,999. Une alerte D sur ces deux fragments est donc
   cet état, pas une panne nouvelle ; sur d'autres fragments, c'en est une.
 - **Si A tombe** : lire `make monitorage-etat` et `/v1/sante` ; relancer le service ; si c'est le
