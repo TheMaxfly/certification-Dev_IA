@@ -1,0 +1,7 @@
+id = "CHN-16"
+origine = "E3 étape 6, spec 02 (2026-11-07) — un « pas de verdict » pris pour un refus de la règle"
+fichier = "14_chaine/src/chaine/etapes.py"
+avant = '''        raise Arret(Code.PAS_DE_VERDICT, f"pas de verdict : {motif}")'''
+apres = '''        raise Arret(Code.REFUS_REGLE, f"pas de verdict : {motif}")'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]

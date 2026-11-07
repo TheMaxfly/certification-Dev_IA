@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chaine-livraison"
+version = "0.1.0"
+description = "La chaîne de livraison du modèle : tester les données, encoder, tester l'encodage, mesurer, juger — en préproduction, sans jamais promouvoir."
+readme = "README.md"
+requires-python = ">=3.12"
+# Bibliothèque standard seule à l'exécution : la chaîne lance les commandes des modules
+# 05, 09, 10 et 11 dans leur propre environnement, et lit leur sortie.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    # Les tests lisent les déclencheurs de verify.yml et indicatif.yml ; jamais à
+    # l'exécution.
+    "pyyaml==6.0.3",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.pyright]
+# Exigence du module neuf : strict sur le code du module. `make verify` désigne
+# l'interpréteur du module (--pythonpath) ; en local, celui de `.venv`.
+include = ["src"]
+strict = ["src"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+[tool.bandit]
+# Lancé sur src/ seulement ; aucune règle écartée.
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
