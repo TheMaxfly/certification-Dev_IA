@@ -689,9 +689,11 @@ def test_les_metriques_apres_une_sequence_connue(tmp_path, doublures):
     texte = metriques.exposer()[0].decode()
     a = 'profil="factice-a",role="reponse"'
     for ligne in (
-        f'api_modele_llm_appels_total{{{a},statut="ok"}} 2.0',
-        f'api_modele_llm_appels_total{{{a},statut="fournisseur_refus"}} 1.0',
-        f'api_modele_llm_appels_total{{{a},statut="fournisseur_delai"}} 1.0',
+        f'api_modele_llm_appels_total{{mode="strict",{a},statut="ok"}} 2.0',
+        f'api_modele_llm_appels_total{{mode="strict",{a},statut="fournisseur_refus"}}'
+        " 1.0",
+        f'api_modele_llm_appels_total{{mode="strict",{a},statut="fournisseur_delai"}}'
+        " 1.0",
         f'api_modele_llm_jetons_total{{{a},type="entree"}} 200.0',
         f'api_modele_llm_jetons_total{{{a},type="sortie"}} 40.0',
         f'api_modele_llm_jetons_total{{{a},type="raisonnement"}} 0.0',

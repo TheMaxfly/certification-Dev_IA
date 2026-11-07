@@ -1,0 +1,40 @@
+{
+  "instance": "bge-m3",
+  "table": "bench.vecteurs_bge_m3",
+  "taille_lot": 16,
+  "vecteurs_ecrits": 66290,
+  "encodage_cree": true,
+  "encodage_mis_a_jour": true,
+  "fragments_corpus": 66290,
+  "fragments_a_encoder": 66290,
+  "encodage_id": 1,
+  "duree_encodage_s": 2038.1,
+  "debit_fragments_s": 32.5,
+  "termine": true,
+  "vecteurs_de_l_encodage": 66290,
+  "surveillance": {
+    "vram_pic": 2745171968,
+    "vram_carte_pic": 2848980992,
+    "ram_anonyme_pic": 1489010688,
+    "swap_ko_ecrits": 8924,
+    "secondes_avec_swap": 11,
+    "swap_continu": false,
+    "echantillons": 1903,
+    "ram_pic": 2971172864
+  },
+  "memoire_fin": {
+    "ram": 2238939136,
+    "ram_pic": 2971172864,
+    "ram_anonyme": 1467908096,
+    "ram_cache_fichiers": 761065472,
+    "vram": 2443182080
+  },
+  "service": {
+    "modele": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "precision": "float32",
+    "version": "1.9.4",
+    "image": "ghcr.io/huggingface/text-embeddings-inference:86-1.9.4",
+    "digest": "sha256:bee0bdb887096229add91b6fdfcf95258c12eb9180e90dc86f3b4b25b86fc613"
+  }
+}

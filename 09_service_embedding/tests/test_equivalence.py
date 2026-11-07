@@ -126,12 +126,15 @@ def test_un_service_qui_ne_sert_pas_l_encodage_est_refuse(encodee):
 # --------------------------------------------------------------------------- #
 
 
+def dossier_du_service_reel():
+    """Le dossier que vérifie `verify-poste` : celui de la production, toujours —
+    `EQUIVALENCE_DOSSIER` posée ou non (question 38) : la vérification de la
+    production ne se détourne pas."""
+    return equivalence.dossier_production(CONFIG)
+
+
 def test_equivalence_du_service_reel():
-    exports = sorted(
-        (equivalence.RACINE_MODULE / CONFIG["export"]["dossier"]).glob(
-            "encodage_*.json"
-        )
-    )
+    exports = sorted(dossier_du_service_reel().glob("encodage_*.json"))
     if not exports:
         pytest.skip(
             "aucun échantillon exporté (service_embedding.equivalence exporter)"

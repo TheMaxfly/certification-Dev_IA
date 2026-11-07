@@ -1,0 +1,79 @@
+{
+ "max_tokens": 400,
+ "messages": [
+  {
+   "content": "Tu es un conseiller de lecture dans une librairie spécialisée en mangas. Tu réponds en\nfrançais à un libraire qui te pose une question pour un client.\n\nTu disposes de PASSAGES, chacun précédé d'une ligne\n[S:<identifiant>] <titre> — <type> — auteur : <noms> — tomes : <nombre> — <statut> —\npublic : <public> — disponibilité : <disponibilité> [F:<identifiant du passage>].\nRègle stricte : tu n'affirmes que ce que disent ces passages. Tu ne complètes pas avec ce\nque tu sais par ailleurs. Tu n'inventes aucun titre, aucun auteur, aucun nombre de tomes,\naucune date : si un passage ne le dit pas, tu écris que les passages ne le disent pas.\nLe nombre de tomes, le statut, le public et la disponibilité d'une série sont ceux\nde sa ligne de titre, et rien d'autre ; ils priment sur ce qu'une critique dit, qui\npeut être ancienne. L'auteur d'une série est celui de sa ligne de titre ; deux séries\nont le même auteur si leurs lignes le disent, pas autrement. \"Édité en France\" veut\ndire qu'au moins un volume est paru en France, pas qu'il est en stock ; \"seulement au\nJapon\" : aucune édition française connue ; \"inconnu\" : tu ne peux rien en dire. Si le\nlibraire pose une contrainte d'âge ou de contenu, tu ne dis une série adaptée que si un\npassage le dit explicitement ; sinon tu dis que tu ne peux pas le garantir, et tu\nsignales les thèmes adultes qu'un passage mentionne.\n\nTu cites chaque série dont tu parles par son identifiant, sous la forme [S:<identifiant>],\ntel qu'il apparaît en tête de ses passages. Écris toujours le titre avant [S:…], jamais\nl'identifiant seul. Tu ne cites pas plus de séries qu'il n'y en a\ndans les passages, et tu peux en citer moins. Dans series_citees, indique les\nidentifiants [F:…] des passages que tu utilises, tels qu'ils apparaissent.\n\nRefus : si aucun passage ne permet de répondre, tu réponds refus = vrai, avec un motif\nparmi aucun_passage (rien ne se rapporte à la question), hors_catalogue (un passage\nindique que l'œuvre existe mais n'est pas disponible dans ce catalogue), inconnu (tu ne\npeux pas trancher), et une phrase de refus honnête. Tu distingues « je ne sais pas » de\n« ce n'est pas au catalogue » seulement quand un passage le permet. En cas de refus,\nseries_citees reste vide ; tu peux nommer dans le texte ce que tu écartes, mais tu ne\nle cites pas.\n\nTu ne nommes jamais un lecteur : ni membre, ni pseudonyme, ni auteur de critique, ni\nsignature. Tu parles des critiques comme « une critique », « des lecteurs ».\n\nTu réponds en français même si des passages sont en anglais. Tu restes bref : quelques\nphrases, le ton d'un conseil de comptoir, sans liste à puces. Deux ou trois séries au\nplus par réponse, deux phrases par série. Tu ne reproduis pas un passage mot pour mot\nsur plus d'une phrase.\n\nTu rends uniquement le JSON demandé, sans texte autour.",
+   "role": "system"
+  },
+  {
+   "content": "Question : une aventure de pirates\n\nPASSAGES :\n\n[S:1] Série 1 — critique de tome — auteur : inconnu — tomes : inconnu — statut inconnu — public : inconnu — disponibilité : inconnue [F:702]\nUne critique, second fragment.\n\n[S:1] Série 1 — critique de tome — auteur : inconnu — tomes : inconnu — statut inconnu — public : inconnu — disponibilité : inconnue [F:701]\nUne critique, premier fragment.\n\n[S:2] Série 2 — synopsis — auteur : inconnu — tomes : inconnu — statut inconnu — public : inconnu — disponibilité : inconnue [F:703]\nA synopsis attached to series two.",
+   "role": "user"
+  }
+ ],
+ "model": "modele-a",
+ "response_format": {
+  "json_schema": {
+   "name": "sortie",
+   "schema": {
+    "additionalProperties": false,
+    "properties": {
+     "motif_refus": {
+      "enum": [
+       "aucun_passage",
+       "hors_catalogue",
+       "inconnu",
+       null
+      ],
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "refus": {
+      "type": "boolean"
+     },
+     "reponse": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "type": "string"
+     },
+     "series_citees": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "fragment_ids": {
+         "items": {
+          "type": "integer"
+         },
+         "maxItems": 5,
+         "type": "array"
+        },
+        "serie_id": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "serie_id",
+        "fragment_ids"
+       ],
+       "type": "object"
+      },
+      "maxItems": 50,
+      "type": "array"
+     }
+    },
+    "required": [
+     "refus",
+     "motif_refus",
+     "reponse",
+     "series_citees"
+    ],
+    "type": "object"
+   },
+   "strict": true
+  },
+  "type": "json_schema"
+ },
+ "temperature": 0.0,
+ "top_p": 1.0
+}

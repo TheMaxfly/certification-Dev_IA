@@ -13,16 +13,20 @@ encore, ou `Retry-After` au-delà de 10 s, le 503 `fournisseur_refus`, qui porte
    (`reformulation_ignoree = "trop_longue"`). Un nom de membre : 503, et la recherche
    n'a pas lieu.
 3. Recherche : la fonction interne de `/v1/recherche`, mêmes réglages, même classement.
-4. Aucun passage : 200, refus `aucun_passage`, SANS appel au modèle (déterministe,
-   gratuit, et c'est ce que le mode strict dirait).
+4. Aucun passage : en strict, 200, refus `aucun_passage`, SANS appel au modèle
+   (déterministe, gratuit) ; en enrichi (question 33), l'appel a lieu, contexte vide
+   de passages, et la partie stricte doit être ce refus (`refus_incoherent` sinon).
 5. Contexte : par série, dans l'ordre du classement, la ligne de titre (`[S:<serie_id>]
    <titre> — <type> — tomes : … — <statut> — public : … — disponibilité : …
    [F:<fragment_id>]`) puis le texte du passage tel quel ; la question, l'historique
-   plié. Appel de réponse, sortie contrainte par un schéma JSON strict.
+   plié. Appel de réponse, sortie contrainte par un schéma JSON strict — un par mode :
+   en enrichi, l'invite de base plus le bloc du complément (`complement.md`), et le
+   schéma gagne `complement` et `complement_titres`.
 6. Contrôles de sortie, dans cet ordre — `schema`, `serie_inconnue`,
    `fragment_inconnu`, `refus_incoherent`, `pseudonyme`, `disponibilite`,
-   `demographie` — chacun : 503 `sortie_modele_invalide`, son motif, son compteur ; la
-   sortie fautive n'est ni rendue ni journalisée ; pas de second essai.
+   `demographie`, puis en enrichi ceux du complément (`api_modele.complement`) —
+   chacun : 503 `sortie_modele_invalide`, son motif, son compteur ; la sortie fautive
+   n'est ni rendue ni journalisée ; pas de second essai.
 7. Réponse : les séries citées complétées par leur titre et leur rang (pris dans la
    recherche, jamais chez le modèle), les séries de la recherche, le `contexte`. Dans
    le texte, chaque `[S:<serie_id>]` sans le titre du catalogue juste avant ni juste
@@ -40,10 +44,13 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
+from psycopg import Error as ErreurBase
+from psycopg.errors import QueryCanceled
+from psycopg_pool import PoolTimeout
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from api_modele import __version__, affirmations, recherche
+from api_modele import __version__, affirmations, base, complement, recherche
 from api_modele.configuration import RACINE_MODULE, Profil
 from api_modele.erreurs import ErreurApi
 from api_modele.etat import EtatApi
@@ -59,6 +66,7 @@ from api_modele.fournisseurs import (
 from api_modele.modeles import (
     SCHEMA_REFORMULATION,
     SCHEMA_SORTIE,
+    SCHEMA_SORTIE_ENRICHI,
     AppelModele,
     ContexteReponse,
     DemandeReponse,
@@ -73,6 +81,7 @@ from api_modele.modeles import (
     Serie,
     SerieCitee,
     SortieModele,
+    SortieModeleEnrichi,
     SortieReformulation,
     Tour,
 )
@@ -82,6 +91,9 @@ INVITE_REPONSE = (INVITES / "reponse.md").read_text(encoding="utf-8").strip()
 INVITE_REFORMULATION = (
     (INVITES / "reformulation.md").read_text(encoding="utf-8").strip()
 )
+#: Le bloc du mode enrichi, ajouté à l'invite de base, qui ne change pas d'un mot.
+INVITE_COMPLEMENT = (INVITES / "complement.md").read_text(encoding="utf-8").strip()
+PASSAGES_ABSENTS = "(aucun passage)"
 
 #: L'appel de reformulation : fixé, pas exposé (décision de la spec 03).
 TEMPERATURE_REFORMULATION = 0.0
@@ -204,9 +216,19 @@ def titrer(texte: str, series: list[Serie]) -> str:
 
 def message_de_reponse(historique: str, question: str, series: list[Serie]) -> str:
     debut = f"{historique}\n\n" if historique else ""
-    return (
-        f"{debut}Question : {question}\n\nPASSAGES :\n\n{contexte_des_passages(series)}"
-    )
+    passages = contexte_des_passages(series) or PASSAGES_ABSENTS
+    return f"{debut}Question : {question}\n\nPASSAGES :\n\n{passages}"
+
+
+def invite_de(mode: str) -> str:
+    """L'invite de base ; en enrichi, le bloc du complément à sa suite."""
+    if mode == "enrichi":
+        return f"{INVITE_REPONSE}\n\n{INVITE_COMPLEMENT}"
+    return INVITE_REPONSE
+
+
+def schema_de(mode: str) -> Mapping[str, object]:
+    return SCHEMA_SORTIE_ENRICHI if mode == "enrichi" else SCHEMA_SORTIE
 
 
 def sortie_invalide(
@@ -344,11 +366,12 @@ async def appeler(
     demandes: Demandes,
     schema: Mapping[str, object],
     deroulement: Deroulement,
+    mode: str = "strict",
 ) -> Sortie:
     """Un appel de la couche des fournisseurs ; son refus devient son code. Sur un
     refus de débit, un seul nouvel essai, le refus tracé dans `appels`."""
     couche = etat.fournisseurs
-    arguments = (profil.nom, identifiant, role, messages, demandes, schema)
+    arguments = (profil.nom, identifiant, role, messages, demandes, schema, mode)
     debut = time.perf_counter()
     try:
         sortie = await couche.appeler(*arguments)
@@ -433,6 +456,7 @@ async def reformuler(
         demandes,
         SCHEMA_REFORMULATION,
         deroulement,
+        corps.mode,
     )
     try:
         question = SortieReformulation.model_validate_json(sortie.texte).question
@@ -445,6 +469,52 @@ async def reformuler(
         raise sortie_invalide(etat, "pseudonyme", "reformulation")
     deroulement.suivi["reformulation"] = "faite"
     return question, None
+
+
+def titres_du_catalogue(etat: EtatApi, titres: list[str]) -> set[str]:
+    """Les titres du complément que le catalogue porte (clés comparables), dans une
+    transaction bornée, en lecture seule ; la base en défaut : le 503 de la
+    recherche."""
+    try:
+        with base.transaction(etat.pool, etat.reglages) as cx:
+            return base.lire_titres_du_catalogue(cx, titres)
+    except QueryCanceled as exc:
+        raise ErreurApi(
+            503,
+            "base_indisponible",
+            "La base n'a pas répondu dans le délai.",
+            {"cause": "delai_depasse", "delai_s": etat.reglages.delai_base_s},
+        ) from exc
+    except (ErreurBase, PoolTimeout) as exc:
+        raise ErreurApi(
+            503, "base_indisponible", "Base injoignable.", {"cause": "injoignable"}
+        ) from exc
+
+
+async def controler_complement(
+    etat: EtatApi, modele: SortieModeleEnrichi, series: list[Serie], question: str
+) -> tuple[str, list[str]] | None:
+    """Les contrôles du complément (`api_modele.complement`), après ceux de la partie
+    stricte ; (texte, titres), ou None s'il est vide (valide : rien n'est rendu)."""
+    texte = (modele.complement or "").strip()
+    if not texte:
+        return None
+    titres = [t.strip() for t in modele.complement_titres or [] if t.strip()]
+    envoyes = [(p.doc_key, p.extrait) for s in series for p in s.passages]
+    if etat.pseudonymes.fautifs("\n".join([texte, *titres]), envoyes, question):
+        raise sortie_invalide(etat, "complement_pseudonyme", "reponse")
+    du_catalogue: set[str] = (
+        await run_in_threadpool(titres_du_catalogue, etat, titres) if titres else set()
+    )
+    motif = complement.fautif(
+        texte,
+        titres,
+        [s.titre for s in series if s.serie_id is not None],
+        du_catalogue,
+    )
+    if motif is not None:
+        raise sortie_invalide(etat, motif, "reponse")
+    return texte, titres
 
 
 def reglages_appliques(
@@ -501,9 +571,12 @@ async def repondre(
     refus, texte = True, PHRASE_AUCUN_PASSAGE
     motif: MotifRefus | None = "aucun_passage"
     citees: list[SerieCitee] = []
-    if any(s.passages for s in series):
+    ajout: tuple[str, list[str]] | None = None
+    enrichi = corps.mode == "enrichi"
+    avec_passages = any(s.passages for s in series)
+    if avec_passages or enrichi:
         messages = Messages(
-            INVITE_REPONSE,
+            invite_de(corps.mode),
             message_de_reponse(plier(corps.historique), question, series),
         )
         sortie = await appeler(
@@ -513,19 +586,31 @@ async def repondre(
             "reponse",
             messages,
             demandes,
-            SCHEMA_SORTIE,
+            schema_de(corps.mode),
             deroulement,
+            corps.mode,
         )
+        lecteur = SortieModeleEnrichi if enrichi else SortieModele
         try:
-            modele = SortieModele.model_validate_json(sortie.texte)
+            modele = lecteur.model_validate_json(sortie.texte)
         except ValidationError:
             raise sortie_invalide(etat, "schema", "reponse") from None
+        if not avec_passages and not (
+            modele.refus
+            and modele.motif_refus == "aucun_passage"
+            and not modele.series_citees
+        ):
+            raise sortie_invalide(etat, "refus_incoherent", "reponse")
         citees = controler(etat, modele, series, corps.question)
+        if isinstance(modele, SortieModeleEnrichi):
+            ajout = await controler_complement(etat, modele, series, corps.question)
         refus, motif = modele.refus, modele.motif_refus
         texte = titrer(modele.reponse, series)
 
     cout = deroulement.cout()
     suivi.update(refus=refus, nb_series_citees=len(citees), cout_estime_usd=cout)
+    if enrichi:  # en strict, la ligne de journal reste celle de 1.3.1
+        suivi["complement"] = ajout is not None
     etat.metriques.reponses.labels(
         refus="vrai" if refus else "faux", motif=motif or "aucun"
     ).inc()
@@ -553,6 +638,9 @@ async def repondre(
         reponse=texte,
         series_citees=citees,
         series=series,
+        complement=ajout[0] if ajout else None,
+        complement_titres=ajout[1] if ajout else None,
+        complement_etiquette=complement.ETIQUETTE if ajout else None,
         contexte=ContexteReponse(
             **contexte,
             profil=profil.nom,

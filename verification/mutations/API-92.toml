@@ -1,0 +1,7 @@
+id = "API-92"
+origine = "E3 étape 6, spec 06, C.6 (2026-11-07) — le contrôle complement_pseudonyme retiré : un nom de membre dans le complément du mode enrichi serait rendu"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    if etat.pseudonymes.fautifs("\n".join([texte, *titres]), envoyes, question):'''
+apres = '''    if False and etat.pseudonymes.fautifs("\n".join([texte, *titres]), envoyes, question):'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_enrichi.py", "-k", "fautif"]

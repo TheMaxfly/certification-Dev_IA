@@ -1,0 +1,7 @@
+id = "MON-17"
+origine = "E3 étape 6, bloc C, C6 (2026-11-07) — une mesure publiée n'est plus retirée : après une promotion sans mesure, l'exporteur exposerait le chiffre d'un autre encodage"
+fichier = "13_monitorage/src/monitorage/exporteur.py"
+avant = '''            self._metriques.retirer_mesure()'''
+apres = '''            pass'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_exporteur.py"]

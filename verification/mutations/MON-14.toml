@@ -1,0 +1,7 @@
+id = "MON-14"
+origine = "E3 étape 6, bloc C, C6 (2026-11-07) — l'exporteur oublie la référence connue d'une promotion sans run : après un retour arrière à l'encodage 2, plus aucune mesure publiée"
+fichier = "13_monitorage/src/monitorage/exporteur.py"
+avant = '''    return REFERENCES.get(int(encodage_id))'''
+apres = '''    return None'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_exporteur.py"]

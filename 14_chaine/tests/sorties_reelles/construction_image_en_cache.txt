@@ -1,0 +1,54 @@
+#1 [internal] load local bake definitions
+#1 DONE 0.0s
+#2 [internal] load build definition from Dockerfile
+#2 DONE 0.0s
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9eebf9edff68adedb369df8e7b98711a2
+#3 DONE 0.0s
+#4 [internal] load metadata for docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28
+#4 DONE 0.0s
+#5 [internal] load build context
+#5 DONE 0.0s
+#6 [construction  1/15] FROM docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28
+#6 DONE 0.0s
+#7 [uv 1/1] FROM ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9eebf9edff68adedb369df8e7b98711a2
+#7 DONE 0.0s
+#5 [internal] load build context
+#5 DONE 0.0s
+#8 [construction  7/15] RUN cd 11_api_modele && uv sync --locked --no-install-project
+#8 CACHED
+#9 [construction  9/15] COPY 10_mesures_recherche/src/mesures_recherche 10_mesures_recherche/src/mesures_recherche
+#9 CACHED
+#10 [construction  6/15] COPY 11_api_modele/pyproject.toml 11_api_modele/uv.lock 11_api_modele/README.md 11_api_modele/
+#10 CACHED
+#11 [construction 15/15] RUN cd 11_api_modele && uv sync --locked
+#11 CACHED
+#12 [stage-2 4/5] RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin api
+#12 CACHED
+#13 [construction 11/15] COPY 05_nettoyage_agregation_bdd/src/corpus/pseudonymes.py 05_nettoyage_agregation_bdd/src/corpus/
+#13 CACHED
+#14 [construction  5/15] COPY 09_service_embedding/src 09_service_embedding/src
+#14 CACHED
+#15 [construction  8/15] COPY 09_service_embedding/config 09_service_embedding/config
+#15 CACHED
+#16 [construction 10/15] COPY 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py 05_nettoyage_agregation_bdd/src/evaluation/
+#16 CACHED
+#17 [construction 14/15] COPY 11_api_modele/src 11_api_modele/src
+#17 CACHED
+#18 [construction 12/15] COPY database/donnees/corpus_homonymes_admis.csv database/donnees/
+#18 CACHED
+#19 [stage-2 3/5] COPY --from=construction /app /app
+#19 CACHED
+#20 [construction  4/15] COPY 09_service_embedding/pyproject.toml 09_service_embedding/README.md 09_service_embedding/
+#20 CACHED
+#21 [construction 13/15] COPY 11_api_modele/config 11_api_modele/config
+#21 CACHED
+#22 [stage-2 2/5] COPY --from=construction /opt/venv /opt/venv
+#22 CACHED
+#23 [construction  2/15] COPY --from=uv /uv /usr/local/bin/uv
+#23 CACHED
+#24 [construction  3/15] WORKDIR /app
+#24 CACHED
+#25 [stage-2 5/5] WORKDIR /app/11_api_modele
+#25 CACHED
+#26 DONE 0.1s
+#27 DONE 0.0s

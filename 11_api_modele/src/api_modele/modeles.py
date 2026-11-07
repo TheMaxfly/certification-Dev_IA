@@ -8,7 +8,7 @@ font partie du contrat publié.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import PydanticCustomError
@@ -243,6 +243,12 @@ class Info(BaseModel):
 #  La route de réponse — `POST /v1/reponse` (E3, étape 3)
 # --------------------------------------------------------------------------- #
 MotifRefus = Literal["aucun_passage", "hors_catalogue", "inconnu"]
+#: Les modes de la réponse : `enrichi` depuis 1.4.0 (ajout à une énumération d'entrée).
+Mode = Literal["strict", "enrichi"]
+#: Les bornes du complément du mode enrichi (spec 06, B.3).
+COMPLEMENT_MAX = 600
+COMPLEMENT_TITRES_MAX = 5
+COMPLEMENT_TITRE_MAX = 200
 MotifHistorique = Literal[
     "trop_de_tours",
     "trop_long",
@@ -319,7 +325,13 @@ class DemandeReponse(BaseModel):
         int,
         Field(ge=_L.min, le=_L.max, description="Jetons de sortie au plus."),
     ] = _L.defaut
-    mode: Literal["strict"] = "strict"
+    mode: Mode = Field(
+        default="strict",
+        description="strict : la réponse tirée des seuls passages. enrichi (1.4.0) :"
+        " la même réponse, plus un complément tiré des connaissances du modèle,"
+        " étiqueté « non vérifié » ; sans passage, le modèle est appelé quand même et"
+        " la partie stricte refuse.",
+    )
     nombre_series: Annotated[int, Field(ge=_N.min, le=_N.max)] = (
         REPONSE.nombre_series.defaut
     )
@@ -413,13 +425,42 @@ class ContexteReponse(Contexte):
     latences_ms: Latences
 
 
+def _nul(valeur: object) -> bool:
+    return valeur is None
+
+
 class Reponse(BaseModel):
+    """La réponse ; en mode enrichi, le complément s'y ajoute. Les trois champs du
+    complément sont **absents** quand il n'y en a pas (mode strict, complément vide) :
+    une réponse stricte reste celle de 1.3.1, champ pour champ."""
+
     refus: bool
     motif_refus: MotifRefus | None
     reponse: str
     series_citees: list[SerieCitee]
     series: list[Serie]
     contexte: ContexteReponse
+    complement: str | None = Field(
+        default=None,
+        exclude_if=_nul,
+        description="Mode enrichi : ce que le modèle ajoute de ses connaissances"
+        " générales, sans source, NON VÉRIFIÉ ; contrôlé (aucun nom de membre, aucune"
+        " disponibilité ni métadonnée affirmée sur une série du catalogue, aucune"
+        " marque), mais il peut être faux sur une œuvre hors catalogue. Absent en"
+        " strict et quand le modèle n'a rien ajouté. N'entre pas dans l'historique.",
+    )
+    complement_titres: list[str] | None = Field(
+        default=None,
+        exclude_if=_nul,
+        description="Les titres que le complément nomme (cinq au plus), tels que le"
+        " modèle les écrit ; présent avec le complément.",
+    )
+    complement_etiquette: str | None = Field(
+        default=None,
+        exclude_if=_nul,
+        description="Texte fixe, présent dès qu'un complément l'est : à afficher avec"
+        " lui.",
+    )
 
 
 # La sortie du modèle, contrainte par son schéma (rapport de l'étape 3, section D)
@@ -438,6 +479,20 @@ class SortieModele(BaseModel):
     motif_refus: MotifRefus | None
     reponse: Annotated[str, Field(min_length=1, max_length=4000)]
     series_citees: Annotated[list[CiteeParLeModele], Field(max_length=50)]
+
+
+class SortieModeleEnrichi(SortieModele):
+    """La sortie du mode enrichi : les quatre champs stricts, inchangés, plus le
+    complément ; vide ou absent, il est valide."""
+
+    complement: Annotated[str | None, Field(max_length=COMPLEMENT_MAX)] = None
+    complement_titres: (
+        Annotated[
+            list[Annotated[str, Field(max_length=COMPLEMENT_TITRE_MAX)]],
+            Field(max_length=COMPLEMENT_TITRES_MAX),
+        ]
+        | None
+    ) = None
 
 
 class SortieReformulation(BaseModel):
@@ -481,6 +536,28 @@ SCHEMA_SORTIE: dict[str, object] = {
                     },
                 },
             },
+        },
+    },
+}
+#: Le schéma de la sortie du mode enrichi : celui du strict, plus le complément
+#: (borné), tous deux requis et nuls admis (forme des schémas stricts).
+SCHEMA_SORTIE_ENRICHI: dict[str, object] = {
+    **SCHEMA_SORTIE,
+    "required": [
+        "refus",
+        "motif_refus",
+        "reponse",
+        "series_citees",
+        "complement",
+        "complement_titres",
+    ],
+    "properties": {
+        **cast(dict[str, object], SCHEMA_SORTIE["properties"]),
+        "complement": {"type": ["string", "null"], "maxLength": COMPLEMENT_MAX},
+        "complement_titres": {
+            "type": ["array", "null"],
+            "maxItems": COMPLEMENT_TITRES_MAX,
+            "items": {"type": "string", "maxLength": COMPLEMENT_TITRE_MAX},
         },
     },
 }

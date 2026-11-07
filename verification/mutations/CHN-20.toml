@@ -1,0 +1,8 @@
+id = "CHN-20"
+origine = "E3 étape 6, relecture des écarts 04 (2026-11-07) — le retour arrière sans son préalable d'image : sur un poste sans image de préproduction, la ligne serait écrite au journal avant l'échec"
+fichier = "14_chaine/src/chaine/deployer.py"
+avant = '''    image_presente(o)
+    s = o.lanceur('''
+apres = '''    s = o.lanceur('''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "rien"]

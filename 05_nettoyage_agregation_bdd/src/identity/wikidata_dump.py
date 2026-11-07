@@ -31,8 +31,8 @@ import requests
 
 # --- Configuration ---------------------------------------------------------
 
-CONTACT = "maxime.mcfly@gmail.com"  # requis par la politique Wikimedia
-USER_AGENT = f"MangaAdvisorBot/0.1 (contact: {CONTACT}) python-requests"
+CONTACT = "https://github.com/TheMaxfly/certification-Dev_IA"  # requis par Wikimedia
+USER_AGENT = f"MangaAdvisorBot/0.1 ({CONTACT}) python-requests/{requests.__version__}"
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 WB_API = "https://www.wikidata.org/w/api.php"
@@ -303,7 +303,7 @@ def main() -> None:
 
     if CONTACT.startswith("CHANGE-MOI"):
         sys.exit(
-            "Renseigne CONTACT (email) en tête de fichier : "
+            "Renseigne CONTACT (URL ou courriel) en tête de fichier : "
             "la politique User-Agent de Wikimedia l'exige."
         )
 

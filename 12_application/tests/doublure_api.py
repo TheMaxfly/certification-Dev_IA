@@ -117,7 +117,7 @@ def info(
             profil("gpt-6-sol", "openai"),
         ]
     return {
-        "version_api": "1.3.1",
+        "version_api": "1.4.0",
         "modele": "modele-embedding-factice",
         "revision": "0" * 8,
         "precision": "float32",
@@ -226,7 +226,7 @@ def contexte(**valeurs: Any) -> dict[str, Any]:
         "encodage_id": 3,
         "identifiant_requete": "api-factice-0001",
         "duree_ms": 1200.0,
-        "version_api": "1.3.1",
+        "version_api": "1.4.0",
         "profil": "mistral-large-2512",
         "fournisseur": "mistral",
         "modele_langage": "modele-de-mistral-large-2512",

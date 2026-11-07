@@ -1,0 +1,7 @@
+id = "API-101"
+origine = "E3 étape 6, spec 06, E (2026-11-07) — le compte des titres non déclarés qui ne laisse pas sa place au titre déclaré : un titre du catalogue contenu dans un titre déclaré (« One » dans « One Shot ») compté à tort"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''                if forme in declarees:'''
+apres = '''                if False:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_enrichi.py", "-k", "nommes_sans_etre_declares"]

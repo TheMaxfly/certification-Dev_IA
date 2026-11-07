@@ -1,0 +1,7 @@
+id = "CHN-11"
+origine = "E3 étape 6, spec 02 (2026-11-07) — un schéma de candidat ouvert : une clé inconnue passerait"
+fichier = "14_chaine/src/chaine/candidat.py"
+avant = '''                raise invalide(chemin, f"clé inconnue {nom}{cle}")'''
+apres = '''                pass'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_candidat.py"]

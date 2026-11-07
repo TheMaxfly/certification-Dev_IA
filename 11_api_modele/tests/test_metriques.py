@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from api_modele import reponse
 from api_modele.affirmations import Motif
+from api_modele.complement import Motif as MotifComplement
 from api_modele.fournisseurs import Role
 from api_modele.metriques import (
     MOTIFS_REFUS,
@@ -102,7 +103,9 @@ def test_les_series_du_modele_de_langage_existent_des_le_demarrage(api):
         assert f'api_modele_llm_cout_usd_total{{profil="{profil}"}} 0.0' in texte
         for role in ROLES:
             a = f'profil="{profil}",role="{role}"'
-            assert f'api_modele_llm_appels_total{{{a},statut="ok"}} 0.0' in texte
+            for mode in ("strict", "enrichi"):
+                appels = f'mode="{mode}",{a},statut="ok"'
+                assert f"api_modele_llm_appels_total{{{appels}}} 0.0" in texte
             assert f"api_modele_llm_latence_secondes_count{{{a}}} 0.0" in texte
             for type_ in TYPES_DE_JETONS:
                 assert f'api_modele_llm_jetons_total{{{a},type="{type_}"}} 0.0' in texte
@@ -119,4 +122,6 @@ def test_les_listes_fermees_suivent_le_code():
     assert MOTIFS_REFUS == get_args(MotifRefus)
     source = Path(reponse.__file__).read_text(encoding="utf-8")
     motifs = set(re.findall(r'sortie_invalide\(etat, "([a-z_]+)"', source))
-    assert motifs | set(get_args(Motif.__value__)) == set(MOTIFS_SORTIE)
+    assert motifs | set(get_args(Motif.__value__)) | set(
+        get_args(MotifComplement.__value__)
+    ) == set(MOTIFS_SORTIE)

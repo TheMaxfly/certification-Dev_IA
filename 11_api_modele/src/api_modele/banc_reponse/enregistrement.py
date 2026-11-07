@@ -6,7 +6,8 @@ ligne `bench.eval_runs`.
 - Les textes des réponses vont dans un fichier hors dépôt, hors MLflow
   (`05_…/data/rapports/mesures_reponse/<run>/`), pour la lecture humaine ; ils ont
   passé le contrôle des noms de membres avant d'y être écrits.
-- Le run MLflow (expérience `E3-reponse`, magasin du module 10) est écrit par
+- Le run MLflow (expérience `E3-reponse` par défaut, réglable : `--experience` ;
+  magasin du module 10) est écrit par
   l'interpréteur du module 10 (`journal_mlflow.py`), avec un environnement réduit
   (ni clé, ni DSN) ; ses pièces ne portent aucun texte de passage ni de réponse.
 - La ligne `bench.eval_runs` (corpus, encodage, run) est écrite sous le DSN du
@@ -47,12 +48,21 @@ SORTIES = (
 MODULE_10 = RACINE_DEPOT / "10_mesures_recherche"
 STOCKAGE = MODULE_10 / "mlflow"
 EXPERIENCE = "E3-reponse"
+#: Le nom d'une autre expérience (`mesurer --experience`, par exemple
+#: `E3-reponse-enrichi-preprod` : l'expérience dit l'environnement, question 40 de
+#: l'étape 6).
+FORME_EXPERIENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SCRIPT = Path(__file__).with_name("journal_mlflow.py")
 #: Ce que l'interpréteur du module 10 reçoit de l'environnement : de quoi trouver uv
 #: et son cache, rien d'autre (ni clé de fournisseur, ni DSN).
 ENVIRONNEMENT_TRANSMIS = ("PATH", "HOME", "LANG", "UV_CACHE_DIR")
 RUN_ID = re.compile(r"^[0-9a-f]{32}$")
+#: L'étiquette `etape` d'un run, par défaut (dette 41 : elle était écrite en dur) :
+#: « E3-06 » = E3, étape 3, spec 06, la mesure de la réponse rédigée. Un run en donne
+#: une autre par `--etape`, gardée dans ses paramètres ; les runs anciens, sans ce
+#: paramètre, gardent ce défaut.
 ETAPE = "E3-06"
+FORME_ETAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 CONFIGURATION = RACINE_MODULE / "config"
 INVITES_DU_DEPOT = "11_api_modele/config/invites"
 #: Ce que chaque run joint, et le paramètre qui porte son empreinte.
@@ -228,11 +238,12 @@ def etiquettes_du_run(
     statut: str,
     motif_interruption: str | None,
     verdict: Mapping[str, object] | None,
+    etape: str = ETAPE,
 ) -> dict[str, str]:
     """Les étiquettes d'un run : `verdict` s'il a un critère (pas les scénarios),
-    `cause_interruption` s'il a été interrompu."""
+    `cause_interruption` s'il a été interrompu ; `etape`, celle du run."""
     etiquettes = {
-        "etape": ETAPE,
+        "etape": etape,
         "role": "profil_actif" if profil == profil_actif else "repli",
         "invite_version": version_des_invites,
         "statut": "interrompu" if statut == "interrompu" else "complet",
@@ -273,6 +284,7 @@ def etiquettes_des_runs_faits(
             str(resume["statut"]),
             cast(str | None, resume.get("motif_interruption")),
             cast(Mapping[str, object] | None, verdict),
+            parametres.get("etape", ETAPE),
         )
     return runs
 
@@ -345,13 +357,15 @@ def charge_mlflow(
     pieces: dict[str, object],
     stockage: Path | None = None,
     fichiers: Mapping[str, str] | None = None,
+    experience: str = EXPERIENCE,
 ) -> dict[str, object]:
-    """La charge d'un run : paramètres en texte, pièces en JSON, fichiers tels quels."""
+    """La charge d'un run : paramètres en texte, pièces en JSON, fichiers tels quels ;
+    l'expérience, `EXPERIENCE` sauf demande."""
     stockage = stockage or STOCKAGE
     return {
         "suivi": f"sqlite:///{stockage / 'mlflow.db'}",
         "pieces": (stockage / "pieces").as_uri(),
-        "experience": EXPERIENCE,
+        "experience": experience,
         "nom": nom,
         "etiquettes": etiquettes,
         "parametres": {
@@ -367,6 +381,14 @@ def charge_mlflow(
             **(fichiers or {}),
         },
     }
+
+
+def note_eval_run(nom: str, mode: str = "strict") -> str:
+    """La note de la ligne `eval_runs` : en strict, celle de l'étape 3 ; en enrichi,
+    celle de l'étape 6 (spec 06, E)."""
+    if mode == "enrichi":
+        return f"E3 étape 6, spec 06 — réponse rédigée, mode enrichi — {nom}"
+    return f"E3 étape 3, spec 06 — réponse rédigée — {nom}"
 
 
 def inscrire_eval_run(

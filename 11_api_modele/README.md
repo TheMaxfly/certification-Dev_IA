@@ -3,7 +3,8 @@
 Une API REST qui expose le modèle d'embedding en service et, depuis la version
 **1.1.0**, un modèle de langage choisi par profil ; depuis la **1.2.0**, chaque série
 porte ses métadonnées, et depuis la **1.3.0** ses auteurs ; la **1.3.1** rend l'attente
-d'un 429 du fournisseur (`Retry-After`). Deux routes métier, sous `/v1/` :
+d'un 429 du fournisseur (`Retry-After`) ; la **1.4.0** ajoute le **mode enrichi** de la
+réponse (un complément « non vérifié », plus bas). Deux routes métier, sous `/v1/` :
 
 - `POST /v1/recherche` : une question entre, une liste de séries classées sort, avec
   les passages qui les justifient ;
@@ -48,8 +49,9 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
 - **le refus est une réponse normale** (200, `refus: true`) : aucun passage ne répond
   (`aucun_passage`), l'œuvre n'est pas au catalogue (`hors_catalogue`), ou le modèle ne
   peut pas trancher (`inconnu`). Quand la recherche ne rend aucun passage, la route
-  refuse **sans appeler le modèle** : c'est gratuit, déterministe, et c'est ce que le
-  mode strict dirait ;
+  refuse, en mode strict, **sans appeler le modèle** : c'est gratuit et déterministe
+  (en mode enrichi, l'appel a lieu pour le complément, et la partie stricte doit
+  refuser) ;
 - **conversation courte** : l'historique (au plus 5 questions-réponses, 10 tours) vient
   avec chaque requête ; un premier appel au modèle en tire une question autonome, sans
   critère absent de la conversation ni critère d'un tour précédent auquel le dernier tour
@@ -61,8 +63,8 @@ run de référence (69 / 69 le 2026-10-20, scores identiques au bit près).
 
 **Elle ne fait pas** :
 
-- pas de **mode enrichi** (une réponse qui compléterait les passages par ce que le
-  modèle sait) : il s'ajoutera par une étape à part, après une mesure à part ;
+- pas de **réponse mêlée** : en mode enrichi (1.4.0), ce que le modèle sait s'ajoute
+  à part, dans un complément étiqueté « non vérifié », jamais dans `reponse` ;
 - pas de **mémoire côté API** : elle ne garde ni conversation, ni historique, ni
   question. L'application tient la conversation et l'efface ;
 - pas de **bascule automatique** entre profils : changer de modèle est un geste de
@@ -320,7 +322,7 @@ Un seul lecteur, `api_modele.configuration`, et deux sources :
 | `profil_actif` | `mistral-large-2512` | un profil déclaré, disponible | `API_MODELE_PROFIL_ACTIF` | un seul réglage désigne le modèle qui rédige ; en changer est un geste de configuration |
 | `temperature` | 0 | 0 à 1 | — (champ de la requête) | 0 rend la même réponse deux fois, ce qu'un conseil sourcé veut ; 0,7 varie ; au-delà de 1 la réponse se dégrade |
 | `longueur_max` | 400 jetons, ou celle du profil (`longueur_max` du profil : 2 000 pour `mistral-large-4`, 400 pour les autres) | 50 à 4 000 | — (champ de la requête) | lisibilité au comptoir et coût ; base de l'estimation ; 1 000 était la borne d'usage, 4 000 admet les profils qui raisonnent, mesurés avant tout usage ; une longueur demandée l'emporte sur celle du profil |
-| `mode` | `strict` | `strict` seul | — | la réponse tirée des seuls passages ; `enrichi` viendra après une mesure à part |
+| `mode` | `strict` | `strict`, `enrichi` | — | `strict` : la réponse tirée des seuls passages ; `enrichi` (1.4.0) : la même, plus un complément « non vérifié » (plus bas) ; une valeur hors de la liste empêche le démarrage |
 | `historique` | vide | 10 tours, 4 000 caractères (2 000 par tour) | — | cinq questions-réponses, borne franche ; ni gardé ni journalisé |
 | `reformuler` | vrai | — | — (champ de la requête) | les suites de comptoir ne retrouvent rien seules ; désactivable pour la démonstration |
 | recherche de la route | 5 séries × 2 passages, catalogue seul | bornes de la recherche | — (champs de la requête) | de quoi choisir sans recopier le corpus ; ceux de `/v1/recherche` (10 × 1) ne changent pas |
@@ -409,7 +411,7 @@ X-Identifiant-Requete: 7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90
     "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3,
     "identifiant_requete": "7c0e6a52-3d1b-4f6e-9a7d-2b8f1c4e5a90",
-    "duree_ms": 84.7, "version_api": "1.3.1"
+    "duree_ms": 84.7, "version_api": "1.4.0"
   }
 }
 ```
@@ -472,7 +474,7 @@ X-Identifiant-Requete: 6f1c…
     "reglages": {"nombre_series": 2, "passages_par_serie": 2, "catalogue_seul": true},
     "modele": "google/embeddinggemma-300m", "revision": "…", "precision": "float32",
     "corpus_id": "v2", "encodage_id": 3, "identifiant_requete": "6f1c…",
-    "duree_ms": 3104.5, "version_api": "1.3.1",
+    "duree_ms": 3104.5, "version_api": "1.4.0",
     "profil": "mistral-large-2512", "fournisseur": "mistral",
     "modele_langage": "mistral-large-2512", "statut_profil": "stable",
     "date_appel": "2026-11-02T10:14:07+00:00",
@@ -503,7 +505,7 @@ X-Identifiant-Requete: 6f1c…
 | `profil` | le profil actif | un profil déclaré, disponible | le modèle qui rédige |
 | `temperature` | 0 | 0 à 1 | variété de la réponse ; refusé si le profil ne l'expose pas |
 | `longueur_max` | 400 | 50 à 4 000 | jetons de sortie au plus |
-| `mode` | `strict` | `strict` seul | — |
+| `mode` | `strict` | `strict`, `enrichi` | `enrichi` : le complément « non vérifié » (plus bas) |
 | `nombre_series`, `passages_par_serie`, `catalogue_seul` | 5, 2, vrai | bornes de la recherche | transmis à la recherche |
 | `identite` | absent | 1 à 64, `[A-Za-z0-9._@:-]` | recopiée dans le journal |
 
@@ -528,14 +530,92 @@ X-Identifiant-Requete: 6f1c…
 - `latences_ms` : la recherche, la reformulation, le modèle, le total, mesurés par l'API.
 
 **Le refus est une réponse** : 200, `refus: true`, `motif_refus`, une phrase honnête,
-`series_citees` vide. Exemple, sans appel au modèle (la recherche n'a rendu aucun
-passage) :
+`series_citees` vide. Exemple, en mode strict, sans appel au modèle (la recherche n'a
+rendu aucun passage) :
 
 ```json
 {"refus": true, "motif_refus": "aucun_passage",
  "reponse": "Les passages disponibles ne permettent pas de répondre à cette question.",
  "series_citees": [], "series": [], "contexte": {"appels": [], "cout_estime_usd": 0.0, "date_appel": null, "…": "…"}}
 ```
+
+### Le mode enrichi (1.4.0) : le complément « non vérifié »
+
+`"mode": "enrichi"` dans la demande (`strict` reste le défaut ; `/v1/info` publie
+`reglages_reponse.mode.valeurs = ["strict", "enrichi"]`, et l'application montre alors son
+sélecteur). **Un seul appel** : la même recherche, le même contexte, la même invite, plus
+un bloc versionné à part (`config/invites/complement.md`) ; l'invite de base ne change pas
+d'un mot (son empreinte est comparée par un test). Le schéma de sortie gagne deux champs,
+bornés : `complement` (600 caractères au plus) et `complement_titres` (cinq titres au
+plus, 200 caractères chacun au plus ; au-delà : 503 `schema`). La partie stricte
+(`reponse`, `refus`, `motif_refus`, `series_citees`) est inchangée et contrôlée comme
+en strict.
+
+- **Ce qu'est le complément** : ce que le modèle ajoute de ses connaissances générales,
+  après la réponse fondée sur les passages, quand il a quelque chose d'utile — souvent
+  quand le strict refuse (une œuvre hors catalogue). Il est rendu dans `complement`, les
+  titres qu'il nomme dans `complement_titres`, et `complement_etiquette` porte un texte
+  fixe à afficher avec lui : « non vérifié — connaissances du modèle, sans source ».
+- **Ce qu'il n'est pas** : une source. Aucun passage ne le fonde ; **il peut être faux**,
+  en particulier sur une œuvre hors catalogue, que rien ne permet de vérifier — et la
+  mesure l'a montré (ci-dessous : 5 compléments faux et 2 dangereux sur 10 lus). C'est
+  pourquoi il est étiqueté, et pourquoi il ne remplace jamais la partie stricte.
+- **Ce qui est contrôlé** (après les contrôles de la partie stricte ; chacun : 503
+  `sortie_modele_invalide`, motif préfixé `complement_`, son compteur ; pas de second
+  essai) : `complement_pseudonyme` (un nom de membre, par la même méthode que la réponse,
+  homonymes compris) ; `complement_disponibilite` (une disponibilité en France affirmée
+  sur un titre du catalogue, les formes et les réserves de la réponse : une négation,
+  une question, une comparaison n'en sont pas) ; `complement_metadonnee` (un nombre de
+  tomes, un statut, un public, un auteur affirmés sur un titre du catalogue : formes
+  versionnées dans `config/formes_affirmations.toml`, conservatrices — mieux vaut un 503
+  de trop qu'une affirmation fausse ; une négation, une question n'en sont pas, une
+  comparaison si) ; `complement_marque` (un `[S:…]` ou `[F:…]`). Un **titre du
+  catalogue** : celui d'une série du catalogue rendue par la recherche, ou un titre de
+  `complement_titres` que le catalogue porte (comparés sans casse, sans accents ni
+  signes : lettres et chiffres seuls). Une forme se rapporte au titre nommé le plus près
+  avant elle dans sa phrase, sinon au premier nommé après elle dans la phrase, sinon au
+  dernier nommé dans les phrases d'avant, sinon au seul titre de `complement_titres`.
+- **Ce qui ne l'est pas** : la justesse d'une affirmation sur une œuvre hors catalogue ;
+  une métadonnée dite sous une forme que la liste ne connaît pas ; un titre du catalogue
+  que le modèle écrit autrement que le catalogue (au-delà de la casse, des accents et
+  des signes) ; **un titre du catalogue que le texte nomme sans le mettre dans
+  `complement_titres`, quand la recherche ne l'a pas rendu** : il n'est pas reconnu
+  (l'invite demande de nommer au plus cinq titres, pas de les reporter).
+- **Complément vide ou absent** : valide ; les trois champs sont alors **absents** de la
+  réponse — comme en strict, où la réponse reste celle de 1.3.1 champ pour champ (un test
+  la compare à une réponse capturée en 1.3.1, et la requête au fournisseur à la sienne,
+  sous la même forme canonique : clés triées).
+- **Sans passage** : en enrichi, l'appel a lieu quand même, avec un contexte
+  vide de passages ; la partie stricte doit être `refus: true`, `motif_refus:
+  aucun_passage`, sans série citée (sinon 503 `refus_incoherent`), et le complément suit
+  les contrôles. En strict, aucun appel, comme avant.
+- **Jamais dans l'historique** : l'application ne renvoie à l'API que `reponse` comme tour
+  de l'assistant ; le complément n'entre pas dans la conversation (testé côté
+  application).
+- **Profils de repli** : non mesurés en enrichi ; le mode reste sélectionnable avec eux.
+- **Un mode retiré de `reglages.toml`** (`mode.valeurs`) disparaît de `/v1/info`, donc de
+  l'interface (l'application ne montre plus le sélecteur), mais **reste accepté par
+  l'API** : le contrat 1.4.0 garde l'énumération `strict | enrichi`. Le couper vraiment
+  demandera une nouvelle version du contrat.
+- **Mesure** (2026-11-07, en préproduction, `mistral-large-2512`, les 26 questions du profil
+  actif ; banc de la réponse, `--mode enrichi`, run `59004a46…` de l'expérience
+  `E3-reponse-enrichi-preprod`) : **le critère de la partie stricte n'est pas tenu en
+  enrichi** — refus correct F7 **3 / 5** (5 / 5 en strict) : une question F7 n'est plus
+  refusée, une autre rend un 503 pour son complément ; hors catalogue 4 / 5 ; 0 série
+  inventée ; 0 nom de membre. **7 sorties sur 26 coupées** à la longueur par défaut (400
+  jetons) : réponse et complément la dépassent. Complément présent 14 fois sur 26 ; après
+  un refus de la partie stricte, 5 fois sur 6. 3 sorties refusées pour leur complément (1
+  disponibilité, 2 métadonnées). Coût : 0,055 $.
+- **Lecture humaine** (Max, 10 compléments, les refus d'abord, vérifications en ligne) :
+  **2 utiles, 1 inutile, 5 faux, 2 dangereux**. Les deux « dangereux » décrivent comme
+  réelles des œuvres **inventées** par le jeu d'évaluation (questions F7) ; les « faux »
+  inventent des titres, une édition française, un auteur — sur des œuvres hors catalogue,
+  que la route ne peut pas contrôler.
+- **D'où la règle** : le mode enrichi reste **sélectionnable**, mais **n'est pas proposé par
+  défaut** — `strict` reste le défaut de `reglages.toml`, et l'application le présente
+  sélectionné. Motif : sur un échantillon lu, le complément affirme comme vraies des œuvres
+  qui n'existent pas ; l'étiquette « non vérifié » ne suffit pas à en faire le comportement
+  par défaut d'un outil de libraire.
 
 ### Les métadonnées d'une série
 
@@ -583,7 +663,7 @@ série sous `modele_api`, qui ne lit pas ces tables.
 `GET /v1/info` (avec la clé) — le modèle d'embedding servi, et le modèle de langage :
 
 ```json
-{"version_api": "1.3.1", "modele": "google/embeddinggemma-300m",
+{"version_api": "1.4.0", "modele": "google/embeddinggemma-300m",
  "revision": "57c266a740f537b4dc058e1b0cda161fd15afa75", "precision": "float32", "dimension": 768,
  "outil": "text-embeddings-inference", "outil_version": "1.9.4",
  "corpus_id": "v2", "encodage_id": 3, "nb_fragments": 77006,
@@ -645,24 +725,31 @@ statut ; les tests en produisent chacun (« Vérifier »).
 | 503 | `sortie_modele_invalide` | (réponse) la sortie du modèle ne tient pas le contrat | `{"motif": "…", "role": "reponse"}` (ou `"reformulation"`) |
 | 500 | `erreur_interne` | imprévu ; la trace est au journal, sous l'identifiant | `null` |
 
-Les sept motifs de `sortie_modele_invalide`, contrôlés dans cet ordre, chacun compté
-par `api_modele_sortie_invalide_total{motif}` :
+Les onze motifs de `sortie_modele_invalide`, contrôlés dans cet ordre (les quatre du
+complément en mode enrichi seulement), chacun compté par
+`api_modele_sortie_invalide_total{motif}` :
 
 | Motif | Le modèle a rendu… |
 |---|---|
 | `schema` | un JSON invalide, ou hors du schéma (champ manquant, de trop, mal typé) |
 | `serie_inconnue` | une série citée qui n'est pas dans la recherche |
 | `fragment_inconnu` | un fragment cité qui n'est pas un passage de sa série |
-| `refus_incoherent` | un refus qui cite des séries ou sans motif, ou une réponse qui n'en cite aucune ou porte un motif |
+| `refus_incoherent` | un refus qui cite des séries ou sans motif, ou une réponse qui n'en cite aucune ou porte un motif ; en mode enrichi sans passage, autre chose qu'un refus `aucun_passage` sans série citée |
 | `pseudonyme` | un nom de membre, dans la réponse ou la question reformulée (règle des homonymes : « Sécurité et données ») |
 | `disponibilite` | une série citée dite disponible, publiée, éditée, sortie ou commandable en France, alors que sa ligne dit `seulement_au_japon` ou `inconnue` |
 | `demographie` | un public (shōnen, seinen, shōjo, josei) différent de celui de la ligne, quand elle porte l'un de ces quatre |
+| `complement_pseudonyme` | (enrichi) un nom de membre dans le complément ou ses titres |
+| `complement_disponibilite` | (enrichi) une disponibilité en France affirmée sur un titre du catalogue |
+| `complement_metadonnee` | (enrichi) un nombre de tomes, un statut, un public ou un auteur affirmés sur un titre du catalogue |
+| `complement_marque` | (enrichi) un `[S:…]` ou `[F:…]` dans le complément ou ses titres |
 
-Pour ces deux derniers, `details.serie_id` dit la série contredite. **Formes affirmatives
-seulement**, liste versionnée (`config/formes_affirmations.toml`) : une négation, une question,
-une comparaison ne sont pas des affirmations, et une forme se rapporte à la marque `[S:<id>]`
-la plus proche avant elle dans la phrase. Pas de contrôle sur les tomes ni le statut : leurs
-formes sont trop variées ; la ligne et l'invite suffisent, la mesure le dit.
+Pour `disponibilite` et `demographie`, `details.serie_id` dit la série contredite. Dans
+la partie stricte, **formes affirmatives seulement**, liste versionnée
+(`config/formes_affirmations.toml`) : une négation, une question, une comparaison ne sont
+pas des affirmations, et une forme se rapporte à la marque `[S:<id>]` la plus proche avant
+elle dans la phrase. Pas de contrôle sur les tomes ni le statut dans la partie stricte :
+leurs formes sont trop variées ; la ligne et l'invite suffisent, la mesure le dit. Le
+complément du mode enrichi, lui, les contrôle (règles plus haut).
 
 **Pas de second essai**, ni sur une sortie invalide ni sur un refus du fournisseur : un
 seul appel par rôle. L'erreur est visible et comptée ; un second essai cacherait un modèle
@@ -771,8 +858,14 @@ $B estimer mistral-large-2512 famille:F7,issue:hors_catalogue   # aucun appel
 $B estimer-scenarios mistral-large-2512 <fichier des scénarios>.csv   # aucun appel
 $B essai mistral-large-2512 "<question inventée>" [--temperature 0.7] [--longueur-max 1000]
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
-  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
-DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
+  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10 [--etape E]
+# le mode enrichi : essai, estimation, mesure (la ligne eval_runs en préproduction)
+$B estimer mistral-large-2512 famille:F7,issue:hors_catalogue --mode enrichi
+$B essai mistral-large-2512 "<question inventée>" --mode enrichi
+DATABASE_URL='postgresql://postgres@localhost:5432/apimanga_preprod' \
+  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10 \
+  --mode enrichi --experience E3-reponse-enrichi-preprod [--etape E]
+DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv [--etape E]
 $B relire <dossier du run>             # selon les règles d'aujourd'hui, aucun appel
 $B etiqueter                           # les runs déjà faits, a posteriori
 $B registre <profil>=<run_id> …        # une version par profil
@@ -791,7 +884,8 @@ $B registre <profil>=<run_id> …        # une version par profil
   est mesuré est gardé) ; arrêt aussi si un fournisseur refuse ou ne répond pas. Une
   sortie coupée par la borne de longueur (`longueur_atteinte`) n'est pas un
   fournisseur en échec : la question compte en échec, le run continue.
-- **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse`, magasin du
+- **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse` par défaut,
+  réglable par `--experience` ; magasin du
   module 10, écrit par l'interpréteur du module 10 : le module 11 n'installe pas
   MLflow) ; ses pièces ne portent que des identifiants et des nombres — par appel,
   sa latence (échecs compris) et la forme de `message.content` (son type ; en liste,
@@ -806,7 +900,10 @@ $B registre <profil>=<run_id> …        # une version par profil
   dépôt et hors MLflow, pour la lecture humaine.
 - **MLflow, en plus** : chaque run joint en artefacts les deux invites et `reglages.toml`,
   leurs empreintes en paramètres (`invite_reponse_sha`, `invite_reformulation_sha`,
-  `reglages_sha`), et porte ses étiquettes : `etape`, `role` (`profil_actif`, `repli`),
+  `reglages_sha`), et porte ses étiquettes : `etape` (`--etape` de `mesurer` et
+  `scenarios`, 32 caractères au plus, lettres, chiffres, « . », « _ », « - » ; `E3-06`
+  par défaut, soit E3, étape 3, spec 06 ; gardée dans les paramètres du run, que
+  `etiqueter` relit), `role` (`profil_actif`, `repli`),
   `invite_version` (le commit court qui a écrit les invites), `statut` (`complet`,
   `interrompu`), `verdict` (`tenu`, `non_tenu`, sauf les scénarios, sans critère),
   `cause_interruption`. Les runs déjà faits ont reçu leurs étiquettes a posteriori, pas
@@ -825,7 +922,8 @@ $B registre <profil>=<run_id> …        # une version par profil
   la première mesure, on écrit le chiffre. `titre_present` : part des séries citées
   dont le titre est juste avant ou juste après chacune de leurs marques dans le texte
   **du modèle**, avant l'insertion de la route — la règle de l'insertion, appliquée à
-  ce que le modèle fait seul (son texte reste en mémoire, jamais écrit) ; une série
+  ce que le modèle fait seul (son texte reste en mémoire ; il n'est écrit, hors dépôt,
+  que pour la lecture d'une sortie refusée sans nom de membre) ; une série
   citée que le texte ne marque pas est comptée à part (`citees_sans_marque`).
 - **Deux lectures du critère, arrêtées après une mesure et écrites comme telles** (voir
   les résultats) : dire le titre demandé absent des passages vaut mention « pas au
@@ -836,6 +934,47 @@ $B registre <profil>=<run_id> …        # une version par profil
   `verdict_a_la_mesure`), la relecture s'y ajoute (`relecture.json`, métriques `_relu`).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
+- **Le mode enrichi** (`--mode enrichi`, pour `essai`, `estimer`, `mesurer` ; `strict` par
+  défaut, et la requête reste alors celle d'avant le mode, sans le champ `mode`) :
+  - **l'estimation** compte l'invite avec le bloc du complément et, en enrichi, **un
+    appel aussi pour une question sans passage** (question 33) ; elle dit combien de
+    questions sont sans passage (`sans_passage`) ;
+  - **le critère** porte sur la partie stricte, inchangé : un 503 `complement_*` n'y
+    entre pas (la question compte comme une sortie invalide, et le refus correct qu'elle
+    portait peut-être n'est pas compté) ; un nom de membre que le banc trouverait dans un
+    complément **rendu** y entre, comme dans la réponse (le banc refait le contrôle des
+    noms sur le complément et ses titres ; pour un 503 `complement_pseudonyme`, les
+    empreintes du nom, jamais le nom) ;
+  - **les métriques du complément** : `complement_present` (sur les questions),
+    `complement_quand_refus` (sur `refus_rendus`), aussi pour F7 et pour les questions
+    hors catalogue (`_F7`, `_hors_catalogue`) ; `complement_titres_moyen` (sur les
+    compléments rendus ; absente sans complément) ; `sorties_invalides_complement`
+    (chaque motif `complement_*` compté aussi à part) ; `complement_titre_non_declare` :
+    les compléments dont le texte nomme un titre du catalogue absent de
+    `complement_titres` ; `complement_titre_hors_controle` : parmi eux, ceux dont le
+    titre n'est pas non plus celui d'une série rendue par la recherche — la limite du
+    contrôle de la route (voir « Ce qui ne l'est pas »), comptée. Un titre est trouvé
+    dans le texte par sa suite de mots (lettres et chiffres seuls, sans casse ni
+    accents), le plus long d'abord, titres déclarés compris ; « déclaré » se juge par
+    la clé de comparaison du catalogue. Les titres trouvés sont gardés par question.
+    **Limites** : un titre court du catalogue peut être un mot ordinaire du texte
+    (« Ciel », « Air », « 1945 » : faux positif) ; un titre écrit autrement que le
+    catalogue (« Dragonball » pour « Dragon Ball ») n'est pas trouvé (faux négatif) :
+    la lecture des titres trouvés tranche ;
+  - **les textes** des compléments rendus (marqués quand ils suivent un refus), et pour
+    une sortie refusée pour son complément, sa réponse et son complément s'ils ne portent
+    aucun nom de membre, vont dans `reponses.md`, hors dépôt et hors MLflow, pour la
+    lecture de Max ;
+  - **l'estimation** ne compte pas le schéma de sortie (`response_format`), plus long en
+    enrichi : ce que le fournisseur facture en entrée peut dépasser le compte des
+    caractères envoyés ; le plafond du run (`COUT_PLAFOND_RUN`), sur le coût réel, garde ;
+  - **l'enregistrement** : `--experience <nom>` choisit l'expérience MLflow (défaut
+    `E3-reponse` ; `E3-reponse-enrichi-preprod` pour la mesure de l'étape 6 : l'expérience
+    dit l'environnement) ; l'étiquette `mode` est posée sur chaque run ; la note de la
+    ligne `bench.eval_runs` dit le mode. Cette ligne s'écrit dans la base de
+    `DATABASE_URL` : pour la mesure de l'étape 6, la préproduction (`apimanga_preprod`),
+    jamais la production ; l'API du banc, elle, lit sa base comme toujours, en lecture
+    seule.
 
 ## Résultats de la mesure (2026-10-30 ; profil actif rejoué les 2026-11-02 et 03)
 
@@ -964,12 +1103,14 @@ restent mesurées sur l'invite d'avant.
 
 - **Journal** : une ligne JSON par requête (identifiant, route, statut, code, durée,
   nom de la clé ; pour la réponse : profil, tours et taille de l'historique,
-  reformulation `faite` / `ignoree` / `sans`, refus, séries citées, coût) et une ligne
+  reformulation `faite` / `ignoree` / `sans`, refus, séries citées, coût, le mode dans
+  les réglages et, en enrichi, si un complément a été rendu) et une ligne
   par appel au modèle (`appel_modele` : profil, fournisseur, modèle demandé et rendu,
   statut, réglages, jetons, coût, estimation avant appel, latence, date, nom de la
   variable de clé). Jamais un texte, jamais une clé.
 - **Métriques** (`/metrics`, réseau interne) : en plus de celles de l'étape 2,
-  `api_modele_llm_appels_total{profil, role, statut}`,
+  `api_modele_llm_appels_total{profil, role, statut, mode}` (`mode` : `strict` ou
+  `enrichi`, depuis 1.4.0),
   `api_modele_llm_jetons_total{profil, role, type}`,
   `api_modele_llm_cout_usd_total{profil}`, `api_modele_llm_latence_secondes{profil,
   role}`, `api_modele_profil_actif{profil}` (le profil **par défaut** : une demande peut
@@ -1105,7 +1246,9 @@ Pour ajouter une route :
    `contrat/openapi_v1.json` avec la route. Le test d'égalité à l'octet refuse un
    contrat périmé.
 4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`, 1.2.0 pour
-   `metadonnees`, 1.3.0 pour `auteurs`) : la
+   `metadonnees`, 1.3.0 pour `auteurs`, 1.4.0 pour le mode enrichi : une valeur
+   d'énumération d'entrée et trois champs facultatifs ; contrat figé à côté,
+   `contrat/openapi_v1.3.1.json`, comparé par un test) : la
    majeure reste celle de l'adresse. Un en-tête documenté, sans champ ni route, monte la
    corrective (1.3.1 pour `Retry-After`).
 

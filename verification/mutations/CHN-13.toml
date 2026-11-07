@@ -1,0 +1,11 @@
+id = "CHN-13"
+origine = "E3 étape 6, spec 02 (2026-11-07) — le verdict de l'équivalence lu dans le code de sortie : une panne passerait pour un échec d'équivalence"
+fichier = "14_chaine/src/chaine/etapes.py"
+avant = '''    r = json_de(s.stdout)
+    if r is not None and "verdict" in r:'''
+apres = '''    r = json_de(s.stdout)
+    if s.code == 1:
+        raise Arret(Code.TEST_MODELE, "code 1")
+    if r is not None and "verdict" in r:'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]
