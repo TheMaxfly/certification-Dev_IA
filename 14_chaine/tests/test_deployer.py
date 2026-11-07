@@ -59,13 +59,28 @@ def max_(monde: Monde, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Monde
 def livrer(m: Monde, verdict: str, encodage: int, image: str = IMAGE) -> str:
     m.outils.livraisons.mkdir(parents=True, exist_ok=True)
     nom = "20261107T030000Z_requalification_v2"
-    d = {"verdict": verdict, "encodage": encodage, "run": RUN, "image": image}
+    d = {
+        "verdict": verdict,
+        "encodage": encodage,
+        "run": RUN,
+        "image": image,
+        "code": 0 if verdict == "promotion proposée" else 10,
+    }
     (m.outils.livraisons / f"{nom}.json").write_text(json.dumps(d))
     (m.outils.livraisons / f"{nom}.md").write_text("# rapport\n")
     return nom
 
 
 NOM = "20261107T030000Z_requalification_v2"
+
+
+def livrer_arrete_a_7(m: Monde) -> None:
+    """Un passage arrêté à l'étape 7 : le verdict de l'étape 6, mais ni code 0 ni
+    image."""
+    nom = livrer(m, "promotion proposée", 3)
+    js = m.outils.livraisons / f"{nom}.json"
+    d = json.loads(js.read_text())
+    js.write_text(json.dumps(d | {"code": 80, "image": None}))
 
 
 def test_la_promotion_suit_l_ordre_et_verifie_l_api(max_: Monde):
@@ -76,6 +91,7 @@ def test_la_promotion_suit_l_ordre_et_verifie_l_api(max_: Monde):
     noms = [n for n in max_.lanceur.noms() if not n.startswith("git.")]
     assert noms == [
         "docker.pile",
+        "docker.image",
         "10.journal.promouvoir",
         "09.instances.arret",
         "docker.image",
@@ -129,9 +145,19 @@ def test_la_promotion_suit_l_ordre_et_verifie_l_api(max_: Monde):
         ),
         (lambda m: livrer(m, "promotion proposée", 3, "sha256:" + "cd" * 32), "image"),
         (lambda m: livrer(m, "promotion proposée", 4), "aucune vérification"),
+        (lambda m: livrer_arrete_a_7(m), "pas allé au bout"),
         (lambda m: m.environ.update({"CHAINE_BASE": "apimanga"}), "production"),
     ],
-    ids=["refus", "non-pousse", "pgpass", "pile", "image", "encodage-4", "production"],
+    ids=[
+        "refus",
+        "non-pousse",
+        "pgpass",
+        "pile",
+        "image",
+        "encodage-4",
+        "arret-etape-7",
+        "production",
+    ],
 )
 def test_la_promotion_refusee_n_ecrit_rien_au_journal(
     max_: Monde, preparer, motif_attendu
@@ -140,8 +166,7 @@ def test_la_promotion_refusee_n_ecrit_rien_au_journal(
     with pytest.raises(Arret) as e:
         deployer.promouvoir(NOM, "motif", max_.environ, max_.outils)
     assert e.value.code == Code.PREREQUIS and motif_attendu in e.value.motif
-    if motif_attendu != "image":
-        assert "10.journal.promouvoir" not in max_.lanceur.noms()
+    assert "10.journal.promouvoir" not in max_.lanceur.noms()
 
 
 def test_un_motif_vide_est_refuse(max_: Monde):
@@ -301,3 +326,61 @@ def test_la_cle_se_lit_sous_ses_formes(tmp_path: Path):
     env = tmp_path / "env"
     env.write_text('export API_MODELE_CLES="app:secret1, b:secret2"\n')
     assert deployer.cle_api(env) == "secret1"
+
+
+def test_l_api_de_preproduction_se_leve_sous_son_image_jamais_celle_de_production(
+    max_: Monde,
+):
+    from chaine import etapes
+
+    deployer.promouvoir(
+        NOM, "Chaîne, run x : règle D3 tenue.", max_.environ, max_.outils
+    )
+    for nom in ("11.api.up", "11.api.down"):
+        c = max_.lanceur.une(nom)
+        assert str(etapes.COMPOSE_PREPROD) in c.argv, nom
+        assert c.env[etapes.VARIABLE_IMAGE] == etapes.image_de_preproduction(), nom
+    inspecter = max_.lanceur.une("docker.image")
+    assert etapes.image_de_preproduction() in inspecter.argv
+    assert etapes.image_de_l_api() not in inspecter.argv
+
+
+def test_l_etat_ne_dit_pas_none_pour_un_encodage_sans_precedent(max_: Monde):
+    journal = {
+        "en_service": {"encodage_id": 3},
+        "journal": [
+            {
+                "promotion_id": 1,
+                "decide_le": "2026-10-10 00:03:29+02",
+                "decision": "promu",
+                "encodage_id": 2,
+                "encodage_precedent_id": None,
+                "run_id": None,
+                "decide_par": "Max",
+                "derogation": False,
+            }
+        ],
+    }
+    max_.lanceur.reponses |= {
+        "10.journal.etat": Sortie(0, json.dumps(journal)),
+        "psql.motifs": Sortie(0, "1\tReprise de la décision de Max.\n"),
+    }
+    deployer.etat(max_.environ, max_.outils)
+    texte = "\n".join(max_.ecran)
+    assert "promu · encodage 2 (précédent —) · run —" in texte
+    assert "None" not in texte
+
+
+@pytest.mark.parametrize("geste", ["promouvoir", "revenir"])
+def test_sans_image_de_preproduction_rien_n_est_ecrit_au_journal(
+    max_: Monde, geste: str
+):
+    max_.lanceur.reponses["docker.image"] = Sortie(1, "", "No such image")
+    with pytest.raises(Arret) as e:
+        if geste == "promouvoir":
+            deployer.promouvoir(NOM, "motif", max_.environ, max_.outils)
+        else:
+            deployer.revenir("motif", max_.environ, max_.outils)
+    assert e.value.code == Code.PREREQUIS
+    assert "est absente du poste" in e.value.motif
+    assert f"10.journal.{geste}" not in max_.lanceur.noms()

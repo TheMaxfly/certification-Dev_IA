@@ -351,7 +351,11 @@ def etape_7(p: Passage, o: Outils) -> dict[str, Any]:
     if e.code != 0 or not e.stdout.strip():
         raise Arret(Code.PACKAGING, "empreinte de l'image illisible", e.stderr)
     p.image = e.stdout.strip()
-    return {"image": etapes.image_de_l_api(), "empreinte": p.image}
+    return {
+        "image": etapes.image_de_preproduction(),
+        "empreinte": p.image,
+        "cache": etapes.cache_de(f"{s.stdout}\n{s.stderr}"),
+    }
 
 
 def requis(p: Passage) -> tuple[Candidat, Cible]:

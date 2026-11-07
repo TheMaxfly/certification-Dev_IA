@@ -10,6 +10,7 @@ import pytest
 from conftest import (
     CANDIDATS,
     INFO_GEMMA,
+    RACINE,
     REELLES,
     Monde,
     apres,
@@ -724,3 +725,111 @@ def test_un_motif_aux_valeurs_variees_et_le_repli_sur_le_brut(
 
     monkeypatch.setattr(rapport, "motif_lisible", panne)
     assert "| brut {'a': 1} |" in rapport.markdown(d, "la suite")
+
+
+# --------------------------------------------------------------------------- #
+#  L'image de la préproduction (écart 04-4) et le cache de l'étape 7 ; le passage à
+#  blanc sans « None » (écart 04-2)
+# --------------------------------------------------------------------------- #
+
+CONSTRUCTION_EN_CACHE = (REELLES / "construction_image_en_cache.txt").read_text("utf-8")
+
+
+def test_l_image_de_la_preproduction_n_est_jamais_celle_de_la_production(
+    monde: Monde,
+):
+    from chaine import etapes
+
+    production = etapes.image_de_l_api()
+    preproduction = etapes.image_de_preproduction()
+    assert preproduction == f"{production}-preprod" and preproduction != production
+    requalification(monde)
+    p = lancer(monde, REQUALIFICATION)
+    construire = monde.lanceur.une("11.image")
+    assert construire.argv[construire.argv.index("-f", 5) + 1] == str(
+        etapes.COMPOSE_PREPROD
+    )
+    assert construire.env == {etapes.VARIABLE_IMAGE: preproduction}
+    inspecter = monde.lanceur.une("docker.image")
+    assert preproduction in inspecter.argv and production not in inspecter.argv
+    for c in monde.lanceur.lancees:
+        if c.argv[:2] == ("docker", "compose"):
+            assert str(etapes.COMPOSE_PREPROD) in c.argv, c.nom
+            assert c.env.get(etapes.VARIABLE_IMAGE) == preproduction, c.nom
+    assert p.resultats[7].details["image"] == preproduction
+
+
+def test_le_compose_de_la_preproduction_remplace_l_image_et_exige_la_variable():
+    """La fusion réelle (`docker compose config`) : l'image résolue est celle de la
+    préproduction, jamais celle de la production ; sans la variable, refus."""
+    import os
+    import subprocess
+
+    import yaml
+
+    from chaine import etapes
+
+    d = yaml.safe_load(etapes.COMPOSE_PREPROD.read_text("utf-8"))
+    assert list(d["services"]) == ["api"] and list(d["services"]["api"]) == ["image"]
+    commande = [
+        "docker",
+        "compose",
+        "--env-file",
+        "/dev/null",
+        "-f",
+        str(etapes.COMPOSE_11),
+        "-f",
+        str(etapes.COMPOSE_PREPROD),
+        "config",
+        "--images",
+    ]
+    base = {"PATH": os.environ["PATH"], "API_MODELE_PGPASS": "/dev/null"}
+    fusion = subprocess.run(
+        commande, env=base | etapes.env_image(), capture_output=True, text=True
+    )
+    assert fusion.returncode == 0, fusion.stderr
+    images = fusion.stdout.split()
+    assert etapes.image_de_preproduction() in images
+    assert etapes.image_de_l_api() not in images
+    sans = subprocess.run(commande, env=base, capture_output=True, text=True)
+    assert sans.returncode != 0 and etapes.VARIABLE_IMAGE in sans.stderr
+
+
+def test_l_etape_7_dit_ce_qui_sort_du_cache(monde: Monde):
+    from chaine import etapes
+
+    assert etapes.cache_de(CONSTRUCTION_EN_CACHE) == (
+        "toutes les étapes reprises du cache (18), même contenu (l'empreinte peut"
+        " changer : métadonnées)"
+    )
+    une_refaite = CONSTRUCTION_EN_CACHE.replace("#11 CACHED\n", "#11 DONE 4.2s\n")
+    assert etapes.cache_de(une_refaite) == "17 étapes sur 18 reprises du cache"
+    une_seule = "#8 [a 2/3] RUN x\n#8 CACHED\n#9 [a 3/3] RUN y\n#9 DONE 1.0s\n"
+    assert etapes.cache_de(une_seule) == "1 étape sur 2 reprise du cache"
+    assert etapes.cache_de("").startswith("inconnu")
+    requalification(monde)
+    monde.lanceur.reponses["11.image"] = Sortie(0, "", CONSTRUCTION_EN_CACHE)
+    p = lancer(monde, REQUALIFICATION)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    assert (
+        "cache : toutes les étapes reprises du cache (18)" in lignes_des_etapes(md)[7]
+    )
+
+
+def test_le_passage_a_blanc_de_la_requalification_ne_dit_pas_none(monde: Monde):
+    ecran: list[str] = []
+    executer.a_blanc(REQUALIFICATION, monde.environ, ecran.append)
+    sortie = "\n".join(ecran)
+    assert "None" not in sortie
+    assert "écrit : rien (le candidat réutilise l'encodage 3)" in sortie
+    from chaine import etapes
+
+    assert etapes.image_de_preproduction() in sortie
+
+
+def test_les_cibles_de_la_chaine_font_taire_les_lignes_de_construction_d_uv():
+    """Écart 04-3 : `uv run --quiet` dans `CHAINE` (les lignes de construction d'uv
+    portaient un chemin personnel)."""
+    makefile = (RACINE / "Makefile").read_text("utf-8")
+    debut = makefile.index("CHAINE = ")
+    assert "uv run --quiet " in makefile[debut : makefile.index("\n\n", debut)]

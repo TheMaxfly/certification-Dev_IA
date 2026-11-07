@@ -112,7 +112,7 @@ verify-mutations:
 # La chaîne de livraison du modèle (module 14) : la préproduction seule, jamais la
 # production ; le motif des gestes de Max n'a pas de valeur par défaut.
 CHAINE = cd 14_chaine && EQUIVALENCE_DOSSIER="$(EQUIVALENCE_DOSSIER)" \
-	uv run --locked --no-env-file python -m chaine
+	uv run --quiet --locked --no-env-file python -m chaine
 
 preprod-creer:
 	@$(CHAINE) preprod

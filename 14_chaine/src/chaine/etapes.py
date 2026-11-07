@@ -21,6 +21,7 @@ from chaine.candidat import Candidat
 from chaine.codes import Arret, Code
 from chaine.environnement import (
     RACINE_DEPOT,
+    RACINE_MODULE,
     VARIABLE_DOSSIER,
     Cible,
     Commande,
@@ -34,6 +35,9 @@ M09 = RACINE_DEPOT / "09_service_embedding"
 M10 = RACINE_DEPOT / "10_mesures_recherche"
 M11 = RACINE_DEPOT / "11_api_modele"
 COMPOSE_11 = M11 / "docker-compose.yml"
+#: Le Compose de la préproduction, posé sur celui du 11 : l'image du service `api`.
+COMPOSE_PREPROD = RACINE_MODULE / "compose.preprod.yml"
+VARIABLE_IMAGE = "CHAINE_IMAGE_PREPROD"
 PROJET_PREPROD = "api-modele-preprod"
 EXPERIENCE = "E3-chaine-preprod"
 MLFLOW = M10 / "mlflow"
@@ -189,8 +193,12 @@ def encoder(c: Candidat, cible: Cible, travail: Path) -> Commande:
         ),
         dossier=M09,
         env={"DATABASE_URL": cible.dsn("postgres")},
-        ecrit=f"un encodage {c.modele} du corpus {c.corpus} et ses vecteurs"
-        " (préproduction)",
+        ecrit=(
+            f"un encodage {c.modele} du corpus {c.corpus} et ses vecteurs"
+            " (préproduction)"
+            if c.modele
+            else f"rien (le candidat réutilise l'encodage {c.encodage})"
+        ),
     )
 
 
@@ -315,30 +323,79 @@ def image_de_l_api() -> str:
     return trouve.group(1)
 
 
+def image_de_preproduction() -> str:
+    """L'étiquette de l'image de l'API de préproduction : celle du Compose du 11,
+    suffixée `-preprod`. La chaîne ne construit ni ne lève jamais l'étiquette de la
+    production (écart 04-4 de l'étape 6 : une construction sous ce nom l'avait
+    déplacée)."""
+    return f"{image_de_l_api()}-preprod"
+
+
+def env_image() -> dict[str, str]:
+    """La variable que lit `compose.preprod.yml` : l'image de la préproduction."""
+    return {VARIABLE_IMAGE: image_de_preproduction()}
+
+
+def compose_preprod(*action: str) -> tuple[str, ...]:
+    """`docker compose` sur le projet de la préproduction : le Compose du 11, et
+    par-dessus `compose.preprod.yml`, qui remplace l'image du service `api`."""
+    return (
+        "docker",
+        "compose",
+        "-p",
+        PROJET_PREPROD,
+        "-f",
+        str(COMPOSE_11),
+        "-f",
+        str(COMPOSE_PREPROD),
+        *action,
+    )
+
+
+#: Une étape de construction de `docker build --progress plain` (hors `FROM` et hors
+#: étapes internes), et une étape reprise du cache.
+ETAPE_DE_CONSTRUCTION = re.compile(r"^#(\d+) \[[^\]]*\d+/\d+\] (?!FROM )", re.M)
+ETAPE_EN_CACHE = re.compile(r"^#(\d+) CACHED\s*$", re.M)
+
+
+def cache_de(sortie: str) -> str:
+    """Ce que la construction a repris du cache, dit en mots (étape 7 du rapport)."""
+    etapes = set(ETAPE_DE_CONSTRUCTION.findall(sortie))
+    if not etapes:
+        return "inconnu (aucune étape lue dans la sortie)"
+    en_cache = etapes & set(ETAPE_EN_CACHE.findall(sortie))
+    if en_cache == etapes:
+        return (
+            f"toutes les étapes reprises du cache ({len(etapes)}), même contenu"
+            " (l'empreinte peut changer : métadonnées)"
+        )
+    n = len(en_cache)
+    pluriel = "s" if n > 1 else ""
+    return f"{n} étape{pluriel} sur {len(etapes)} reprise{pluriel} du cache"
+
+
 def construire_image() -> Commande:
     return Commande(
         "11.image",
-        (
-            "docker",
-            "compose",
-            "-p",
-            PROJET_PREPROD,
-            "-f",
-            str(COMPOSE_11),
-            "--progress",
-            "plain",
-            "build",
-            "api",
-        ),
+        compose_preprod("--progress", "plain", "build", "api"),
         dossier=M11,
-        ecrit=f"l'image {image_de_l_api()} (locale)",
+        env=env_image(),
+        ecrit=f"l'image {image_de_preproduction()} (locale) ; l'étiquette de la"
+        " production n'est pas touchée",
     )
 
 
 def empreinte_image() -> Commande:
     return Commande(
         "docker.image",
-        ("docker", "image", "inspect", image_de_l_api(), "--format", "{{.Id}}"),
+        (
+            "docker",
+            "image",
+            "inspect",
+            image_de_preproduction(),
+            "--format",
+            "{{.Id}}",
+        ),
     )
 
 

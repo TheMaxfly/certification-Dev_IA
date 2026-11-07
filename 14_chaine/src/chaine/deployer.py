@@ -150,20 +150,13 @@ def lever_instance(instance: str) -> Commande:
 def compose_api(cb: Cible, pgpass: str, *action: str) -> Commande:
     return Commande(
         f"11.api.{action[0]}",
-        (
-            "docker",
-            "compose",
-            "-p",
-            etapes.PROJET_PREPROD,
-            "-f",
-            str(etapes.COMPOSE_11),
-            *action,
-        ),
+        etapes.compose_preprod(*action),
         dossier=etapes.M11,
         env={
             "API_MODELE_DSN_CONTENEUR": f"postgresql://modele_api@host.docker.internal:5432/{cb.base}",
             "API_MODELE_PGPASS": pgpass,
             "API_MODELE_PORT_PUBLIE": str(PORT_PREPROD),
+            **etapes.env_image(),
         },
     )
 
@@ -184,19 +177,35 @@ def attendre(
         o.dormir(3.0)
 
 
+def image_presente(o: Outils, attendue: str | None = None) -> str:
+    """L'empreinte de l'image de l'API de préproduction, présente sur le poste, et, si
+    une est attendue, celle-là ; sinon refus (un préalable : rien n'est écrit)."""
+    nom = etapes.image_de_preproduction()
+    s = o.lanceur(etapes.empreinte_image())
+    lu = s.stdout.strip()
+    if s.code != 0 or not lu:
+        raise Arret(
+            Code.PREREQUIS,
+            f"l'image de préproduction {nom} est absente du poste : un passage de la"
+            " chaîne jusqu'à l'étape 7 la construit",
+        )
+    if attendue is not None and lu != attendue:
+        raise Arret(
+            Code.PREREQUIS,
+            f"l'image de préproduction {nom} ({lu[:19]}…) n'est pas celle du rapport"
+            f" ({attendue[:19]}…) : elle a été reconstruite ou étiquetée depuis (par"
+            " un passage plus récent, par exemple) ; relancer ce passage, ou promouvoir"
+            " le rapport qui la désigne",
+        )
+    return lu
+
+
 def deployer(
     o: Outils, cb: Cible, pgpass: str, cle: str, encodage: int, image: str | None
 ) -> dict[str, Any]:
     """Instances arrêtées, API de préproduction levée, `/v1/info` lu, API arrêtée."""
     o.lanceur(arreter_instances())
-    if image is not None:
-        lu = o.lanceur(etapes.empreinte_image()).stdout.strip()
-        if lu != image:
-            raise Arret(
-                Code.PREREQUIS,
-                f"l'image locale ({lu[:19]}…) n'est pas celle du rapport"
-                f" ({image[:19]}…)",
-            )
+    image_presente(o, image)
     s = o.lanceur(compose_api(cb, pgpass, "up", "-d", "--no-build"))
     try:
         if s.code != 0:
@@ -346,12 +355,21 @@ def promouvoir(
             f"verdict « {d.get('verdict')} » : la chaîne ne promeut que sur « promotion"
             " proposée » (une dérogation passe par le module 10, pas par la chaîne)",
         )
+    if d.get("code") != int(Code.PROMOTION_PROPOSEE) or not d.get("image"):
+        raise Arret(
+            Code.PREREQUIS,
+            f"le passage n'est pas allé au bout (code {d.get('code', '—')},"
+            f" image {'désignée' if d.get('image') else 'absente'}) : la chaîne ne"
+            " promeut qu'un passage au code 0 dont le rapport désigne une image ;"
+            " relancer le passage",
+        )
     encodage, run = d.get("encodage"), d.get("run")
     if not isinstance(encodage, int) or not run or encodage not in VERIFICATIONS:
         raise Arret(
             Code.PREREQUIS, f"encodage {encodage} : aucune vérification connue pour lui"
         )
     cb, pgpass, cle = prealables_communs(environ, o)
+    image_presente(o, d.get("image"))
     complet = (
         f"{motif.strip()} — rapport 14_chaine/livraisons/{js.stem}.md ({commit[:12]})"
     )
@@ -395,6 +413,7 @@ def revenir(motif: str, environ: Mapping[str, str], o: Outils) -> Code:
             Code.PREREQUIS, 'le motif est obligatoire (MOTIF="…"), et il est de Max'
         )
     cb, pgpass, cle = prealables_communs(environ, o)
+    image_presente(o)
     s = o.lanceur(
         journal_des_promotions(cb, "revenir", "--motif", motif.strip(), "--par", "Max")
     )
@@ -441,13 +460,13 @@ def etat(environ: Mapping[str, str], o: Outils) -> Code:
     en_service: dict[str, Any] = r.get("en_service") or {}
     o.afficher(
         f"Préproduction ({cb.base}) — encodage en service :"
-        f" {en_service.get('encodage_id')}"
+        f" {en_service.get('encodage_id') or '—'}"
     )
     for ligne in r.get("journal", []):
         o.afficher(
             f"  n° {ligne['promotion_id']} · {str(ligne['decide_le'])[:19]}"
             f" · {ligne['decision']} · encodage {ligne['encodage_id']}"
-            f" (précédent {ligne['encodage_precedent_id']})"
+            f" (précédent {ligne['encodage_precedent_id'] or '—'})"
             f" · run {str(ligne['run_id'] or '—')[:8]} · {ligne['decide_par']}"
             f" · {motifs.get(str(ligne['promotion_id']), '')}"
         )
@@ -455,6 +474,6 @@ def etat(environ: Mapping[str, str], o: Outils) -> Code:
         d = json.loads(js.read_text(encoding="utf-8"))
         o.afficher(
             f"  livraison {chemin_lisible(js)} : {d.get('verdict') or '—'},"
-            f" code {d.get('code')}"
+            f" code {d.get('code', '—')}"
         )
     return Code.PROMOTION_PROPOSEE
