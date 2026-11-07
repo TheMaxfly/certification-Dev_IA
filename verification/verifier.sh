@@ -875,7 +875,7 @@ poste() {
   (cd "$RACINE" && "${PROPRE[@]}" "${cmd[@]}") || echouer poste "état d'apimanga" "${cmd[*]}"
   dire "poste — cohérence avec l'ensemble de règles de GitHub (gh)"
   REGLES=1 coherence || echouer poste "cohérence" "REGLES=1 bash verification/verifier.sh coherence"
-  dire "poste — harnais : accessibilité de l'application, fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages compris), ensemble de règles passés"
+  dire "poste — harnais : accessibilité de l'application, fidelite.sh, équivalence du service et de l'API, état d'apimanga (pseudonymes des passages rendus par l'API et des fichiers suivis compris), ensemble de règles passés"
 }
 
 # --------------------------------------------------------------------------- #

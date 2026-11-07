@@ -247,3 +247,19 @@ def test_les_metriques_lues_existent_aux_modules_11_et_12():
             assert metrique in api, metrique
         if metrique.startswith("application_"):
             assert metrique in application, metrique
+
+
+def config_du_panneau(nom: str, titre: str) -> dict[str, Any]:
+    (panneau,) = [p for p in panneaux(nom) if p.get("title") == titre]
+    return panneau["fieldConfig"]["defaults"]
+
+
+def test_les_trois_defauts_d_affichage_sont_corriges():
+    """Relevés à l'étape 5 : graduations du disque toutes égales faute de décimale ;
+    axe du taux de réussite zoomé sur une ligne plate ; trous de la durée moyenne
+    reliés par une diagonale."""
+    assert config_du_panneau("service", "Machine : disque")["decimals"] == 3
+    taux = config_du_panneau("modele", "Dernière mesure : taux de réussite à 10")
+    assert (taux["min"], taux["max"]) == (0, 1)
+    duree = config_du_panneau("service", "Service d'embedding : durée moyenne")
+    assert duree["custom"]["spanNulls"] is False

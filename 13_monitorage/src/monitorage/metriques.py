@@ -33,7 +33,7 @@ class EtatSonde:
 
 @dataclass(frozen=True)
 class Mesure:
-    """La dernière mesure de l'encodage en service, lue en base."""
+    """La mesure qui a fait promouvoir l'encodage en service, lue en base."""
 
     hit_rate_10: float
     horodatage: float
@@ -52,12 +52,13 @@ class _Collecteur(Collector):
         if self.mesure is not None:
             yield GaugeMetricFamily(
                 "modele_derniere_mesure_hit_rate_10",
-                "Taux de réussite à 10, dernière mesure de l'encodage en service.",
+                "Taux de réussite à 10, mesure du run cité par la dernière promotion"
+                " de l'encodage en service.",
                 value=self.mesure.hit_rate_10,
             )
             yield GaugeMetricFamily(
                 "modele_derniere_mesure_timestamp",
-                "Date de la dernière mesure de l'encodage en service, en secondes.",
+                "Date de cette mesure, en secondes.",
                 value=self.mesure.horodatage,
             )
 
@@ -117,7 +118,7 @@ class Metriques:
         )
         self.base_activee = Gauge(
             "modele_exporteur_base_activee",
-            "1 si l'exporteur lit la dernière mesure en base, 0 sinon.",
+            "1 si l'exporteur lit la mesure en base, 0 sinon.",
             registry=self.registre,
         )
         self.base_activee.set(1 if lecture_base else 0)
@@ -127,6 +128,11 @@ class Metriques:
 
     def publier_mesure(self, mesure: Mesure) -> None:
         self._collecteur.mesure = mesure
+
+    def retirer_mesure(self) -> None:
+        """Plus de mesure à publier (promotion sans run ni référence, run sans
+        mesure) : les deux jauges disparaissent, plutôt qu'un chiffre périmé."""
+        self._collecteur.mesure = None
 
     def exposer(self) -> bytes:
         return generate_latest(self.registre)

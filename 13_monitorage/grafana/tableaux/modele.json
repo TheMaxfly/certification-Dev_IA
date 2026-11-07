@@ -845,7 +845,7 @@
     {
       "type": "timeseries",
       "title": "Dernière mesure : taux de réussite à 10",
-      "description": "Ce qu'il montre : la qualité de référence de l'encodage en service, lue en base ; un chiffre qui ne bouge qu'à une nouvelle mesure, pas un signal vivant. Normal : 52,5 %. Sans valeur : la lecture de la base n'est pas activée.",
+      "description": "Ce qu'il montre : la qualité de référence de l'encodage en service, celle du run cité par sa dernière promotion, lue en base ; un chiffre qui ne bouge qu'à une promotion ou un retour arrière, pas un signal vivant. Normal : 52,5 %. Sans valeur : la lecture de la base n'est pas activée, ou l'encodage en service n'a pas de mesure à publier.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -884,7 +884,9 @@
             "showPoints": "auto",
             "fillOpacity": 5,
             "spanNulls": true
-          }
+          },
+          "min": 0,
+          "max": 1
         },
         "overrides": [
           {
@@ -937,7 +939,7 @@
     {
       "type": "stat",
       "title": "Âge de la dernière mesure et lecture de la base",
-      "description": "Ce qu'il montre : depuis quand la qualité n'a pas été remesurée, et si l'exporteur lit la base. Normal : l'âge grandit jusqu'à la prochaine mesure. Une mesure vieille est une information : le modèle a pu changer sans être remesuré.",
+      "description": "Ce qu'il montre : l'âge de la mesure qui a fait promouvoir l'encodage en service (un rejeu ne la rajeunit pas), et si l'exporteur lit la base. Normal : l'âge grandit jusqu'à la prochaine promotion. Une mesure vieille est une information : le modèle a pu changer sans être remesuré.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"

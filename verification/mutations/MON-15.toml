@@ -1,0 +1,7 @@
+id = "MON-15"
+origine = "E3 étape 6, bloc C, C6 (2026-11-07) — la référence connue l'emporterait sur le run cité par la promotion : un encodage promu de nouveau, avec un run, publierait l'ancienne mesure"
+fichier = "13_monitorage/src/monitorage/exporteur.py"
+avant = '''        return str(run_id)'''
+apres = '''        return REFERENCES.get(int(encodage_id), str(run_id))'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_exporteur.py"]

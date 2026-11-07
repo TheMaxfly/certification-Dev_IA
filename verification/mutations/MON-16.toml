@@ -1,0 +1,7 @@
+id = "MON-16"
+origine = "E3 étape 6, bloc C, C6 (2026-11-07) — la première promotion au lieu de la dernière : après 3 → 2 → 3, l'exporteur relirait l'ancien run de l'encodage"
+fichier = "13_monitorage/src/monitorage/exporteur.py"
+avant = '''    " ORDER BY p.promotion_id DESC LIMIT 1"'''
+apres = '''    " ORDER BY p.promotion_id ASC LIMIT 1"'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_exporteur.py"]
