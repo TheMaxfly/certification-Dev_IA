@@ -592,6 +592,12 @@ en strict.
   de l'assistant ; le complément n'entre pas dans la conversation (testé côté
   application).
 - **Profils de repli** : non mesurés en enrichi ; le mode reste sélectionnable avec eux.
+- **Un mode retiré de `reglages.toml`** (`mode.valeurs`) disparaît de `/v1/info`, donc de
+  l'interface (l'application ne montre plus le sélecteur), mais **reste accepté par
+  l'API** : le contrat 1.4.0 garde l'énumération `strict | enrichi`. Le couper vraiment
+  demandera une nouvelle version du contrat.
+- **Mesure** : le banc de la réponse, `--mode enrichi` (ci-dessous, « Le banc de mesure de
+  la réponse »).
 
 ### Les métadonnées d'une série
 
@@ -835,6 +841,12 @@ $B estimer-scenarios mistral-large-2512 <fichier des scénarios>.csv   # aucun a
 $B essai mistral-large-2512 "<question inventée>" [--temperature 0.7] [--longueur-max 1000]
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
   $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
+# le mode enrichi : essai, estimation, mesure (la ligne eval_runs en préproduction)
+$B estimer mistral-large-2512 famille:F7,issue:hors_catalogue --mode enrichi
+$B essai mistral-large-2512 "<question inventée>" --mode enrichi
+DATABASE_URL='postgresql://postgres@localhost:5432/apimanga_preprod' \
+  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10 \
+  --mode enrichi --experience E3-reponse-enrichi-preprod
 DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
 $B relire <dossier du run>             # selon les règles d'aujourd'hui, aucun appel
 $B etiqueter                           # les runs déjà faits, a posteriori
@@ -854,7 +866,8 @@ $B registre <profil>=<run_id> …        # une version par profil
   est mesuré est gardé) ; arrêt aussi si un fournisseur refuse ou ne répond pas. Une
   sortie coupée par la borne de longueur (`longueur_atteinte`) n'est pas un
   fournisseur en échec : la question compte en échec, le run continue.
-- **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse`, magasin du
+- **Ce qu'il garde** : un run MLflow par profil (expérience `E3-reponse` par défaut,
+  réglable par `--experience` ; magasin du
   module 10, écrit par l'interpréteur du module 10 : le module 11 n'installe pas
   MLflow) ; ses pièces ne portent que des identifiants et des nombres — par appel,
   sa latence (échecs compris) et la forme de `message.content` (son type ; en liste,
@@ -888,7 +901,8 @@ $B registre <profil>=<run_id> …        # une version par profil
   la première mesure, on écrit le chiffre. `titre_present` : part des séries citées
   dont le titre est juste avant ou juste après chacune de leurs marques dans le texte
   **du modèle**, avant l'insertion de la route — la règle de l'insertion, appliquée à
-  ce que le modèle fait seul (son texte reste en mémoire, jamais écrit) ; une série
+  ce que le modèle fait seul (son texte reste en mémoire ; il n'est écrit, hors dépôt,
+  que pour la lecture d'une sortie refusée sans nom de membre) ; une série
   citée que le texte ne marque pas est comptée à part (`citees_sans_marque`).
 - **Deux lectures du critère, arrêtées après une mesure et écrites comme telles** (voir
   les résultats) : dire le titre demandé absent des passages vaut mention « pas au
@@ -899,6 +913,47 @@ $B registre <profil>=<run_id> …        # une version par profil
   `verdict_a_la_mesure`), la relecture s'y ajoute (`relecture.json`, métriques `_relu`).
 - **Codes de sortie** : 0 fait ; 2 refusé avant tout appel ; 3 run interrompu ; 4 run
   mesuré mais non enregistré (`reprendre <dossier>` rejoue l'enregistrement).
+- **Le mode enrichi** (`--mode enrichi`, pour `essai`, `estimer`, `mesurer` ; `strict` par
+  défaut, et la requête reste alors celle d'avant le mode, sans le champ `mode`) :
+  - **l'estimation** compte l'invite avec le bloc du complément et, en enrichi, **un
+    appel aussi pour une question sans passage** (question 33) ; elle dit combien de
+    questions sont sans passage (`sans_passage`) ;
+  - **le critère** porte sur la partie stricte, inchangé : un 503 `complement_*` n'y
+    entre pas (la question compte comme une sortie invalide, et le refus correct qu'elle
+    portait peut-être n'est pas compté) ; un nom de membre que le banc trouverait dans un
+    complément **rendu** y entre, comme dans la réponse (le banc refait le contrôle des
+    noms sur le complément et ses titres ; pour un 503 `complement_pseudonyme`, les
+    empreintes du nom, jamais le nom) ;
+  - **les métriques du complément** : `complement_present` (sur les questions),
+    `complement_quand_refus` (sur `refus_rendus`), aussi pour F7 et pour les questions
+    hors catalogue (`_F7`, `_hors_catalogue`) ; `complement_titres_moyen` (sur les
+    compléments rendus ; absente sans complément) ; `sorties_invalides_complement`
+    (chaque motif `complement_*` compté aussi à part) ; `complement_titre_non_declare` :
+    les compléments dont le texte nomme un titre du catalogue absent de
+    `complement_titres` ; `complement_titre_hors_controle` : parmi eux, ceux dont le
+    titre n'est pas non plus celui d'une série rendue par la recherche — la limite du
+    contrôle de la route (voir « Ce qui ne l'est pas »), comptée. Un titre est trouvé
+    dans le texte par sa suite de mots (lettres et chiffres seuls, sans casse ni
+    accents), le plus long d'abord, titres déclarés compris ; « déclaré » se juge par
+    la clé de comparaison du catalogue. Les titres trouvés sont gardés par question.
+    **Limites** : un titre court du catalogue peut être un mot ordinaire du texte
+    (« Ciel », « Air », « 1945 » : faux positif) ; un titre écrit autrement que le
+    catalogue (« Dragonball » pour « Dragon Ball ») n'est pas trouvé (faux négatif) :
+    la lecture des titres trouvés tranche ;
+  - **les textes** des compléments rendus (marqués quand ils suivent un refus), et pour
+    une sortie refusée pour son complément, sa réponse et son complément s'ils ne portent
+    aucun nom de membre, vont dans `reponses.md`, hors dépôt et hors MLflow, pour la
+    lecture de Max ;
+  - **l'estimation** ne compte pas le schéma de sortie (`response_format`), plus long en
+    enrichi : ce que le fournisseur facture en entrée peut dépasser le compte des
+    caractères envoyés ; le plafond du run (`COUT_PLAFOND_RUN`), sur le coût réel, garde ;
+  - **l'enregistrement** : `--experience <nom>` choisit l'expérience MLflow (défaut
+    `E3-reponse` ; `E3-reponse-enrichi-preprod` pour la mesure de l'étape 6 : l'expérience
+    dit l'environnement) ; l'étiquette `mode` est posée sur chaque run ; la note de la
+    ligne `bench.eval_runs` dit le mode. Cette ligne s'écrit dans la base de
+    `DATABASE_URL` : pour la mesure de l'étape 6, la préproduction (`apimanga_preprod`),
+    jamais la production ; l'API du banc, elle, lit sa base comme toujours, en lecture
+    seule.
 
 ## Résultats de la mesure (2026-10-30 ; profil actif rejoué les 2026-11-02 et 03)
 

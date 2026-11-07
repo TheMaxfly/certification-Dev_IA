@@ -1,0 +1,7 @@
+id = "API-98"
+origine = "E3 étape 6, spec 06, E (2026-11-07) — le compte des titres du catalogue nommés sans être déclarés qui ne juge plus « déclaré » par la clé : un titre déclaré autrement écrit compté quand même, un compte gonflé"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''            if titre is None or titre_comparable(titre) in cles or titre in trouves:'''
+apres = '''            if titre is None or titre in trouves:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_enrichi.py", "-k", "nommes_sans_etre_declares"]
