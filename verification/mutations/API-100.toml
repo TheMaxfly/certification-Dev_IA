@@ -1,0 +1,7 @@
+id = "API-100"
+origine = "E3 étape 6, spec 06, E (2026-11-07) — le banc qui garderait pour la lecture le texte d'une sortie refusée pour son complément alors qu'il porte un nom de membre"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''    if banc_.pseudonymes.empreintes_trouvees(texte):'''
+apres = '''    if False:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_enrichi.py", "-k", "portant_un_nom_de_membre"]

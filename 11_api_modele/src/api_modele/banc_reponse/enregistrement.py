@@ -6,7 +6,8 @@ ligne `bench.eval_runs`.
 - Les textes des réponses vont dans un fichier hors dépôt, hors MLflow
   (`05_…/data/rapports/mesures_reponse/<run>/`), pour la lecture humaine ; ils ont
   passé le contrôle des noms de membres avant d'y être écrits.
-- Le run MLflow (expérience `E3-reponse`, magasin du module 10) est écrit par
+- Le run MLflow (expérience `E3-reponse` par défaut, réglable : `--experience` ;
+  magasin du module 10) est écrit par
   l'interpréteur du module 10 (`journal_mlflow.py`), avec un environnement réduit
   (ni clé, ni DSN) ; ses pièces ne portent aucun texte de passage ni de réponse.
 - La ligne `bench.eval_runs` (corpus, encodage, run) est écrite sous le DSN du
@@ -47,6 +48,10 @@ SORTIES = (
 MODULE_10 = RACINE_DEPOT / "10_mesures_recherche"
 STOCKAGE = MODULE_10 / "mlflow"
 EXPERIENCE = "E3-reponse"
+#: Le nom d'une autre expérience (`mesurer --experience`, par exemple
+#: `E3-reponse-enrichi-preprod` : l'expérience dit l'environnement, question 40 de
+#: l'étape 6).
+FORME_EXPERIENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SCRIPT = Path(__file__).with_name("journal_mlflow.py")
 #: Ce que l'interpréteur du module 10 reçoit de l'environnement : de quoi trouver uv
 #: et son cache, rien d'autre (ni clé de fournisseur, ni DSN).
@@ -352,13 +357,15 @@ def charge_mlflow(
     pieces: dict[str, object],
     stockage: Path | None = None,
     fichiers: Mapping[str, str] | None = None,
+    experience: str = EXPERIENCE,
 ) -> dict[str, object]:
-    """La charge d'un run : paramètres en texte, pièces en JSON, fichiers tels quels."""
+    """La charge d'un run : paramètres en texte, pièces en JSON, fichiers tels quels ;
+    l'expérience, `EXPERIENCE` sauf demande."""
     stockage = stockage or STOCKAGE
     return {
         "suivi": f"sqlite:///{stockage / 'mlflow.db'}",
         "pieces": (stockage / "pieces").as_uri(),
-        "experience": EXPERIENCE,
+        "experience": experience,
         "nom": nom,
         "etiquettes": etiquettes,
         "parametres": {
@@ -374,6 +381,14 @@ def charge_mlflow(
             **(fichiers or {}),
         },
     }
+
+
+def note_eval_run(nom: str, mode: str = "strict") -> str:
+    """La note de la ligne `eval_runs` : en strict, celle de l'étape 3 ; en enrichi,
+    celle de l'étape 6 (spec 06, E)."""
+    if mode == "enrichi":
+        return f"E3 étape 6, spec 06 — réponse rédigée, mode enrichi — {nom}"
+    return f"E3 étape 3, spec 06 — réponse rédigée — {nom}"
 
 
 def inscrire_eval_run(

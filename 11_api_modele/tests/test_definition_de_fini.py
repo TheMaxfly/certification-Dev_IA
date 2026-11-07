@@ -261,7 +261,13 @@ def test_une_requete_complete_se_trace_de_la_meme_facon_partout(api_reponse, cap
             == a["jetons_sortie"]
         )
         assert (
-            valeur(metriques, "api_modele_llm_appels_total", **etiquettes, statut="ok")
+            valeur(
+                metriques,
+                "api_modele_llm_appels_total",
+                mode="strict",
+                **etiquettes,
+                statut="ok",
+            )
             == 1
         )
     # Le même coût : la somme des appels, partout.

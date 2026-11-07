@@ -141,6 +141,10 @@ class Profil:
     longueur_max: int | None = None
 
 
+#: Les modes que la route de réponse sait servir (1.4.0 : `enrichi`).
+MODES_CONNUS = ("strict", "enrichi")
+
+
 @dataclass(frozen=True, slots=True)
 class ReglagesReponse:
     """Les réglages de la route de réponse : défauts et bornes (décision 4)."""
@@ -505,6 +509,12 @@ def _reglages_reponse(lecteur: _Lecteur, contrat: Contrat) -> ReglagesReponse:
     modes = lecteur.textes(t, chemin, "valeurs")
     if modes and mode_defaut not in modes:
         lecteur.ecarts.append(f"reglages.toml : [{chemin}] défaut hors des valeurs")
+    inconnus = [m for m in modes if m not in MODES_CONNUS]
+    if inconnus:
+        lecteur.ecarts.append(
+            f"reglages.toml : [{chemin}] mode inconnu : {', '.join(inconnus)}"
+            f" (connus : {', '.join(MODES_CONNUS)})"
+        )
     chemin = "modele_langage.historique"
     t = lecteur.table(chemin)
     tours = lecteur.entier(t, chemin, "tours_max", 1)

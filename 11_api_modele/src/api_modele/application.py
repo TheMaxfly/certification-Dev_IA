@@ -77,6 +77,11 @@ Toutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).
 Depuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en
 français une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse
 porte ses sources, le profil, les réglages, les jetons, le coût et les latences.
+
+Depuis 1.4.0, le mode « enrichi » : la même réponse, plus un complément tiré des
+connaissances du modèle et des titres qu'il nomme, étiquetés « non vérifié » et
+contrôlés pour ne pas contredire le catalogue. En mode « strict » (le défaut), rien ne
+change.
 """
 
 REPONSES_CLE: dict[int | str, dict[str, object]] = {

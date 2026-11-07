@@ -149,11 +149,11 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seuls `Info`
     (`modele_langage`) et `Serie` (`metadonnees`) gagnent un champ ; la route de
     réponse, ses schémas, `Metadonnees` et l'exemple du 503 de `/v1/sante` s'ajoutent ;
-    la version passe à 1.3.1."""
+    la version passe à 1.4.0."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.3.1")
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.4.0")
     assert apres["info"]["title"] == avant["info"]["title"]
     assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (
@@ -254,3 +254,54 @@ def test_compatibilite_avec_le_contrat_1_0_0():
                 for champ, forme in sortie_avant.get("properties", {}).items():
                     assert champ in sortie["properties"], (chemin, statut, champ)
                     assert sortie["properties"][champ] == forme, (chemin, champ)
+
+
+REFERENCE_1_3_1 = DESTINATION.parent / "openapi_v1.3.1.json"
+EMPREINTE_1_3_1 = "eaaecd704051c7a6"  # le contrat de develop à eae9f43
+
+
+def test_depuis_la_1_3_1_le_mode_enrichi_n_ajoute_que_des_champs():
+    """1.4.0 sur 1.3.1 (figé, `openapi_v1.3.1.json`) : chaque route et chaque schéma
+    inchangés, sauf `DemandeReponse.mode` (énumération élargie à `enrichi`, défaut
+    `strict`) et `Reponse`, qui gagne trois champs facultatifs ; la description de
+    l'API gagne son paragraphe ; la version passe à 1.4.0."""
+    avant = json.loads(REFERENCE_1_3_1.read_text(encoding="utf-8"))
+    apres = contrat()
+
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.3.1", "1.4.0")
+    assert apres["info"]["description"].startswith(avant["info"]["description"])
+    assert apres["paths"] == avant["paths"]
+    schemas, schemas_avant = (
+        apres["components"]["schemas"],
+        avant["components"]["schemas"],
+    )
+    assert set(schemas) == set(schemas_avant)
+    for nom, schema in schemas_avant.items():
+        if nom not in ("DemandeReponse", "Reponse"):
+            assert schemas[nom] == schema, nom
+    demande = copy.deepcopy(schemas["DemandeReponse"])
+    mode = demande["properties"].pop("mode")
+    mode_avant = copy.deepcopy(schemas_avant["DemandeReponse"])
+    mode_avant_forme = mode_avant["properties"].pop("mode")
+    assert demande == mode_avant
+    assert (mode_avant_forme["const"], mode["enum"]) == (
+        "strict",
+        ["strict", "enrichi"],
+    )
+    assert mode["default"] == mode_avant_forme["default"] == "strict"
+    reponse = copy.deepcopy(schemas["Reponse"])
+    ajoutes = {
+        k: reponse["properties"].pop(k)
+        for k in ("complement", "complement_titres", "complement_etiquette")
+    }
+    reponse.pop("description")
+    assert reponse == schemas_avant["Reponse"]
+    assert set(ajoutes) & set(schemas["Reponse"]["required"]) == set()
+
+
+def test_la_reference_1_3_1_est_le_contrat_livre():
+    """Le figé ne bouge pas : son empreinte est celle du contrat servi en 1.3.1."""
+    import hashlib
+
+    empreinte = hashlib.sha256(REFERENCE_1_3_1.read_bytes()).hexdigest()
+    assert empreinte.startswith(EMPREINTE_1_3_1)

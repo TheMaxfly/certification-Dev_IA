@@ -11,6 +11,7 @@ est toujours celui de la vue `bench.v_encodage_en_service`.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -39,6 +40,13 @@ SQL_CORPUS = (
 SQL_TITRES_SERIES = (
     "SELECT series_id, series_title FROM manga.ms_series_enriched"
     " WHERE series_id = ANY(%s)"
+)
+#: Tous les titres du catalogue (≈ 15 000 textes courts), pour reconnaître ceux que
+#: nomme un complément (mode enrichi) : la comparaison se fait en Python, des deux
+#: côtés la même (`titre_comparable`), sans dépendre du classement du serveur.
+SQL_TITRES_DU_CATALOGUE = (
+    "SELECT DISTINCT series_title FROM manga.ms_series_enriched"
+    " WHERE series_title IS NOT NULL"
 )
 SQL_TITRES_KITSU = (
     "SELECT kitsu_id, title FROM bench.corpus_docs WHERE corpus_id = %s"
@@ -172,6 +180,23 @@ def lire_titres(
         if t is not None
     }
     return series, kitsu
+
+
+def titre_comparable(titre: str) -> str:
+    """Sans casse, sans accents, lettres et chiffres seuls : « Série 2 », « serie-2 »
+    et « SERIE 2 » se comparent égaux."""
+    decompose = unicodedata.normalize("NFKD", titre.casefold())
+    return "".join(c for c in decompose if c.isalnum() and not unicodedata.combining(c))
+
+
+def lire_titres_du_catalogue(cx: Connection[TupleRow], titres: list[str]) -> set[str]:
+    """Les titres comparables (`titre_comparable`) de `titres` que le catalogue
+    porte."""
+    cles = {titre_comparable(t) for t in titres} - {""}
+    if not cles:
+        return set()
+    lus = cx.execute(SQL_TITRES_DU_CATALOGUE).fetchall()
+    return {titre_comparable(str(t)) for (t,) in lus} & cles
 
 
 def lire_metadonnees(

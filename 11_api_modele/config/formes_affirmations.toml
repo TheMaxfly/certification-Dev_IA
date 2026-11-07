@@ -40,3 +40,29 @@ Josei = '''josei\b'''
 motif = "Devant une forme, dans la même proposition, ou dans la forme elle-même : ce n'est pas une affirmation. Une phrase qui finit par un point d'interrogation non plus."
 negations = '''\b(?:ne|n'|pas|jamais|aucune?s?|sans|ni|non|guere|si|ignorons?|ignore|ignorent|incertain|incertaine|verifier|savoir|confirmer|garantir|peut-etre|pourrait|pourraient|serait|seraient|soit|soient)\b'''
 comparaisons = '''\b(?:comme|proche|proches|rappelle|rappellent|rappelant|facon|maniere|style|loin|contrairement|plutot|amateurs?|fans?|lecteurs?|lectrices?|habitues?|genre|type|compare|comparee|comparaison|influence|influencee|inspire|inspiree|heritier|heritiere|melange|melant|croise|croisant|entre|hors|dela)\b'''
+
+# --------------------------------------------------------------------------------- #
+#  Le complément du mode enrichi (E3, étape 6, spec 06) : `api_modele.complement`.
+#  `complement_disponibilite` reprend les formes de [disponibilite] ci-dessus ;
+#  `complement_metadonnee` lit les formes ci-dessous ET celles de [demographie] (un
+#  public affirmé). Texte aplati, formes affirmatives ; réserves : toutes celles de
+#  [reserves] pour la disponibilité, les seules `negations` pour les métadonnées
+#  (une comparaison n'y excuse rien).
+# --------------------------------------------------------------------------------- #
+
+[complement_metadonnee]
+motif = "Le complément affirme un nombre de tomes, un statut (terminé, en cours), un public ou un auteur sur un titre du catalogue : la ligne de titre fait foi, le complément n'en dit rien. Conservatrices : mieux vaut un 503 de trop qu'une affirmation fausse."
+formes = [
+    # Les tomes : « en 12 tomes », « 27 volumes », « tomes : 12 », « douze tomes ».
+    '''\b\d+\s+(?:tomes?|volumes?)\b''',
+    '''\b(?:tomes?|volumes?)\s*:\s*\d+''',
+    '''\b(?:un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|cent)\s+(?:seuls?\s+)?(?:tomes?|volumes?)\b''',
+    # Le statut : « est terminé », « la série est achevée », « toujours en cours ».
+    '''\b(?:est|sont|reste|restent|serie|manga|oeuvre|publication|parution)\s+(?:[\w'-]+\s+){0,2}?(?:terminee?s?|achevee?s?|finie?s?|inachevee?s?|abandonnee?s?|en cours)\b''',
+    '''\b(?:terminee?s?|achevee?s?)\s+en\s+\d{4}\b''',
+    '''\ben cours de (?:publication|parution)\b''',
+    # L'auteur : « écrit par », « dessiné par », « de la plume de », « son auteur ».
+    '''\b(?:ecrite?s?|dessinee?s?|scenarisee?s?|creee?s?|imaginee?s?|signee?s?|realisee?s?)\s+par\b''',
+    '''\bde la plume de\b''',
+    '''\b(?:auteure?s?|autrices?|mangakas?|scenaristes?|dessinat(?:eur|rice)s?)\b''',
+]
