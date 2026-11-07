@@ -394,6 +394,28 @@ défaut à `corpus_id`, pour que le chargeur du corpus v1 et les tests antérieu
 deux corpus (clés composites) et d'écrire dans un corpus clos ; la règle ferme la
 voie au défaut côté code.*
 
+## La chaîne de livraison du modèle — module 14
+
+Un candidat (une nouvelle version du corpus, un autre modèle d'embedding) se juge par la
+chaîne, en préproduction ; la décision reste un geste du mainteneur
+([README du module 14](14_chaine/README.md)).
+
+- **Trois environnements.** Développement : les bases jetables des tests. Préproduction :
+  la base `apimanga_preprod`, copie de la production sur le même serveur, avec ses propres
+  fichiers (dossier `09_service_embedding/mesures/equivalence_preprod/`, image de l'API
+  `api-modele:<version>-preprod`). Production : `apimanga`, **jamais touchée par un essai**
+  ; la chaîne refuse de la viser.
+- **Les onze déclencheurs** (le commit, le push, la demande de fusion, `develop`, GitHub à
+  la main, le lundi, la préproduction, la chaîne, la promotion, le retour arrière,
+  `verify-poste` et `verify-mutations`) sont recensés et datés dans le README du module 14 ;
+  un test vérifie que ce tableau dit vrai.
+- **Un passage = un rapport commité.** Chaque passage réel de `make chaine` (pas le passage
+  à blanc) écrit un rapport de livraison (`14_chaine/livraisons/`, `.md` et `.json`) ; il se commite et se pousse avant
+  le passage suivant (`docs(chaine): rapport de livraison <horodatage>_<candidat>`) : la
+  chaîne refuse un arbre qui n'est pas propre.
+- **La promotion et le retour arrière sont des gestes du mainteneur**, en préproduction,
+  par `make chaine-promouvoir` et `make chaine-revenir`, avec un motif qu'il écrit.
+
 ## Un cycle complet
 
 Les fichiers de corps (`--body-file`, `-F`) s'écrivent hors du dépôt.
