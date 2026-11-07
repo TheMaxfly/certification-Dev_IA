@@ -215,10 +215,17 @@ def ecrire(tmp_path: Path, remplacement: tuple[str, str]) -> Path:
         ),
         (
             (
-                'defaut = "strict"\nvaleurs = ["strict"]',
+                'defaut = "strict"\nvaleurs = ["strict", "enrichi"]',
                 'defaut = "enrichi"\nvaleurs = ["strict"]',
             ),
             "défaut hors des valeurs",
+        ),
+        (
+            (
+                'valeurs = ["strict", "enrichi"]',
+                'valeurs = ["strict", "enrichi", "libre"]',
+            ),
+            "mode inconnu : libre (connus : strict, enrichi)",
         ),
         (
             ("nombre_series = 5\n", "nombre_series = 60\n"),
@@ -294,7 +301,7 @@ def test_le_fichier_versionne_declare_les_quatre_profils_et_la_route():
         50,
         4000,
     )
-    assert (r.mode_defaut, r.modes) == ("strict", ("strict",))
+    assert (r.mode_defaut, r.modes) == ("strict", ("strict", "enrichi"))
     assert (
         r.historique_tours_max,
         r.historique_caracteres_max,

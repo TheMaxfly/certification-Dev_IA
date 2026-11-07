@@ -369,6 +369,20 @@ def test_le_nouvel_historique_part_dans_le_champ_cache_et_la_question_se_vide(
     assert soupe(r).select_one("textarea#question").get_text() == ""
 
 
+def test_le_complement_n_entre_pas_dans_l_historique(navigateur, doublure):
+    """Seule `reponse` part dans le champ caché : le complément « non vérifié » et
+    ses titres n'entrent jamais dans la conversation renvoyée à l'API (spec 06, C.7)."""
+    doublure.choisir(reponse="complement")
+    r = poser(navigateur)
+
+    assert "Complément factice." in soupe(r).get_text(), "le bloc est affiché"
+    cache = champ_cache(r)
+    tours = json.loads(cache)
+    assert tours[1]["contenu"].startswith("Série factice A [S:101]")
+    for absent in ("Complément factice.", "Titre factice hors catalogue"):
+        assert absent not in cache, absent
+
+
 def test_les_reglages_restent_choisis_d_un_tour_a_l_autre(navigateur):
     r = navigateur.post(
         "/question",

@@ -359,8 +359,12 @@
             "type": "integer"
           },
           "mode": {
-            "const": "strict",
             "default": "strict",
+            "description": "strict : la réponse tirée des seuls passages. enrichi (1.4.0) : la même réponse, plus un complément tiré des connaissances du modèle, étiqueté « non vérifié » ; sans passage, le modèle est appelé quand même et la partie stricte refuse.",
+            "enum": [
+              "strict",
+              "enrichi"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -1054,7 +1058,47 @@
         "type": "object"
       },
       "Reponse": {
+        "description": "La réponse ; en mode enrichi, le complément s'y ajoute. Les trois champs du\ncomplément sont **absents** quand il n'y en a pas (mode strict, complément vide) :\nune réponse stricte reste celle de 1.3.1, champ pour champ.",
         "properties": {
+          "complement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode enrichi : ce que le modèle ajoute de ses connaissances générales, sans source, NON VÉRIFIÉ ; contrôlé (aucun nom de membre, aucune disponibilité ni métadonnée affirmée sur une série du catalogue, aucune marque), mais il peut être faux sur une œuvre hors catalogue. Absent en strict et quand le modèle n'a rien ajouté. N'entre pas dans l'historique.",
+            "title": "Complement"
+          },
+          "complement_etiquette": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Texte fixe, présent dès qu'un complément l'est : à afficher avec lui.",
+            "title": "Complement Etiquette"
+          },
+          "complement_titres": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Les titres que le complément nomme (cinq au plus), tels que le modèle les écrit ; présent avec le complément.",
+            "title": "Complement Titres"
+          },
           "contexte": {
             "$ref": "#/components/schemas/ContexteReponse"
           },
@@ -1311,9 +1355,9 @@
     }
   },
   "info": {
-    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n",
+    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n\nDepuis 1.4.0, le mode « enrichi » : la même réponse, plus un complément tiré des\nconnaissances du modèle et des titres qu'il nomme, étiquetés « non vérifié » et\ncontrôlés pour ne pas contredire le catalogue. En mode « strict » (le défaut), rien ne\nchange.\n",
     "title": "API du modèle",
-    "version": "1.3.1"
+    "version": "1.4.0"
   },
   "openapi": "3.1.0",
   "paths": {

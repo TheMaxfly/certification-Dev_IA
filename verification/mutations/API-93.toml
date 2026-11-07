@@ -1,0 +1,7 @@
+id = "API-93"
+origine = "E3 étape 6, spec 06, B.3 et C.5 (2026-11-07) — le schéma enrichi envoyé en mode strict : la requête au fournisseur ne serait plus celle de 1.3.1"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    return SCHEMA_SORTIE_ENRICHI if mode == "enrichi" else SCHEMA_SORTIE'''
+apres = '''    return SCHEMA_SORTIE_ENRICHI'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_enrichi.py", "-k", "en_strict"]

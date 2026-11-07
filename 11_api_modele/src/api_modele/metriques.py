@@ -47,7 +47,13 @@ MOTIFS_SORTIE = (
     "pseudonyme",
     "disponibilite",
     "demographie",
+    "complement_pseudonyme",
+    "complement_disponibilite",
+    "complement_metadonnee",
+    "complement_marque",
 )
+#: Les modes de la route de réponse (1.4.0) : une étiquette des appels au modèle.
+MODES = ("strict", "enrichi")
 MOTIFS_REFUS = ("aucun_passage", "hors_catalogue", "inconnu")
 
 
@@ -87,8 +93,9 @@ class Metriques:
         )
         self.llm_appels = Counter(
             "api_modele_llm_appels",
-            "Appels au modèle de langage, par profil, rôle et statut (ok ou code).",
-            ["profil", "role", "statut"],
+            "Appels au modèle de langage, par profil, rôle, statut (ok ou code) et"
+            " mode de la réponse (strict, enrichi).",
+            ["profil", "role", "statut", "mode"],
             registry=self.registre,
         )
         self.llm_jetons = Counter(
@@ -142,7 +149,10 @@ class Metriques:
         for profil in profils:
             self.llm_cout.labels(profil=profil)
             for role in ROLES:
-                self.llm_appels.labels(profil=profil, role=role, statut="ok")
+                for mode in MODES:
+                    self.llm_appels.labels(
+                        profil=profil, role=role, statut="ok", mode=mode
+                    )
                 self.llm_latence.labels(profil=profil, role=role)
                 for type_ in TYPES_DE_JETONS:
                     self.llm_jetons.labels(profil=profil, role=role, type=type_)

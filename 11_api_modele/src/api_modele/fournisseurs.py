@@ -388,7 +388,10 @@ class Fournisseurs:
         messages: Messages,
         demandes: Demandes,
         schema: Mapping[str, object],
+        mode: str = "strict",
     ) -> Sortie:
+        """Un appel au modèle de langage ; `mode` (celui de la réponse) n'étiquette que
+        son compteur."""
         profil = self.profils.get(nom_profil)
         if profil is None:
             raise ErreurFournisseur(
@@ -438,7 +441,7 @@ class Fournisseurs:
             raise
         finally:
             latence_s = self._horloge() - debut
-            self._compter(profil, role, statut, latence_s, sortie)
+            self._compter(profil, role, statut, latence_s, sortie, mode)
             self._tracer(
                 identifiant=identifiant,
                 role=role,
@@ -647,9 +650,12 @@ class Fournisseurs:
         statut: str,
         latence_s: float,
         sortie: Sortie | None,
+        mode: str = "strict",
     ) -> None:
         m = self._metriques
-        m.llm_appels.labels(profil=profil.nom, role=role, statut=statut).inc()
+        m.llm_appels.labels(
+            profil=profil.nom, role=role, statut=statut, mode=mode
+        ).inc()
         m.llm_latence.labels(profil=profil.nom, role=role).observe(latence_s)
         if sortie is None:
             return

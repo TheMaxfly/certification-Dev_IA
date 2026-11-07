@@ -134,7 +134,7 @@ def test_une_reponse_avec_ses_sources_et_son_contexte(
     assert c["cout_estime_usd"] == pytest.approx((100 * 2 + 20 * 8) / 1e6)
     assert c["question_reformulee"] is None and c["reformulation_ignoree"] is None
     assert c["date_appel"].endswith("+00:00")
-    assert c["version_api"] == "1.3.1"
+    assert c["version_api"] == "1.4.0"
     assert set(c["latences_ms"]) == {"recherche", "reformulation", "modele", "totale"}
     assert c["latences_ms"]["reformulation"] is None
 
@@ -338,7 +338,7 @@ def test_un_historique_a_ses_bornes_passe(api_reponse, tours):
     [
         ({"question": "x" * 501}, "question_trop_longue"),
         ({"profil": "absent"}, "profil_inconnu"),
-        ({"mode": "enrichi"}, "entree_invalide"),
+        ({"mode": "libre"}, "entree_invalide"),
         ({"inconnu": 1}, "entree_invalide"),
     ],
 )
@@ -1181,7 +1181,7 @@ def test_la_ligne_de_journal_de_la_requete(api_reponse, caplog):
 
 def test_info_annonce_la_1_2_0_et_v2_n_existe_pas(api_reponse):
     assert (
-        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.3.1"
+        api_reponse.get("/v1/info", headers=entetes()).json()["version_api"] == "1.4.0"
     )
     assert (
         api_reponse.post("/v2/reponse", json={"question": QUESTION}).status_code == 404
