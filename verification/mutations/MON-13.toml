@@ -1,0 +1,8 @@
+id = "MON-13"
+origine = "E3 étape 6, bloc C (2026-11-07) — le refus d'un corps trop long s'arrête là : sans son return, le serveur lirait et compterait quand même le corps refusé"
+fichier = "13_monitorage/src/monitorage/serveur.py"
+avant = '''                self.send_error(413)
+                return'''
+apres = '''                self.send_error(413)'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_serveur.py", "-k", "corps"]
