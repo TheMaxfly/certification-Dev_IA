@@ -1,0 +1,7 @@
+id = "CHN-02"
+origine = "E3 étape 6, question 38 (2026-11-07) — comparer qui ignorerait le dossier donné relirait l'échantillon de la production"
+fichier = "09_service_embedding/src/service_embedding/equivalence.py"
+avant = '''        chemin_export(config, args.encodage, dossier).read_text(encoding="utf-8")'''
+apres = '''        chemin_export(config, args.encodage).read_text(encoding="utf-8")'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_dossier_export.py"]

@@ -1,0 +1,7 @@
+id = "CHN-09"
+origine = "E3 étape 6, spec 02 (2026-11-07) — le dossier de la préproduction non transmis au module 09 : l'échantillon irait chez la production"
+fichier = "14_chaine/src/chaine/etapes.py"
+avant = '''        env=cible.env_ecriture(),'''
+apres = '''        env={"DATABASE_URL": cible.dsn("postgres")},'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]

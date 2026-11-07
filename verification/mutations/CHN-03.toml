@@ -1,0 +1,7 @@
+id = "CHN-03"
+origine = "E3 étape 6, question 38 (2026-11-07) — exporter qui ignorerait le dossier donné écrirait chez la production"
+fichier = "09_service_embedding/src/service_embedding/equivalence.py"
+avant = '''    chemin = chemin_export(config, encodage_id, dossier)'''
+apres = '''    chemin = chemin_export(config, encodage_id)'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_dossier_export.py"]

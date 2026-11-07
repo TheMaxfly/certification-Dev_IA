@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "10_mesures_recherche/src/mesures_recherche/promotion.py", line 266, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "10_mesures_recherche/src/mesures_recherche/promotion.py", line 255, in main
+    r = comparer(dsn, args.run, charger_regle())
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "10_mesures_recherche/src/mesures_recherche/promotion.py", line 191, in comparer
+    raise VerdictRefuse(
+mesures_recherche.promotion.VerdictRefuse: l'encodage mesuré (3) est celui en service : la comparaison ne rend pas de verdict

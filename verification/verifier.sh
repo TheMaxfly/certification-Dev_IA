@@ -85,6 +85,7 @@ MODULES=(
   "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
   "12|12_application|12_application|pytest|--extra dev||application||pyright,bandit,pip-audit"
   "13|13_monitorage|13_monitorage|pytest|--extra dev||monitorage||pyright,bandit,pip-audit"
+  "14|14_chaine|14_chaine|pytest|--extra dev||chaine||pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
   "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,

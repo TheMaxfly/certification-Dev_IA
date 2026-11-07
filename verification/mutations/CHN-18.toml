@@ -1,0 +1,9 @@
+id = "CHN-18"
+origine = "E3 étape 6, écart 04-4 (2026-11-07) — l'empreinte lue sur l'étiquette de la production : le rapport et la promotion parleraient d'une autre image que celle construite"
+fichier = "14_chaine/src/chaine/etapes.py"
+avant = '''            "inspect",
+            image_de_preproduction(),'''
+apres = '''            "inspect",
+            image_de_l_api(),'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py", "-k", "image"]

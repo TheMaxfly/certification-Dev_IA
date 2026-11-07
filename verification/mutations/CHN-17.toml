@@ -1,0 +1,11 @@
+id = "CHN-17"
+origine = "E3 étape 6, écart 04-4 (2026-11-07) — sans le Compose de la préproduction, la chaîne construirait et lèverait l'image sous l'étiquette de la production, et la déplacerait"
+fichier = "14_chaine/src/chaine/etapes.py"
+avant = '''        str(COMPOSE_11),
+        "-f",
+        str(COMPOSE_PREPROD),
+        *action,'''
+apres = '''        str(COMPOSE_11),
+        *action,'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py", "tests/test_deployer.py", "-k", "image"]

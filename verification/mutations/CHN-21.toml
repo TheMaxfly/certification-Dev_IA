@@ -1,0 +1,7 @@
+id = "CHN-21"
+origine = "E3 étape 6, relecture des écarts 04 (2026-11-07) — un passage arrêté à l'étape 7 (verdict « promotion proposée », mais ni code 0 ni image) serait promu sur une image laissée par un autre passage"
+fichier = "14_chaine/src/chaine/deployer.py"
+avant = '''    if d.get("code") != int(Code.PROMOTION_PROPOSEE) or not d.get("image"):'''
+apres = '''    if False:'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "rien"]
