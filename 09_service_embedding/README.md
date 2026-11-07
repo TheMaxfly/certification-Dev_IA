@@ -176,6 +176,12 @@ graine 20261010 ; seuils 0,999 et 0,99). Deux temps :
 - `comparer --encodage N`, et le test `tests/test_equivalence.py -k service_reel`, ne
   lisent que ce fichier et le service, après confrontation de `/info` à la ligne de
   l'encodage. Le test ne se connecte jamais à une base réelle.
+- **Le dossier** : `mesures/equivalence/` par défaut, celui de la production, que lisent
+  la sonde du monitorage et `verify-poste`. La variable `EQUIVALENCE_DOSSIER` en donne un
+  autre à `exporter` et à `comparer` : la préproduction écrit dans le sien
+  (`mesures/equivalence_preprod/`, ignoré par git). Une variable qui désigne le dossier
+  de la production, ou un dossier qui s'y trouve, est refusée (code 2) avant toute
+  écriture. Le test du service réel lit toujours le dossier de la production.
 
 `make verify-poste` lance l'instance EmbeddingGemma seule (seuils de mémoire, refus si
 une instance tourne déjà), joue le test sur chaque échantillon exporté, puis arrête

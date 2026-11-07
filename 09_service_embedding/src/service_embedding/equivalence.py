@@ -18,6 +18,13 @@ DEUX TEMPS, pour que le test ne touche jamais une base réelle :
 
 Les fragments où figure un pseudonyme sont écartés de l'échantillon : aucun
 pseudonyme en clair dans un fichier.
+
+LE DOSSIER DES ÉCHANTILLONS (E3, étape 6, question 38). Par défaut, celui de la
+production (`[export] dossier`), que lisent la sonde du monitorage et
+`verify-poste`. La variable `EQUIVALENCE_DOSSIER` en donne un autre à `exporter` et
+à `comparer` — celui de la préproduction : les fichiers suivent la base. Une
+variable qui désigne le dossier de la production, ou un dossier qui s'y trouve, est
+refusée avant toute écriture. Sans la variable, rien ne change.
 """
 
 from __future__ import annotations
@@ -59,8 +66,43 @@ def verdict(cos_min: float, seuils: dict) -> str:
     return "echec"
 
 
-def chemin_export(config: dict, encodage_id: int) -> Path:
-    return RACINE_MODULE / config["export"]["dossier"] / f"encodage_{encodage_id}.json"
+VARIABLE_DOSSIER = "EQUIVALENCE_DOSSIER"
+
+
+class DossierRefuse(RuntimeError):
+    """Le dossier demandé est celui des échantillons de la production, ou s'y trouve."""
+
+
+def dossier_production(config: dict) -> Path:
+    """Le dossier des échantillons de la production : la sonde et `verify-poste` le
+    lisent, et lui seul."""
+    return RACINE_MODULE / config["export"]["dossier"]
+
+
+def dossier_export(config: dict, environ: dict[str, str] | None = None) -> Path:
+    """Le dossier d'`exporter` et de `comparer` : la variable `EQUIVALENCE_DOSSIER`
+    (lue ici, et seulement ici), sinon celui de la production. Une variable qui
+    désigne le dossier de la production — chemin relatif ou lien compris — ou un
+    dossier qui s'y trouve est refusée : la préproduction a le sien."""
+    valeur = (os.environ if environ is None else environ).get(VARIABLE_DOSSIER, "")
+    production = dossier_production(config)
+    if not valeur:
+        return production
+    demande = Path(valeur).expanduser().resolve()
+    if demande.is_relative_to(production.resolve()):
+        raise DossierRefuse(
+            f"{VARIABLE_DOSSIER} désigne le dossier des échantillons de la production"
+            f" ({config['export']['dossier']} du module 09), ou un dossier qui s'y"
+            " trouve : refus — la préproduction a son propre dossier"
+        )
+    return demande
+
+
+def chemin_export(config: dict, encodage_id: int, dossier: Path | None = None) -> Path:
+    """L'échantillon d'un encodage : dans `dossier`, sinon dans celui de la
+    production (la sonde et le test du service réel appellent sans dossier)."""
+    racine = dossier_production(config) if dossier is None else dossier
+    return racine / f"encodage_{encodage_id}.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -133,12 +175,14 @@ def echantillon(cx, encodage_id: int, config: dict) -> tuple[dict, list[dict]]:
     ]
 
 
-def exporter(dsn: str, encodage_id: int, config: dict) -> Path:
+def exporter(
+    dsn: str, encodage_id: int, config: dict, dossier: Path | None = None
+) -> Path:
     import psycopg
 
     with psycopg.connect(dsn, options="-c default_transaction_read_only=on") as cx:
         e, ech = echantillon(cx, encodage_id, config)
-    chemin = chemin_export(config, encodage_id)
+    chemin = chemin_export(config, encodage_id, dossier)
     chemin.parent.mkdir(parents=True, exist_ok=True)
     chemin.write_text(
         json.dumps(
@@ -206,14 +250,19 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--encodage", type=int, required=True)
     args = parser.parse_args(argv)
     config = charger_config()
+    try:
+        dossier = dossier_export(config)
+    except DossierRefuse as refus:
+        print(f"refus : {refus}", file=sys.stderr)
+        return 2
     if args.commande == "exporter":
         dsn = os.environ.get("DATABASE_URL")
         if not dsn:
             raise SystemExit("DATABASE_URL absente")
-        print(exporter(dsn, args.encodage, config))
+        print(exporter(dsn, args.encodage, config, dossier))
         return 0
     export = json.loads(
-        chemin_export(config, args.encodage).read_text(encoding="utf-8")
+        chemin_export(config, args.encodage, dossier).read_text(encoding="utf-8")
     )
     r = comparer(client_de(export["encodage"]), export, config)
     print(json.dumps(r, ensure_ascii=False, indent=1))
