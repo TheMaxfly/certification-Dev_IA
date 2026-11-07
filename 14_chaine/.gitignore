@@ -1,0 +1,13 @@
+# Environnements et artefacts Python
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+# Hors dépôt : le dossier de travail des passages et le journal d'exécution.
+.travail/
+.journal/

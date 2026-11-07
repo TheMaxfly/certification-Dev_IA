@@ -1,0 +1,169 @@
+{
+ "livraison": "20261107T121319Z_requalification_v2",
+ "environnement": "préproduction",
+ "base": "apimanga_preprod",
+ "dossier_echantillons": "09_service_embedding/mesures/equivalence_preprod",
+ "candidat": {
+  "fichier": "14_chaine/candidats/requalification_v2.toml",
+  "nom": "requalification_v2",
+  "motif": "démonstration de la chaîne : requalifier l'encodage en service, en préproduction, jusqu'à la promotion",
+  "corpus": "v2",
+  "mesure": 8,
+  "reference_run": "a3b7f0e025e4476ea4b60e7d0498876b"
+ },
+ "commit": "597146c2c3ad4d00e665636546455eb839fd4db2",
+ "encodage": 3,
+ "run": "2516e8fa724d40a7a9b275a14db337c7",
+ "experience": "E3-chaine-preprod",
+ "mesure": {
+  "questions": 59,
+  "global": 31,
+  "reconnaissance": 21,
+  "proposition": 10,
+  "ndcg_10": 0.37398439006438544
+ },
+ "regle": {
+  "fichier": "10_mesures_recherche/config/promotion_corpus_v2.toml",
+  "commit": "b6c081c81e2f48467ade875c90e43baceb298926",
+  "date": "2026-10-10T02:50:54+02:00"
+ },
+ "verdict": "promotion proposée",
+ "conditions_manquantes": [],
+ "image": "sha256:4047b64df00c296aeabd5bcda43b2cd89af5473c8ba727a973cf26d4e1cbf0f0",
+ "etapes": [
+  {
+   "numero": 0,
+   "nom": "Préalables",
+   "statut": "tenue",
+   "duree_s": 0.1,
+   "details": {
+    "base": "apimanga_preprod",
+    "dossier": "09_service_embedding/mesures/equivalence_preprod",
+    "commit": "597146c2c3ad4d00e665636546455eb839fd4db2",
+    "instance": "embeddinggemma",
+    "info": {
+     "model_id": "google/embeddinggemma-300m",
+     "model_sha": "57c266a740f537b4dc058e1b0cda161fd15afa75",
+     "model_dtype": "float32",
+     "version": "1.9.4"
+    },
+    "encodage_en_service": 2
+   }
+  },
+  {
+   "numero": 1,
+   "nom": "Tester les données",
+   "statut": "tenue",
+   "duree_s": 108.7,
+   "details": {
+    "jeu": "31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30",
+    "empreintes": {
+     "docs": [
+      "56775",
+      "ef95cb474897e314b03bad89ddb9acba"
+     ],
+     "fragments": [
+      "77006",
+      "254549aba3841608511f9e526631bfc0"
+     ]
+    },
+    "reconstruction_a_blanc": {
+     "fragments": 77006,
+     "documents": {
+      "ms_review": 11041,
+      "kitsu_synopsis": 37049,
+      "ms_synopsis": 8685
+     }
+    }
+   }
+  },
+  {
+   "numero": 2,
+   "nom": "Construire",
+   "statut": "non lancée",
+   "duree_s": 0.0,
+   "details": {
+    "condition": "le candidat déclare une nouvelle version"
+   }
+  },
+  {
+   "numero": 3,
+   "nom": "Encoder",
+   "statut": "non lancée",
+   "duree_s": 0.0,
+   "details": {
+    "condition": "le candidat demande un nouvel encodage"
+   }
+  },
+  {
+   "numero": 4,
+   "nom": "Tester le modèle",
+   "statut": "tenue",
+   "duree_s": 48.0,
+   "details": {
+    "echantillon": "09_service_embedding/mesures/equivalence_preprod/encodage_3.json",
+    "verdict": "equivalent",
+    "cos_min": 0.9999994015536319,
+    "n": 200,
+    "sous_0999": 0
+   }
+  },
+  {
+   "numero": 5,
+   "nom": "Évaluer",
+   "statut": "tenue",
+   "duree_s": 41.0,
+   "details": {
+    "run": "2516e8fa724d40a7a9b275a14db337c7",
+    "experience": "E3-chaine-preprod",
+    "global": {
+     "hit_rate@5/atteignables": 0.4407,
+     "hit_rate@10/atteignables": 0.5254,
+     "mrr@10/atteignables": 0.3651,
+     "ndcg@10/atteignables": 0.374,
+     "hit_rate@5/toutes": 0.4407,
+     "hit_rate@10/toutes": 0.5254,
+     "mrr@10/toutes": 0.3651,
+     "ndcg@10/toutes": 0.374
+    },
+    "rejeu": {
+     "reference": "a3b7f0e025e4476ea4b60e7d0498876b",
+     "identiques": true
+    }
+   }
+  },
+  {
+   "numero": 6,
+   "nom": "Valider",
+   "statut": "tenue",
+   "duree_s": 2.0,
+   "details": {
+    "verdict": "promotion proposée",
+    "global": 31,
+    "reconnaissance": 21,
+    "proposition": 10,
+    "questions": 59,
+    "ndcg_10": 0.37398439006438544,
+    "regle": {
+     "fichier": "10_mesures_recherche/config/promotion_corpus_v2.toml",
+     "commit": "b6c081c81e2f48467ade875c90e43baceb298926",
+     "date": "2026-10-10T02:50:54+02:00"
+    }
+   }
+  },
+  {
+   "numero": 7,
+   "nom": "Packaging",
+   "statut": "tenue",
+   "duree_s": 0.8,
+   "details": {
+    "image": "api-modele:1.3.1",
+    "empreinte": "sha256:4047b64df00c296aeabd5bcda43b2cd89af5473c8ba727a973cf26d4e1cbf0f0"
+   }
+  }
+ ],
+ "code": 0,
+ "code_nom": "PROMOTION_PROPOSEE",
+ "sens": "toutes les étapes tenues, règle tenue ; arrêt avant la promotion",
+ "piece_mlflow": "attachée"
+}

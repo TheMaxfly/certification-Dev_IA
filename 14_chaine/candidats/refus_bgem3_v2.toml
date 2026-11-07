@@ -1,0 +1,39 @@
+# Candidat refus_bgem3_v2 — le passage refusé (E3 étape 6, spec 03 ; décisions § 9).
+#
+# BGE-M3, l'autre modèle du banc d'E2, encodé pour de vrai sur le corpus v2 en
+# préproduction, mesuré par la configuration 7 du module 10 (bge-m3-sens-catalogue :
+# par le sens, meilleur fragment, classement limité au catalogue), puis jugé par la règle
+# D3, telle qu'elle a été commitée le 10 octobre (b6c081c).
+#
+# Attendu : REFUS (code 10). Sur le corpus v1, cette configuration rendait 22 / 59 au
+# global et 16 / 23 en reconnaissance ; la règle exige au moins 31 et 20. Attendu parce
+# que le score est trop bas, pas connu d'avance : s'il atteignait les seuils, la règle
+# proposerait sa promotion, et ce serait un résultat, écrit tel quel.
+#
+# Ce passage est lancé pour démontrer la chaîne, pas parce qu'une règle a changé.
+
+nom = "refus_bgem3_v2"
+motif = "démonstration de la chaîne : un autre modèle, encodé pour de vrai, mesuré et jugé par la règle écrite avant"
+
+[corpus]
+version = "v2"
+nouvelle_version = false
+
+[encodage]
+# Un nouvel encodage : son numéro est lu dans le bilan de l'encodeur, jamais supposé.
+nouveau = true
+instance = "bge-m3"
+modele = "BAAI/bge-m3"
+revision = "5617a9f61b028005a4858fdac845db406aefb181"
+precision = "float32"
+
+[mesure]
+# Le numéro de la configuration dans 10_mesures_recherche/config/mesures.toml.
+numero = 7
+
+[regle]
+fichier = "10_mesures_recherche/config/promotion_corpus_v2.toml"
+
+[preproduction]
+# L'encodage en service attendu au départ, dans apimanga_preprod.
+encodage_en_service = 3

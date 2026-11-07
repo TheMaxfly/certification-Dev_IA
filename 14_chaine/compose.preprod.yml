@@ -1,0 +1,8 @@
+# L'API de préproduction sous son propre nom d'image : la chaîne construit et lève
+# `api-modele:<version>-preprod`, jamais l'étiquette de la production (écart 04-4 de
+# l'étape 6 : une construction sous le nom de la production l'avait déplacée).
+# Posé sur le Compose du module 11 (`docker compose -f … -f …`), qui n'est pas modifié ;
+# l'étiquette vient de la chaîne (CHAINE_IMAGE_PREPROD), lue dans ce Compose.
+services:
+  api:
+    image: ${CHAINE_IMAGE_PREPROD:?CHAINE_IMAGE_PREPROD absente — l'image de la préproduction, posée par la chaîne}

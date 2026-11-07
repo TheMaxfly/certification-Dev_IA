@@ -26,7 +26,7 @@ commande sur le poste et sur GitHub.
 |---|---|
 | `make verify` | les modules concernés par les changements depuis `origin/develop`, et ceux qui en dépendent (`verification/dependances.tsv`) : Ruff, format, tests ; plus la tâche `statique`, toujours |
 | `make verify TOUT=1` | tous les modules |
-| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `13`, `database`, `demo`, `statique` |
+| `make verify MODULE=<nom>` | un seul module : `01` … `05`, `07` … `14`, `database`, `demo`, `statique` |
 | `make verify-indicatif` | Bandit et pip-audit sur les modules existants — jamais exigé ; réussit dès que les rapports sont produits, quel que soit le nombre de constats |
 | `make verify-poste` | la mémoire d'abord (5 Go disponibles et 4 Go de mémoire vidéo libre pour le service ; 6,9 Go disponibles avec l'API du modèle) ; `make verify` complet, sauf si l'arbre, propre, a déjà un verdict complet vert (`FORCER=1` pour le rejouer) ; puis les harnais du poste seul : accessibilité de l'application (axe-core dans Chromium, `rapport_axe` réécrit), fidélité du schéma, équivalence sur une instance EmbeddingGemma lancée puis arrêtée — du service d'embedding (échantillons exportés), puis de l'API du modèle (les 69 questions du jeu gelé, dix premières séries égales au run de référence) ; **sans échantillon ou sans DSN, échec** : une vérification qui ne tourne pas est un échec —, état d'`apimanga` en lecture seule (pseudonymes des passages que l'API vient de rendre et des fichiers suivis compris), cohérence des contrôles obligatoires de l'ensemble de règles de GitHub avec les tâches de `verify.yml` (relevés par `gh`) |
 
@@ -38,7 +38,7 @@ commande sur le poste et sur GitHub.
   strict sur `src/`, Bandit sur `src/`, pip-audit sur le verrou, après ses tests, dans
   `make verify` ; un constat est un échec, et la couverture est mesurée. Elles se
   déclarent dans le 9e champ de sa ligne de `MODULES` (`verification/verifier.sh`) ;
-  le module 11 (API du modèle), le module 12 (application) et le module 13 (monitorage) les portent. Pour les modules d'avant, Bandit et
+  le module 11 (API du modèle), le module 12 (application), le module 13 (monitorage) et le module 14 (chaîne de livraison) les portent. Pour les modules d'avant, Bandit et
   pip-audit restent indicatifs.
 - La tâche `statique` vérifie ce qui ne s'exécute dans aucun module : Ruff du 06 et de
   `docs/modeles/`, actionlint, shellcheck des scripts de `.githooks/`, de
@@ -393,6 +393,28 @@ défaut à `corpus_id`, pour que le chargeur du corpus v1 et les tests antérieu
 *Motif : un corpus omis tombe dans `v1` sans bruit. La base refuse déjà de mêler
 deux corpus (clés composites) et d'écrire dans un corpus clos ; la règle ferme la
 voie au défaut côté code.*
+
+## La chaîne de livraison du modèle — module 14
+
+Un candidat (une nouvelle version du corpus, un autre modèle d'embedding) se juge par la
+chaîne, en préproduction ; la décision reste un geste du mainteneur
+([README du module 14](14_chaine/README.md)).
+
+- **Trois environnements.** Développement : les bases jetables des tests. Préproduction :
+  la base `apimanga_preprod`, copie de la production sur le même serveur, avec ses propres
+  fichiers (dossier `09_service_embedding/mesures/equivalence_preprod/`, image de l'API
+  `api-modele:<version>-preprod`). Production : `apimanga`, **jamais touchée par un essai**
+  ; la chaîne refuse de la viser.
+- **Les onze déclencheurs** (le commit, le push, la demande de fusion, `develop`, GitHub à
+  la main, le lundi, la préproduction, la chaîne, la promotion, le retour arrière,
+  `verify-poste` et `verify-mutations`) sont recensés et datés dans le README du module 14 ;
+  un test vérifie que ce tableau dit vrai.
+- **Un passage = un rapport commité.** Chaque passage réel de `make chaine` (pas le passage
+  à blanc) écrit un rapport de livraison (`14_chaine/livraisons/`, `.md` et `.json`) ; il se commite et se pousse avant
+  le passage suivant (`docs(chaine): rapport de livraison <horodatage>_<candidat>`) : la
+  chaîne refuse un arbre qui n'est pas propre.
+- **La promotion et le retour arrière sont des gestes du mainteneur**, en préproduction,
+  par `make chaine-promouvoir` et `make chaine-revenir`, avec un motif qu'il écrit.
 
 ## Un cycle complet
 

@@ -1,0 +1,8 @@
+id = "CHN-19"
+origine = "E3 étape 6, relecture des écarts 04 (2026-11-07) — la promotion sans son préalable d'image : une image absente ou remplacée serait découverte après l'écriture au journal"
+fichier = "14_chaine/src/chaine/deployer.py"
+avant = '''    image_presente(o, d.get("image"))
+    complet = ('''
+apres = '''    complet = ('''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "rien"]

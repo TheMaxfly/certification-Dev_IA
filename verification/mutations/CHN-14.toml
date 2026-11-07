@@ -1,0 +1,7 @@
+id = "CHN-14"
+origine = "E3 étape 6, spec 02 (2026-11-07) — le contrôle du verdict retiré de la promotion : on promouvrait un refus"
+fichier = "14_chaine/src/chaine/deployer.py"
+avant = '''    if d.get("verdict") != "promotion proposée":'''
+apres = '''    if False:'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py"]

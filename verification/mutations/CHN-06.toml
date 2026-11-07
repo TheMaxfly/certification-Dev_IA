@@ -1,0 +1,7 @@
+id = "CHN-06"
+origine = "E3 étape 6, spec 02 (2026-11-07) — un refus de la règle qui rendrait 0 : la chaîne proposerait ce que la règle refuse"
+fichier = "14_chaine/src/chaine/executer.py"
+avant = '''    if r["verdict"] == "refus proposé":'''
+apres = '''    if False:'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]

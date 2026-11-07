@@ -1,0 +1,12 @@
+id = "CHN-05"
+origine = "E3 étape 6, spec 02 (2026-11-07) — l'arrêt au premier échec retiré : la suite tournerait après une étape en échec"
+fichier = "14_chaine/src/chaine/executer.py"
+avant = '''                f" {arret.code.name} : {arret.motif}"
+            )
+            break
+'''
+apres = '''                f" {arret.code.name} : {arret.motif}"
+            )
+'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]

@@ -1,0 +1,8 @@
+id = "CHN-07"
+origine = "E3 étape 6, spec 02 (2026-11-07) — lancer qui appellerait la promotion : la décision ne serait plus humaine"
+fichier = "14_chaine/src/chaine/executer.py"
+avant = '''    p.image = e.stdout.strip()'''
+apres = '''    p.image = e.stdout.strip()
+    o.lanceur(etapes.Commande("10.journal.promouvoir", ("python", "-m", "mesures_recherche.journal_promotions", "promouvoir")))'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_executer.py"]
