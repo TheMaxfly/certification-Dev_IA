@@ -557,7 +557,8 @@ en strict.
   titres qu'il nomme dans `complement_titres`, et `complement_etiquette` porte un texte
   fixe à afficher avec lui : « non vérifié — connaissances du modèle, sans source ».
 - **Ce qu'il n'est pas** : une source. Aucun passage ne le fonde ; **il peut être faux**,
-  en particulier sur une œuvre hors catalogue, que rien ne permet de vérifier. C'est
+  en particulier sur une œuvre hors catalogue, que rien ne permet de vérifier — et la
+  mesure l'a montré (ci-dessous : 5 compléments faux et 2 dangereux sur 10 lus). C'est
   pourquoi il est étiqueté, et pourquoi il ne remplace jamais la partie stricte.
 - **Ce qui est contrôlé** (après les contrôles de la partie stricte ; chacun : 503
   `sortie_modele_invalide`, motif préfixé `complement_`, son compteur ; pas de second
@@ -596,8 +597,25 @@ en strict.
   l'interface (l'application ne montre plus le sélecteur), mais **reste accepté par
   l'API** : le contrat 1.4.0 garde l'énumération `strict | enrichi`. Le couper vraiment
   demandera une nouvelle version du contrat.
-- **Mesure** : le banc de la réponse, `--mode enrichi` (ci-dessous, « Le banc de mesure de
-  la réponse »).
+- **Mesure** (2026-11-07, en préproduction, `mistral-large-2512`, les 26 questions du profil
+  actif ; banc de la réponse, `--mode enrichi`, run `59004a46…` de l'expérience
+  `E3-reponse-enrichi-preprod`) : **le critère de la partie stricte n'est pas tenu en
+  enrichi** — refus correct F7 **3 / 5** (5 / 5 en strict) : une question F7 n'est plus
+  refusée, une autre rend un 503 pour son complément ; hors catalogue 4 / 5 ; 0 série
+  inventée ; 0 nom de membre. **7 sorties sur 26 coupées** à la longueur par défaut (400
+  jetons) : réponse et complément la dépassent. Complément présent 14 fois sur 26 ; après
+  un refus de la partie stricte, 5 fois sur 6. 3 sorties refusées pour leur complément (1
+  disponibilité, 2 métadonnées). Coût : 0,055 $.
+- **Lecture humaine** (Max, 10 compléments, les refus d'abord, vérifications en ligne) :
+  **2 utiles, 1 inutile, 5 faux, 2 dangereux**. Les deux « dangereux » décrivent comme
+  réelles des œuvres **inventées** par le jeu d'évaluation (questions F7) ; les « faux »
+  inventent des titres, une édition française, un auteur — sur des œuvres hors catalogue,
+  que la route ne peut pas contrôler.
+- **D'où la règle** : le mode enrichi reste **sélectionnable**, mais **n'est pas proposé par
+  défaut** — `strict` reste le défaut de `reglages.toml`, et l'application le présente
+  sélectionné. Motif : sur un échantillon lu, le complément affirme comme vraies des œuvres
+  qui n'existent pas ; l'étiquette « non vérifié » ne suffit pas à en faire le comportement
+  par défaut d'un outil de libraire.
 
 ### Les métadonnées d'une série
 
