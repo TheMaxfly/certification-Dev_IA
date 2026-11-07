@@ -858,14 +858,14 @@ $B estimer mistral-large-2512 famille:F7,issue:hors_catalogue   # aucun appel
 $B estimer-scenarios mistral-large-2512 <fichier des scénarios>.csv   # aucun appel
 $B essai mistral-large-2512 "<question inventée>" [--temperature 0.7] [--longueur-max 1000]
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga' \
-  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10
+  $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10 [--etape E]
 # le mode enrichi : essai, estimation, mesure (la ligne eval_runs en préproduction)
 $B estimer mistral-large-2512 famille:F7,issue:hors_catalogue --mode enrichi
 $B essai mistral-large-2512 "<question inventée>" --mode enrichi
 DATABASE_URL='postgresql://postgres@localhost:5432/apimanga_preprod' \
   $B mesurer mistral-large-2512 famille:F7,issue:hors_catalogue,famille:F9,famille:F10 \
-  --mode enrichi --experience E3-reponse-enrichi-preprod
-DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv
+  --mode enrichi --experience E3-reponse-enrichi-preprod [--etape E]
+DATABASE_URL=… $B scenarios mistral-large-2512 <fichier des scénarios>.csv [--etape E]
 $B relire <dossier du run>             # selon les règles d'aujourd'hui, aucun appel
 $B etiqueter                           # les runs déjà faits, a posteriori
 $B registre <profil>=<run_id> …        # une version par profil
@@ -900,7 +900,10 @@ $B registre <profil>=<run_id> …        # une version par profil
   dépôt et hors MLflow, pour la lecture humaine.
 - **MLflow, en plus** : chaque run joint en artefacts les deux invites et `reglages.toml`,
   leurs empreintes en paramètres (`invite_reponse_sha`, `invite_reformulation_sha`,
-  `reglages_sha`), et porte ses étiquettes : `etape`, `role` (`profil_actif`, `repli`),
+  `reglages_sha`), et porte ses étiquettes : `etape` (`--etape` de `mesurer` et
+  `scenarios`, 32 caractères au plus, lettres, chiffres, « . », « _ », « - » ; `E3-06`
+  par défaut, soit E3, étape 3, spec 06 ; gardée dans les paramètres du run, que
+  `etiqueter` relit), `role` (`profil_actif`, `repli`),
   `invite_version` (le commit court qui a écrit les invites), `statut` (`complet`,
   `interrompu`), `verdict` (`tenu`, `non_tenu`, sauf les scénarios, sans critère),
   `cause_interruption`. Les runs déjà faits ont reçu leurs étiquettes a posteriori, pas

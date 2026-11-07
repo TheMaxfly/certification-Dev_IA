@@ -456,6 +456,8 @@ def test_un_run_enrichi_par_la_ligne_de_commande(
             "enrichi",
             "--experience",
             EXPERIENCE,
+            "--etape",
+            "E3-6-06",
         ],
         environ={"DATABASE_URL": base_api.dsn_admin},
         ouvreur=ouvreur,
@@ -473,6 +475,7 @@ def test_un_run_enrichi_par_la_ligne_de_commande(
     (charge,) = charges
     assert charge["experience"] == EXPERIENCE
     assert charge["etiquettes"]["mode"] == "enrichi"
+    assert charge["etiquettes"]["etape"] == "E3-6-06"  # --etape (C7) avec --mode
     assert COMPLEMENT not in json.dumps(charge, ensure_ascii=False)
     assert COMPLEMENT in (dossier / "reponses.md").read_text(encoding="utf-8")
     with psycopg.connect(base_api.dsn_admin) as cx:

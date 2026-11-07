@@ -32,7 +32,7 @@ make monitorage-arret  # tout s'arrête ; les données de Prometheus restent sur
 | `api` | `api:8010` | l'API du modèle : requêtes, erreurs, modèle de langage |
 | `application` | `application:8020` | l'application : requêtes, erreurs de l'API, état de l'API |
 | `machine` | `node-exporter:9100` | la machine ; aucun port publié |
-| `qualite` | `sonde:9108` | la sonde d'équivalence, la dernière mesure |
+| `qualite` | `sonde:9108` | la sonde d'équivalence, la mesure de la dernière promotion |
 
 Scrutation 15 s, rétention 15 jours. **Seul le réseau `collecte` (`172.30.13.0/24`) lit
 `/metrics` de l'API et de l'application** : deux variables du fichier de fusion, aucune ligne de
@@ -67,9 +67,14 @@ docker exec api-modele-sonde-1 python -m monitorage mesurer   # un passage à la
 
 ## L'exporteur de qualité
 
-`modele_derniere_mesure_hit_rate_10` et `modele_derniere_mesure_timestamp` : la dernière mesure de
-l'encodage en service, lue dans `bench.eval_mesures`, toutes les 5 minutes. **Un chiffre qui ne
-bouge qu'à une nouvelle mesure, pas un signal vivant.**
+`modele_derniere_mesure_hit_rate_10` et `modele_derniere_mesure_timestamp` : la mesure qui a fait
+promouvoir l'encodage en service — celle du run cité par sa dernière promotion (`bench.promotions`,
+`decision = 'promu'`), lue dans `bench.eval_mesures` (taux de réussite à 10, global, jeu v2, toutes
+les questions), toutes les 5 minutes. Un run plus récent du même encodage (un rejeu, une autre
+configuration) ne la change pas. Une promotion sans run (l'encodage 2, promu par la migration 021
+le 2026-10-09) lit la référence connue de son encodage (`28aa0e60`, la mesure 8 sur le corpus v1).
+Sans mesure à publier, les deux jauges disparaissent ; une base injoignable laisse la dernière
+valeur. **Un chiffre qui ne bouge qu'à une promotion ou un retour arrière, pas un signal vivant.**
 
 **Éteint sans sa configuration** (`modele_exporteur_base_activee` à 0, et les deux jauges absentes).
 Pour le lire, trois choses, toutes hors dépôt ou sur le serveur :

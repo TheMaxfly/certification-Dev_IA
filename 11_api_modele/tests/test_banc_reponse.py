@@ -1297,8 +1297,14 @@ def ouvreur_de(banc_: Banc) -> Iterator[Banc]:
     yield banc_
 
 
+@pytest.mark.parametrize("etape", [None, "E4-01"], ids=["defaut", "donnee"])
 def test_un_run_complet_par_la_ligne_de_commande(
-    banc_: Banc, doublures: Doublures, base_api: BaseApi, tmp_path, monkeypatch
+    banc_: Banc,
+    doublures: Doublures,
+    base_api: BaseApi,
+    tmp_path,
+    monkeypatch,
+    etape: str | None,
 ):
     DoublureFournisseur.contenu = REFUS
     DoublureFournisseur.usage = {"prompt_tokens": 1000, "completion_tokens": 20}
@@ -1314,10 +1320,11 @@ def test_un_run_complet_par_la_ligne_de_commande(
 
     monkeypatch.setattr(enregistrement, "executer", executer)
     code = cli.principal(
-        ["mesurer", "factice-a", COURT],
+        ["mesurer", "factice-a", COURT, *(["--etape", etape] if etape else [])],
         environ={"DATABASE_URL": base_api.dsn_admin},
         ouvreur=lambda _: ouvreur_de(banc_),
     )
+    attendue = etape or "E3-06"
     assert code == 0
     (dossier,) = sorties.iterdir()
     assert dossier.name.startswith("factice-a-F7+hors_catalogue-")
@@ -1331,10 +1338,11 @@ def test_un_run_complet_par_la_ligne_de_commande(
     # Les étiquettes, les invites et les réglages en artefacts, leurs empreintes.
     etiquettes = charge["etiquettes"]
     assert (etiquettes["etape"], etiquettes["role"], etiquettes["statut"]) == (
-        "E3-06",
+        attendue,
         "profil_actif",
         "complet",
     )
+    assert resume["parametres"]["etape"] == attendue, "gardée pour l'étiquetage"
     assert etiquettes["verdict"] == "tenu"
     assert etiquettes["invite_version"] == "inconnue"  # le commit factice
     for chemin, parametre in enregistrement.FICHIERS_DU_RUN.items():
@@ -1517,7 +1525,7 @@ def test_les_scenarios_par_la_ligne_de_commande(
     monkeypatch.setattr(enregistrement, "executer", en_panne)
     fichier = scenarios_csv(tmp_path, cinq_scenarios(QUESTION))
     code = cli.principal(
-        ["scenarios", "factice-a", str(fichier)],
+        ["scenarios", "factice-a", str(fichier), "--etape", "E4-01"],
         {"DATABASE_URL": base_api.dsn_admin},
         lambda _: ouvreur_de(banc_),
     )
@@ -1528,6 +1536,7 @@ def test_les_scenarios_par_la_ligne_de_commande(
     resume = json.loads((dossier / "resume.json").read_text(encoding="utf-8"))
     assert resume["metriques"]["reformulation_meme_serie"] == 5
     assert len(resume["parametres"]["scenarios_empreinte"]) == 64
+    assert resume["parametres"]["etape"] == "E4-01"
     assert (dossier / "mlflow_charge.json").is_file()
 
 
@@ -1816,3 +1825,41 @@ def test_les_metriques_sans_reponse_rendue():
     assert metriques(run)["latence_totale_ms_p95"] == 1200.0
     run.par_question = [ligne(titres_presents=None)]
     assert "titre_present" not in metriques(run)
+
+
+# --------------------------------------------------------------------------- #
+#  L'étiquette `etape` (dette 41 : elle était écrite en dur)
+# --------------------------------------------------------------------------- #
+def test_l_etape_d_un_run_se_donne_et_se_relit(tmp_path, monkeypatch):
+    assert (
+        enregistrement.etiquettes_du_run(
+            "actif", "actif", "abc1234", "termine", None, None, "E4-01"
+        )["etape"]
+        == "E4-01"
+    )
+    monkeypatch.setattr(enregistrement, "invite_version", lambda commit: commit[:7])
+    dossier = tmp_path / "run"
+    dossier.mkdir()
+    enregistrement.ecrire_json(dossier / "run_id.json", {"run_id": "c" * 32})
+    enregistrement.ecrire_json(
+        dossier / "resume.json",
+        {
+            "statut": "termine",
+            "motif_interruption": None,
+            "parametres": {"profil": "actif", "commit": "3333333", "etape": "E4-01"},
+        },
+    )
+    runs = enregistrement.etiquettes_des_runs_faits("actif", tmp_path)
+    assert runs["c" * 32]["etape"] == "E4-01"
+
+
+@pytest.mark.parametrize(
+    "commande", ["estimer", "mesurer", "scenarios", "estimer-scenarios"]
+)
+def test_l_option_etape_a_un_defaut_et_une_forme(commande: str):
+    assert cli.analyser([commande, "p", "x"]).etape == "E3-06"
+    assert cli.analyser([commande, "p", "x", "--etape", "E3-06.b"]).etape == "E3-06.b"
+    assert cli.analyser([commande, "p", "x", "--etape", "a" * 32]).etape == "a" * 32
+    for mauvaise in ("E3 06", "-E3", ".E3", "_E3", "x" * 33, "", "E3-06\n"):
+        with pytest.raises(SystemExit):
+            cli.analyser([commande, "p", "x", f"--etape={mauvaise}"])

@@ -119,6 +119,22 @@ def test_le_resume_de_l_equivalence_nomme_l_etat_connu():
     assert "cause non établie" in resume
 
 
+def test_le_resume_de_resolution_de_d_ne_dit_plus_sous_0_999():
+    """Le résumé est rendu à chaque évaluation : en alerte, l'écart et l'état connu ;
+    revenue, l'équivalence, sans « sous 0,999 »."""
+    (regle,) = [r for r in regles() if r["title"].startswith("D ")]
+    resume = regle["annotations"]["summary"]
+    assert resume.startswith(
+        '{{ $b := (index $values "B").Value }}{{ if and (gt $b 0.0) (lt $b 0.999) }}'
+    )
+    alerte, reste = resume.removesuffix("{{ end }}").split("{{ else if gt $b 0.0 }}")
+    revenue, sans_valeur = reste.split("{{ else }}")
+    assert "sous 0,999" in alerte
+    assert "sous 0,999" not in revenue + sans_valeur
+    assert "revenue" in revenue and "Lire le journal de la sonde" in revenue
+    assert "Plus de valeur" in sans_valeur and "Lire le journal" in sans_valeur
+
+
 def test_la_politique_regroupe_30_s_et_repete_4_h():
     (politique,) = lire("politiques.yml")["policies"]
     assert politique["group_wait"] == "30s"

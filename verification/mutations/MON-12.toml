@@ -1,0 +1,7 @@
+id = "MON-12"
+origine = "E3 étape 6, bloc C (2026-11-07) — le seuil du webhook d'essai : un corps d'exactement CORPS_MAX_OCTETS est admis, un octet de plus est refusé"
+fichier = "13_monitorage/src/monitorage/serveur.py"
+avant = '''            if longueur > CORPS_MAX_OCTETS:'''
+apres = '''            if longueur >= CORPS_MAX_OCTETS:'''
+dossier = "13_monitorage"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_serveur.py", "-k", "corps"]

@@ -4,8 +4,8 @@
     $B essai <profil> "<question>" [--temperature T] [--longueur-max N] [--mode M]
     $B estimer <profil> <jeu> [--mode M]
     $B estimer-scenarios <profil> <fichier.csv>
-    DATABASE_URL=… $B mesurer <profil> <jeu> [--mode M] [--experience E]
-    DATABASE_URL=… $B scenarios <profil> <fichier.csv>
+    DATABASE_URL=… $B mesurer <profil> <jeu> [--mode M] [--experience E] [--etape E]
+    DATABASE_URL=… $B scenarios <profil> <fichier.csv> [--etape E]
     DATABASE_URL=… $B reprendre <dossier du run>
     $B relire <dossier du run>           # selon les règles d'aujourd'hui, sans appel
     $B etiqueter                         # les runs déjà faits, a posteriori
@@ -230,6 +230,7 @@ def enregistrer(
                 run.statut,
                 run.motif_interruption,
                 cast(Mapping[str, object] | None, resultat.get("verdict")),
+                str(parametres["etape"]),
             ),
         },
         parametres,
@@ -421,7 +422,7 @@ def commande_mesurer(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
         estimation,
         plafond,
         banc_.modele_langage.caracteres_par_jeton,
-    ) | {"mode": args.mode, "experience": args.experience}
+    ) | {"mode": args.mode, "experience": args.experience, "etape": args.etape}
     resultat: dict[str, object] = {
         "nom": nom,
         "statut": run.statut,
@@ -459,7 +460,7 @@ def commande_scenarios(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
         estimation,
         plafond,
         banc_.modele_langage.caracteres_par_jeton,
-    ) | {"scenarios_empreinte": empreinte}
+    ) | {"scenarios_empreinte": empreinte, "etape": args.etape}
     resultat: dict[str, object] = {
         "nom": nom,
         "statut": run.statut,
@@ -544,12 +545,30 @@ def commande_registre(couples: Sequence[str], environ: Mapping[str, str]) -> int
     return 0
 
 
+def etape_admise(valeur: str) -> str:
+    if not enregistrement.FORME_ETAPE.fullmatch(valeur):
+        raise argparse.ArgumentTypeError(
+            "étape : lettres, chiffres, « . », « _ », « - », 32 au plus"
+        )
+    return valeur
+
+
 def experience_admise(valeur: str) -> str:
     if not enregistrement.FORME_EXPERIENCE.fullmatch(valeur):
         raise argparse.ArgumentTypeError(
             "expérience : lettres, chiffres, « . », « _ », « - », 64 au plus"
         )
     return valeur
+
+
+def ajouter_etape(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--etape",
+        type=etape_admise,
+        default=enregistrement.ETAPE,
+        help=f"l'étiquette `etape` du run (défaut : {enregistrement.ETAPE}, E3 étape 3"
+        " spec 06) ; sans effet pour estimer, qui ne crée pas de run",
+    )
 
 
 def ajouter_mode(p: argparse.ArgumentParser) -> None:
@@ -575,6 +594,7 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
         p = sous.add_parser(nom)
         p.add_argument("profil")
         p.add_argument("jeu", help="famille:F7,issue:hors_catalogue,…")
+        ajouter_etape(p)
         ajouter_mode(p)
         if nom == "mesurer":
             p.add_argument(
@@ -588,6 +608,7 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
         p = sous.add_parser(nom)
         p.add_argument("profil")
         p.add_argument("fichier", help="le CSV des scénarios écrits par Max")
+        ajouter_etape(p)
     p = sous.add_parser("relire", help="un run mesuré, selon les règles d'aujourd'hui")
     p.add_argument("dossier")
     p = sous.add_parser("reprendre", help="enregistrer un run déjà mesuré")

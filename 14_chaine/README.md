@@ -27,7 +27,7 @@ préproduction, sur une copie de la base, et ne touche jamais la production. Ell
 | candidat | un fichier qui dit ce que la chaîne doit juger : un corpus, un encodage, une mesure, une règle |
 | jeu d'évaluation gelé | les 69 questions de référence, avec leurs réponses attendues ; il ne change plus |
 | test d'équivalence, cosinus minimal | on réencode 200 fragments et on compare aux vecteurs en base ; le cosinus minimal est l'accord le plus faible (1 = identique) |
-| reconnaissance, proposition, nDCG@10 | trois familles de questions du jeu (retrouver une œuvre décrite, proposer des œuvres) et une mesure de la qualité du classement des 10 premiers |
+| reconnaissance, proposition, nDCG@10 | deux familles de questions du jeu (retrouver une œuvre décrite, proposer des œuvres) et une mesure de la qualité du classement des 10 premiers |
 | rejeu, run de référence | rejouer une mesure et la comparer, chiffre par chiffre, à un run déjà enregistré |
 | sonde, pile du monitorage | la pile lance l'API, l'application et le monitorage ; la sonde y vérifie l'équivalence toutes les 15 minutes |
 | E3, E4 | deux épreuves de la certification ; la chaîne a été construite à l'étape 6 d'E3 (à ne pas confondre avec l'étape 6 de la chaîne, « Valider ») |
@@ -143,15 +143,16 @@ règle a changé.
 2. **L'environnement du module** : `cd 14_chaine && uv sync --locked --extra dev`. La
    chaîne n'a aucune dépendance à l'exécution : la bibliothèque standard de Python suffit.
 3. **Les mots de passe**, dans `~/.pgpass`. Un mot de passe appartient au rôle, pas à la
-   base : chaque ligne nouvelle copie la ligne `apimanga` du même rôle, et seul le nom de
-   la base change. La chaîne vérifie ces lignes par une connexion ; elle n'ouvre jamais le
-   fichier. Leur forme, sans le mot de passe :
+   base : chaque ligne nouvelle copie la ligne `apimanga` du même rôle — même hôte et même
+   port que cette ligne —, et seul le nom de la base change. La chaîne vérifie ces lignes
+   par une connexion ; elle n'ouvre jamais le fichier. Leur forme, sans le mot de passe,
+   `<hôte>:<port>` étant ceux de la ligne `apimanga` du rôle :
 
    ```text
-   localhost:5432:apimanga_preprod:postgres:<mot de passe du rôle postgres>
-   localhost:5432:apimanga_preprod:verif_lecture:<mot de passe du rôle verif_lecture>
-   localhost:5432:apimanga_preprod:modele_api:<mot de passe du rôle modele_api>
-   localhost:5432:postgres:postgres:<mot de passe du rôle postgres>
+   <hôte>:<port>:apimanga_preprod:postgres:<mot de passe du rôle postgres>
+   <hôte>:<port>:apimanga_preprod:verif_lecture:<mot de passe du rôle verif_lecture>
+   <hôte>:<port>:apimanga_preprod:modele_api:<mot de passe du rôle modele_api>
+   <hôte>:<port>:postgres:postgres:<mot de passe du rôle postgres>
    ```
 
    La dernière ligne ouvre la base d'entretien du serveur, celle où l'on se connecte pour
@@ -209,7 +210,13 @@ la chaîne (code 21). Il doit être commité et identique à `HEAD` (sinon, code
 **La règle** est `10_mesures_recherche/config/promotion_corpus_v2.toml`, commitée le
 10 octobre 2026 (commit `b6c081c`), avant toute mesure de la chaîne : au moins 31 questions
 sur 59 au global et 20 sur 23 en reconnaissance. Le seuil de 31 est le score de la
-référence : aucune perte nette n'est admise. Elle ne juge que le corpus v2, et jamais
+référence : aucune perte nette n'est admise au global. En reconnaissance, la référence fait
+21 sur 23 et le seuil est de 20 : une question de marge, parce qu'une question seule ne
+prouve rien. La règle et les résultats comptent sur 59 questions, et non sur les 69 du jeu :
+les 10 autres n'attendent aucune série du catalogue — 5 questions de refus sur des œuvres
+inventées et 5 œuvres reconnues mais hors catalogue — ; elles jugent le modèle de langage,
+qui doit refuser, pas le classement (d'où aussi 23 questions de reconnaissance, et non 28).
+Elle ne juge que le corpus v2, et jamais
 l'encodage en service. Elle est réutilisée telle quelle : aucune règle
 n'a été écrite pour la chaîne.
 
@@ -243,8 +250,10 @@ make chaine CANDIDAT=14_chaine/candidats/requalification_v2.toml             # l
 ```
 
 - Le passage se lance depuis la racine du dépôt. La pile du monitorage est arrêtée
-  (`make monitorage-arret`). L'instance du service d'embedding du candidat tourne
-  (`docker compose --profile embeddinggemma up -d` dans `09_service_embedding/`).
+  (`make monitorage-arret`). L'instance du service d'embedding du candidat tourne :
+  `docker compose --profile <profil> up -d` dans `09_service_embedding/`, avec le profil de
+  l'instance du candidat (`[encodage] instance`) — `embeddinggemma`, ou `bge-m3` pour
+  BGE-M3.
 - **Rejouer un candidat** demande son état de départ. La requalification attend l'encodage 2
   en service : après la promotion du 7 novembre, il faut d'abord un retour arrière. Le refus
   de BGE-M3, rejoué tel quel, s'arrêterait au code 50 : son encodage existe déjà. Pour

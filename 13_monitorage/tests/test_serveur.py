@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import threading
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterator
 from typing import Any
@@ -73,15 +76,49 @@ def test_le_webhook_compte_et_ne_journalise_que_le_titre(
 
 
 def test_le_webhook_refuse_un_corps_trop_long(adresse: str, metriques: Metriques):
+    """Le refus se décide sur la longueur annoncée, avant toute lecture du corps : le
+    client n'envoie que l'en-tête, et le test ne dépend d'aucune course. (Envoyer le
+    million d'octets en faisait une : le serveur répond 413 et ferme pendant que le
+    client écrit encore ; une connexion coupée a été relevée une fois, le 7
+    novembre.)"""
+    morceaux = urllib.parse.urlsplit(adresse)
+    assert morceaux.hostname is not None and morceaux.port is not None
+    connexion = http.client.HTTPConnection(morceaux.hostname, morceaux.port, timeout=5)
+    try:
+        connexion.putrequest("POST", "/webhook-essai")
+        connexion.putheader("Content-Length", str(CORPS_MAX_OCTETS + 1))
+        connexion.endheaders()
+        assert connexion.getresponse().status == 413
+    finally:
+        connexion.close()
+    time.sleep(0.2)  # un serveur qui lirait quand même le corps compterait ici
+    assert "monitorage_webhook_essai_recus_total 0.0" in metriques.exposer().decode()
+
+
+def test_un_corps_trop_long_vraiment_envoye_est_refuse(
+    adresse: str, metriques: Metriques
+):
+    """Un client qui envoie vraiment le corps : le serveur ne le lit pas. Le client
+    reçoit le 413, ou une connexion coupée s'il écrit encore quand le serveur ferme :
+    les deux sont un refus, et rien n'est compté."""
     requete = urllib.request.Request(
         f"{adresse}/webhook-essai",
         data=b"x" * (CORPS_MAX_OCTETS + 1),
         method="POST",
     )
-    with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(requete)
-    assert exc.value.code == 413
+    with pytest.raises((urllib.error.URLError, ConnectionError)) as exc:
+        urllib.request.urlopen(requete, timeout=5)
+    if isinstance(exc.value, urllib.error.HTTPError):
+        assert exc.value.code == 413
+    elif isinstance(exc.value, urllib.error.URLError):
+        assert isinstance(exc.value.reason, ConnectionError), exc.value.reason
+    time.sleep(0.2)
     assert "monitorage_webhook_essai_recus_total 0.0" in metriques.exposer().decode()
+
+
+def test_un_corps_de_la_taille_maximale_est_accepte(adresse: str, metriques: Metriques):
+    assert poster(adresse, "/webhook-essai", b"x" * CORPS_MAX_OCTETS) == 200
+    assert "monitorage_webhook_essai_recus_total 1.0" in metriques.exposer().decode()
 
 
 @pytest.mark.parametrize(

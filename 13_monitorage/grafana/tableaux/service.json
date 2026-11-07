@@ -620,7 +620,7 @@
           "custom": {
             "showPoints": "auto",
             "fillOpacity": 5,
-            "spanNulls": true
+            "spanNulls": false
           }
         },
         "overrides": []
@@ -847,7 +847,8 @@
             "showPoints": "auto",
             "fillOpacity": 5,
             "spanNulls": true
-          }
+          },
+          "decimals": 3
         },
         "overrides": []
       },
