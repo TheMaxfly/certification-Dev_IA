@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -524,3 +525,202 @@ def test_une_configuration_introuvable_est_un_refus_nomme(
     with pytest.raises(environnement.Arret) as e:
         etapes.image_de_l_api()
     assert e.value.code == Code.PACKAGING
+
+
+# --------------------------------------------------------------------------- #
+#  L'affichage du rapport (écarts 03-1 et 03-2) : le `.md` se lit, le `.json`
+#  garde son schéma et ses valeurs brutes
+# --------------------------------------------------------------------------- #
+
+LIVRAISON_REELLE = REELLES / "livraison_refus_bgem3_v2.json"
+TOTAUX_REELS = {"reconnaissance": 23, "proposition": 36}
+FINE = "\u202f"  # espace fine insécable
+VIDE = re.compile(r"(?<!`)``(?!`)")  # une cellule de code vide
+
+
+def lignes_des_etapes(md: str) -> list[str]:
+    tableau = md.split("## Les étapes", 1)[1].split("\n\n", 2)[1]
+    return [ligne for ligne in tableau.splitlines() if ligne.startswith("| ")][1:]
+
+
+def test_le_rapport_reel_du_refus_se_lit():
+    d = json.loads(LIVRAISON_REELLE.read_text("utf-8"))
+    md = rapport.markdown(d, "la suite", TOTAUX_REELS)
+    assert (
+        "| Résultat | global 23 / 59 ; reconnaissance 17 / 23 ; proposition 6 / 36 ;"
+        " nDCG@10 0,2902 |" in md
+    )
+    assert "cosinus minimal : 0,99999155" in md
+    assert "mémoire vidéo de la carte au plus haut : 2,86 Go" in md
+    assert "mémoire vive au plus haut (cache de fichiers compris) : 3,16 Go" in md
+    assert f"vecteurs : 77{FINE}006" in md and f"| 2{FINE}254,8 |" in md
+    assert f"ms_review 11{FINE}041" in md
+    assert "global (atteignables) : hit_rate@5 0,3051" in md
+    assert "condition non remplie : le candidat déclare une nouvelle version" in md
+    for brut in ("{", "}", "2863661056", "0.2901", "None", "`—`"):
+        assert brut not in md, brut
+    assert re.search(r"\d[.,]\d{9,}", md) is None, "un nombre à rallonge"
+    etapes_md = lignes_des_etapes(md)
+    assert [ligne.split(" | ")[0] for ligne in etapes_md] == [
+        f"| {n}" for n in range(8)
+    ]
+    assert etapes_md[7].startswith("| 7 | Packaging | non lancée | — |")
+    assert "arrêt de la chaîne à l'étape 6 (refus)" in etapes_md[7]
+    for ligne in etapes_md:
+        assert len(re.findall(r"(?<!\\)\|", ligne)) == 6, ligne
+    assert "| Image de l'API | — (non construite) |" in md
+
+
+def test_le_rapport_d_un_refus_porte_l_etape_7_et_les_denominateurs(monde: Monde):
+    p = lancer(monde)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    d = json.loads((monde.outils.livraisons / f"{p.nom_livraison}.json").read_text())
+    assert "reconnaissance 16 / 23 ; proposition 10 / 36" in md
+    assert lignes_des_etapes(md)[7].startswith("| 7 | Packaging | non lancée |")
+    assert [e["numero"] for e in d["etapes"]] == [0, 1, 2, 3, 4, 5, 6]
+    reel = json.loads(LIVRAISON_REELLE.read_text("utf-8"))
+    for cle in ("", "mesure", "candidat", "regle"):
+        assert set(d[cle] if cle else d) == set(reel[cle] if cle else reel), cle
+    communes = {"numero", "nom", "statut", "duree_s", "details"}
+    for e in [*d["etapes"], *reel["etapes"]]:
+        assert communes <= set(e) <= communes | {"code", "motif", "sortie"}, e
+    assert d["mesure"]["ndcg_10"] == pytest.approx(0.37398439006438544)
+
+
+def test_le_rapport_de_la_requalification_dit_le_rejeu_et_l_image(monde: Monde):
+    requalification(monde)
+    p = lancer(monde, REQUALIFICATION)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    etapes_md = lignes_des_etapes(md)
+    assert "rejeu contre `a3b7f0e0` : identique" in etapes_md[5]
+    assert (
+        "promotion proposée : global 31 / 59 ; reconnaissance 21 / 23 ;"
+        " proposition 10 / 36" in etapes_md[6]
+    )
+    assert etapes_md[7].startswith("| 7 | Packaging | tenue |")
+    assert "empreinte : `sha256:abababab…`" in etapes_md[7]
+    assert f"| Image de l'API | `sha256:{'ab' * 32}` |" in md
+    assert len(etapes_md) == 8
+
+
+def test_un_arret_tot_dit_les_etapes_suivantes_sans_valeur_vide(monde: Monde):
+    monde.lanceur.reponses["09.equivalence.comparer"] = comparer_rend(
+        "echec", 0.9512345678901234
+    )
+    p = lancer(monde)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    etapes_md = lignes_des_etapes(md)
+    assert [ligne.split(" | ")[2] for ligne in etapes_md[5:]] == ["non lancée"] * 3
+    assert all("arrêt de la chaîne à l'étape 4 (arrêt)" in x for x in etapes_md[5:])
+    assert "condition : verdict « promotion proposée »" in etapes_md[7]
+    assert "cosinus minimal 0,95123457" in etapes_md[4], "le motif, à la française"
+    assert "0.95123" not in md
+    for present in (
+        "| Résultat | — |",
+        "| Règle | — |",
+        "| Mesure | n° 7 ; aucun run |",
+    ):
+        assert present in md, present
+    assert "None" not in md
+
+
+@pytest.mark.parametrize(
+    "environ, attendu",
+    [
+        ({"CHAINE_BASE": "apimanga"}, "| Environnement | préproduction, base — |"),
+        ({}, "| Dossier des échantillons | — |"),
+    ],
+    ids=["production", "sans-dossier"],
+)
+def test_un_arret_a_l_etape_0_n_ecrit_ni_none_ni_cellule_vide(
+    monde: Monde, environ: dict[str, str], attendu: str
+):
+    monde.environ = monde.environ | environ if environ else {}
+    p = lancer(monde)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    assert p.code == Code.PREREQUIS and attendu in md
+    assert "None" not in md and VIDE.search(md) is None
+    assert len(lignes_des_etapes(md)) == 8
+
+
+def test_un_arbre_sale_et_un_candidat_invalide_n_ecrivent_pas_none(
+    monde: Monde, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monde.lanceur.reponses["git.status"] = Sortie(0, " M fichier\n")
+    p = lancer(monde)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    assert "| Commit | — |" in md and "None" not in md and VIDE.search(md) is None
+    monkeypatch.setattr(environnement, "RACINE_DEPOT", tmp_path)
+    invalide = tmp_path / "invalide.toml"
+    invalide.write_text('nom = "invalide"\n', "utf-8")
+    monde.lanceur.reponses["git.status"] = Sortie(0, "")
+    p = lancer(monde, invalide)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    assert p.code == Code.CANDIDAT_INVALIDE
+    assert "| Mesure | — ; aucun run |" in md and "None" not in md
+
+
+def test_une_image_construite_sans_empreinte_n_est_pas_dite_non_construite(
+    monde: Monde,
+):
+    requalification(monde)
+    monde.lanceur.reponses["docker.image"] = Sortie(0, "")
+    p = lancer(monde, REQUALIFICATION)
+    md = (monde.outils.livraisons / f"{p.nom_livraison}.md").read_text("utf-8")
+    assert p.code == Code.PACKAGING
+    assert "| Image de l'API | — (empreinte non relevée : voir l'étape 7) |" in md
+
+
+def test_une_barre_verticale_ne_casse_pas_le_tableau():
+    d = json.loads(LIVRAISON_REELLE.read_text("utf-8"))
+    d["etapes"][-1]["motif"] = "a | b\nc"
+    md = rapport.markdown(d, "la suite")
+    assert "| a \\| b c |" in md
+    assert "reconnaissance 17 ; proposition 6" in md, "sans dénominateur connu"
+
+
+def test_les_nombres_a_la_francaise():
+    assert rapport.valeur_lisible("memoire_vive_pic", -1) == "non mesurée"
+    assert rapport.valeur_lisible("memoire_video_pic", 0) == "non mesurée"
+    assert rapport.valeur_lisible("global", {}) == "—"
+    motif = "ne sert pas : {'modele': 'x', 'fragments': 77006} ; {nu}"
+    assert rapport.motif_lisible(motif) == (
+        f"ne sert pas : (modele x, fragments 77{FINE}006) ; {{nu}}"
+    )
+    assert rapport.motif_lisible("a {'v': {'g': 31}} b") == "a (v (g 31)) b"
+    for casse in ("{[1]: 0}", "{{}}", "{[1]}", "{'a': {[2]: 1}}", "{"):
+        assert rapport.motif_lisible(f"x {casse} y") == f"x {casse} y", casse
+    lu = "écart : {'model_sha': ('" + "a" * 40 + "', '" + "b" * 40 + "')}"
+    assert rapport.motif_lisible(lu) == (
+        f"écart : (model_sha ({'a' * 40}, {'b' * 40}))"
+    ), "l'ordre lu, attendu ; rien de tronqué"
+    assert rapport.motif_lisible("{'c': 0.9512345678901234, 'd': 0.5}") == (
+        "(c 0,95123457, d 0,5)"
+    )
+    assert rapport.motif_lisible("version 1.9.4, 0.123456789") == (
+        "version 1.9.4, 0,12345679"
+    )
+    assert rapport.nombre(2254.8, 1) == f"2{FINE}254,8"
+    assert rapport.nombre(77006) == f"77{FINE}006"
+    assert rapport.valeur_lisible("memoire_vive_pic", 3161292800) == "3,16 Go"
+    assert rapport.valeur_lisible("duree_encodage_s", 2254.0) == f"2{FINE}254,0 s"
+    assert rapport.valeur_lisible("verdict", True) == "oui"
+    assert rapport.valeur_lisible("x", []) == "—"
+    assert rapport.valeur_lisible("x", ["a", 2]) == "a, 2"
+    assert rapport.valeur_lisible("commit", "c0ffee" + "0" * 34) == "`c0ffee00…`"
+
+
+def test_un_motif_aux_valeurs_variees_et_le_repli_sur_le_brut(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    assert rapport.motif_lisible("{'a': None, 'b': True, 'c': [1, 2], 'd': {3}}") == (
+        "(a —, b oui, c (1, 2), d (3))"
+    )
+    d = json.loads(LIVRAISON_REELLE.read_text("utf-8"))
+    d["etapes"][-1]["motif"] = "brut {'a': 1}"
+
+    def panne(_texte: str) -> str:
+        raise RuntimeError("panne")
+
+    monkeypatch.setattr(rapport, "motif_lisible", panne)
+    assert "| brut {'a': 1} |" in rapport.markdown(d, "la suite")

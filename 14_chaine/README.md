@@ -165,6 +165,12 @@ make chaine-etat
 
 - Un passage écrit son rapport dans `14_chaine/livraisons/`. **Un passage = un rapport
   commité** avant le suivant : la chaîne refuse un arbre qui n'est pas propre.
+- Le `.md` se lit : les nombres à la française (quatre décimales pour les mesures, huit
+  pour le cosinus minimal, une pour les durées, la mémoire en Go), la reconnaissance et la
+  proposition avec leur dénominateur, une ligne par étape de 0 à 7, « non lancée » avec sa
+  raison. Dans le motif d'un arrêt, texte libre, seuls les réels à cinq décimales ou plus
+  (huit décimales) et les dictionnaires (dits en mots, valeurs entières) sont réécrits.
+  Le `.json` garde les valeurs brutes, pour la commande de promotion.
 - La promotion exige un rapport commité et poussé, au verdict « promotion proposée », et un
   motif écrit par Max. Le motif n'a jamais de valeur par défaut, et il ne porte pas de
   guillemet droit.
