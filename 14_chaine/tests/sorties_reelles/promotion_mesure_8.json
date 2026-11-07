@@ -1,0 +1,108 @@
+{
+ "run": {
+  "run_id": "a3b7f0e0-25e4-476e-a4b6-0e7d0498876b",
+  "corpus_id": "v2",
+  "encodage_id": "3",
+  "inscrit_le": "2026-10-10 03:11:19.651532+02:00",
+  "note": "mesure 8 — embeddinggemma-sens-catalogue"
+ },
+ "reference_run": {
+  "run_id": "28aa0e60-e801-4b07-8bf4-8f5c7c2ce78a",
+  "corpus_id": "v1",
+  "encodage_id": "2",
+  "inscrit_le": "2026-10-10 01:00:21.882910+02:00",
+  "note": "mesure 8 — inscrit après coup, depuis ses paramètres MLflow (migration 021)"
+ },
+ "encodage_en_service": [
+  2,
+  "v1"
+ ],
+ "regle_empreinte": "74dc6a10e1b210648e598aac477c80f308d1799eb44c2b6c90ff7f378dcd81f2",
+ "regle": {
+  "metrique": "hit_rate@10",
+  "global_min": 31,
+  "reconnaissance_min": 20
+ },
+ "nouveau": {
+  "questions": 59,
+  "global": 31,
+  "a_50": 41,
+  "proposition": 10,
+  "proposition_sur": 36,
+  "reconnaissance": 21,
+  "reconnaissance_sur": 23,
+  "par_famille": {
+   "F1": 3,
+   "F11": 1,
+   "F2": 5,
+   "F3": 1,
+   "F4": 4,
+   "F5": 5,
+   "F6": 6,
+   "F8": 4,
+   "F9": 2
+  },
+  "ndcg_10": 0.37398439006438544
+ },
+ "reference": {
+  "questions": 59,
+  "global": 31,
+  "a_50": 41,
+  "proposition": 10,
+  "proposition_sur": 36,
+  "reconnaissance": 21,
+  "reconnaissance_sur": 23,
+  "par_famille": {
+   "F1": 2,
+   "F11": 1,
+   "F2": 5,
+   "F3": 1,
+   "F4": 4,
+   "F5": 5,
+   "F6": 6,
+   "F8": 5,
+   "F9": 2
+  },
+  "ndcg_10": 0.35425107525786576
+ },
+ "mouvements": {
+  "par_mode": {
+   "proposition": {
+    "gagnees": 1,
+    "perdues": 1
+   }
+  },
+  "par_famille": {
+   "F1": {
+    "gagnees": 1
+   },
+   "F8": {
+    "perdues": 1
+   }
+  }
+ },
+ "hypothese": {
+  "proposition": {
+   "attendu": "≥ 12",
+   "mesure": 10,
+   "tenue": false
+  },
+  "reconnaissance": {
+   "attendu": [
+    20,
+    22
+   ],
+   "mesure": 21,
+   "tenue": true
+  },
+  "global": {
+   "attendu": [
+    31,
+    36
+   ],
+   "mesure": 31,
+   "tenue": true
+  }
+ },
+ "verdict": "promotion proposée"
+}

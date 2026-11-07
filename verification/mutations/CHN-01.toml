@@ -1,0 +1,7 @@
+id = "CHN-01"
+origine = "E3 étape 6, question 38 (2026-11-07) — sans le refus, la préproduction pourrait écrire ses échantillons dans le dossier que lisent la sonde et verify-poste"
+fichier = "09_service_embedding/src/service_embedding/equivalence.py"
+avant = '''    if demande.is_relative_to(production.resolve()):'''
+apres = '''    if False:'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_dossier_export.py"]

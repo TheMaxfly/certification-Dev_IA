@@ -1,0 +1,7 @@
+id = "CHN-04"
+origine = "E3 étape 6, question 38 (2026-11-07) — un test du service réel qui suivrait la variable laisserait détourner la vérification de la production"
+fichier = "09_service_embedding/tests/test_equivalence.py"
+avant = '''    return equivalence.dossier_production(CONFIG)'''
+apres = '''    return equivalence.dossier_export(CONFIG)'''
+dossier = "09_service_embedding"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_dossier_export.py"]

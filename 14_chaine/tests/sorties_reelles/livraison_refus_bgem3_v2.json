@@ -1,0 +1,160 @@
+{
+ "livraison": "20261107T015815Z_refus_bgem3_v2",
+ "environnement": "préproduction",
+ "base": "apimanga_preprod",
+ "dossier_echantillons": "09_service_embedding/mesures/equivalence_preprod",
+ "candidat": {
+  "fichier": "14_chaine/candidats/refus_bgem3_v2.toml",
+  "nom": "refus_bgem3_v2",
+  "motif": "démonstration de la chaîne : un autre modèle, encodé pour de vrai, mesuré et jugé par la règle écrite avant",
+  "corpus": "v2",
+  "mesure": 7,
+  "reference_run": null
+ },
+ "commit": "5897814ccdbeebd092930578398bfbf9c748e5c4",
+ "encodage": 4,
+ "run": "b70077dbe8334f1d906dc4e72f871106",
+ "experience": "E3-chaine-preprod",
+ "mesure": {
+  "questions": 59,
+  "global": 23,
+  "reconnaissance": 17,
+  "proposition": 6,
+  "ndcg_10": 0.29015665152125475
+ },
+ "regle": {
+  "fichier": "10_mesures_recherche/config/promotion_corpus_v2.toml",
+  "commit": "b6c081c81e2f48467ade875c90e43baceb298926",
+  "date": "2026-10-10T02:50:54+02:00"
+ },
+ "verdict": "refus proposé",
+ "conditions_manquantes": [
+  "global 23 < 31",
+  "reconnaissance 17 < 20"
+ ],
+ "image": null,
+ "etapes": [
+  {
+   "numero": 0,
+   "nom": "Préalables",
+   "statut": "tenue",
+   "duree_s": 0.1,
+   "details": {
+    "base": "apimanga_preprod",
+    "dossier": "09_service_embedding/mesures/equivalence_preprod",
+    "commit": "5897814ccdbeebd092930578398bfbf9c748e5c4",
+    "instance": "bge-m3",
+    "info": {
+     "model_id": "BAAI/bge-m3",
+     "model_sha": "5617a9f61b028005a4858fdac845db406aefb181",
+     "model_dtype": "float32",
+     "version": "1.9.4"
+    },
+    "encodage_en_service": 3
+   }
+  },
+  {
+   "numero": 1,
+   "nom": "Tester les données",
+   "statut": "tenue",
+   "duree_s": 103.1,
+   "details": {
+    "jeu": "31712b0d0b0cbd318ef228da105673af0cba2db431a72462f7635b2f6ec78b30",
+    "empreintes": {
+     "docs": [
+      "56775",
+      "ef95cb474897e314b03bad89ddb9acba"
+     ],
+     "fragments": [
+      "77006",
+      "254549aba3841608511f9e526631bfc0"
+     ]
+    },
+    "reconstruction_a_blanc": {
+     "fragments": 77006,
+     "documents": {
+      "ms_review": 11041,
+      "kitsu_synopsis": 37049,
+      "ms_synopsis": 8685
+     }
+    }
+   }
+  },
+  {
+   "numero": 2,
+   "nom": "Construire",
+   "statut": "non lancée",
+   "duree_s": 0.0,
+   "details": {
+    "condition": "le candidat déclare une nouvelle version"
+   }
+  },
+  {
+   "numero": 3,
+   "nom": "Encoder",
+   "statut": "tenue",
+   "duree_s": 2254.8,
+   "details": {
+    "encodage": 4,
+    "vecteurs": 77006,
+    "fragments": 77006,
+    "duree_encodage_s": 2254.0,
+    "memoire_video_pic": 2863661056,
+    "memoire_vive_pic": 3161292800,
+    "service": {
+     "modele": "BAAI/bge-m3",
+     "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+     "precision": "float32",
+     "version": "1.9.4",
+     "digest": "sha256:bee0bdb887096229add91b6fdfcf95258c12eb9180e90dc86f3b4b25b86fc613"
+    }
+   }
+  },
+  {
+   "numero": 4,
+   "nom": "Tester le modèle",
+   "statut": "tenue",
+   "duree_s": 52.2,
+   "details": {
+    "echantillon": "09_service_embedding/mesures/equivalence_preprod/encodage_4.json",
+    "verdict": "equivalent",
+    "cos_min": 0.9999915488335094,
+    "n": 200,
+    "sous_0999": 0
+   }
+  },
+  {
+   "numero": 5,
+   "nom": "Évaluer",
+   "statut": "tenue",
+   "duree_s": 27.4,
+   "details": {
+    "run": "b70077dbe8334f1d906dc4e72f871106",
+    "experience": "E3-chaine-preprod",
+    "global": {
+     "hit_rate@5/atteignables": 0.3051,
+     "hit_rate@10/atteignables": 0.3898,
+     "mrr@10/atteignables": 0.2862,
+     "ndcg@10/atteignables": 0.2902,
+     "hit_rate@5/toutes": 0.3051,
+     "hit_rate@10/toutes": 0.3898,
+     "mrr@10/toutes": 0.2862,
+     "ndcg@10/toutes": 0.2902
+    }
+   }
+  },
+  {
+   "numero": 6,
+   "nom": "Valider",
+   "statut": "refus",
+   "duree_s": 2.0,
+   "details": {},
+   "code": 10,
+   "motif": "la règle n'est pas tenue : global 23 < 31, reconnaissance 17 < 20"
+  }
+ ],
+ "code": 10,
+ "code_nom": "REFUS_REGLE",
+ "sens": "la règle n'est pas tenue ; aucune promotion proposée",
+ "piece_mlflow": "attachée"
+}

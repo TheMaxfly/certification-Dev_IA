@@ -1,0 +1,36 @@
+# Candidat requalification_v2 — le passage réussi (E3 étape 6, spec 04 ; décisions § 10).
+#
+# L'encodage 3 (EmbeddingGemma, corpus v2), celui que sert la production, requalifié en
+# préproduction : Max l'a d'abord retiré du service de la préproduction (retour arrière
+# 3 → 2), pour que la règle accepte de le juger. Aucun encodage : le candidat réutilise un
+# encodage existant — l'encodage a tourné dans le passage BGE-M3.
+#
+# Mesure : la configuration 8 du module 10 (embeddinggemma-sens-catalogue), rejouée
+# contre le run a3b7f0e0 (mesure 8 du corpus v2, 10 octobre). Règle D3, commitée le
+# 10 octobre (b6c081c).
+#
+# Attendu : PROMOTION PROPOSÉE (code 0) — 31 / 59, 21 / 23, 10 / 36, les 104 métriques
+# identiques à celles du run a3b7f0e0. La chaîne s'arrête là : la promotion est le geste
+# de Max.
+
+nom = "requalification_v2"
+motif = "démonstration de la chaîne : requalifier l'encodage en service, en préproduction, jusqu'à la promotion"
+
+[corpus]
+version = "v2"
+nouvelle_version = false
+
+[encodage]
+nouveau = false
+instance = "embeddinggemma"
+numero = 3
+
+[mesure]
+numero = 8
+reference_run = "a3b7f0e025e4476ea4b60e7d0498876b"
+
+[regle]
+fichier = "10_mesures_recherche/config/promotion_corpus_v2.toml"
+
+[preproduction]
+encodage_en_service = 2

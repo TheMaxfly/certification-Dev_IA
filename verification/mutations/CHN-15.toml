@@ -1,0 +1,8 @@
+id = "CHN-15"
+origine = "E3 étape 6, spec 02 (2026-11-07) — la clé de l'API affichée au déploiement"
+fichier = "14_chaine/src/chaine/deployer.py"
+avant = '''        info = etapes.json_de(corps) or {}'''
+apres = '''        o.afficher(cle)
+        info = etapes.json_de(corps) or {}'''
+dossier = "14_chaine"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py"]

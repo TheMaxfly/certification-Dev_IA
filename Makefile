@@ -8,7 +8,7 @@
 #                            docs/modeles, actionlint, shellcheck, essais des hooks
 #                            et du périmètre)
 #   make verify TOUT=1       tous les modules
-#   make verify MODULE=05    un seul module : 01 … 05, 07 … 12, database, demo, statique
+#   make verify MODULE=05    un seul module : 01 … 05, 07 … 14, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
 #   make app-compose-arret   les arrête
@@ -24,6 +24,13 @@
 #                            service d'embedding et de l'API du modèle, état d'apimanga
 #                            en lecture seule (pseudonymes des passages rendus compris),
 #                            ensemble de règles de GitHub
+#   make preprod-creer       la préproduction : copie de la production dans apimanga_preprod
+#                            (supprimée et recréée si elle existe), contrôlée
+#   make chaine CANDIDAT=…   la chaîne de livraison du modèle, en préproduction : étapes 0
+#                            à 8, jamais la promotion (A_BLANC=1 : la séquence, sans rien
+#                            lancer) ; chaine-promouvoir LIVRAISON=… MOTIF="…" et
+#                            chaine-revenir MOTIF="…" sont les gestes de Max ; chaine-etat
+#                            lit le journal de la préproduction
 #   make verify-mutations    les mutations versionnées (verification/mutations/),
 #                            rejouées dans un arbre jetable : chacune doit faire
 #                            rougir son test (poste, avant une demande vers main ;
@@ -38,9 +45,16 @@ TOUT ?=
 FORCER ?=
 MUTATIONS ?=
 CONSTRUIRE ?=
+CANDIDAT ?=
+A_BLANC ?=
+LIVRAISON ?=
+MOTIF ?=
+# Les fichiers suivent la base : la préproduction écrit ses échantillons dans le sien.
+EQUIVALENCE_DOSSIER ?= $(CURDIR)/09_service_embedding/mesures/equivalence_preprod
 
 .PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret \
-	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret
+	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret \
+	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -94,3 +108,23 @@ monitorage-arret:
 
 verify-mutations:
 	@uv run --no-project python -I verification/rejouer_mutations.py $(MUTATIONS)
+
+# La chaîne de livraison du modèle (module 14) : la préproduction seule, jamais la
+# production ; le motif des gestes de Max n'a pas de valeur par défaut.
+CHAINE = cd 14_chaine && EQUIVALENCE_DOSSIER="$(EQUIVALENCE_DOSSIER)" \
+	uv run --quiet --locked --no-env-file python -m chaine
+
+preprod-creer:
+	@$(CHAINE) preprod
+
+chaine:
+	@$(CHAINE) lancer "$(CANDIDAT)" $(if $(A_BLANC),--a-blanc)
+
+chaine-promouvoir:
+	@$(CHAINE) promouvoir "$(LIVRAISON)" --motif "$(MOTIF)"
+
+chaine-revenir:
+	@$(CHAINE) revenir --motif "$(MOTIF)"
+
+chaine-etat:
+	@$(CHAINE) etat
