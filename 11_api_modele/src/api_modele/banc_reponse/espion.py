@@ -14,8 +14,10 @@ raison de fin, la latence de l'appel (même en échec), la forme de
 `message.content` (son type ; en liste, le type et la taille en caractères de chaque
 morceau), et pour un refus le code et le message d'erreur du fournisseur (tronqué).
 Jamais un message, un passage, ni un en-tête ; le texte d'une sortie de réponse
-(`texte_modele`, celui du modèle, avant que la route n'y insère les titres) reste en
-mémoire le temps d'en compter les titres, et n'est jamais écrit ; de même le
+(`texte_modele`, celui du modèle, avant que la route n'y insère les titres) et son
+complément (`complement_modele`, mode enrichi) restent en mémoire le temps d'en
+compter les titres — ils ne sont écrits, hors dépôt et hors MLflow, que pour la
+lecture humaine d'une sortie refusée qui ne porte aucun nom de membre ; de même le
 message envoyé (`message_envoye`, passages et question), le temps de dire si un nom
 trouvé dans une sortie refusée y figurait. De la sortie de réponse, il garde aussi
 sa forme (`forme` : refus, nombre de séries citées, motif de refus), sans texte.
@@ -82,6 +84,9 @@ class Releve:
     erreur: dict[str, str] | None = None
     #: Le champ `reponse` de la sortie du modèle : en mémoire seulement.
     texte_modele: str | None = field(default=None, repr=False)
+    #: Le champ `complement` de la sortie du modèle (mode enrichi) : en mémoire
+    #: seulement, pour la lecture d'une sortie refusée pour son complément.
+    complement_modele: str | None = field(default=None, repr=False)
     #: La forme de la sortie de réponse, sans texte (`_forme`).
     forme: dict[str, object] | None = None
     #: La forme de `message.content`, sans texte (`_forme_contenu`).
@@ -185,8 +190,10 @@ def _sortie(choix: object) -> dict[str, object] | None:
         return None
 
 
-def _texte_modele(sortie: dict[str, object] | None) -> str | None:
-    texte = (sortie or {}).get("reponse")
+def _texte_modele(
+    sortie: dict[str, object] | None, champ: str = "reponse"
+) -> str | None:
+    texte = (sortie or {}).get(champ)
     return texte if isinstance(texte, str) else None
 
 
@@ -299,6 +306,7 @@ class Espion:
                 releve.forme_contenu = _forme_contenu(premier)
                 sortie = _sortie(premier)
                 releve.texte_modele = _texte_modele(sortie)
+                releve.complement_modele = _texte_modele(sortie, "complement")
                 if releve.role == "reponse":
                     releve.forme = _forme(sortie)
             return reponse

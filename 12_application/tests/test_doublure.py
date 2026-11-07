@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 
 def test_le_contrat_est_celui_de_la_version_livree():
-    assert d.CONTRAT["info"]["version"] == "1.3.1"
+    assert d.CONTRAT["info"]["version"] == "1.4.0"
 
 
 @pytest.mark.parametrize("nom", sorted(d.SCENARIOS_REPONSE))

@@ -19,6 +19,25 @@ jamais, par construction.
 passage envoyé (`ligne_dementie`). Le contrôle de la route ne change pas, le libraire
 reçoit le 503 ; le banc la compte à part, et elle ne compte pas contre le critère :
 ce n'est pas le modèle qui s'est trompé.
+
+**Mode enrichi** (E3 étape 6, spec 06, E) : la même mesure, `mode: "enrichi"` dans
+chaque requête ; le critère porte sur la partie stricte, inchangé : un 503
+`complement_*` n'y entre pas (la question compte comme une sortie invalide, et le
+refus correct qu'elle portait peut-être n'est pas compté) ; un nom de membre que le
+banc trouverait dans un complément **rendu** y entre (`pseudonymes_rendus`), comme
+dans la réponse. Métriques du complément : `complement_present` (sur les questions),
+`complement_quand_refus` (sur `refus_rendus`), et pour F7 et pour les questions hors
+catalogue ; `complement_titres_moyen` (sur les compléments rendus, absente sans
+complément) ; `sorties_invalides_complement` (tous motifs `complement_*`, chacun
+compté aussi à part) ; `complement_titre_non_declare` : les compléments dont le texte
+nomme un titre du catalogue absent de `complement_titres` (même suite de mots,
+lettres et chiffres seuls, sans casse ni accents ; même clé `titre_comparable` pour
+dire « déclaré ») ; `complement_titre_hors_controle` : parmi eux, ceux dont le titre
+n'est pas non plus celui d'une série rendue — la limite du contrôle de la route.
+Titres trouvés gardés par question ; un titre court du catalogue peut être un mot du
+texte (faux positif), un titre écrit autrement (« Dragonball » pour « Dragon Ball »)
+n'est pas trouvé (faux négatif) : la lecture tranche. L'estimation compte en enrichi
+les questions sans passage : l'appel a lieu (question 33).
 """
 
 from __future__ import annotations
@@ -37,15 +56,16 @@ import httpx
 from api_modele import affirmations, banc
 from api_modele.banc_reponse.espion import Espion, Releve, objet
 from api_modele.banc_reponse.jeu import Question
+from api_modele.base import titre_comparable
 from api_modele.configuration import ModeleLangage, Profil
 from api_modele.fournisseurs import estimer_cout
 from api_modele.modeles import Serie
 from api_modele.pseudonymes import Pseudonymes
 from api_modele.reponse import (
     INVITE_REFORMULATION,
-    INVITE_REPONSE,
     LONGUEUR_REFORMULATION,
     MARQUE_SERIE,
+    invite_de,
     message_de_reponse,
     titre_marque,
 )
@@ -90,6 +110,21 @@ STATUT_DEBIT = 429
 TYPE_DEBIT = "rate_limited"
 ATTENTE_DEBIT_S = 10.0
 REPRISES_DEBIT = 3
+#: Les deux modes de la route (`DemandeReponse.mode`) ; en strict, la requête du banc
+#: reste celle d'avant le mode enrichi (sans le champ `mode`).
+MODES = ("strict", "enrichi")
+PREFIXE_COMPLEMENT = "complement_"
+MOT = re.compile(r"[^\W_]+")
+
+
+def mots(texte: str) -> tuple[str, ...]:
+    """Les mots d'un texte, lettres et chiffres seuls, sans casse ni accents."""
+    return tuple(MOT.findall(affirmations.aplatir(texte)))
+
+
+def aucun_titre() -> list[str]:
+    """Le catalogue d'un banc qui ne le lit pas (le mode strict n'en a pas besoin)."""
+    return []
 
 
 class Client(Protocol):
@@ -116,10 +151,60 @@ class Banc:
     espion: Espion
     pause_s: float = PAUSE_S
     dormir: Callable[[float], None] = time.sleep
+    #: Les titres du catalogue (`manga.ms_series_enriched`), lus une fois, à la
+    #: première question : pour compter les titres que le complément nomme sans les
+    #: déclarer.
+    catalogue: Callable[[], Sequence[str]] = aucun_titre
+    _formes: dict[tuple[str, ...], str] | None = field(
+        default=None, init=False, repr=False
+    )
 
     @property
     def entetes(self) -> dict[str, str]:
         return {"X-API-Key": self.cle}
+
+    def charger_catalogue(self) -> dict[tuple[str, ...], str]:
+        """Les titres du catalogue par leur suite de mots, lus une fois — avant le
+        premier appel d'une mesure enrichie : une base en défaut arrête le banc avant
+        toute dépense."""
+        if self._formes is None:
+            formes: dict[tuple[str, ...], str] = {}
+            for titre in self.catalogue():
+                suite = mots(titre)
+                if suite:
+                    formes.setdefault(suite, titre)
+            self._formes = formes
+        return self._formes
+
+    def titres_non_declares(self, texte: str, declares: Sequence[str]) -> list[str]:
+        """Les titres du catalogue que `texte` nomme — même suite de mots, lettres et
+        chiffres seuls, sans casse ni accents — et qui ne sont pas des titres de
+        `declares` (même clé `titre_comparable`) ; le plus long d'abord, titres
+        déclarés compris : un titre contenu dans un autre, ou dans un titre déclaré,
+        ne compte pas. Dans l'ordre du texte, sans doublon."""
+        formes = self.charger_catalogue()
+        declarees = {mots(t) for t in declares} - {()}
+        longueur = max((len(f) for f in (*formes, *declarees)), default=0)
+        suite = mots(texte)
+        trouvees: list[tuple[int, int, str | None]] = []
+        for debut in range(len(suite)):
+            for n in range(1, min(longueur, len(suite) - debut) + 1):
+                forme = suite[debut : debut + n]
+                if forme in declarees:
+                    trouvees.append((debut, debut + n, None))
+                elif forme in formes:
+                    trouvees.append((debut, debut + n, formes[forme]))
+        prises: list[tuple[int, int, str | None]] = []
+        for debut, fin, titre in sorted(trouvees, key=lambda x: x[0] - x[1]):
+            if all(fin <= a or b <= debut for a, b, _ in prises):
+                prises.append((debut, fin, titre))
+        cles = {titre_comparable(t) for t in declares}
+        trouves: list[str] = []
+        for _, _, titre in sorted(prises, key=lambda x: x[0]):
+            if titre is None or titre_comparable(titre) in cles or titre in trouves:
+                continue
+            trouves.append(titre)
+        return trouves
 
     def profil(self, nom: str) -> Profil:
         profil = self.modele_langage.profil(nom)
@@ -151,19 +236,26 @@ class Estimation:
     appels: int
     jetons_entree: int
     cout_usd: float
+    #: Les questions dont la recherche ne rend aucun passage : sans appel en strict,
+    #: avec appel en enrichi (question 33).
+    sans_passage: int = 0
 
     def en_dict(self) -> dict[str, object]:
         return {
             "questions": self.questions,
             "appels": self.appels,
+            "sans_passage": self.sans_passage,
             "jetons_entree": self.jetons_entree,
             "cout_usd": round(self.cout_usd, 6),
         }
 
 
-def caracteres_du_contexte(banc_: Banc, question: str) -> int:
-    """Les caractères que l'appel de réponse enverrait (invite comprise) ; 0 si la
-    recherche ne rend aucun passage (la route refuse alors sans appel)."""
+def contexte_envoye(
+    banc_: Banc, question: str, mode: str = "strict"
+) -> tuple[int, bool]:
+    """(caractères que l'appel de réponse enverrait, invite comprise ; la recherche
+    est-elle sans passage). Sans passage, 0 en strict (la route refuse sans appel) ;
+    en enrichi, l'appel a lieu, contexte vide de passages (question 33)."""
     r = banc_.modele_langage.reponse
     series = banc_.rechercher(
         question,
@@ -171,9 +263,15 @@ def caracteres_du_contexte(banc_: Banc, question: str) -> int:
         passages_par_serie=r.passages_par_serie.defaut,
         catalogue_seul=r.catalogue_seul,
     )
-    if not any(s.passages for s in series):
-        return 0
-    return len(INVITE_REPONSE) + len(message_de_reponse("", question, series))
+    vide = not any(s.passages for s in series)
+    if vide and mode != "enrichi":
+        return 0, True
+    return len(invite_de(mode)) + len(message_de_reponse("", question, series)), vide
+
+
+def caracteres_du_contexte(banc_: Banc, question: str, mode: str = "strict") -> int:
+    """Les caractères que l'appel de réponse enverrait (`contexte_envoye`)."""
+    return contexte_envoye(banc_, question, mode)[0]
 
 
 def longueur_par_defaut(banc_: Banc, profil: Profil) -> int:
@@ -185,20 +283,26 @@ def longueur_par_defaut(banc_: Banc, profil: Profil) -> int:
 
 
 def estimer(
-    banc_: Banc, profil: Profil, textes: Iterable[str], longueur: int | None = None
+    banc_: Banc,
+    profil: Profil,
+    textes: Iterable[str],
+    longueur: int | None = None,
+    mode: str = "strict",
 ) -> Estimation:
     """Le coût au plus d'une série d'appels de réponse : jetons d'entrée comptés
     par caractères, sortie au maximum (`longueur_max` demandée, sinon celle du
     profil, sinon celle par défaut), sans raisonnement — la formule de la couche des
-    fournisseurs (`estimer_cout`)."""
+    fournisseurs (`estimer_cout`). En enrichi : l'invite avec le bloc du complément,
+    et un appel aussi pour une question sans passage."""
     ml = banc_.modele_langage
     if longueur is None:
         longueur = longueur_par_defaut(banc_, profil)
-    questions = appels = jetons = 0
+    questions = appels = jetons = vides = 0
     cout = 0.0
     for texte in textes:
         questions += 1
-        caracteres = caracteres_du_contexte(banc_, texte)
+        caracteres, vide = contexte_envoye(banc_, texte, mode)
+        vides += vide
         if not caracteres:
             continue
         entree = math.ceil(caracteres / ml.caracteres_par_jeton)
@@ -208,7 +312,7 @@ def estimer(
         appels += 1
         jetons += entree
         cout += estime
-    return Estimation(questions, appels, jetons, cout)
+    return Estimation(questions, appels, jetons, cout, vides)
 
 
 def garder_plafond(estimation: Estimation, plafond: float) -> None:
@@ -235,6 +339,9 @@ class Appel:
     texte_modele: str | None = None
     pseudonymes: int = 0
     passages: list[str] = field(default_factory=list[str])
+    #: Le complément rendu (mode enrichi), gardé comme le texte : après le contrôle
+    #: des noms de membres refait par le banc.
+    complement: str | None = None
 
     @property
     def code(self) -> str | None:
@@ -262,11 +369,17 @@ class Appel:
         )
 
 
-def noms_trouves(banc_: Banc, releve: Releve | None) -> list[dict[str, object]]:
-    """Les noms de membres trouvés dans une sortie du modèle, par leur seule
-    empreinte : figuraient-ils dans le message envoyé (passages, question) ; sont-ils
-    admis comme homonymes, pour un document au moins ? Jamais un nom ni un texte."""
-    if releve is None or releve.texte_modele is None:
+def noms_trouves(
+    banc_: Banc, releve: Releve | None, champ: str = "reponse"
+) -> list[dict[str, object]]:
+    """Les noms de membres trouvés dans une sortie du modèle (`champ` : sa réponse,
+    ou son complément), par leur seule empreinte : figuraient-ils dans le message
+    envoyé (passages, question) ; sont-ils admis comme homonymes, pour un document au
+    moins ? Jamais un nom ni un texte."""
+    if releve is None:
+        return []
+    texte = releve.complement_modele if champ == "complement" else releve.texte_modele
+    if texte is None:
         return []
     p = banc_.pseudonymes
     envoyes = set(p.empreintes_trouvees(releve.message_envoye))
@@ -276,7 +389,7 @@ def noms_trouves(banc_: Banc, releve: Releve | None) -> list[dict[str, object]]:
             "dans_le_message_envoye": h in envoyes,
             "homonyme_admis": p.homonyme_admis(h),
         }
-        for h in p.empreintes_trouvees(releve.texte_modele)
+        for h in p.empreintes_trouvees(texte)
     ]
 
 
@@ -302,10 +415,20 @@ def demander(banc_: Banc, corps: dict[str, object]) -> Appel:
         if isinstance(reformulee, str)
         else 0
     )
+    ajout = appel.corps.get("complement")
+    if isinstance(ajout, str):
+        titres = [
+            str(t)
+            for t in cast(list[object], appel.corps.get("complement_titres") or [])
+        ]
+        appel.pseudonymes += banc_.pseudonymes.fautifs(
+            "\n".join([ajout, *titres]), envoyes, question
+        )
     if appel.pseudonymes == 0:
         appel.texte = texte
         releve = appel.releve_de_reponse
         appel.texte_modele = None if releve is None else releve.texte_modele
+        appel.complement = ajout if isinstance(ajout, str) else None
     return appel
 
 
@@ -341,6 +464,22 @@ def garder_la_contredite(
     texte = None if releve is None else releve.texte_modele
     if texte is not None and not banc_.pseudonymes.empreintes_trouvees(texte):
         run.textes[f"{cle} (sortie refusée, {appel.motif})"] = texte
+
+
+def garder_le_complement_refuse(banc_: Banc, run: Run, cle: str, appel: Appel) -> None:
+    """Une sortie refusée pour son complément (`complement_*`) : pour la lecture
+    humaine (hors dépôt, hors MLflow), la réponse et le complément du modèle, si ni
+    l'un ni l'autre ne porte un nom de membre."""
+    releve = appel.releve_de_reponse
+    if releve is None or not (appel.motif or "").startswith(PREFIXE_COMPLEMENT):
+        return
+    ajout = releve.complement_modele
+    if ajout is None:
+        return
+    texte = f"{releve.texte_modele or ''}\n\nComplément refusé : {ajout}"
+    if banc_.pseudonymes.empreintes_trouvees(texte):
+        return
+    run.textes[f"{cle} (sortie refusée, {appel.motif})"] = texte
 
 
 def appels_de(appel: Appel, profil: Profil, cpj: float) -> list[dict[str, object]]:
@@ -396,17 +535,58 @@ def releve_en_dict(r: Releve, profil: Profil, cpj: float) -> dict[str, object]:
 # --------------------------------------------------------------------------- #
 #  L'essai : un appel, ses chiffres
 # --------------------------------------------------------------------------- #
-def essai(
+def corps_de_requete(question: str, profil: Profil, mode: str) -> dict[str, object]:
+    """La requête de réponse du banc ; `mode` seulement en enrichi (en strict, la
+    requête d'avant le mode enrichi, octet pour octet)."""
+    corps: dict[str, object] = {"question": question, "profil": profil.nom}
+    if mode != "strict":
+        corps["mode"] = mode
+    return corps
+
+
+def ligne_complement(banc_: Banc, appel: Appel) -> dict[str, object]:
+    """Ce qu'une réponse rendue en enrichi dit de son complément, sans son texte :
+    présence, nombre de titres déclarés, longueur ; les titres du catalogue que le
+    texte nomme sans les déclarer, et parmi eux ceux que la recherche n'a pas rendus
+    — ceux-là, la route ne les a pas contrôlés (des titres du catalogue, jamais un
+    nom)."""
+    ajout = appel.corps.get("complement")
+    titres = [
+        str(t) for t in cast(list[object], appel.corps.get("complement_titres") or [])
+    ]
+    texte = ajout if isinstance(ajout, str) else ""
+    non_declares = banc_.titres_non_declares(texte, titres) if texte else []
+    rendus = {
+        titre_comparable(str(s.get("titre", "")))
+        for s in cast(list[dict[str, object]], appel.corps.get("series") or [])
+        if s.get("serie_id") is not None
+    }
+    return {
+        "complement_present": bool(texte),
+        "complement_titres": len(titres),
+        "complement_longueur": len(texte),
+        "complement_titres_non_declares": non_declares,
+        "complement_titres_hors_controle": [
+            t for t in non_declares if titre_comparable(t) not in rendus
+        ],
+    }
+
+
+def essai_appel(
     banc_: Banc,
     profil: Profil,
     question: str,
     temperature: float | None = None,
     longueur_max: int | None = None,
-) -> tuple[dict[str, object], str | None]:
-    """Un appel de réponse sur un profil : (chiffres, texte contrôlé ou None)."""
+    mode: str = "strict",
+) -> tuple[dict[str, object], Appel]:
+    """Un appel de réponse sur un profil : (chiffres, l'appel — son texte et son
+    complément contrôlés, ou None)."""
     cpj = banc_.modele_langage.caracteres_par_jeton
-    estimation = estimer(banc_, profil, [question], longueur_max)
-    corps: dict[str, object] = {"question": question, "profil": profil.nom}
+    estimation = estimer(banc_, profil, [question], longueur_max, mode)
+    if mode == "enrichi":
+        banc_.charger_catalogue()
+    corps = corps_de_requete(question, profil, mode)
     if temperature is not None:
         corps["temperature"] = temperature
     if longueur_max is not None:
@@ -417,6 +597,7 @@ def essai(
         "fournisseur": profil.fournisseur,
         "modele": profil.modele,
         "statut_profil": profil.statut,
+        "mode": mode,
         "temperature_demandee": temperature,
         "longueur_max_demandee": longueur_max,
         "estimation": estimation.en_dict(),
@@ -438,6 +619,23 @@ def essai(
             "date_appel": c["date_appel"],
             "longueur_reponse": len(appel.corps["reponse"]),
         }
+        if mode == "enrichi":
+            chiffres |= ligne_complement(banc_, appel)
+    return chiffres, appel
+
+
+def essai(
+    banc_: Banc,
+    profil: Profil,
+    question: str,
+    temperature: float | None = None,
+    longueur_max: int | None = None,
+    mode: str = "strict",
+) -> tuple[dict[str, object], str | None]:
+    """Un appel de réponse sur un profil : (chiffres, texte contrôlé ou None)."""
+    chiffres, appel = essai_appel(
+        banc_, profil, question, temperature, longueur_max, mode
+    )
     return chiffres, appel.texte
 
 
@@ -467,6 +665,7 @@ class Run:
     #: Pris de la première réponse rendue : réglages appliqués, corpus, encodage.
     contexte: dict[str, object] = field(default_factory=dict[str, object])
     modeles_rendus: set[str] = field(default_factory=set[str])
+    mode: str = "strict"
 
     def noter(self, appel: Appel) -> None:
         self.modeles_rendus.update(
@@ -485,17 +684,25 @@ class Run:
 
 
 def mesurer(
-    banc_: Banc, profil: Profil, questions: Sequence[Question], plafond: float
+    banc_: Banc,
+    profil: Profil,
+    questions: Sequence[Question],
+    plafond: float,
+    mode: str = "strict",
 ) -> Run:
     """Les questions, une à une, réglages par défaut, sans historique. Arrêt
     (`interrompu`) si le coût réel cumulé dépasse le plafond, ou si un fournisseur
-    refuse ou ne répond pas : ce qui a été mesuré est gardé."""
+    refuse ou ne répond pas : ce qui a été mesuré est gardé. En enrichi, le
+    complément de chaque réponse rendue (hors dépôt, pour la lecture de Max) et ses
+    chiffres."""
     cpj = banc_.modele_langage.caracteres_par_jeton
-    run = Run(profil.nom)
+    run = Run(profil.nom, mode=mode)
+    if mode == "enrichi":
+        banc_.charger_catalogue()
     for numero, q in enumerate(questions):
         if numero:
             banc_.dormir(banc_.pause_s)
-        appel = demander(banc_, {"question": q.texte, "profil": profil.nom})
+        appel = demander(banc_, corps_de_requete(q.texte, profil, mode))
         run.noter(appel)
         cout = appel.cout(profil, cpj)
         run.cout_reel_usd += cout
@@ -512,8 +719,15 @@ def mesurer(
         }
         if appel.statut == 200:
             ligne |= ligne_reponse(banc_, q, appel)
+            if mode == "enrichi":
+                ligne |= ligne_complement(banc_, appel)
             if appel.texte is not None:
                 run.textes[q.question_id] = appel.texte
+            if appel.complement:
+                apres = ", après un refus" if appel.corps["refus"] else ""
+                run.textes[f"{q.question_id} (complément, non vérifié{apres})"] = (
+                    appel.complement
+                )
         elif appel.code == "sortie_modele_invalide":
             # Ce que la route a refusé, sans son texte : la forme de la sortie et,
             # pour un nom de membre, ses empreintes.
@@ -521,7 +735,10 @@ def mesurer(
             ligne["forme_sortie"] = None if releve is None else releve.forme
             if appel.motif == "pseudonyme":
                 ligne["noms_trouves"] = noms_trouves(banc_, releve)
+            if appel.motif == "complement_pseudonyme":
+                ligne["noms_trouves"] = noms_trouves(banc_, releve, "complement")
             garder_la_contredite(banc_, run, q.question_id, appel, ligne)
+            garder_le_complement_refuse(banc_, run, q.question_id, appel)
         run.par_question.append(ligne)
         if appel.fournisseur_en_echec:
             run.statut, run.motif_interruption = "interrompu", appel.code
@@ -680,6 +897,46 @@ def metriques(run: Run) -> dict[str, float]:
         valeurs = _nombres(rendues, nom)
         if valeurs:
             m[f"{nom}_moyen"] = round(statistics.fmean(valeurs), 2)
+    if run.mode == "enrichi":
+        m |= metriques_du_complement(lignes, rendues)
+    return m
+
+
+def metriques_du_complement(
+    lignes: list[dict[str, object]], rendues: list[dict[str, object]]
+) -> dict[str, float]:
+    """Les métriques du complément (mode enrichi) ; le critère n'en lit aucune."""
+    presents = [x for x in rendues if x.get("complement_present")]
+    refus = [x for x in rendues if x["refus"]]
+    apports = [x for x in refus if x.get("complement_present")]
+    titres = _nombres(presents, "complement_titres")
+    m: dict[str, float] = {
+        "complement_present": len(presents),
+        "refus_rendus": len(refus),
+        "complement_quand_refus": len(apports),
+        "refus_rendus_F7": sum(1 for x in refus if x["famille"] == "F7"),
+        "complement_quand_refus_F7": sum(1 for x in apports if x["famille"] == "F7"),
+        "refus_rendus_hors_catalogue": sum(
+            1 for x in refus if x["issue"] == "reconnue_hors_catalogue"
+        ),
+        "complement_quand_refus_hors_catalogue": sum(
+            1 for x in apports if x["issue"] == "reconnue_hors_catalogue"
+        ),
+        "complement_titre_non_declare": sum(
+            1 for x in presents if x.get("complement_titres_non_declares")
+        ),
+        "complement_titre_hors_controle": sum(
+            1 for x in presents if x.get("complement_titres_hors_controle")
+        ),
+        "sorties_invalides_complement": sum(
+            1
+            for x in lignes
+            if x["code"] == "sortie_modele_invalide"
+            and str(x["motif"]).startswith(PREFIXE_COMPLEMENT)
+        ),
+    }
+    if presents:  # une moyenne sans complément rendu est sans objet
+        m["complement_titres_moyen"] = round(statistics.fmean(titres), 2)
     return m
 
 
@@ -950,12 +1207,13 @@ def estimer_scenarios(banc_: Banc, profil: Profil, tours: Sequence[Tour]) -> Est
     ml = banc_.modele_langage
     longueur = longueur_par_defaut(banc_, profil)
     cpj = ml.caracteres_par_jeton
-    appels = jetons = 0
+    appels = jetons = vides = 0
     cout = 0.0
     precedents: dict[str, int] = {}
     for t in tours:
         historique = precedents.get(t.scenario, 0)
-        base = caracteres_du_contexte(banc_, t.question_autonome_attendue)
+        base, vide = contexte_envoye(banc_, t.question_autonome_attendue)
+        vides += vide
         entree = math.ceil((base + historique) / cpj)
         appels += 1
         jetons += entree
@@ -970,4 +1228,4 @@ def estimer_scenarios(banc_: Banc, profil: Profil, tours: Sequence[Tour]) -> Est
         precedents[t.scenario] = (
             historique + len(t.question) + math.ceil(longueur * cpj)
         )
-    return Estimation(len(tours), appels, jetons, cout)
+    return Estimation(len(tours), appels, jetons, cout, vides)

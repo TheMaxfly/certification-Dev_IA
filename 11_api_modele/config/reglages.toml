@@ -101,8 +101,8 @@ motif = "Jetons de sortie au plus (max_tokens) : lisibilité au comptoir et coû
 
 [modele_langage.mode]
 defaut = "strict"
-valeurs = ["strict"]
-motif = "Réponse tirée des seuls passages, refus compris. « enrichi » s'ajoutera par une spec ultérieure, après mesure à part (ajout compatible à une énumération d'entrée)."
+valeurs = ["strict", "enrichi"]
+motif = "strict : la réponse tirée des seuls passages, refus compris. enrichi (1.4.0, ajout compatible à une énumération d'entrée) : la même réponse, contrôlée de même, plus un complément tiré des connaissances du modèle, étiqueté « non vérifié », contrôlé pour ne pas contredire le catalogue ; sans passage, l'appel a lieu quand même et la partie stricte doit refuser (question 33). strict par défaut : le complément se demande."
 
 [modele_langage.historique]
 tours_max = 10

@@ -1,10 +1,10 @@
 """La ligne de commande du banc (voir `api_modele.banc_reponse`).
 
     B="uv run --env-file .env python -m api_modele.banc_reponse"
-    $B essai <profil> "<question>" [--temperature T] [--longueur-max N]
-    $B estimer <profil> <jeu>
+    $B essai <profil> "<question>" [--temperature T] [--longueur-max N] [--mode M]
+    $B estimer <profil> <jeu> [--mode M]
     $B estimer-scenarios <profil> <fichier.csv>
-    DATABASE_URL=… $B mesurer <profil> <jeu>
+    DATABASE_URL=… $B mesurer <profil> <jeu> [--mode M] [--experience E]
     DATABASE_URL=… $B scenarios <profil> <fichier.csv>
     DATABASE_URL=… $B reprendre <dossier du run>
     $B relire <dossier du run>           # selon les règles d'aujourd'hui, sans appel
@@ -35,18 +35,19 @@ from typing import cast
 
 from fastapi.testclient import TestClient
 
-from api_modele import journal
+from api_modele import base, journal
 from api_modele.application import creer_application
 from api_modele.banc_reponse import enregistrement, jeu
 from api_modele.banc_reponse.espion import Espion
 from api_modele.banc_reponse.mesure import (
     CRITERE,
+    MODES,
     Banc,
     Estimation,
     PlafondDepasse,
     Run,
     Tour,
-    essai,
+    essai_appel,
     estimer,
     estimer_scenarios,
     garder_plafond,
@@ -101,7 +102,21 @@ def ouvrir(environ: Mapping[str, str]) -> Generator[Banc]:
     espion = Espion()
     with espion.ecouter(), TestClient(application) as api:
         etat = cast(EtatApi, application.state.etat)
-        yield Banc(api, cle, reglages.modele_langage, etat.pseudonymes, espion)
+        yield Banc(
+            api,
+            cle,
+            reglages.modele_langage,
+            etat.pseudonymes,
+            espion,
+            catalogue=lambda: lire_le_catalogue(etat),
+        )
+
+
+def lire_le_catalogue(etat: EtatApi) -> list[str]:
+    """Les titres du catalogue, par la connexion de l'API (lecture seule), pour le
+    compte des titres que le complément nomme sans les déclarer."""
+    with base.transaction(etat.pool, etat.reglages) as cx:
+        return [str(t) for (t,) in cx.execute(base.SQL_TITRES_DU_CATALOGUE)]
 
 
 def lire_scenarios(fichier: Path) -> tuple[list[Tour], str]:
@@ -188,8 +203,11 @@ def enregistrer(
     mesures: dict[str, float],
     resultat: dict[str, object],
     dsn: str,
+    experience: str = enregistrement.EXPERIENCE,
 ) -> int:
-    """Textes hors dépôt, run MLflow, ligne `eval_runs` ; le code de sortie."""
+    """Textes hors dépôt, run MLflow (dans `experience`), ligne `eval_runs` ; le code
+    de sortie."""
+    mode = str(parametres.get("mode", "strict"))
     dossier = enregistrement.dossier_du_run(nom)
     enregistrement.ecrire_textes(dossier, nom, run.textes)
     pieces: dict[str, object] = {
@@ -204,6 +222,7 @@ def enregistrer(
             "spec": SPEC,
             "profil": run.profil,
             "statut_profil": str(parametres["statut_profil"]),
+            "mode": mode,
             **enregistrement.etiquettes_du_run(
                 run.profil,
                 banc_.modele_langage.profil_actif,
@@ -217,6 +236,7 @@ def enregistrer(
         {k: float(v) for k, v in mesures.items()},
         pieces,
         fichiers=enregistrement.fichiers_du_run(),
+        experience=experience,
     )
     code = 3 if run.statut == "interrompu" else 0
     try:
@@ -227,7 +247,7 @@ def enregistrer(
             run_id,
             str(c.get("corpus_id", "v2")),
             int(cast(int, c.get("encodage_id", 3))),
-            f"E3 étape 3, spec 06 — réponse rédigée — {nom}",
+            enregistrement.note_eval_run(nom, mode),
         )
     except Exception as exc:  # la mesure est faite : la garder, dire comment reprendre
         print(
@@ -244,34 +264,44 @@ def enregistrer(
 
 def commande_essai(banc_: Banc, args: argparse.Namespace) -> int:
     profil = banc_.profil(args.profil)
-    chiffres, texte = essai(
-        banc_, profil, args.question, args.temperature, args.longueur_max
+    chiffres, appel = essai_appel(
+        banc_, profil, args.question, args.temperature, args.longueur_max, args.mode
     )
+    texte = appel.texte
     chiffres["git"] = enregistrement.etat_git()
     suffixe = "" if args.temperature is None else f"_t{args.temperature}"
     suffixe += "" if args.longueur_max is None else f"_l{args.longueur_max}"
+    suffixe += "" if args.mode == "strict" else f"_{args.mode}"
     dossier = enregistrement.dossier_du_run(
         f"{horodatage()}_{profil.nom}{suffixe}", enregistrement.SORTIES / "essais"
     )
     enregistrement.ecrire_json(dossier / "essai.json", chiffres)
     if texte is not None:
-        enregistrement.ecrire_textes(
-            dossier, f"Essai — {profil.nom}", {"reponse": texte}
-        )
+        textes = {"reponse": texte}
+        if appel.complement:
+            textes["complement"] = appel.complement
+        enregistrement.ecrire_textes(dossier, f"Essai — {profil.nom}", textes)
     afficher({"dossier": str(dossier), **chiffres})
     if texte is not None:
         print("\n--- réponse (contrôlée : aucun nom de membre) ---\n" + texte)
+    if texte is not None and appel.complement:
+        print(
+            f"\n--- complément ({appel.corps.get('complement_etiquette')}) ---\n"
+            + appel.complement
+            + f"\ntitres : {', '.join(appel.corps.get('complement_titres') or [])}"
+        )
     return 0 if chiffres["statut"] == 200 else 3
 
 
 def commande_estimer(banc_: Banc, args: argparse.Namespace) -> int:
     profil = banc_.profil(args.profil)
     questions, empreinte = jeu.lire(args.jeu)
-    estimation = estimer(banc_, profil, [q.texte for q in questions])
+    estimation = estimer(banc_, profil, [q.texte for q in questions], mode=args.mode)
     plafond = banc_.modele_langage.plafond_run_usd
     afficher(
         {
             "profil": profil.nom,
+            "mode": args.mode,
             "jeu": args.jeu,
             "jeu_empreinte": empreinte,
             **estimation.en_dict(),
@@ -375,11 +405,12 @@ def commande_mesurer(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
     profil = banc_.profil(args.profil)
     questions, empreinte = jeu.lire(args.jeu)
     plafond = banc_.modele_langage.plafond_run_usd
-    estimation = estimer(banc_, profil, [q.texte for q in questions])
+    estimation = estimer(banc_, profil, [q.texte for q in questions], mode=args.mode)
     garder_plafond(estimation, plafond)
-    run = mesurer(banc_, profil, questions, plafond)
+    run = mesurer(banc_, profil, questions, plafond, args.mode)
     mesures = metriques(run) | {"estimation_cout_usd": round(estimation.cout_usd, 6)}
-    nom = f"{profil.nom}-{jeu.nom_court(args.jeu)}-{horodatage()}"
+    mode = "" if args.mode == "strict" else f"{args.mode}-"
+    nom = f"{profil.nom}-{mode}{jeu.nom_court(args.jeu)}-{horodatage()}"
     parametres = parametres_du_run(
         run,
         profil,
@@ -390,7 +421,7 @@ def commande_mesurer(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
         estimation,
         plafond,
         banc_.modele_langage.caracteres_par_jeton,
-    )
+    ) | {"mode": args.mode, "experience": args.experience}
     resultat: dict[str, object] = {
         "nom": nom,
         "statut": run.statut,
@@ -399,7 +430,9 @@ def commande_mesurer(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
         "verdict": verdict(mesures),
         "parametres": parametres,
     }
-    return enregistrer(banc_, run, nom, parametres, mesures, resultat, dsn)
+    return enregistrer(
+        banc_, run, nom, parametres, mesures, resultat, dsn, args.experience
+    )
 
 
 def commande_scenarios(banc_: Banc, args: argparse.Namespace, dsn: str) -> int:
@@ -454,7 +487,9 @@ def commande_reprendre(dossier: Path, dsn: str) -> int:
         run_id,
         str(parametres["corpus_id"]),
         int(str(parametres["encodage_id"])),
-        f"E3 étape 3, spec 06 — réponse rédigée — {resultat['nom']}",
+        enregistrement.note_eval_run(
+            str(resultat["nom"]), str(parametres.get("mode", "strict"))
+        ),
     )
     enregistrement.ecrire_json(
         dossier / "run_id.json", {"run_id": run_id, "nom": resultat["nom"]}
@@ -509,6 +544,24 @@ def commande_registre(couples: Sequence[str], environ: Mapping[str, str]) -> int
     return 0
 
 
+def experience_admise(valeur: str) -> str:
+    if not enregistrement.FORME_EXPERIENCE.fullmatch(valeur):
+        raise argparse.ArgumentTypeError(
+            "expérience : lettres, chiffres, « . », « _ », « - », 64 au plus"
+        )
+    return valeur
+
+
+def ajouter_mode(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--mode",
+        choices=MODES,
+        default="strict",
+        help="le mode de la route (défaut : strict) ; en enrichi, le complément est"
+        " mesuré à part, le critère porte sur la partie stricte",
+    )
+
+
 def analyser(argv: Sequence[str]) -> argparse.Namespace:
     parseur = argparse.ArgumentParser(prog="python -m api_modele.banc_reponse")
     sous = parseur.add_subparsers(dest="commande", required=True)
@@ -517,10 +570,20 @@ def analyser(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("question")
     p.add_argument("--temperature", type=float, default=None)
     p.add_argument("--longueur-max", type=int, default=None)
+    ajouter_mode(p)
     for nom in ("estimer", "mesurer"):
         p = sous.add_parser(nom)
         p.add_argument("profil")
         p.add_argument("jeu", help="famille:F7,issue:hors_catalogue,…")
+        ajouter_mode(p)
+        if nom == "mesurer":
+            p.add_argument(
+                "--experience",
+                type=experience_admise,
+                default=enregistrement.EXPERIENCE,
+                help="l'expérience MLflow du run (défaut :"
+                f" {enregistrement.EXPERIENCE})",
+            )
     for nom in ("scenarios", "estimer-scenarios"):
         p = sous.add_parser(nom)
         p.add_argument("profil")

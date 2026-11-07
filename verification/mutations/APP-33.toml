@@ -1,0 +1,7 @@
+id = "APP-33"
+origine = "E3 étape 6, spec 06, C.7 (2026-11-07) — le complément du mode enrichi injecté dans l'historique : le texte non vérifié repartirait vers l'API comme une réponse"
+fichier = "12_application/src/application/app.py"
+avant = '''            historique.Tour("assistant", corps.reponse),'''
+apres = '''            historique.Tour("assistant", corps.reponse + (corps.complement or "")),'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_question.py", "-k", "complement_n_entre_pas"]

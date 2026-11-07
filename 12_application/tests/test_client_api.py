@@ -54,7 +54,7 @@ def test_le_repr_ne_montre_pas_la_cle(doublure):
 def test_info_est_lue_et_la_cle_transmise(doublure):
     info = jouer(client_sur(doublure).info())
 
-    assert info.version_api == "1.3.1"
+    assert info.version_api == "1.4.0"
     assert info.modele_langage.profil_actif == "mistral-large-2512"
     assert doublure.cles_recues == [d.CLE_ATTENDUE]
 

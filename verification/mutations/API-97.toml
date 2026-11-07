@@ -1,0 +1,7 @@
+id = "API-97"
+origine = "E3 étape 6, spec 06, E (2026-11-07) — le banc qui ne refait pas le contrôle des noms de membres sur le complément : un nom passé par la route serait gardé pour la lecture"
+fichier = "11_api_modele/src/api_modele/banc_reponse/mesure.py"
+avant = '''        appel.pseudonymes += banc_.pseudonymes.fautifs('''
+apres = '''        appel.pseudonymes += 0 * banc_.pseudonymes.fautifs('''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_enrichi.py", "-k", "recompte_les_noms"]

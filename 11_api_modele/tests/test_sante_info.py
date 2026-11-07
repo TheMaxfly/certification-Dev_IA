@@ -132,7 +132,7 @@ MODELE_LANGAGE = {
     "reglages_reponse": {
         "temperature": {"defaut": 0.0, "min": 0.0, "max": 1.0},
         "longueur_max": {"defaut": 400, "min": 50, "max": 4000},
-        "mode": {"defaut": "strict", "valeurs": ["strict"]},
+        "mode": {"defaut": "strict", "valeurs": ["strict", "enrichi"]},
         "historique": {"tours_max": 10, "caracteres_max": 4000},
         "reformuler": {"defaut": True},
         "nombre_series": {"defaut": 5, "min": 1, "max": 50},

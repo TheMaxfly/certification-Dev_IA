@@ -1,0 +1,7 @@
+id = "API-94"
+origine = "E3 étape 6, spec 06, question 33 (2026-11-07) — un appel au modèle en mode strict quand la recherche ne rend aucun passage : un coût et une sortie là où le refus est déterministe"
+fichier = "11_api_modele/src/api_modele/reponse.py"
+avant = '''    if avec_passages or enrichi:'''
+apres = '''    if True:'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_mode_enrichi.py", "-k", "sans_passage_en_strict"]
