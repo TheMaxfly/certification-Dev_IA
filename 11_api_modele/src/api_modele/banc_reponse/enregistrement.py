@@ -52,7 +52,12 @@ SCRIPT = Path(__file__).with_name("journal_mlflow.py")
 #: et son cache, rien d'autre (ni clé de fournisseur, ni DSN).
 ENVIRONNEMENT_TRANSMIS = ("PATH", "HOME", "LANG", "UV_CACHE_DIR")
 RUN_ID = re.compile(r"^[0-9a-f]{32}$")
+#: L'étiquette `etape` d'un run, par défaut (dette 41 : elle était écrite en dur) :
+#: « E3-06 » = E3, étape 3, spec 06, la mesure de la réponse rédigée. Un run en donne
+#: une autre par `--etape`, gardée dans ses paramètres ; les runs anciens, sans ce
+#: paramètre, gardent ce défaut.
 ETAPE = "E3-06"
+FORME_ETAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 CONFIGURATION = RACINE_MODULE / "config"
 INVITES_DU_DEPOT = "11_api_modele/config/invites"
 #: Ce que chaque run joint, et le paramètre qui porte son empreinte.
@@ -228,11 +233,12 @@ def etiquettes_du_run(
     statut: str,
     motif_interruption: str | None,
     verdict: Mapping[str, object] | None,
+    etape: str = ETAPE,
 ) -> dict[str, str]:
     """Les étiquettes d'un run : `verdict` s'il a un critère (pas les scénarios),
-    `cause_interruption` s'il a été interrompu."""
+    `cause_interruption` s'il a été interrompu ; `etape`, celle du run."""
     etiquettes = {
-        "etape": ETAPE,
+        "etape": etape,
         "role": "profil_actif" if profil == profil_actif else "repli",
         "invite_version": version_des_invites,
         "statut": "interrompu" if statut == "interrompu" else "complet",
@@ -273,6 +279,7 @@ def etiquettes_des_runs_faits(
             str(resume["statut"]),
             cast(str | None, resume.get("motif_interruption")),
             cast(Mapping[str, object] | None, verdict),
+            parametres.get("etape", ETAPE),
         )
     return runs
 

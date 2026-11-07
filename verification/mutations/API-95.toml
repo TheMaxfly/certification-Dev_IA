@@ -1,0 +1,7 @@
+id = "API-95"
+origine = "E3 étape 6, bloc C, C7 (2026-11-07), dette 41 — l'étiquette etape d'un run du banc de la réponse redevient fixe : un run d'une autre étape serait étiqueté E3-06"
+fichier = "11_api_modele/src/api_modele/banc_reponse/enregistrement.py"
+avant = '''        "etape": etape,'''
+apres = '''        "etape": ETAPE,'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_banc_reponse.py", "-k", "etape"]
