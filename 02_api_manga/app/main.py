@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from datetime import date as DateISO  # cf. le champ `date` de `Review`
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -27,7 +27,7 @@ from psycopg import Error as PsycopgError
 from psycopg_pool import ConnectionPool, PoolClosed, PoolTimeout
 from pydantic import BaseModel, Field
 
-from . import API_VERSION
+from . import API_VERSION, recherche
 from .database import create_pool, get_pool
 from .security import api_key_header, require_api_key
 from .settings import Settings
@@ -163,6 +163,12 @@ class RagDocumentResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+# Les valeurs de `manga.v_metadonnees_serie` (migration 025), fermées.
+DISPONIBILITE = Literal["edite_en_france", "seulement_au_japon", "inconnue"]
+NB_VOLUMES_SOURCE = Literal["champ", "repli_volumes_distincts", "divergent"]
+STATUT = Literal["termine", "en_cours"]
+
+
 class GenreCode(BaseModel):
     """Un genre normalisé : le code d'abord, le libellé comme commodité.
 
@@ -199,7 +205,13 @@ class SeriesResponse(BaseModel):
     dessinateur: str | None
     scenariste: str | None
     magazine_prepublication: str | None
-    statuses: list[str] = Field(default_factory=list)
+    statuses: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Status badges of the source record, **serialised as collected** "
+            "(Python-formatted strings). The normalised status is `statut`."
+        ),
+    )
 
     genres_source: list[str] = Field(
         default_factory=list,
@@ -227,12 +239,18 @@ class SeriesResponse(BaseModel):
     )
 
     popularity_rank: int | None
-    members_rating: float | None
-    members_votes: int | None
+    members_rating: float | None = Field(description="Members' rating, **out of 10**.")
+    members_votes: int | None = Field(description="Number of members' votes.")
     experts_rating: float | None
     experts_votes: int | None
 
-    volume_count: int | None
+    volume_count: int | None = Field(
+        description=(
+            "Number of edition rows of the series **as recorded in December 2025** "
+            "(a frozen field of the reference: it may lag behind the catalogue, or "
+            "be missing). For the number of volumes, read `nb_volumes`."
+        )
+    )
     review_count: int | None
     score_mean: float | None
     score_min: float | None
@@ -249,6 +267,104 @@ class SeriesResponse(BaseModel):
             "review. Method, score and reason live on `/identity/{work_uid}`."
         )
     )
+
+    # Contrat 0.5.0 : sept champs de `manga.v_metadonnees_serie` (migrations 025, 026),
+    # à leurs noms dans la vue — les noms et les valeurs que l'API du modèle porte sur
+    # ses cartes : un seul vocabulaire, de la base à l'écran.
+    disponibilite: DISPONIBILITE | None = Field(
+        default=None,
+        description=(
+            "`edite_en_france` when a volume carries a French EAN (9782, 97910) or "
+            "the record carries the « français » badge; `seulement_au_japon` for a "
+            "Manga with volumes and none of that; `inconnue` otherwise. **Published "
+            "in France does not mean in stock**: the catalogue knows no stock. The "
+            "value the model API carries on its cards."
+        ),
+    )
+    nb_volumes: int | None = Field(
+        default=None,
+        description=(
+            "The larger of the « volumes published » field and the distinct volume "
+            "numbers (a volume without a number counts as number 1), all editions "
+            "mixed; a number between 1900 and 2100 is a year from the title and does "
+            "not count. Read it with `nb_volumes_source`."
+        ),
+    )
+    nb_volumes_source: NB_VOLUMES_SOURCE | None = Field(
+        default=None,
+        description=(
+            "`divergent` when both counts exist and differ by more than 20 % of the "
+            "larger; `champ` when the field is at least the numbers; "
+            "`repli_volumes_distincts` otherwise. **Any source other than `champ` "
+            "reads as a minimum**: « at least N »."
+        ),
+    )
+    statut: STATUT | None = Field(
+        default=None,
+        description=(
+            "`termine` on the « Complète » badge or Kitsu `finished`; `en_cours` on "
+            "Kitsu `current` without the badge. The catalogue never writes « en "
+            "cours »: no badge does not mean ongoing. `null`: unknown."
+        ),
+    )
+    demographie: str | None = Field(
+        default=None,
+        description=(
+            "`series_category_clean`, or `series_category` when it holds a value "
+            "from the same list (the three Korean categories mapped). The catalogue "
+            "label, as is."
+        ),
+    )
+    auteurs: str | None = Field(
+        default=None,
+        description=(
+            "The writer then the artist, as written, joined by a comma, the same "
+            "name once; a textual « inconnu » counts as absent; COLLECTIF stays."
+        ),
+    )
+    annee_fr: int | None = Field(
+        default=None,
+        description="Year of the first volume with a French EAN.",
+    )
+
+
+class SeriesSearchItem(BaseModel):
+    """Une série trouvée par `GET /series`, et ce qui a répondu à la saisie."""
+
+    series_id: int
+    title: str | None
+    type: str | None
+    year: int | None
+    auteurs: str | None = Field(description="As on `/series/{series_id}`.")
+    members_rating: float | None = Field(description="Members' rating, out of 10.")
+    members_votes: int | None
+    disponibilite: DISPONIBILITE | None = Field(
+        description="As on `/series/{series_id}`."
+    )
+    nb_volumes: int | None = Field(description="As on `/series/{series_id}`.")
+    nb_volumes_source: NB_VOLUMES_SOURCE | None = Field(
+        description="As on `/series/{series_id}`."
+    )
+    correspondance: Literal["titre", "autre_titre", "auteur"] = Field(
+        description=(
+            "What answered the query: the main title, another title, or an author "
+            "(the first of the three that answers)."
+        )
+    )
+    titre_correspondant: str | None = Field(
+        description=(
+            "The other title that answered; `null` when the main title or an author "
+            "answered."
+        )
+    )
+
+
+class SeriesSearchResponse(BaseModel):
+    query: str = Field(description="The query, stripped.")
+    total: int
+    limit: int
+    offset: int
+    items: list[SeriesSearchItem]
 
 
 class Volume(BaseModel):
@@ -307,7 +423,14 @@ class Review(BaseModel):
     )
     title: str | None
     score: float | None
-    author: str | None
+    author: None = Field(
+        default=None,
+        description=(
+            "Always `null`: the authors of collected reviews are readers' "
+            "pseudonyms, never served (project rule, E3). The field stays for "
+            "existing clients."
+        ),
+    )
     date: DateISO | None = Field(
         description=(
             "Parsed date, or `null` when the source truncated it to a weekday "
@@ -917,6 +1040,186 @@ def _liste(valeur: Any) -> list[str]:
     return [str(element) for element in valeur if element is not None]
 
 
+# ---------------------------------------------------------------------------
+# La recherche du catalogue — `GET /series` (contrat 0.5.0)
+# ---------------------------------------------------------------------------
+# Une forme normalisée par colonne (`recherche.ACCENTS`, liée en paramètres), un rang
+# par manière de répondre : titre exact (1), en début (2), contenu (3) — pour le titre
+# et pour chacun des autres titres —, auteur contenu (4). Le rang d'une série est le
+# meilleur des siens. Un préfiltre d'abord : une série ne répond que si l'une de ses
+# formes (titre, texte des autres titres, auteurs) CONTIENT la saisie — un titre égal
+# ou qui commence par elle la contient aussi —, et les rangs exacts, dont le dépliage
+# des autres titres, ne se calculent que pour ces candidates. Les métadonnées de la
+# vue ne sont jointes qu'aux lignes de la page : la vue se calcule à la lecture, série
+# par série.
+_NORME = "translate(lower({colonne}), %(de)s, %(vers)s)"
+_RECHERCHE_RANGS = f"""
+WITH normes AS (
+  SELECT s.series_id, s.series_title, s.series_type, s.series_year,
+         s.series_members_rating, s.series_members_votes, s.series_other_titles,
+         {_NORME.format(colonne="coalesce(s.series_title, '')")} AS titre,
+         {_NORME.format(colonne="coalesce(s.series_scenariste, '')")} AS scenariste,
+         {_NORME.format(colonne="coalesce(s.series_dessinateur, '')")} AS dessinateur,
+         {_NORME.format(colonne="coalesce(s.series_other_titles::text, '')")} AS autres
+    FROM manga.ms_series_enriched s
+), candidats AS (
+  SELECT *
+    FROM normes
+   WHERE titre LIKE %(contient)s ESCAPE '\\'
+      OR autres LIKE %(contient)s ESCAPE '\\'
+      OR scenariste LIKE %(contient)s ESCAPE '\\'
+      OR dessinateur LIKE %(contient)s ESCAPE '\\'
+), rangs AS (
+  SELECT n.*,
+         CASE WHEN n.titre = %(exact)s THEN 1
+              WHEN n.titre LIKE %(debut)s ESCAPE '\\' THEN 2
+              WHEN n.titre LIKE %(contient)s ESCAPE '\\' THEN 3
+         END AS rang_titre,
+         autre.rang AS rang_autre,
+         autre.valeur AS autre_titre,
+         CASE WHEN n.scenariste LIKE %(contient)s ESCAPE '\\'
+                OR n.dessinateur LIKE %(contient)s ESCAPE '\\' THEN 4
+         END AS rang_auteur
+    FROM candidats n
+    LEFT JOIN LATERAL (
+      SELECT a.rang, a.valeur
+        FROM (
+          SELECT t.valeur,
+                 CASE WHEN {_NORME.format(colonne="t.valeur")} = %(exact)s THEN 1
+                      WHEN {_NORME.format(colonne="t.valeur")}
+                           LIKE %(debut)s ESCAPE '\\' THEN 2
+                      WHEN {_NORME.format(colonne="t.valeur")}
+                           LIKE %(contient)s ESCAPE '\\' THEN 3
+                 END AS rang
+            FROM jsonb_array_elements_text(
+                     coalesce(n.series_other_titles, '[]'::jsonb)) AS t(valeur)
+        ) a
+       WHERE a.rang IS NOT NULL
+       ORDER BY a.rang, a.valeur
+       LIMIT 1
+    ) autre ON true
+)
+"""
+_RECHERCHE_FILTRE = "WHERE coalesce(rang_titre, rang_autre, rang_auteur) IS NOT NULL"
+
+
+@router.get(
+    "/series",
+    response_model=SeriesSearchResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 503: RESPONSE_503},
+    tags=["catalogue"],
+    summary="Search the catalogue by title, other title or author",
+    description=(
+        "Searches the series title, its other titles (`series_other_titles`) and its "
+        "authors (writer, artist).\n\n"
+        "**Normalisation**: case-insensitive and accent-insensitive, through one "
+        "character table applied to the columns and to the query alike.\n\n"
+        "**Ranking**: exact title, then title starting with the query, then title "
+        "containing it (main title or another title), then author containing it; "
+        "then `members_votes` descending, then `series_id`. `correspondance` says "
+        "what answered, `titre_correspondant` which other title did.\n\n"
+        "**No typo tolerance**: a typo finds nothing — the application says so and "
+        "points to the adviser. No result is `200` with `items: []`, never 404.\n\n"
+        "`offset` is capped at 1 000: a search returning more than 1 000 series is "
+        "a query that is too short."
+    ),
+)
+def search_series(
+    pool: PoolDependency,
+    q: Annotated[
+        str,
+        Query(
+            min_length=2,
+            max_length=100,
+            description="Title or author, 2 to 100 characters once stripped.",
+        ),
+    ],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    offset: Annotated[int, Query(ge=0, le=1000)] = 0,
+) -> SeriesSearchResponse:
+    """Cherche une série par son titre, un autre titre ou un auteur."""
+    saisie = q.strip()
+    if len(saisie) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="q must contain at least 2 non-whitespace characters",
+        )
+    parametres = recherche.parametres(saisie)
+    # Un seul parcours : le total vient de la même requête que la page
+    # (`count(*) OVER ()`, calculé avant la limite). Normaliser les colonnes est le
+    # coût de la recherche (`translate` sur quatre colonnes, 14 670 séries) : le
+    # refaire pour un comptage à part doublerait la latence. Le comptage seul n'est
+    # rejoué que pour une page vide au-delà de la première, qui ne porte aucun total.
+    sql = f"""
+    {_RECHERCHE_RANGS}, trouvees AS (
+      SELECT series_id, series_title, series_type, series_year,
+             series_members_rating, series_members_votes,
+             least(rang_titre, rang_autre, rang_auteur) AS rang,
+             CASE WHEN rang_titre IS NOT NULL THEN 'titre'
+                  WHEN rang_autre IS NOT NULL THEN 'autre_titre'
+                  ELSE 'auteur'
+             END AS correspondance,
+             CASE WHEN rang_titre IS NULL THEN autre_titre END AS titre_correspondant,
+             count(*) OVER () AS total
+        FROM rangs
+       {_RECHERCHE_FILTRE}
+    ), page AS (
+      SELECT *
+        FROM trouvees
+       ORDER BY rang, series_members_votes DESC NULLS LAST, series_id
+       LIMIT %(limit)s OFFSET %(offset)s
+    )
+    SELECT p.series_id, p.series_title, p.series_type, p.series_year,
+           m.auteurs, p.series_members_rating, p.series_members_votes,
+           m.disponibilite, m.nb_volumes, m.nb_volumes_source,
+           p.correspondance, p.titre_correspondant, p.total
+      FROM page p
+      LEFT JOIN manga.v_metadonnees_serie m ON m.series_id = p.series_id
+     ORDER BY p.rang, p.series_members_votes DESC NULLS LAST, p.series_id
+    """
+    count_sql = f"{_RECHERCHE_RANGS} SELECT count(*) FROM rangs {_RECHERCHE_FILTRE}"
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, {**parametres, "limit": limit, "offset": offset})
+                rows = cur.fetchall()
+                if rows:
+                    total = int(rows[0][12])
+                elif offset == 0:
+                    total = 0
+                else:
+                    cur.execute(count_sql, parametres)
+                    total_row = cur.fetchone()
+                    total = int(total_row[0]) if total_row else 0
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    return SeriesSearchResponse(
+        query=saisie,
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[
+            SeriesSearchItem(
+                series_id=row[0],
+                title=row[1],
+                type=row[2],
+                year=row[3],
+                auteurs=row[4],
+                members_rating=row[5],
+                members_votes=row[6],
+                disponibilite=row[7],
+                nb_volumes=row[8],
+                nb_volumes_source=row[9],
+                correspondance=row[10],
+                titre_correspondant=row[11],
+            )
+            for row in rows
+        ],
+    )
+
+
 @router.get(
     "/series/{series_id}",
     response_model=SeriesResponse,
@@ -960,8 +1263,11 @@ def get_series(
                   FROM jsonb_array_elements_text(
                            COALESCE(s.series_genres_enriched, '[]'::jsonb)) g
                   JOIN manga.genre_ref r ON r.code = g),
-               '[]'::jsonb) AS genres_enriched
+               '[]'::jsonb) AS genres_enriched,
+           m.disponibilite, m.nb_volumes, m.nb_volumes_source, m.statut,
+           m.demographie, m.auteurs, m.annee_fr
     FROM manga.ms_series_enriched s
+    LEFT JOIN manga.v_metadonnees_serie m ON m.series_id = s.series_id
     WHERE s.series_id = %s
     """
     try:
@@ -1007,6 +1313,13 @@ def get_series(
         kitsu_id=row[28],
         needs_review=row[29],
         genres_enriched=[GenreCode(**item) for item in (row[30] or [])],
+        disponibilite=row[31],
+        nb_volumes=row[32],
+        nb_volumes_source=row[33],
+        statut=row[34],
+        demographie=row[35],
+        auteurs=row[36],
+        annee_fr=row[37],
     )
 
 
@@ -1122,10 +1435,11 @@ def get_series_reviews(
     ),
     offset: Annotated[int, Query(ge=0, le=COLLECTION_OFFSET_MAX)] = 0,
 ) -> ReviewsResponse:
-    """Expose les critiques d'une série, depuis le référentiel COMPLET."""
+    """Expose les critiques d'une série, depuis le référentiel COMPLET, sans leur
+    auteur (`author` toujours nul : un pseudonyme de lecteur ne sort jamais)."""
     sql = """
     SELECT review_id, volume_number, volume_url, review_url, review_title,
-           review_score, review_author, review_date_iso, review_date_raw,
+           review_score, review_date_iso, review_date_raw,
            review_type, review_grain, review_body
     FROM manga.ms_reviews_all
     WHERE series_id = %s
@@ -1159,12 +1473,15 @@ def get_series_reviews(
                 review_url=row[3],
                 title=row[4],
                 score=row[5],
-                author=row[6],
-                date=row[7],
-                date_raw=row[8],
-                type=row[9],
-                grain=row[10],
-                body=row[11],
+                # Toujours nul : les auteurs des critiques collectées sont des
+                # pseudonymes de lecteurs, jamais servis (`review_author` n'est
+                # pas lu).
+                author=None,
+                date=row[6],
+                date_raw=row[7],
+                type=row[8],
+                grain=row[9],
+                body=row[10],
             )
             for row in rows
         ],

@@ -1,0 +1,7 @@
+id = "E4C-03"
+origine = "E4, lot 2a, spec 01 (2026-11-08) — le Compose du 02 publié sur toutes les interfaces : l'API data joignable depuis le réseau du poste"
+fichier = "02_api_manga/docker-compose.yml"
+avant = '''      - "127.0.0.1:8000:8000"'''
+apres = '''      - "8000:8000"'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "bouclage"]

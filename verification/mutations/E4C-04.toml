@@ -1,0 +1,7 @@
+id = "E4C-04"
+origine = "E4, lot 2a, spec 01 (2026-11-08) — le « % » de la saisie non échappé : « 100% » deviendrait un joker de LIKE"
+fichier = "02_api_manga/app/recherche.py"
+avant = '''    litterale = echapper(forme)'''
+apres = '''    litterale = forme'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "jokers"]

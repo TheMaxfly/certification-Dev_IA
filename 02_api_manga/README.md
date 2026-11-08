@@ -44,7 +44,9 @@ n'en contient aucune. **Exporter uniquement `API_KEYS` ne suffit pas** : sans le
 mot de passe de `manga_api` dans `DB_PASSWORD`, le processus peut vivre mais
 `/health` répond en état dégradé.
 
-API : `http://localhost:8000`  
+API : `http://localhost:8000` — publiée sur le **bouclage seulement**
+(`127.0.0.1:8000:8000` dans `docker-compose.yml`, E4) : un déploiement qui veut
+autre chose le dit dans son propre fichier de fusion.  
 Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
 
 ## Prérequis
@@ -101,7 +103,7 @@ exception ni variante par famille de ressource :
 | `/docs` · `/redoc` · `/openapi.json` | **non** | contrat : un contrat qu'on ne peut pas lire ne s'intègre pas |
 | `/kitsu/{kitsu_id}` · `/search` | **oui** | données |
 | `/rag/preview` · `/rag/export` · `/rag/export/composition` · `/rag/doc/{doc_key}` | **oui** | données |
-| `/series/{series_id}` · `/series/{series_id}/volumes` · `/series/{series_id}/reviews` | **oui** | données |
+| `/series` · `/series/{series_id}` · `/series/{series_id}/volumes` · `/series/{series_id}/reviews` | **oui** | données |
 | `/identity/{work_uid}` · `/coverage` | **oui** | données |
 
 **C'est une règle, pas une omission : la documentation est ouverte, les données
@@ -299,25 +301,64 @@ Trois sources cohabitent donc dans le corpus servi par `/rag/export` et `/search
 
 ### 7) Catalogue, identité et couverture
 
-Cinq endpoints exposent ce que le projet a construit : le socle catalogue Manga
-Sanctuary, le référentiel d'identité et le référentiel complet des critiques.
-Tous sont protégés par `X-API-Key`, comme le reste des routes de données.
+Six endpoints exposent ce que le projet a construit : le socle catalogue Manga
+Sanctuary, sa recherche, le référentiel d'identité et le référentiel complet des
+critiques. Tous sont protégés par `X-API-Key`, comme le reste des routes de données.
 
 | Endpoint | Source | Sa raison d'être |
 |---|---|---|
-| `GET /series/{series_id}` | `ms_series_enriched` | sans elle, une application sait quoi conseiller mais pas quoi afficher |
+| `GET /series?q=` | `ms_series_enriched` (titres, auteurs) ⟕ `v_metadonnees_serie` | trouver une série par son titre ou un auteur (contrat 0.5.0) |
+| `GET /series/{series_id}` | `ms_series_enriched` ⟕ `v_metadonnees_serie` | sans elle, une application sait quoi conseiller mais pas quoi afficher |
 | `GET /series/{series_id}/volumes` | `ms_volumes_enriched` | tomaison, EAN, format — ce qu'un libraire vend |
 | `GET /series/{series_id}/reviews` | **`ms_reviews_all`** | le référentiel complet, 11 074 critiques |
 | `GET /identity/{work_uid}` | `work_identity` ⨝ `v_match_current` | les identifiants croisés **et la provenance de chaque lien** |
 | `GET /coverage` | agrégats | ce que le corpus contient, et ce qu'il ne contient pas |
 
 ```bash
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series?q=naruto&limit=5"
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/series/8514
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/volumes?limit=20"
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/reviews?limit=20"
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/identity/14689
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/coverage
 ```
+
+**La recherche — `GET /series` (contrat 0.5.0).** Paramètres : `q` (2 à 100
+caractères une fois les espaces des bords retirés, sinon 422), `limit` (1 à 50,
+20 par défaut), `offset` (0 à 1 000 : une recherche qui rend plus de 1 000 séries
+est une saisie trop courte). Elle cherche dans le titre, les autres titres
+(`series_other_titles`) et les auteurs (scénariste, dessinateur), **sans casse ni
+accents** : une seule table de correspondance (`app/recherche.py`), appliquée aux
+colonnes (`translate(lower(…))`, ses deux chaînes liées en paramètres) et à la
+saisie (minuscules, puis la table) ; les jokers `%`, `_` et `\` de la saisie sont
+échappés (`ESCAPE '\'`). **Classement** : titre exact, titre qui commence par la
+saisie, titre qui la contient (titre principal ou autre titre), auteur qui la
+contient ; puis `members_votes` décroissant, puis `series_id`. Chaque résultat dit
+**ce qui a répondu** (`correspondance` : `titre`, `autre_titre`, `auteur`) et
+quel autre titre (`titre_correspondant`). Aucun résultat : `200` et `items: []`,
+jamais 404. **Pas de tolérance aux fautes** : une faute de frappe ne trouve rien —
+l'application le dit et renvoie au conseiller. Viendront au lot 2b (migration 028) :
+`unaccent` à la place de la table, les trigrammes (`pg_trgm`), « Vouliez-vous
+dire ? ». Aucun index dans ce lot.
+
+**La fiche porte les métadonnées de l'API du modèle (contrat 0.5.0).** Sept champs
+de la vue `manga.v_metadonnees_serie` (migrations 025, 026), à leurs noms dans la
+vue — `disponibilite`, `nb_volumes`, `nb_volumes_source`, `statut`, `demographie`,
+`auteurs`, `annee_fr` — : **les valeurs que l'API du modèle porte sur ses cartes**,
+un seul vocabulaire de la base à l'écran. Leurs règles sont dans leurs descriptions
+OpenAPI (« édité en France ne veut pas dire en stock » ; toute source autre que
+`champ` se lit « au moins N »). `members_rating` est une note **sur 10**.
+`volume_count` et `statuses` restent tels quels : `volume_count` est le nombre de
+lignes d'éditions **relevé en décembre 2025**, champ figé du référentiel —
+constaté le 2026-11-08 sur 14 670 séries : 12 194 égaux au compte actuel des lignes
+de volumes, 1 012 inférieurs, 2 supérieurs, 1 462 absents ; pour le nombre de
+tomes, lire `nb_volumes`. `statuses` porte les badges tels que collectés (chaînes
+au format Python) ; le statut normalisé est `statut`.
+
+**`author` des critiques collectées : toujours `null`.** Les auteurs des critiques
+de `ms_reviews_all` sont des pseudonymes de lecteurs : ils ne sortent jamais (règle
+du projet, E3) — la requête ne lit même pas `review_author`. Le champ reste au
+contrat, pour qu'un client existant ne casse pas.
 
 **Les genres viennent en deux champs, et aucun ne remplace l'autre.**
 `genres_source` porte les libellés bruts de Manga Sanctuary (français, casse
@@ -361,6 +402,18 @@ se transmet.
 codées en dur : 1 694 séries sans genre dans aucune source, 525 séries sur le
 seul code générique `lgbt` faute d'appariement Kitsu fiable. Une limite mesurée
 et affichée est une force ; découverte par un tiers, c'est une faute.
+
+## Consommateurs
+
+- **L'application du libraire (module 12, E4)** lit le catalogue par `/series` (la
+  recherche) et `/series/{series_id}` (la fiche), sous sa propre clé (consommateur
+  `conseiller`) ; **elle n'appelle pas `/reviews`**.
+- Le corpus RAG historique (`/rag/*`) et la recherche plein texte (`/search`)
+  restent servis tels quels ; l'API du modèle (module 11) lit, elle, la base
+  directement, sous son propre rôle.
+
+C'est la réponse à « qui consomme votre API ? » : une application réelle, nommée
+par sa clé dans le journal d'autorisation.
 
 ## Architecture
 
@@ -519,15 +572,15 @@ curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=one%20piece&lim
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=shounen%20fantasy&limit=5" | head
 ```
 
-> **La section 7) est ailleurs, à dessein.** Les cinq routes de catalogue —
-> `/series/{series_id}`, `/series/{series_id}/volumes`,
+> **La section 7) est ailleurs, à dessein.** Les six routes de catalogue —
+> `/series`, `/series/{series_id}`, `/series/{series_id}/volumes`,
 > `/series/{series_id}/reviews`, `/identity/{work_uid}`, `/coverage` — sont
 > documentées avec leurs sources sous
 > [« 7) Catalogue, identité et couverture »](#7-catalogue-identité-et-couverture),
 > parce que ce qu'elles exposent ne se lit qu'avec le périmètre en main. Elles
 > sont protégées comme les autres routes de données.
 >
-> **Les 13 routes de l'API sont ainsi couvertes** : `/live`, `/health`, puis
+> **Les 14 routes de l'API sont ainsi couvertes** : `/live`, `/health`, puis
 > 1) à 7). Le contrat complet, machine-lisible, est dans
 > [`openapi.json`](openapi.json), régénéré par
 > `uv run python outils/exporter_openapi.py` et tenu à jour par la suite de

@@ -1,12 +1,14 @@
 services:
   api:
     build: .
+    # Publication sur le bouclage seulement (E4, D11) : un déploiement qui veut autre
+    # chose le dit dans son propre fichier de fusion.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-API Manga}
-      APP_VERSION: ${APP_VERSION:-0.4.0}
+      APP_VERSION: ${APP_VERSION:-0.5.0}
       # Trousseau d'autorisation. Transmis vide s'il est absent de
       # l'environnement : c'est alors l'API qui refuse de démarrer, avec un
       # message explicite. Le refus appartient à l'application, en un seul
