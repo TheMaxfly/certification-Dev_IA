@@ -1,9 +1,10 @@
 """Le seul code qui parle au catalogue — l'API data du module 02 —, par son contrat
 0.5.0.
 
-Deux appels de données, `rechercher(q, page)` (`GET /series`) et `serie(series_id)`
-(`GET /series/{series_id}`, 404 → None), et une sonde, `sante()` (`GET /live`, sans
-clé).
+Trois appels de données, `rechercher(q, page)` (`GET /series`), `serie(series_id)`
+(`GET /series/{series_id}`, 404 → None) et `volumes(series_id)` (`GET
+/series/{series_id}/volumes`, toutes les pages, 404 → None ; E4, lot 3), et une sonde,
+`sante()` (`GET /live`, sans clé).
 Les formes ci-dessous ne retiennent que ce que l'application emploie : un champ de plus
 de l'API est ignoré. L'application n'appelle **jamais** `/series/{id}/reviews` : les
 critiques collectées portent des pseudonymes de lecteurs.
@@ -18,6 +19,7 @@ route et issue, l'état du catalogue posé à chaque appel.
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 from typing import Literal
 
 import httpx
@@ -31,6 +33,10 @@ from application.metriques import Metriques
 ENTETE_CLE = "X-API-Key"
 ROUTE_RECHERCHE = "/series"
 ROUTE_LIVE = "/live"
+#: La plus grande page de `GET /series/{id}/volumes` (contrat 0.5.0 du 02).
+VOLUMES_PAR_APPEL = 200
+#: La borne de sécurité : au-delà, la liste est tronquée et le journal le dit.
+VOLUMES_MAX = 1000
 
 type Disponibilite = Literal["edite_en_france", "seulement_au_japon", "inconnue"]
 type SourceTomes = Literal["champ", "repli_volumes_distincts", "divergent"]
@@ -93,6 +99,59 @@ class SerieCatalogue(BaseModel):
             demographie=self.demographie,
             auteurs=self.auteurs,
         )
+
+
+class Volume(BaseModel):
+    """Un volume d'une série : ce que le formulaire de critique propose. L'éditeur et
+    le statut ne sont pas lus : deux défauts de source connus du 02 (son contrat le
+    dit)."""
+
+    volume_url: str
+    title: str | None
+    number: int | None
+    publication_date: date | None
+
+
+class Volumes(BaseModel):
+    series_id: int
+    total: int
+    limit: int
+    offset: int
+    items: list[Volume]
+
+
+def libelle_de(volume: Volume, *, avec_annee: bool = False) -> str:
+    """« Tome N — titre », « Tome N » sans titre, le titre seul sans numéro ; sans l'un
+    ni l'autre, « Volume sans titre » et l'année s'il y en a une. `avec_annee` : l'année
+    entre parenthèses (deux éditions d'un même numéro). C'est ce libellé qui est copié
+    dans la critique (`volume_libelle`) et proposé dans le formulaire."""
+    annee = volume.publication_date.year if volume.publication_date else None
+    titre = (volume.title or "").strip()
+    if volume.number is not None:
+        libelle = (
+            f"Tome {volume.number} — {titre}" if titre else f"Tome {volume.number}"
+        )
+    elif titre:
+        libelle = titre
+    else:
+        return "Volume sans titre" + (f" ({annee})" if annee else "")
+    return f"{libelle} ({annee})" if avec_annee and annee else libelle
+
+
+def libelles_de(volumes: list[Volume]) -> dict[str, str]:
+    """`volume_url` → libellé, dans l'ordre du 02 ; deux volumes au même numéro dont les
+    années diffèrent portent chacun son année."""
+    annees: dict[int, set[int | None]] = {}
+    for volume in volumes:
+        if volume.number is not None:
+            annee = volume.publication_date.year if volume.publication_date else None
+            annees.setdefault(volume.number, set()).add(annee)
+    return {
+        v.volume_url: libelle_de(
+            v, avec_annee=v.number is not None and len(annees[v.number]) > 1
+        )
+        for v in volumes
+    }
 
 
 class CatalogueIndisponible(Exception):
@@ -204,6 +263,38 @@ class ClientCatalogue:
             raise self._hors_contrat("serie") from None
         self._noter("serie", "ok", "ok")
         return fiche
+
+    async def volumes(self, series_id: int) -> list[Volume] | None:
+        """`GET /series/{series_id}/volumes`, toutes les pages de 200, dans l'ordre du
+        02 (numéro, sans numéro en dernier) ; une série inconnue (404) : None. Au-delà
+        de `VOLUMES_MAX`, la liste est tronquée et le journal le dit (sans
+        l'identifiant)."""
+        lus: list[Volume] = []
+        while True:
+            reponse = await self._appeler(
+                f"{ROUTE_RECHERCHE}/{series_id}/volumes",
+                "volumes",
+                {"limit": VOLUMES_PAR_APPEL, "offset": len(lus)},
+            )
+            if reponse.status_code == 404:
+                self._noter("volumes", "introuvable", "ok")
+                return None
+            if reponse.status_code != 200:
+                raise self._hors_contrat("volumes")
+            try:
+                page = Volumes.model_validate_json(reponse.content)
+            except ValidationError:
+                raise self._hors_contrat("volumes") from None
+            self._noter("volumes", "ok", "ok")
+            lus += page.items
+            if len(lus) >= VOLUMES_MAX and page.total > VOLUMES_MAX:
+                journal.evenement(
+                    "catalogue_volumes_tronques",
+                    {"total": page.total, "gardes": VOLUMES_MAX},
+                )
+                return lus[:VOLUMES_MAX]
+            if not page.items or len(lus) >= page.total:
+                return lus
 
     async def sante(self) -> bool:
         """`GET /live`, sans clé, délai court : le catalogue vit-il ?"""

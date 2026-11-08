@@ -7,8 +7,9 @@ contrat n'énumère pas aussi. Seuls les corps hors contrat et les scénarios sa
 réponse y échappent, exprès.
 
 Elle sert aussi le **catalogue** — l'API data du module 02, `GET /series`,
-`GET /series/{series_id}`, et `/live` —, chaque réponse validée contre le contrat du 02
-(`02_api_manga/openapi.json`, second contrat, même mécanisme), sous une clé distincte
+`GET /series/{series_id}`, `GET /series/{series_id}/volumes` (E4, lot 3) et `/live` —,
+chaque réponse validée contre le contrat du 02 (`02_api_manga/openapi.json`, second
+contrat, même mécanisme), sous une clé distincte
 (sans clé : 401, comme le 02). Elle compte ses appels par route, `/series/{id}/reviews`
 comprise : l'application ne doit jamais l'appeler.
 
@@ -822,9 +823,80 @@ SCENARIOS_CATALOGUE = (
     "cle_refusee",
     "lent",
     "corps_hors_contrat",
+    # E4, lot 3 : les volumes d'une série.
+    "sans_volume",
+    "beaucoup",
 )
 #: `plusieurs_pages` : 45 séries, trois pages de 20.
 TOTAL_PLUSIEURS_PAGES = 45
+#: `beaucoup` : 250 volumes, deux pages de 200.
+TOTAL_BEAUCOUP = 250
+
+
+def volume_catalogue(
+    series_id: int, rang: int, numero: int | None, titre: str | None, annee: int | None
+) -> dict[str, Any]:
+    """Un volume du contrat du 02 : ses champs obligatoires, factices ; l'éditeur porte
+    le défaut de source connu (un libellé de champ), que l'application ne lit pas."""
+    return {
+        "volume_url": f"https://catalogue.invalid/serie/{series_id}/volume/{rang}",
+        "title": titre,
+        "number": numero,
+        "publication_date": None if annee is None else f"{annee}-03-01",
+        "ean": None,
+        "editeur": "Mag. de prépublication",
+        "dessinateur": None,
+        "scenariste": None,
+        "format": None,
+        "pages": None,
+        "country": None,
+        "status": None,
+        "tomes_published": None,
+        "tomes_total": None,
+        "experts_rating": None,
+        "experts_votes": None,
+        "review_count": None,
+        "synopsis": None,
+    }
+
+
+def volumes_nominaux(series_id: int) -> list[dict[str, Any]]:
+    """Trois volumes, dans l'ordre du 02 (numéro, sans numéro en dernier) : deux
+    éditions du tome 1, d'années différentes, et un hors-série sans numéro."""
+    return [
+        volume_catalogue(series_id, 1, 1, "Premier tome factice", 2001),
+        volume_catalogue(series_id, 2, 1, "Premier tome factice", 2010),
+        volume_catalogue(series_id, 3, None, "Hors-série factice", 2005),
+    ]
+
+
+def volumes_selon(nom: str, series_id: int, limit: int, offset: int) -> Rendu:
+    """`GET /series/{series_id}/volumes` selon le scénario."""
+    if nom == "indisponible":
+        return Rendu(503, {"detail": "database unavailable"})
+    if nom == "cle_refusee":
+        return Rendu(401, {"detail": "Missing or invalid API key."})
+    if nom == "corps_hors_contrat":
+        return Rendu(200, brut=b'{"items": "pas une liste"}')
+    if nom == "serie_inconnue" or series_id not in SERIES_FACTICES | {1000}:
+        return Rendu(404, {"detail": "series_id not found"})
+    if nom == "sans_volume":
+        tous: list[dict[str, Any]] = []
+    elif nom == "beaucoup":
+        tous = [
+            volume_catalogue(series_id, i, i, f"Tome factice {i}", 2000 + i % 20)
+            for i in range(1, TOTAL_BEAUCOUP + 1)
+        ]
+    else:
+        tous = volumes_nominaux(series_id)
+    corps = {
+        "series_id": series_id,
+        "total": len(tous),
+        "limit": limit,
+        "offset": offset,
+        "items": tous[offset : offset + limit],
+    }
+    return Rendu(200, corps, attente_s=1.0 if nom == "lent" else 0.0)
 
 
 def recherche_catalogue(nom: str, q: str, limit: int, offset: int) -> Rendu:
@@ -895,6 +967,8 @@ class Doublure:
         self.appels_catalogue: dict[str, int] = {}
         #: Les recherches reçues : (q, limit, offset).
         self.recherches: list[tuple[str, int, int]] = []
+        #: Les lectures de volumes reçues : (series_id, limit, offset).
+        self.lectures_volumes: list[tuple[int, int, int]] = []
         self.corps_recus: list[dict[str, Any]] = []
         self.cles_recues: list[str | None] = []
         self.cles_sante: list[str | None] = []
@@ -1063,6 +1137,22 @@ class Doublure:
             if not self._compter(route, request):
                 return await self._rendre_catalogue(route, nom, sans_cle)
             return await self._rendre_catalogue(route, nom, fiche_selon(nom, series_id))
+
+        @app.get("/series/{series_id}/volumes")
+        async def route_volumes(request: Request, series_id: int) -> Response:
+            nom = self.scenario_catalogue
+            route = "/series/{series_id}/volumes"
+            if not self._compter(route, request):
+                return await self._rendre_catalogue(route, nom, sans_cle)
+            limit = int(request.query_params.get("limit", "50"))
+            offset = int(request.query_params.get("offset", "0"))
+            if not (1 <= limit <= 200 and 0 <= offset <= 10000):
+                self.ecarts.append(
+                    f"{route} : limit {limit}, offset {offset} hors bornes"
+                )
+            self.lectures_volumes.append((series_id, limit, offset))
+            rendu = volumes_selon(nom, series_id, limit, offset)
+            return await self._rendre_catalogue(route, nom, rendu)
 
         @app.get("/series/{series_id}/reviews")
         async def route_critiques(request: Request, series_id: int) -> Response:

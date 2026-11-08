@@ -1,0 +1,7 @@
+id = "E4R-02"
+origine = "E4, lot 3, spec 01 (2026-11-08) — le retrait devenu une suppression : la ligne retiree disparaîtrait (et app_rw la refuse, 42501 : le test doit le voir aussi)"
+fichier = "12_application/src/application/critiques.py"
+avant = '''            "UPDATE application.critiques SET statut = 'retiree', modifie_le = now()"'''
+apres = '''            "DELETE FROM application.critiques"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_critiques.py", "-k", "retirer_par_l_auteur_pose_le_statut"]
