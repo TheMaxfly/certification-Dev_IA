@@ -1,5 +1,29 @@
 {
+  "source": {
+    "base": "apimanga_preprod",
+    "role": "verif_lecture"
+  },
   "tables": [
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "table_type": "BASE TABLE"
+    },
     {
       "table_schema": "manga",
       "table_name": "genre_mapping",
@@ -167,7 +191,17 @@
     },
     {
       "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "table_type": "VIEW"
+    },
+    {
+      "table_schema": "manga",
       "table_name": "v_mi_ean_multiples",
+      "table_type": "VIEW"
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_pseudonymes",
       "table_type": "VIEW"
     },
     {
@@ -198,6 +232,26 @@
     {
       "table_schema": "manga",
       "table_name": "work_identity",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "table_type": "BASE TABLE"
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
       "table_type": "BASE TABLE"
     },
     {
@@ -257,6 +311,414 @@
     }
   ],
   "colonnes": [
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 1,
+      "column_name": "description_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 2,
+      "column_name": "character_uid",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 3,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 4,
+      "column_name": "lang",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 5,
+      "column_name": "texte",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 6,
+      "column_name": "licence",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 7,
+      "column_name": "provenance",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 8,
+      "column_name": "longueur",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_descriptions",
+      "ordinal_position": 9,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 1,
+      "column_name": "forme_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 2,
+      "column_name": "character_uid",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 3,
+      "column_name": "forme",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 4,
+      "column_name": "forme_norm",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 5,
+      "column_name": "forme_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 6,
+      "column_name": "forme_lang",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 7,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_forms",
+      "ordinal_position": 8,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 1,
+      "column_name": "lien_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 2,
+      "column_name": "character_uid",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 3,
+      "column_name": "oeuvre_source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 4,
+      "column_name": "oeuvre_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 5,
+      "column_name": "role_source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 6,
+      "column_name": "role_normalise",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 7,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "character_work",
+      "ordinal_position": 8,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 1,
+      "column_name": "character_uid",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 2,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 3,
+      "column_name": "source_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 4,
+      "column_name": "slug",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 5,
+      "column_name": "canonical_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 6,
+      "column_name": "mal_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 7,
+      "column_name": "source_created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 8,
+      "column_name": "source_updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "characters",
+      "ordinal_position": 9,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
     {
       "table_schema": "manga",
       "table_name": "genre_mapping",
@@ -5419,6 +5881,102 @@
     },
     {
       "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 1,
+      "column_name": "series_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 64
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 2,
+      "column_name": "disponibilite",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 3,
+      "column_name": "nb_volumes",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 4,
+      "column_name": "nb_volumes_source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 5,
+      "column_name": "statut",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 6,
+      "column_name": "demographie",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 7,
+      "column_name": "annee_fr",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_metadonnees_serie",
+      "ordinal_position": 8,
+      "column_name": "auteurs",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
       "table_name": "v_mi_ean_multiples",
       "ordinal_position": 1,
       "column_name": "ean",
@@ -5496,6 +6054,18 @@
       "column_name": "sorties",
       "data_type": "ARRAY",
       "udt_name": "_int8",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "manga",
+      "table_name": "v_pseudonymes",
+      "ordinal_position": 1,
+      "column_name": "review_author",
+      "data_type": "text",
+      "udt_name": "text",
       "is_nullable": "YES",
       "column_default": null,
       "character_maximum_length": null,
@@ -6062,6 +6632,402 @@
       "udt_name": "timestamptz",
       "is_nullable": "NO",
       "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 1,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 2,
+      "column_name": "source_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 3,
+      "column_name": "lang",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 4,
+      "column_name": "texte",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 5,
+      "column_name": "licence",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 6,
+      "column_name": "provenance",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 7,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_descriptions",
+      "ordinal_position": 8,
+      "column_name": "source_file",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 1,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 2,
+      "column_name": "source_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 3,
+      "column_name": "forme",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 4,
+      "column_name": "forme_norm",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 5,
+      "column_name": "forme_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 6,
+      "column_name": "forme_lang",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 7,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_forms",
+      "ordinal_position": 8,
+      "column_name": "source_file",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 1,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 2,
+      "column_name": "source_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 3,
+      "column_name": "oeuvre_source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 4,
+      "column_name": "oeuvre_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 5,
+      "column_name": "role_source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 6,
+      "column_name": "role_normalise",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 7,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "character_work",
+      "ordinal_position": 8,
+      "column_name": "source_file",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 1,
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 2,
+      "column_name": "source_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 3,
+      "column_name": "slug",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 4,
+      "column_name": "canonical_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 5,
+      "column_name": "mal_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 6,
+      "column_name": "source_created_at",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 7,
+      "column_name": "source_updated_at",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 8,
+      "column_name": "loaded_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "column_default": "now()",
+      "character_maximum_length": null,
+      "numeric_precision": null
+    },
+    {
+      "table_schema": "staging",
+      "table_name": "characters",
+      "ordinal_position": 9,
+      "column_name": "source_file",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
       "character_maximum_length": null,
       "numeric_precision": null
     },
@@ -8169,6 +9135,160 @@
   "contraintes": [
     {
       "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_lang_connue",
+      "type": "c",
+      "definition": "CHECK (((lang IS NULL) OR (lang = ANY (ARRAY['en'::text, 'ja'::text, 'fr'::text]))))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_source_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(source) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_texte_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(texte) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_character_uid_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (character_uid) REFERENCES manga.characters(character_uid) ON DELETE CASCADE"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (description_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "nom": "character_descriptions_unique",
+      "type": "u",
+      "definition": "UNIQUE (character_uid, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(forme) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_source_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(source) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_type_connu",
+      "type": "c",
+      "definition": "CHECK ((forme_type = ANY (ARRAY['canonical'::text, 'name_lang'::text, 'alias'::text])))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_character_uid_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (character_uid) REFERENCES manga.characters(character_uid) ON DELETE CASCADE"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (forme_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "nom": "character_forms_unique",
+      "type": "u",
+      "definition": "UNIQUE (character_uid, forme_norm, forme_type, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_oeuvre_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(oeuvre_id) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_role_connu",
+      "type": "c",
+      "definition": "CHECK (((role_normalise IS NULL) OR (role_normalise = ANY (ARRAY['principal'::text, 'secondaire'::text, 'recurrent'::text, 'apparition'::text]))))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_source_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(source) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_character_uid_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (character_uid) REFERENCES manga.characters(character_uid) ON DELETE CASCADE"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (lien_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "nom": "character_work_unique",
+      "type": "u",
+      "definition": "UNIQUE (character_uid, oeuvre_source, oeuvre_id, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "nom": "characters_nom_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(canonical_name) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "nom": "characters_source_non_vide",
+      "type": "c",
+      "definition": "CHECK ((btrim(source) <> ''::text))"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "nom": "characters_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (character_uid)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "nom": "characters_source_id_unique",
+      "type": "u",
+      "definition": "UNIQUE (source, source_id)"
+    },
+    {
+      "schema": "manga",
       "table": "genre_mapping",
       "nom": "genre_mapping_check",
       "type": "c",
@@ -8410,7 +9530,7 @@
       "table": "match_decision",
       "nom": "match_decision_method_check",
       "type": "c",
-      "definition": "CHECK ((method = ANY (ARRAY['kitsu_bridge'::text, 'exact'::text, 'exact_author'::text, 'exact_kitsu'::text, 'exact_kitsu_author'::text, 'trgm'::text, 'embedding'::text, 'llm_review'::text, 'human_review'::text, 'manual'::text])))"
+      "definition": "CHECK ((method = ANY (ARRAY['kitsu_bridge'::text, 'exact'::text, 'exact_author'::text, 'exact_kitsu'::text, 'exact_kitsu_author'::text, 'trgm'::text, 'embedding'::text, 'llm_review'::text, 'human_review'::text, 'kitsu_propagation'::text, 'manual'::text])))"
     },
     {
       "schema": "manga",
@@ -8715,6 +9835,158 @@
     }
   ],
   "index": [
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "index": "character_descriptions_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX character_descriptions_pkey ON manga.character_descriptions USING btree (description_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "index": "character_descriptions_unique",
+      "unique": true,
+      "primaire": false,
+      "definition": "CREATE UNIQUE INDEX character_descriptions_unique ON manga.character_descriptions USING btree (character_uid, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "index": "idx_character_descriptions_source",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_descriptions_source ON manga.character_descriptions USING btree (source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_descriptions",
+      "index": "idx_character_descriptions_uid",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_descriptions_uid ON manga.character_descriptions USING btree (character_uid)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "character_forms_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX character_forms_pkey ON manga.character_forms USING btree (forme_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "character_forms_unique",
+      "unique": true,
+      "primaire": false,
+      "definition": "CREATE UNIQUE INDEX character_forms_unique ON manga.character_forms USING btree (character_uid, forme_norm, forme_type, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "idx_character_forms_ja",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_forms_ja ON manga.character_forms USING btree (forme) WHERE (forme_lang = 'ja'::text)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "idx_character_forms_norm",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_forms_norm ON manga.character_forms USING btree (forme_norm)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "idx_character_forms_trgm",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_forms_trgm ON manga.character_forms USING gin (forme_norm gin_trgm_ops)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_forms",
+      "index": "idx_character_forms_uid",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_forms_uid ON manga.character_forms USING btree (character_uid)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "index": "character_work_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX character_work_pkey ON manga.character_work USING btree (lien_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "index": "character_work_unique",
+      "unique": true,
+      "primaire": false,
+      "definition": "CREATE UNIQUE INDEX character_work_unique ON manga.character_work USING btree (character_uid, oeuvre_source, oeuvre_id, source)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "index": "idx_character_work_oeuvre",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_work_oeuvre ON manga.character_work USING btree (oeuvre_source, oeuvre_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "index": "idx_character_work_role",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_work_role ON manga.character_work USING btree (role_normalise)"
+    },
+    {
+      "schema": "manga",
+      "table": "character_work",
+      "index": "idx_character_work_uid",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_character_work_uid ON manga.character_work USING btree (character_uid)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "index": "characters_pkey",
+      "unique": true,
+      "primaire": true,
+      "definition": "CREATE UNIQUE INDEX characters_pkey ON manga.characters USING btree (character_uid)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "index": "characters_source_id_unique",
+      "unique": true,
+      "primaire": false,
+      "definition": "CREATE UNIQUE INDEX characters_source_id_unique ON manga.characters USING btree (source, source_id)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "index": "idx_characters_mal_id",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_characters_mal_id ON manga.characters USING btree (mal_id) WHERE (mal_id IS NOT NULL)"
+    },
+    {
+      "schema": "manga",
+      "table": "characters",
+      "index": "idx_characters_source",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX idx_characters_source ON manga.characters USING btree (source)"
+    },
     {
       "schema": "manga",
       "table": "genre_mapping",
@@ -9246,6 +10518,38 @@
     {
       "schema": "manga",
       "table": "ms_series_enriched",
+      "index": "ms_series_enriched_norm_series_dessinateur_trgm_idx",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX ms_series_enriched_norm_series_dessinateur_trgm_idx ON manga.ms_series_enriched USING gin (manga.normaliser(series_dessinateur) gin_trgm_ops)"
+    },
+    {
+      "schema": "manga",
+      "table": "ms_series_enriched",
+      "index": "ms_series_enriched_norm_series_other_titles_trgm_idx",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX ms_series_enriched_norm_series_other_titles_trgm_idx ON manga.ms_series_enriched USING gin (manga.normaliser((series_other_titles)::text) gin_trgm_ops)"
+    },
+    {
+      "schema": "manga",
+      "table": "ms_series_enriched",
+      "index": "ms_series_enriched_norm_series_scenariste_trgm_idx",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX ms_series_enriched_norm_series_scenariste_trgm_idx ON manga.ms_series_enriched USING gin (manga.normaliser(series_scenariste) gin_trgm_ops)"
+    },
+    {
+      "schema": "manga",
+      "table": "ms_series_enriched",
+      "index": "ms_series_enriched_norm_series_title_trgm_idx",
+      "unique": false,
+      "primaire": false,
+      "definition": "CREATE INDEX ms_series_enriched_norm_series_title_trgm_idx ON manga.ms_series_enriched USING gin (manga.normaliser(series_title) gin_trgm_ops)"
+    },
+    {
+      "schema": "manga",
+      "table": "ms_series_enriched",
       "index": "ms_series_enriched_pkey",
       "unique": true,
       "primaire": true,
@@ -9517,6 +10821,48 @@
     }
   ],
   "fk": [
+    {
+      "schema_source": "manga",
+      "table_source": "character_descriptions",
+      "nom": "character_descriptions_character_uid_fkey",
+      "colonnes_source": [
+        "character_uid"
+      ],
+      "schema_cible": "manga",
+      "table_cible": "characters",
+      "colonnes_cible": [
+        "character_uid"
+      ],
+      "on_delete": "c"
+    },
+    {
+      "schema_source": "manga",
+      "table_source": "character_forms",
+      "nom": "character_forms_character_uid_fkey",
+      "colonnes_source": [
+        "character_uid"
+      ],
+      "schema_cible": "manga",
+      "table_cible": "characters",
+      "colonnes_cible": [
+        "character_uid"
+      ],
+      "on_delete": "c"
+    },
+    {
+      "schema_source": "manga",
+      "table_source": "character_work",
+      "nom": "character_work_character_uid_fkey",
+      "colonnes_source": [
+        "character_uid"
+      ],
+      "schema_cible": "manga",
+      "table_cible": "characters",
+      "colonnes_cible": [
+        "character_uid"
+      ],
+      "on_delete": "c"
+    },
     {
       "schema_source": "manga",
       "table_source": "genre_mapping",
@@ -9836,11 +11182,25 @@
     },
     {
       "schema": "manga",
+      "nom": "v_metadonnees_serie",
+      "definition": " SELECT s.series_id,\n        CASE\n            WHEN (v.ean_francais OR (s.series_statuses @> '[{\"pays\": \"français\"}]'::jsonb)) THEN 'edite_en_france'::text\n            WHEN ((v.lignes > 0) AND (s.series_type = 'Manga'::text)) THEN 'seulement_au_japon'::text\n            ELSE 'inconnue'::text\n        END AS disponibilite,\n    (GREATEST((v.tomes_parus)::bigint, v.numeros_distincts))::integer AS nb_volumes,\n        CASE\n            WHEN ((abs((v.tomes_parus - v.numeros_distincts)))::numeric > (0.2 * (GREATEST((v.tomes_parus)::bigint, v.numeros_distincts))::numeric)) THEN 'divergent'::text\n            WHEN (v.tomes_parus >= COALESCE(v.numeros_distincts, (0)::bigint)) THEN 'champ'::text\n            WHEN (v.numeros_distincts IS NOT NULL) THEN 'repli_volumes_distincts'::text\n            ELSE NULL::text\n        END AS nb_volumes_source,\n        CASE\n            WHEN (s.series_statuses @> '[{\"statut\": \"Complète\"}]'::jsonb) THEN 'termine'::text\n            WHEN (k.status = 'finished'::text) THEN 'termine'::text\n            WHEN (k.status = 'current'::text) THEN 'en_cours'::text\n            ELSE NULL::text\n        END AS statut,\n    COALESCE(s.series_category_clean,\n        CASE\n            WHEN (s.series_category = ANY (ARRAY['Seinen'::text, 'Shonen'::text, 'Shojo'::text, 'Josei'::text, 'Yaoi'::text, 'Ecchi-Hentai'::text, 'Shonen-Aï'::text, 'Shojo-Aï'::text, 'Yuri'::text, 'Kodomo'::text, 'Parodie'::text])) THEN s.series_category\n            WHEN (s.series_category = 'Sonyun'::text) THEN 'Shonen'::text\n            WHEN (s.series_category = 'Sunjung'::text) THEN 'Shojo'::text\n            WHEN (s.series_category = 'Chungnyun'::text) THEN 'Seinen'::text\n            ELSE NULL::text\n        END) AS demographie,\n    v.annee_fr,\n    NULLIF(concat_ws(', '::text, a.scenariste, NULLIF(a.dessinateur, a.scenariste)), ''::text) AS auteurs\n   FROM ((((manga.ms_series_enriched s\n     CROSS JOIN LATERAL ( SELECT\n                CASE\n                    WHEN (s.series_scenariste !~* '^\\s*(inconnue?s?)?\\s*$'::text) THEN s.series_scenariste\n                    ELSE NULL::text\n                END AS scenariste,\n                CASE\n                    WHEN (s.series_dessinateur !~* '^\\s*(inconnue?s?)?\\s*$'::text) THEN s.series_dessinateur\n                    ELSE NULL::text\n                END AS dessinateur) a)\n     LEFT JOIN LATERAL ( SELECT count(*) AS lignes,\n            NULLIF(max(vol.volume_tomes_published), 0) AS tomes_parus,\n            NULLIF(count(DISTINCT COALESCE(vol.volume_number, 1)) FILTER (WHERE ((COALESCE(vol.volume_number, 1) < 1900) OR (COALESCE(vol.volume_number, 1) > 2100))), 0) AS numeros_distincts,\n            COALESCE(bool_or((vol.volume_ean ~ '^(9782|97910)'::text)), false) AS ean_francais,\n            (EXTRACT(year FROM min(vol.volume_publication_date) FILTER (WHERE (vol.volume_ean ~ '^(9782|97910)'::text))))::integer AS annee_fr\n           FROM manga.ms_volumes_enriched vol\n          WHERE (vol.series_id = s.series_id)) v ON (true))\n     LEFT JOIN manga.work_identity w ON ((w.series_id = s.series_id)))\n     LEFT JOIN manga.kitsu_series_core k ON ((k.kitsu_id = (w.kitsu_id)::bigint)));"
+    },
+    {
+      "schema": "manga",
       "nom": "v_mi_ean_multiples",
       "definition": " SELECT ean,\n    count(*) AS nb_sorties,\n    count(DISTINCT titre) AS nb_titres_distincts,\n    count(DISTINCT editeur_vf) AS nb_editeurs_distincts,\n    (count(DISTINCT titre) > 1) AS titres_divergents,\n    array_agg(titre ORDER BY titre) AS titres,\n    array_agg(sortie_id ORDER BY sortie_id) AS sorties\n   FROM manga.mi_sorties s\n  WHERE (ean IS NOT NULL)\n  GROUP BY ean\n HAVING (count(*) > 1);"
+    },
+    {
+      "schema": "manga",
+      "nom": "v_pseudonymes",
+      "definition": " SELECT DISTINCT review_author\n   FROM manga.ms_reviews_all\n  WHERE (review_author IS NOT NULL);"
     }
   ],
   "comptes": {
+    "manga.character_descriptions": 39569,
+    "manga.character_forms": 126446,
+    "manga.character_work": 52864,
+    "manga.characters": 47394,
     "manga.genre_mapping": 154,
     "manga.genre_ref": 73,
     "manga.kitsu_formes": 155003,
@@ -9855,7 +11215,7 @@
     "manga.kitsu_weekly_snapshot": 190,
     "manga.kitsu_weekly_snapshot_stg": 190,
     "manga.llm_avis": 2759,
-    "manga.match_decision": 10347,
+    "manga.match_decision": 11516,
     "manga.mi_series": 10162,
     "manga.mi_sorties": 48900,
     "manga.ms_formes": 31904,
@@ -9875,6 +11235,10 @@
     "manga.work_identity": 14670
   },
   "comptes_indisponibles": {
+    "staging.character_descriptions": "permission denied for schema staging",
+    "staging.character_forms": "permission denied for schema staging",
+    "staging.character_work": "permission denied for schema staging",
+    "staging.characters": "permission denied for schema staging",
     "staging.kitsu_formes": "permission denied for schema staging",
     "staging.kitsu_mappings": "permission denied for schema staging",
     "staging.kitsu_staff": "permission denied for schema staging",

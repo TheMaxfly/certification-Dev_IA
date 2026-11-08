@@ -179,7 +179,12 @@ def main() -> int:
         return 2
 
     with psycopg.connect(url, connect_timeout=10) as cx, cx.cursor() as cur:
+        cur.execute("SELECT current_database(), current_user")
+        base, role = cur.fetchone()
         donnees = {
+            # La base et le role lus : le livrable dit d'ou il vient (E4, lot 2b :
+            # regenere sur la preproduction).
+            "source": {"base": base, "role": role},
             "tables": lignes(cur, SQL_TABLES),
             "colonnes": lignes(cur, SQL_COLONNES),
             "contraintes": lignes(cur, SQL_CONTRAINTES),
