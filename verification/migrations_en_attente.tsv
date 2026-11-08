@@ -11,4 +11,5 @@
 #
 # version	motif	appliquée en production par
 027	schéma application et rôle app_rw (E4, lot 1) ; appliquée en préproduction seulement	le lot de livraison continue
+028	normalisation de la recherche (manga.normaliser, index trigrammes), lot 2b (E4) ; appliquée en préproduction seulement	le lot de livraison continue
 029	quota des comptes clients, lot 2b (E4) ; appliquée en préproduction seulement	le lot de livraison continue

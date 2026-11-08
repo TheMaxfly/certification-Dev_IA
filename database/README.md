@@ -70,6 +70,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `025_vue_metadonnees_serie.sql` | **la vue `manga.v_metadonnees_serie`** : disponibilité, nombre de tomes et sa source, statut, public, année française par série, calculés à la lecture sur les volumes, la fiche, le moyeu et Kitsu, règles dans `COMMENT ON VIEW` ; un droit pour `modele_ro`, élévation déclarée, aucune table, aucune donnée |
 | `026_auteurs_metadonnees_serie.sql` | **les auteurs dans `manga.v_metadonnees_serie`** : le scénariste puis le dessinateur, tels quels, un même nom une fois, une colonne de plus sur la vue (`CREATE OR REPLACE`) ; aucun droit, aucune table, aucune donnée |
 | `027_schema_application.sql` | **le schéma `application`** (E4) : les six tables de l'application du libraire — `comptes`, `critiques`, `journal_actions`, `listes`, `couts_jour`, `reglages` —, toutes en une migration ; le rôle de groupe `app_rw`, qui écrit là et n'a **rien** ailleurs, pas même en lecture ; journal en ajout seul et critiques sans suppression, **par les droits** ; aucune clé étrangère vers le catalogue (cf. « L'écriture de l'application ») |
+| `028_recherche_normalisation.sql` | **la normalisation de la recherche du catalogue** (E4, lot 2b) : l'extension `unaccent` (et `pg_trgm`, déjà là), la fonction `manga.normaliser(text)` — `lower(public.unaccent('public.unaccent'::regdictionary, …))`, `IMMUTABLE` parce que le dictionnaire est nommé et qualifié —, quatre index GIN de trigrammes sur ses valeurs (titre, autres titres, scénariste, dessinateur) ; aucune colonne, aucune donnée, aucun droit ; l'API data (02) la détecte et garde la table du lot 2a en repli |
 | `029_quota_comptes.sql` | **le compteur de questions par compte et par jour** (E4, lot 2b) : `application.questions_jour` (compte, jour civil UTC, nombre), le quota des comptes clients du conseiller ; aucun texte ; part avec le compte (`ON DELETE CASCADE`) ; `app_rw` : `SELECT`, `INSERT`, `UPDATE`, pas de `DELETE` |
 
 ## `000` — la frontière héritage / versionné
@@ -113,8 +114,9 @@ sauvegarde) ; `000` y a été **marquée appliquée** le
 `outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
 2026-11-03).
 
-**`027` et `029` ne sont pas appliquées à `apimanga`** : elles le sont d'abord en
-préproduction (`apimanga_preprod` : la `027` au lot 1 d'E4, la `029` au lot 2b), et la
+**`027`, `028` et `029` ne sont pas appliquées à `apimanga`** : elles le sont d'abord en
+préproduction (`apimanga_preprod` : la `027` au lot 1 d'E4, la `028` et la `029` au lot
+2b, en un passage), et la
 production les recevra au lot de livraison continue, après la sauvegarde et l'accord de
 Max. D'ici là, elles sont **déclarées en attente** dans `verification/migrations_en_attente.tsv` : l'état
 d'`apimanga` (`make verify-poste`) l'admet, et refuserait toute autre migration absente

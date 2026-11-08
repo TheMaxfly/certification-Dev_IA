@@ -1,0 +1,7 @@
+id = "E4Q-11"
+origine = "E4, lot 2b, spec 03 (2026-11-08) — l'index du titre posé sur la colonne brute, pas sur sa forme normalisée : la recherche ne l'emploierait pas"
+fichier = "database/migrations/028_recherche_normalisation.sql"
+avant = '''    USING gin (manga.normaliser(series_title) public.gin_trgm_ops);'''
+apres = '''    USING gin (series_title public.gin_trgm_ops);'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche_normalisation.py", "-k", "quatre_index or emploie_l_index"]
