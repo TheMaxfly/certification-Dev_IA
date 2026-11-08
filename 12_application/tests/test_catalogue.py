@@ -272,7 +272,11 @@ def test_v3_les_zones_du_reseau_et_des_listes_sont_nommees(client):
     listes = page.select_one("section.zone-listes")
 
     assert reseau.select_one("h2").get_text() == "Les libraires du réseau"
-    assert "Aucune critique de libraire pour l'instant." in reseau.get_text()
+    # Sans base (E4, lot 3) : l'encart à la place des critiques ; l'état vide nommé,
+    # avec une base, est éprouvé par `test_pages_critiques`.
+    assert "Les critiques du réseau sont momentanément indisponibles." in (
+        reseau.get_text()
+    )
     assert "Vos listes : bientôt disponible." in listes.get_text()
     for zone in ("zone-titre", "zone-note", "zone-synopsis"):
         assert page.select_one(f"section.{zone}") is not None, zone

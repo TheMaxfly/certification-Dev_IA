@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titre %}{{ t.critique_retirer_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.critique_retirer_titre }}</h1>
+<dl>
+<dt>{{ t.critiques_colonne_serie }}</dt><dd>{{ ligne.titre }}</dd>
+<dt>{{ t.critiques_colonne_tome }}</dt><dd>{{ ligne.tome }}</dd>
+<dt>{{ t.critiques_colonne_note }}</dt><dd>{{ ligne.note }}</dd>
+<dt>{{ t.admin_critiques_colonne_debut }}</dt><dd>{{ ligne.debut }}</dd>
+</dl>
+<p>{{ t.critique_retirer_texte }}</p>
+<form method="post" action="{{ action }}">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<button type="submit">{{ t.critique_retirer_bouton }}</button>
+</form>
+<p><a href="{{ annuler }}">{{ t.critique_annuler }}</a></p>
+{% endblock %}

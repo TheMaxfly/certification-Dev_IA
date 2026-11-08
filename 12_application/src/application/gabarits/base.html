@@ -19,11 +19,12 @@
 <li><a href="/catalogue">{{ t.menu_catalogue }}</a></li>
 {% if compte %}
 <li><a href="/compte/mot-de-passe">{{ t.menu_mon_compte }}</a></li>
-{% if compte.role in ("libraire", "admin") %}
+{% if compte.role == "libraire" %}
 <li><a href="/libraire/critiques">{{ t.menu_critiques }}</a></li>
 {% endif %}
 {% if compte.role == "admin" %}
 <li><a href="/admin/comptes">{{ t.menu_comptes }}</a></li>
+<li><a href="/admin/critiques">{{ t.menu_moderation }}</a></li>
 {% endif %}
 <li>{{ connecte }}</li>
 <li><form method="post" action="/deconnexion"><input type="hidden" name="jeton" value="{{ jeton }}"><button>{{ t.menu_deconnexion }}</button></form></li>

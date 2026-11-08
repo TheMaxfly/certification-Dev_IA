@@ -1,0 +1,7 @@
+id = "E4R-06"
+origine = "E4, lot 3, spec 02 (2026-11-08) — un tome hors des volumes de la série accepté par la page (volume_url d'une autre série)"
+fichier = "12_application/src/application/pages_critiques.py"
+avant = '''        if volume_url is not None and volume_url not in libelles:'''
+apres = '''        if volume_url is not None and volume_url == "":'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages_critiques.py", "-k", "saisie_refusee and autre_serie"]

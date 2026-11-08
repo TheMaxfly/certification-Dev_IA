@@ -1,7 +1,12 @@
 {% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% import "composants/critique.html" as k %}
 {% block titre %}{{ titre }}{% endblock %}
 {% block contenu %}
 <h1>{{ titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
 <section class="zone-titre" aria-label="{{ t.serie_metadonnees }}">
 <dl>
 {% for nom, valeur in metadonnees %}
@@ -11,12 +16,29 @@
 </dl>
 <p><small>{{ t.serie_type }} : {{ fiche.type or t.valeur_inconnue }} · {{ t.serie_annee }} : {{ fiche.year or t.valeur_inconnue }}</small></p>
 </section>
+{# La note du réseau d'abord, puis celle des lecteurs : c'est l'argument (deux `p`, la
+   feuille de style du lot 6 en fera un vis-à-vis). #}
 <section class="zone-note" aria-label="{{ t.serie_note_etiquette }}">
-<p>{% if note %}{{ note }}{% else %}{{ t.serie_sans_note }}{% endif %}</p>
+{% if reseau.moyenne %}<p>{{ reseau.moyenne }}</p>
+{% endif %}<p>{% if note %}{{ note }}{% else %}{{ t.serie_sans_note }}{% endif %}</p>
 </section>
 <section class="zone-critiques-reseau" aria-labelledby="reseau-titre">
 <h2 id="reseau-titre">{{ t.serie_reseau_titre }}</h2>
+{% if reseau.indisponible %}
+<article><p>{{ t.serie_reseau_indisponible }}</p></article>
+{% else %}
+{% if reseau.ecrire %}<p><a href="{{ reseau.ecrire }}">{{ t.critique_ecrire }}</a></p>
+{% endif %}
+{% if reseau.critiques %}
+<ul>
+{% for critique in reseau.critiques %}
+<li>{{ k.critique(critique, t) }}</li>
+{% endfor %}
+</ul>
+{% else %}
 <p>{{ t.serie_reseau_vide }}</p>
+{% endif %}
+{% endif %}
 </section>
 <section class="zone-listes" aria-labelledby="listes-titre">
 <h2 id="listes-titre">{{ t.serie_listes_titre }}</h2>

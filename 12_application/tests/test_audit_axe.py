@@ -14,6 +14,12 @@ E4, lot 1 : les écrans des comptes (inscription, connexion, mot de passe,
 administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de rôle,
 formulaire expiré, comptes indisponibles), sur une base jetable ; les connexions se font
 dans le navigateur, par les formulaires eux-mêmes.
+
+E4, lot 3 : les écrans des critiques (« Mes critiques » pleine, vide, sans catalogue ;
+écrire, refus, modifier, retirer, accès refusé ; la fiche avec critiques ; la
+modération, sa liste vide, sa confirmation), sur la même base, où trois critiques
+factices sont posées ; le catalogue y est servi par la doublure, son scénario choisi
+écran par écran.
 """
 
 from __future__ import annotations
@@ -228,6 +234,26 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 " VALUES (%s, %s, %s, %s, %s)",
                 (pseudo, f"Nom {pseudo}", role, HACHEUR_RAPIDE.hacher(MDP), a_changer),
             )
+        # Les critiques de l'audit (identifiants 1 à 3, base neuve) : la série entière,
+        # modifiée ; un tome ; une retirée, d'une autre série.
+        for tome, libelle, note, label, statut, serie in CRITIQUES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.critiques (compte_id, series_id, volume_url,"
+                " volume_libelle, texte, note, label, statut, modifie_le) VALUES ("
+                " (SELECT id FROM application.comptes WHERE pseudo = 'libraire_audit'),"
+                " %s, %s, %s, %s, %s, %s, %s,"
+                " now() + CASE WHEN %s THEN interval '1 day' ELSE interval '0' END)",
+                (
+                    serie,
+                    tome,
+                    libelle,
+                    TEXTE_AUDIT,
+                    note,
+                    label,
+                    statut,
+                    label is not None,
+                ),
+            )
 
     source = (ACCESSIBILITE / "axe.min.js").read_text(encoding="utf-8")
     doublure = Doublure()
@@ -263,6 +289,11 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                     adresse_api=adresse_doublure,
                     base_dsn=base_app,
                     cle_session="a" * 48,
+                    catalogue=replace(
+                        reglages.catalogue,
+                        adresse=adresse_doublure,
+                        cle=CLE_CATALOGUE_ATTENDUE,
+                    ),
                 ),
                 hacheur=HACHEUR_RAPIDE,
             )
@@ -309,7 +340,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
         version_navigateur = navigateur.version
         navigateur.close()
         des_comptes, console_comptes, sans_focus_comptes = auditer_les_comptes(
-            playwright, source, adresse_comptes, adresse
+            playwright, source, adresse_comptes, adresse, adresse_doublure
         )
         pages |= des_comptes
         console += console_comptes
@@ -335,7 +366,8 @@ class EcranCompte:
     """Un écran des comptes : `compte`, qui est connecté avant (None : un visiteur) ;
     `titre`, le titre de niveau 1 attendu — l'écran audité est bien celui qu'on croit ;
     `saisies` et `bouton`, le formulaire rempli puis envoyé ; `action`, l'adresse où
-    l'envoyer à la place de la sienne (une page qu'aucun lien n'atteint)."""
+    l'envoyer à la place de la sienne (une page qu'aucun lien n'atteint) ; `catalogue`,
+    le scénario du catalogue dans la doublure (E4, lot 3)."""
 
     nom: str
     compte: str | None
@@ -344,6 +376,7 @@ class EcranCompte:
     saisies: dict[str, str] = field(default_factory=dict)
     bouton: str | None = None
     action: str | None = None
+    catalogue: str = "nominal"
 
 
 MDP = "mot de passe factice de l'audit"
@@ -357,6 +390,25 @@ COMPTES_AUDIT = (
     ("libraire_audit", "libraire", False),
     ("initial_audit", "libraire", True),
     *((f"lecteur_audit_{i:02d}", "client", False) for i in range(26)),
+    ("libraire_tiers_audit", "libraire", False),
+    ("libraire_vide_audit", "libraire", False),
+)
+TEXTE_AUDIT = (
+    "Texte factice d'une critique d'audit, assez long pour tenir dans les bornes.\n\n"
+    "Un second paragraphe factice, avec <b>du balisage</b> rendu littéralement."
+)
+#: (volume_url, volume_libelle, note, label, statut, series_id) : les critiques 1 à 3.
+CRITIQUES_AUDIT = (
+    (None, None, 8, "coup_de_coeur", "publiee", 101),
+    (
+        "https://catalogue.invalid/serie/101/volume/1",
+        "Tome 1 — Premier tome factice (2001)",
+        6,
+        None,
+        "publiee",
+        101,
+    ),
+    (None, None, 4, None, "retiree", 102),
 )
 ECRANS_COMPTES: tuple[EcranCompte, ...] = (
     EcranCompte("inscription", None, "/inscription", "Créer un compte"),
@@ -439,7 +491,73 @@ ECRANS_COMPTES: tuple[EcranCompte, ...] = (
         "/admin/comptes?page=2&etat=desactive",
         "Comptes",
     ),
-    EcranCompte("critiques", "admin_audit", "/libraire/critiques", "Mes critiques"),
+    # E4, lot 3 : les critiques.
+    EcranCompte(
+        "critiques_liste", "libraire_audit", "/libraire/critiques", "Mes critiques"
+    ),
+    EcranCompte(
+        "critiques_vide", "libraire_vide_audit", "/libraire/critiques", "Mes critiques"
+    ),
+    EcranCompte(
+        "critiques_catalogue_indisponible",
+        "libraire_audit",
+        "/libraire/critiques",
+        "Mes critiques",
+        catalogue="indisponible",
+    ),
+    EcranCompte(
+        "critique_nouvelle",
+        "libraire_audit",
+        "/libraire/critiques/nouvelle?series_id=102",
+        "Écrire une critique",
+    ),
+    EcranCompte(
+        "critique_nouvelle_refusee",
+        "libraire_audit",
+        "/libraire/critiques/nouvelle?series_id=102",
+        "Écrire une critique",
+        {"#texte": "court"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "critique_modifier",
+        "libraire_audit",
+        "/libraire/critiques/1/modifier",
+        "Modifier ma critique",
+    ),
+    EcranCompte(
+        "critique_retirer",
+        "libraire_audit",
+        "/libraire/critiques/1/retirer",
+        "Retirer ma critique",
+    ),
+    EcranCompte(
+        "critique_acces_refuse",
+        "libraire_tiers_audit",
+        "/libraire/critiques/1/modifier",
+        "Accès refusé",
+    ),
+    EcranCompte(
+        "serie_avec_critiques",
+        "libraire_audit",
+        "/series/101?etat=critique_publiee",
+        "Série factice A",
+    ),
+    EcranCompte(
+        "admin_critiques", "admin_audit", "/admin/critiques", "Modération des critiques"
+    ),
+    EcranCompte(
+        "admin_critiques_vide",
+        "admin_audit",
+        "/admin/critiques?libraire=2",
+        "Modération des critiques",
+    ),
+    EcranCompte(
+        "admin_critique_retirer",
+        "admin_audit",
+        "/admin/critiques/2/retirer",
+        "Retirer une critique (modération)",
+    ),
     EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
     EcranCompte(
         "introuvable_connecte", "client_audit", "/nimporte", "Page introuvable"
@@ -477,7 +595,11 @@ def connecter_dans(contexte: Any, adresse: str, pseudo: str) -> None:
 
 
 def auditer_les_comptes(
-    playwright: Any, source: str, adresse: str, adresse_sans_base: str
+    playwright: Any,
+    source: str,
+    adresse: str,
+    adresse_sans_base: str,
+    adresse_doublure: str,
 ) -> tuple[dict[str, dict[str, Any]], list[str], list[str]]:
     """Les écrans des comptes, chacun dans le contexte de son visiteur."""
     pages: dict[str, dict[str, Any]] = {}
@@ -487,6 +609,9 @@ def auditer_les_comptes(
     contextes: dict[str | None, Any] = {}
     for ecran in ECRANS_COMPTES:
         nom, compte = ecran.nom, ecran.compte
+        httpx.post(
+            f"{adresse_doublure}/_essai/scenario", json={"catalogue": ecran.catalogue}
+        ).raise_for_status()
         if compte not in contextes:
             contextes[compte] = navigateur.new_context()
             if compte is not None:

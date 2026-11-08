@@ -205,6 +205,16 @@ def test_des_labels_ou_des_bornes_fautifs_empechent_de_demarrer(
     assert any(attendu in e for e in ecarts), ecarts
 
 
+def test_un_label_qui_n_est_pas_une_table_est_refuse(tmp_path):
+    ecarts = configuration_avec(
+        tmp_path,
+        '{ code = "a_offrir",           libelle = "À offrir" },',
+        '"a_offrir",',
+    )
+
+    assert any("[critiques.labels] table attendue" in e for e in ecarts), ecarts
+
+
 def test_une_liste_de_labels_vide_est_refusee(tmp_path):
     source = (RACINE / "config" / "reglages.toml").read_text(encoding="utf-8")
     debut = source.index("labels = [\n  { code")
@@ -801,3 +811,17 @@ def test_l2_deux_editions_d_un_meme_numero_la_meme_annee_restent_sans_annee():
         for i in range(2)
     ]
     assert list(libelles_de(volumes).values()) == ["Tome 1 — T", "Tome 1 — T"]
+
+
+def test_un_statut_des_volumes_hors_contrat_se_nomme():
+    """Un 422 du 02 sur les volumes (hors des statuts que l'application attend)."""
+    transport = httpx.MockTransport(lambda _: httpx.Response(422, json={"detail": []}))
+    client = ClientCatalogue(
+        "http://127.0.0.1:8000",
+        CLE_CATALOGUE_ATTENDUE,
+        DelaisCatalogue(connexion_s=0.5, reponse_s=0.5),
+        Metriques(),
+        transport,
+    )
+    with pytest.raises(CorpsInattendu):
+        lancer(lambda: client.volumes(101))

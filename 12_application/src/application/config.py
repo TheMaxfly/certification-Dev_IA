@@ -110,7 +110,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " compte_role_admin admin_actif admin_inactif admin_desactiver"
             " admin_reactiver admin_cree admin_desactive admin_reactive admin_soi"
             " admin_aucun admin_inconnu admin_precedente admin_suivante"
-            " critiques_titre critiques_bientot apropos_comptes_titre"
+            " critiques_titre apropos_comptes_titre"
             " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
             " mdp_continuer"
             # E4, lot 2a : le catalogue.
@@ -140,7 +140,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " critique_champ_label critique_label_aucun critique_publier"
             " critique_enregistrer critique_annuler critique_tome_fixe"
             " critique_erreur_note critique_erreur_label critique_erreur_tome"
-            " critique_erreur_controle critique_deja_publiee critique_deja_lien"
+            " critique_erreur_controle critique_erreur_base critique_deja_publiee"
+            " critique_deja_lien"
             " critique_serie_inconnue_titre critique_serie_inconnue"
             " critique_retiree_titre critique_retiree_texte critique_retirer_titre"
             " critique_retirer_texte critique_retirer_bouton critique_ecrire"

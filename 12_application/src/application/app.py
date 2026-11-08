@@ -35,6 +35,7 @@ from application import (
     journal,
     pages_catalogue,
     pages_comptes,
+    pages_critiques,
     presentation,
     sessions,
 )
@@ -585,6 +586,7 @@ def creer_application(
 
     pages_comptes.installer(app, reglages, rendre)
     pages_catalogue.installer(app, reglages, rendre, catalogue)
+    pages_critiques.installer(app, reglages, rendre, catalogue, metriques)
 
     app.state.vue = vue
     app.state.metriques = metriques

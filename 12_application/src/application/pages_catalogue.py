@@ -6,6 +6,10 @@ compte connecté. La ligne de titre de la fiche passe par `metadonnees_de`, comm
 cartes du conseiller : les mêmes valeurs partout. Le catalogue absent, injoignable, en
 délai, ou qui refuse la clé : un encart nommé et un 503, le conseiller et les comptes
 continuent. Une série inconnue : la page introuvable de l'application.
+
+E4, lot 3 : la fiche porte les critiques publiées des libraires du réseau
+(`pages_critiques.reseau_de`) et leur moyenne, avant la note des lecteurs ; la base
+perdue, la fiche s'affiche quand même, avec l'encart à la place de la section.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import journal, presentation, sessions
+from application import journal, pages_critiques, presentation, sessions
 from application.client_catalogue import (
     CatalogueIndisponible,
     ClientCatalogue,
@@ -26,6 +30,7 @@ from application.client_catalogue import (
     Resultats,
     SerieCatalogue,
 )
+from application.comptes import Compte
 from application.config import Reglages
 
 type Rendre = Callable[..., Response]
@@ -204,11 +209,19 @@ def installer(
         )
         return page_catalogue(request, q=q, resultats=resultats, page=page)
 
-    def page_serie(request: Request, fiche: SerieCatalogue) -> Response:
+    async def page_serie(
+        request: Request, fiche: SerieCatalogue, compte: Compte | None
+    ) -> Response:
         meta = fiche.metadonnees()
+        reseau = await pages_critiques.reseau_de(
+            request.app.state.base, reglages, compte, fiche.series_id
+        )
+        publiee = request.query_params.get("etat") == "critique_publiee"
         return rendre(
             request,
             "serie.html",
+            reseau=reseau,
+            avis=t["critiques_l5"] if publiee else None,
             titre=fiche.title or t["valeur_inconnue"],
             fiche=fiche,
             # Une adresse du catalogue, et rien d'autre (ni `javascript:`, ni relatif).
@@ -232,7 +245,7 @@ def installer(
 
     @app.get("/series/{chemin}", include_in_schema=False)
     async def serie(request: Request, chemin: str) -> Response:
-        await sessions.page(request)  # le menu du compte connecté
+        compte = await sessions.page(request)  # le menu, les liens des critiques
         if not (chemin.isascii() and chemin.isdigit() and len(chemin) <= CHIFFRES_MAX):
             raise StarletteHTTPException(status_code=404)
         if client is None:
@@ -245,4 +258,4 @@ def installer(
             return indisponible(request, "corps")
         if fiche is None:
             raise StarletteHTTPException(status_code=404)
-        return page_serie(request, fiche)
+        return await page_serie(request, fiche, compte)

@@ -61,6 +61,14 @@ Aucun courriel, aucune autre donnée personnelle.
 - Index `(series_id)` sur les critiques publiées : la page d'une série.
 - C'est la **table distincte** que lira, chaque mois, la construction du corpus : une
   critique publiée entre dans la recherche à la promotion suivante du corpus.
+- **Usage effectif (E4, lot 3)** : `application/critiques.py` y écrit — un libraire publie,
+  modifie (texte, note, label seulement) et retire les siennes, un administrateur retire
+  n'importe laquelle ; un retrait pose `statut = 'retiree'` et `modifie_le`, jamais une
+  suppression ; `volume_libelle` est le libellé du volume copié du 02 à l'écriture (« Tome N
+  — titre »), `label` un code de la liste de `[critiques]`. Chaque action écrit dans la même
+  transaction sa ligne de `journal_actions` (`critique_publiee`, `critique_modifiee`,
+  `critique_retiree`, objet `critique`, `details` = `series_id`, `tome`, `par` : `auteur` ou
+  `admin`) — jamais le texte. Le modèle ne change pas.
 
 ### `journal_actions`
 
