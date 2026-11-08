@@ -10,7 +10,10 @@
 {% endif %}
 {%- endmacro %}
 
-{# L'avis d'une action réussie : annoncé, et le focus y va quand aucune erreur ne le prend. #}
-{% macro avis(texte, focus=false) -%}
-<div id="avis" role="status"{% if focus %} tabindex="-1" autofocus{% endif %}><p>{{ texte }}</p></div>
+{# L'avis d'une action : un encart (`article`, une carte pour la feuille de style), son texte
+   annoncé (`role="status"`, sur un bloc intérieur : l'`article` ne l'admet pas) ; le focus y va
+   quand aucune erreur ne le prend ; un lien pour continuer, s'il y a lieu. #}
+{% macro avis(texte, focus=false, lien=none, lien_texte=none) -%}
+<article id="avis"{% if focus %} tabindex="-1" autofocus{% endif %}><div role="status"><p>{{ texte }}</p></div>{% if lien %}
+<p><a href="{{ lien }}">{{ lien_texte }}</a></p>{% endif %}</article>
 {%- endmacro %}

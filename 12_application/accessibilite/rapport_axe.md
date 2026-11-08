@@ -84,7 +84,7 @@ Aucun.
 | `inscription_refusee` | 36 | 0 | 1 | 54 |
 | `introuvable_connecte` | 30 | 0 | 0 | 60 |
 | `mot_de_passe` | 35 | 0 | 0 | 55 |
-| `mot_de_passe_change` | 40 | 0 | 0 | 50 |
+| `mot_de_passe_change` | 35 | 0 | 0 | 55 |
 | `mot_de_passe_initial` | 40 | 0 | 0 | 50 |
 | `mot_de_passe_refuse` | 35 | 0 | 1 | 55 |
 | `page_404` | 30 | 0 | 0 | 60 |

@@ -104,6 +104,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " admin_aucun admin_inconnu admin_precedente admin_suivante"
             " critiques_titre critiques_bientot apropos_comptes_titre"
             " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
+            " mdp_continuer"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -159,6 +160,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_nom_longueur": frozenset({"max"}),
     "admin_page": frozenset({"n", "total"}),
     "mdp_verrou": frozenset({"minutes"}),
+    "connexion_refus_regles": frozenset({"seuil", "minutes"}),
     "apropos_comptes": frozenset({"seuil", "minutes"}),
 }
 
