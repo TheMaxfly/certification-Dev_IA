@@ -430,22 +430,44 @@ uv run --env-file .env python -m application
 
 Sans clé, l'application refuse de démarrer. Sans API, elle démarre et le dit à l'écran.
 
-### Par Compose : le service d'embedding, l'API, l'application
+### Par Compose : le service d'embedding, l'API, l'application, le catalogue
 
 ```bash
 make app-compose         # depuis la racine du dépôt
 make app-compose-arret
 ```
 
-Il faut les deux `.env`, celui de ce module et celui de l'API. Dans le second, ajouter à la
-ligne `API_MODELE_CLES`, séparé par une virgule, `application:<secret>` : une seconde ligne
-remplacerait la première.
+Il faut **trois** `.env` : celui de ce module, celui de l'API et celui du module 02 (le
+catalogue) ; sans l'un d'eux, Compose refuse et nomme le fichier absent. Dans celui de
+l'API, ajouter à la ligne `API_MODELE_CLES`, séparé par une virgule,
+`application:<secret>` : une seconde ligne remplacerait la première.
 
-Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **Seule
-l'application est publiée**, sur l'adresse locale ; on atteint l'API par elle. Il ajoute deux
-réseaux : `applicatif`, l'application et l'API, rien d'autre ; `publication`, pour le port :
-Docker ne publie pas sur un réseau interne, celui-ci a donc une route vers l'extérieur, que
-l'application n'emploie pas.
+**Le catalogue dans la pile** (E4, lot 2a) — le service `catalogue`, l'image
+`api-catalogue:0.5.0` du module 02 :
+
+- dans `02_api_manga/.env` : `API_KEYS=conseiller:<clé>` (le consommateur de
+  l'application) et `DB_NAME` (`apimanga`, lu seulement) ; dans le `.env` de ce module,
+  `APPLICATION_CLE_CATALOGUE=<la même clé>`, posée **avant** tout lancement de la pile — la
+  pile pose `CATALOGUE_ADRESSE` : sans `APPLICATION_CLE_CATALOGUE`, l'application ne démarre
+  pas : c'est voulu (une clé absente est une erreur de déploiement, pas un mode ; « non
+  configuré » reste le cas du poste en développement, sans adresse posée) ;
+- le mot de passe de `manga_api` : dans `02_api_manga/.pgpass.conteneur`, hors dépôt, mode
+  600, une ligne `host.docker.internal:5432:<base>:manga_api:<mot de passe>`, monté comme
+  secret (`PGPASSFILE`) — jamais dans le DSN, jamais dans un `.env` ; le service tourne sous
+  l'utilisateur de l'hôte (`HOTE_UID`, `HOTE_GID`), seul lecteur du fichier ;
+- le serveur PostgreSQL admet `manga_api` depuis le seul sous-réseau du catalogue, une
+  ligne de `pg_hba.conf` par base : `host  <base>  manga_api  172.30.2.0/24  scram-sha-256` ;
+- le catalogue est publié sur `127.0.0.1:8000` (`CATALOGUE_PORT_PUBLIE`), joint par
+  l'application sur `applicatif` (`http://catalogue:8000`), et sort vers la base par
+  `catalogue_sortie` (`172.30.2.0/24`, fixe) ; il n'entre pas dans le monitorage (pas de
+  métriques).
+
+Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **L'API
+n'est pas publiée** : on l'atteint par l'application ; l'application et le catalogue le
+sont, sur l'adresse locale seule. Il ajoute trois réseaux : `applicatif`, l'application,
+l'API et le catalogue, rien d'autre ; `publication`, pour le port : Docker ne publie pas sur
+un réseau interne, celui-ci a donc une route vers l'extérieur, que l'application n'emploie
+pas ; `catalogue_sortie`, du catalogue vers la base de l'hôte.
 
 Pour montrer aussi le Swagger de l'API et MLflow : `make demo-direct`, qui ajoute
 `compose.demo.yaml` et publie alors le port de l'API sur l'adresse locale. Voir

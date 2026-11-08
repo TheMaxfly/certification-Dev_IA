@@ -49,6 +49,16 @@ API : `http://localhost:8000` — publiée sur le **bouclage seulement**
 autre chose le dit dans son propre fichier de fusion.  
 Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
 
+### Dans la pile
+
+Dans la pile de l'application (E4, lot 2a), ce module est le service `catalogue` du
+fichier de fusion du module 12 (`12_application/compose.yaml`), image `api-catalogue:0.5.0`,
+lu par l'application sur un réseau interne et publié sur `127.0.0.1:8000` seulement ; il
+lit la base de l'hôte par un sous-réseau fixe, le mot de passe de `manga_api` dans un pgpass
+monté. Formes et gestes : [`../12_application/README.md`](../12_application/README.md),
+« Par Compose ». Le `docker-compose.yml` de ce dossier sert au module **seul**, publié sur
+le bouclage ; un déploiement qui veut autre chose le dit dans son propre fichier de fusion.
+
 ## Prérequis
 
 - Docker + Docker Compose (recommandé pour lancer l’API)

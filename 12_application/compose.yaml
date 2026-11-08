@@ -5,24 +5,57 @@
 # soit, depuis la racine du dépôt :
 #
 #   docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+#     --env-file 02_api_manga/.env \
 #     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml up -d --build
 #
-# Les chemins relatifs partent du dossier du PREMIER fichier (11_api_modele/) ; les deux
-# `.env` sont nommés, sinon celui du 12 n'arriverait pas au service.
+# Les chemins relatifs partent du dossier du PREMIER fichier (11_api_modele/) ; les trois
+# `.env` sont nommés, sinon ceux du 12 et du 02 n'arriveraient pas aux services.
 #
-# Trois services : le service d'embedding, l'API, l'application. Deux réseaux de plus :
-#   - `applicatif` : l'application et l'API, rien d'autre. L'application n'est ni sur le
-#     réseau du service d'embedding (`interne`, ouvert à l'API et à la collecte) ni sur
-#     celui de la base (`sortie`) ;
+# Quatre services : le service d'embedding, l'API, l'application, et le catalogue — l'API
+# data du module 02 (E4, lot 2a). Trois réseaux de plus :
+#   - `applicatif` : l'application, l'API et le catalogue, rien d'autre. L'application
+#     n'est ni sur le réseau du service d'embedding (`interne`, ouvert à l'API et à la
+#     collecte) ni sur ceux de la base (`sortie`, `catalogue_sortie`) ;
 #   - `publication` : le port publié, sur l'adresse locale seule. Docker ne publie pas sur
 #     un réseau `internal` : celui-ci a donc une route vers l'extérieur, que l'application
-#     n'emploie pas (elle n'appelle que l'API, par son code).
+#     n'emploie pas (elle n'appelle que l'API et le catalogue, par son code) ;
+#   - `catalogue_sortie` : le catalogue vers la base de l'hôte, à sous-réseau fixe — le
+#     serveur PostgreSQL admet `manga_api` depuis lui, et lui seul (une ligne de
+#     pg_hba.conf). Le mot de passe est dans un pgpass monté, jamais ici.
 
 services:
   api:
     networks: [interne, sortie, applicatif]
     # Seule l'application est publiée : on atteint l'API par elle.
     ports: !reset []
+
+  # Le catalogue : l'API data du module 02, sur le modèle du service `api`.
+  catalogue:
+    build:
+      context: ../02_api_manga
+    image: api-catalogue:0.5.0
+    environment:
+      APP_ENV: ${CATALOGUE_APP_ENV:-production}
+      # Vide : le 02 refuse de démarrer (le refus lui appartient, en un seul endroit).
+      API_KEYS: ${API_KEYS:-}
+      DB_HOST: host.docker.internal
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-apimanga}
+      DB_USER: manga_api
+      # Dans le pgpass monté, jamais ici.
+      DB_PASSWORD: ""
+      PGPASSFILE: /run/secrets/pgpass_catalogue
+      DB_POOL_MIN_SIZE: "1"
+      DB_POOL_MAX_SIZE: "3"
+    secrets: [pgpass_catalogue]
+    # Non root : l'utilisateur de l'hôte, seul lecteur du pgpass (mode 600), comme l'API.
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [applicatif, catalogue_sortie]
+    ports:
+      - "127.0.0.1:${CATALOGUE_PORT_PUBLIE:-8000}:8000"
+    restart: "no"
 
   application:
     build:
@@ -33,10 +66,17 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      catalogue:
+        condition: service_healthy
     environment:
       # Vide : l'application refuse de démarrer. Aucune valeur n'est écrite ici.
       APPLICATION_CLE_API: ${APPLICATION_CLE_API:-}
       API_MODELE_ADRESSE: http://api:8010
+      # La même valeur que le consommateur `conseiller` du trousseau du 02. Vide : refus
+      # de démarrer (la pile pose l'adresse) — une clé absente est une erreur de
+      # déploiement, pas un mode.
+      APPLICATION_CLE_CATALOGUE: ${APPLICATION_CLE_CATALOGUE:-}
+      CATALOGUE_ADRESSE: http://catalogue:8000
       APPLICATION_METRIQUES_RESEAUX: ${APPLICATION_METRIQUES_RESEAUX:-}
     networks: [applicatif, publication]
     ports:
@@ -47,3 +87,12 @@ networks:
   applicatif:
     internal: true
   publication: {}
+  catalogue_sortie:
+    ipam:
+      config:
+        - subnet: 172.30.2.0/24
+
+secrets:
+  # Relatif au dossier du premier fichier Compose (11_api_modele/) ; hors dépôt.
+  pgpass_catalogue:
+    file: ${CATALOGUE_PGPASS:-../02_api_manga/.pgpass.conteneur}

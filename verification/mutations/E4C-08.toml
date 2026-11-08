@@ -1,0 +1,7 @@
+id = "E4C-08"
+origine = "E4, lot 2a, spec 03 (2026-11-08) — le catalogue publié sur toutes les interfaces dans le fichier de fusion : l'API data joignable depuis le réseau du poste"
+fichier = "12_application/compose.yaml"
+avant = '''      - "127.0.0.1:${CATALOGUE_PORT_PUBLIE:-8000}:8000"'''
+apres = '''      - "${CATALOGUE_PORT_PUBLIE:-8000}:8000"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_conteneurs.py", "-k", "bouclage_et_ne_porte"]
