@@ -395,7 +395,7 @@ def test_wcag_1_3_1_2_4_8_la_pagination_du_catalogue_dit_la_page_courante(pages)
         "Page précédente",
         "Page suivante",
     }
-    assert resultats.select_one("main form[role=search] label[for=q]") is not None
+    assert resultats.select_one("main form label[for=q]") is not None
 
 
 def test_wcag_2_4_4_le_lien_vers_le_site_du_catalogue_se_dit_externe(pages):
@@ -420,3 +420,29 @@ def test_la_fiche_porte_ses_zones_nommees_pour_l_habillage(pages):
         "zone-synopsis",
     ):
         assert len(fiche.select(f"section.{zone}")) == 1, zone
+
+
+@pytest.mark.parametrize(
+    "nom",
+    ["catalogue", "catalogue_resultats", "catalogue_vide", "catalogue_erreur_saisie"],
+)
+def test_le_groupe_de_recherche_ne_porte_que_le_champ_et_le_bouton(pages, nom):
+    """Passage manuel du lot 2a : Pico aligne en ligne tout élément `role="search"` ;
+    posé sur le formulaire entier, il écrasait l'étiquette, repoussait l'aide et faisait
+    déborder la page. Faute de mesurer une largeur, la structure : le groupe ne contient
+    que le champ et le bouton ; l'étiquette, l'aide et l'erreur sont hors du groupe ; le
+    champ reste décrit par l'aide."""
+    page = next(p for p in pages if p.ecran.nom == nom).soupe
+    formulaire = page.select_one('main form[method=get][action="/catalogue"]')
+    groupe = formulaire.select_one("[role=search]")
+
+    assert formulaire.get("role") is None, "le formulaire entier en groupe"
+    assert [e.name for e in groupe.find_all(recursive=False)] == ["input", "button"]
+    assert groupe.select_one("label, small, p") is None
+    assert formulaire.select_one('label[for="q"]').find_parent(role="search") is None
+    aide = formulaire.select_one("#q-aide")
+    assert aide is not None and aide.find_parent(role="search") is None
+    assert "q-aide" in groupe.select_one("#q")["aria-describedby"].split()
+    erreur = formulaire.select_one("#q-erreur")
+    if erreur is not None:
+        assert erreur.find_parent(role="search") is None

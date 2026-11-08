@@ -11,13 +11,17 @@
 </div>
 </article>
 {% endif %}
-<form role="search" method="get" action="/catalogue">
+{# Pico aligne en ligne tout élément `role="search"` : le rôle est porté par le seul groupe
+   champ + bouton, qu'il accole ; l'étiquette au-dessus, l'aide et l'erreur en dessous. #}
+<form method="get" action="/catalogue">
 <label for="q">{{ t.catalogue_champ }}</label>
+<div role="search">
 <input id="q" name="q" type="search" minlength="{{ catalogue_regles.q_min }}" maxlength="{{ catalogue_regles.q_max }}" aria-describedby="q-aide{% if erreur %} q-erreur{% endif %}"{% if q %} value="{{ q }}"{% endif %}{% if erreur %} aria-invalid="true" autofocus{% endif %} required>
+<button type="submit">{{ t.catalogue_bouton }}</button>
+</div>
 <small id="q-aide">{{ aide }}</small>
 {% if erreur %}<p id="q-erreur">{{ erreur }}</p>
 {% endif %}
-<button type="submit">{{ t.catalogue_bouton }}</button>
 </form>
 {% if cherche %}
 <section class="zone-resultats" aria-labelledby="resultats-titre">

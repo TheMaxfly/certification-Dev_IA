@@ -15,7 +15,7 @@ Aucun.
 
 ## À revoir à la main
 
-- `color-contrast`, sur `#ancien`, `#filtre-role`, `#mode`, `#profil`, `#pseudo`, `#q`, `#q-aide`, `#question`, `#role` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
+- `color-contrast`, sur `#ancien`, `#filtre-role`, `#mode`, `#profil`, `#pseudo`, `#q`, `#question`, `#role` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
 
 ## Par page
 

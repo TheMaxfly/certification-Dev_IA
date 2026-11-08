@@ -181,7 +181,9 @@ def test_v2_sans_saisie_la_page_aide_sans_appeler_le_catalogue(client, doublure)
     page = soupe(r)
 
     assert r.status_code == 200
-    assert page.select_one('form[role=search][method=get] label[for="q"]') is not None
+    formulaire = page.select_one('main form[method=get][action="/catalogue"]')
+    assert formulaire.select_one('label[for="q"]') is not None
+    assert formulaire.select_one("[role=search] input#q") is not None
     assert "majuscules et accents indifférents" in page.select_one("#q-aide").get_text()
     assert doublure.recherches == [] and page.select_one("main ol") is None
 

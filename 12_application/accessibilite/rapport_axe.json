@@ -1210,35 +1210,6 @@
        "target": [
         "#q"
        ]
-      },
-      {
-       "all": [],
-       "any": [
-        {
-         "data": {
-          "bgColor": null,
-          "colorParse": null,
-          "contrastRatio": 0,
-          "expectedContrastRatio": "4.5:1",
-          "fgColor": null,
-          "fontSize": "12.5pt (16.6667px)",
-          "fontWeight": "normal",
-          "messageKey": "elmPartiallyObscuring",
-          "shadowColor": null
-         },
-         "id": "color-contrast",
-         "impact": "serious",
-         "message": "Element's background color could not be determined because it partially overlaps other elements",
-         "relatedNodes": []
-        }
-       ],
-       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
-       "html": "<small id=\"q-aide\">De 2 à 100 caractères : un titre, un autre titre ou un auteur ; majuscules et accents indifférents.</small>",
-       "impact": "serious",
-       "none": [],
-       "target": [
-        "#q-aide"
-       ]
       }
      ],
      "tags": [
@@ -1395,35 +1366,6 @@
        "target": [
         "#q"
        ]
-      },
-      {
-       "all": [],
-       "any": [
-        {
-         "data": {
-          "bgColor": null,
-          "colorParse": null,
-          "contrastRatio": 0,
-          "expectedContrastRatio": "4.5:1",
-          "fgColor": null,
-          "fontSize": "12.5pt (16.6667px)",
-          "fontWeight": "normal",
-          "messageKey": "elmPartiallyObscuring",
-          "shadowColor": null
-         },
-         "id": "color-contrast",
-         "impact": "serious",
-         "message": "Element's background color could not be determined because it partially overlaps other elements",
-         "relatedNodes": []
-        }
-       ],
-       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
-       "html": "<small id=\"q-aide\">De 2 à 100 caractères : un titre, un autre titre ou un auteur ; majuscules et accents indifférents.</small>",
-       "impact": "serious",
-       "none": [],
-       "target": [
-        "#q-aide"
-       ]
       }
      ],
      "tags": [
@@ -1578,35 +1520,6 @@
        "none": [],
        "target": [
         "#q"
-       ]
-      },
-      {
-       "all": [],
-       "any": [
-        {
-         "data": {
-          "bgColor": null,
-          "colorParse": null,
-          "contrastRatio": 0,
-          "expectedContrastRatio": "4.5:1",
-          "fgColor": null,
-          "fontSize": "12.5pt (16.6667px)",
-          "fontWeight": "normal",
-          "messageKey": "elmPartiallyObscuring",
-          "shadowColor": null
-         },
-         "id": "color-contrast",
-         "impact": "serious",
-         "message": "Element's background color could not be determined because it partially overlaps other elements",
-         "relatedNodes": []
-        }
-       ],
-       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
-       "html": "<small id=\"q-aide\">De 2 à 100 caractères : un titre, un autre titre ou un auteur ; majuscules et accents indifférents.</small>",
-       "impact": "serious",
-       "none": [],
-       "target": [
-        "#q-aide"
        ]
       }
      ],
@@ -1765,35 +1678,6 @@
        "target": [
         "#q"
        ]
-      },
-      {
-       "all": [],
-       "any": [
-        {
-         "data": {
-          "bgColor": null,
-          "colorParse": null,
-          "contrastRatio": 0,
-          "expectedContrastRatio": "4.5:1",
-          "fgColor": null,
-          "fontSize": "12.5pt (16.6667px)",
-          "fontWeight": "normal",
-          "messageKey": "elmPartiallyObscuring",
-          "shadowColor": null
-         },
-         "id": "color-contrast",
-         "impact": "serious",
-         "message": "Element's background color could not be determined because it partially overlaps other elements",
-         "relatedNodes": []
-        }
-       ],
-       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
-       "html": "<small id=\"q-aide\">De 2 à 100 caractères : un titre, un autre titre ou un auteur ; majuscules et accents indifférents.</small>",
-       "impact": "serious",
-       "none": [],
-       "target": [
-        "#q-aide"
-       ]
       }
      ],
      "tags": [
@@ -1949,35 +1833,6 @@
        "none": [],
        "target": [
         "#q"
-       ]
-      },
-      {
-       "all": [],
-       "any": [
-        {
-         "data": {
-          "bgColor": null,
-          "colorParse": null,
-          "contrastRatio": 0,
-          "expectedContrastRatio": "4.5:1",
-          "fgColor": null,
-          "fontSize": "12.5pt (16.6667px)",
-          "fontWeight": "normal",
-          "messageKey": "elmPartiallyObscuring",
-          "shadowColor": null
-         },
-         "id": "color-contrast",
-         "impact": "serious",
-         "message": "Element's background color could not be determined because it partially overlaps other elements",
-         "relatedNodes": []
-        }
-       ],
-       "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
-       "html": "<small id=\"q-aide\">De 2 à 100 caractères : un titre, un autre titre ou un auteur ; majuscules et accents indifférents.</small>",
-       "impact": "serious",
-       "none": [],
-       "target": [
-        "#q-aide"
        ]
       }
      ],
