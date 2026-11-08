@@ -205,9 +205,10 @@ def test_v4_une_ligne_dit_ce_qui_est_garde_avec_renvoi_vers_a_propos(appli):
     lien = page.select_one('main a[href="/a-propos#comptes"]')
 
     assert (
-        "Ce que nous gardons : votre pseudo et une empreinte de votre mot de passe"
-        in texte
+        "Ce que nous gardons : votre pseudo et une empreinte de votre mot de passe,"
+        " pour vos listes ; le détail dans « à propos »." in texte
     )
+    assert "rien d'autre" not in texte
     assert lien is not None
     a_propos = soupe(client.get("/a-propos"))
     assert a_propos.select_one("#comptes") is not None
@@ -1169,3 +1170,7 @@ def test_a_propos_dit_le_seuil_et_la_duree_du_verrou_et_le_nom_affiche(appli):
 
     assert "15 minutes après 5 erreurs" in texte
     assert "nom affiché" in texte
+    assert (
+        "Vous déconnecter ferme toutes vos sessions ouvertes, sur tous vos appareils."
+        in texte
+    )

@@ -312,6 +312,10 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   contrôle) — un formulaire réservé envoyé sans session reçoit la page 401 —, et répond
   403 à un compte sans le rôle. `Cache-Control: no-store` sur les
   pages de compte et d'administration.
+- **Le 401 sans `WWW-Authenticate`** : écart déclaré à la RFC 9110 (§ 11.6.1), qui veut cet
+  en-tête avec tout 401. L'authentification se fait par formulaire, aucun schéma n'est
+  normalisé pour elle, et l'en-tête n'aurait aucun sens pour un navigateur ; même règle
+  pour le 401 de la connexion refusée.
 - **La garde d'environnement** : `APPLICATION_ENVIRONNEMENT` ; la base du DSN doit être celle
   de l'environnement (`preproduction` ↔ `apimanga_preprod`, `production` ↔ `apimanga`) ; en
   développement, `apimanga` est refusée. Un écart empêche de démarrer, sans montrer le DSN.
@@ -340,10 +344,12 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
 | Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
+| Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
 | Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
+| Consommation de ressources (A04), authentification (A07) : l'inscription | **non couvert à ce lot** : un même poste peut créer des comptes à la chaîne ; couvert au lot du conseiller public avec le quota par session et le plafond global |
 
 ## Configuration
 

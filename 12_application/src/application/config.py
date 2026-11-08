@@ -103,7 +103,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " admin_reactiver admin_cree admin_desactive admin_reactive admin_soi"
             " admin_aucun admin_inconnu admin_precedente admin_suivante"
             " critiques_titre critiques_bientot apropos_comptes_titre"
-            " apropos_suppression erreur_role admin_inchange"
+            " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
