@@ -9,6 +9,11 @@ d'un `POST` n'existe pas.
 
 Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.json`
 et `rapport_axe.md` ; un diff après un passage signale un changement à commiter.
+
+E4, lot 1 : les écrans des comptes (inscription, connexion, mot de passe,
+administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de rôle,
+formulaire expiré, comptes indisponibles), sur une base jetable ; les connexions se font
+dans le navigateur, par les formulaires eux-mêmes.
 """
 
 from __future__ import annotations
@@ -16,14 +21,15 @@ from __future__ import annotations
 import json
 import os
 import socket
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
-from conftest import ServeurLocal
+from conftest import HACHEUR_RAPIDE, ServeurLocal
 from doublure_api import Doublure
 from ecrans import ECRANS, Ecran
 
@@ -211,8 +217,17 @@ def ecrire_rapport(
     os.environ.get("AUDIT_AXE") != "1",
     reason="audit d'accessibilité : navigateur, poste seulement (make verify-poste)",
 )
-def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
+def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     from playwright.sync_api import sync_playwright
+
+    with psycopg.connect(base) as cx:
+        for pseudo, role, a_changer in COMPTES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.comptes"
+                " (pseudo, nom_affiche, role, hachage, doit_changer_mdp)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                (pseudo, f"Nom {pseudo}", role, HACHEUR_RAPIDE.hacher(MDP), a_changer),
+            )
 
     source = (ACCESSIBILITE / "axe.min.js").read_text(encoding="utf-8")
     doublure = Doublure()
@@ -235,6 +250,17 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
         ServeurLocal(adresse_de(fermee)) as adresse_sans_api,
         ServeurLocal(adresse_de(adresse_doublure)) as adresse_neuve,
         ServeurLocal(adresse_de(adresse_doublure, reponse_s=0.2)) as adresse_pressee,
+        ServeurLocal(
+            creer_application(
+                replace(
+                    reglages,
+                    adresse_api=adresse_doublure,
+                    base_dsn=base_app,
+                    cle_session="a" * 48,
+                ),
+                hacheur=HACHEUR_RAPIDE,
+            )
+        ) as adresse_comptes,
         sync_playwright() as playwright,
     ):
         navigateur = playwright.chromium.launch(headless=True)
@@ -272,6 +298,12 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()
+        des_comptes, console_comptes, sans_focus_comptes = auditer_les_comptes(
+            playwright, source, adresse_comptes, adresse
+        )
+        pages |= des_comptes
+        console += console_comptes
+        sans_focus += sans_focus_comptes
 
     assert not doublure.ecarts, doublure.ecarts
     ecrire_rapport(pages, version_axe, version_navigateur, console)
@@ -285,7 +317,195 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
     assert not console, console
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
-    assert len(pages) == len(ECRANS)
+    assert len(pages) == len(ECRANS) + len(ECRANS_COMPTES) + 1
+
+
+@dataclass(frozen=True)
+class EcranCompte:
+    """Un écran des comptes : `compte`, qui est connecté avant (None : un visiteur) ;
+    `titre`, le titre de niveau 1 attendu — l'écran audité est bien celui qu'on croit ;
+    `saisies` et `bouton`, le formulaire rempli puis envoyé ; `action`, l'adresse où
+    l'envoyer à la place de la sienne (une page qu'aucun lien n'atteint)."""
+
+    nom: str
+    compte: str | None
+    chemin: str
+    titre: str
+    saisies: dict[str, str] = field(default_factory=dict)
+    bouton: str | None = None
+    action: str | None = None
+
+
+MDP = "mot de passe factice de l'audit"
+NOUVEAU = "nouveau mot de passe factice de l'audit"
+ENVOYER = "main form button[type=submit]"
+#: Les comptes de l'audit : (pseudo, rôle, mot de passe à changer) ; et assez de
+#: clients pour que la liste de l'administration ait une seconde page.
+COMPTES_AUDIT = (
+    ("admin_audit", "admin", False),
+    ("client_audit", "client", False),
+    ("libraire_audit", "libraire", False),
+    ("initial_audit", "libraire", True),
+    *((f"lecteur_audit_{i:02d}", "client", False) for i in range(26)),
+)
+ECRANS_COMPTES: tuple[EcranCompte, ...] = (
+    EcranCompte("inscription", None, "/inscription", "Créer un compte"),
+    EcranCompte(
+        "inscription_refusee",
+        None,
+        "/inscription",
+        "Créer un compte",
+        {"#pseudo": "ab", "#mot_de_passe": MDP, "#confirmation": MDP},
+        ENVOYER,
+    ),
+    EcranCompte("connexion", None, "/connexion", "Connexion"),
+    EcranCompte(
+        "connexion_refusee",
+        None,
+        "/connexion",
+        "Connexion",
+        {"#pseudo": "inconnu_audit", "#mot_de_passe": MDP},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "formulaire_expire",
+        None,
+        "/connexion",
+        "Formulaire expiré",
+        {"input[name=jeton]": "faux"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "connexion_requise",
+        None,
+        "/connexion",
+        "Connexion requise",
+        {"#pseudo": "inconnu_audit", "#mot_de_passe": MDP},
+        ENVOYER,
+        action="/compte/mot-de-passe",
+    ),
+    EcranCompte(
+        "mot_de_passe", "admin_audit", "/compte/mot-de-passe", "Changer le mot de passe"
+    ),
+    EcranCompte(
+        "mot_de_passe_refuse",
+        "admin_audit",
+        "/compte/mot-de-passe",
+        "Changer le mot de passe",
+        {"#ancien": "faux faux faux", "#nouveau": MDP, "#confirmation": MDP},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "mot_de_passe_change",
+        "libraire_audit",
+        "/compte/mot-de-passe",
+        "Changer le mot de passe",
+        {"#ancien": MDP, "#nouveau": NOUVEAU, "#confirmation": NOUVEAU},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "mot_de_passe_initial",
+        "initial_audit",
+        "/",
+        "Changer le mot de passe",
+    ),
+    EcranCompte("admin_comptes", "admin_audit", "/admin/comptes", "Comptes"),
+    EcranCompte(
+        "admin_refuse",
+        "admin_audit",
+        "/admin/comptes",
+        "Comptes",
+        {
+            "#pseudo": "ab",
+            "#nom_affiche": "Nom",
+            "#mot_de_passe": MDP,
+            "#confirmation": MDP,
+        },
+        'form[action="/admin/comptes"][method=post] button[type=submit]',
+    ),
+    EcranCompte(
+        "admin_seconde_page_et_avis",
+        "admin_audit",
+        "/admin/comptes?page=2&etat=desactive",
+        "Comptes",
+    ),
+    EcranCompte("critiques", "admin_audit", "/libraire/critiques", "Mes critiques"),
+    EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
+    EcranCompte(
+        "introuvable_connecte", "client_audit", "/nimporte", "Page introuvable"
+    ),
+)
+REMPLIR = """([saisies, action]) => {
+  if (action !== null) { document.querySelector("main form").action = action; }
+  for (const [selecteur, valeur] of Object.entries(saisies)) {
+    const champ = document.querySelector(selecteur);
+    champ.removeAttribute("maxlength");
+    champ.value = valeur;
+  }
+  document.querySelectorAll("form").forEach((f) => { f.noValidate = true; });
+}"""
+
+
+def auditer(page: Any, source: str, base: str) -> dict[str, Any]:
+    page.evaluate(OUVRIR)
+    page.evaluate(source)
+    return resume(page.evaluate(LANCER, ETIQUETTES), base)
+
+
+def connecter_dans(contexte: Any, adresse: str, pseudo: str) -> None:
+    """Ouvre la session du compte dans ce contexte, et s'assure qu'elle l'est : sans
+    quoi l'audit passerait sur la page de connexion refusée, sous le nom d'un autre."""
+    page = contexte.new_page()
+    page.goto(adresse + "/connexion")
+    page.fill("#pseudo", pseudo)
+    page.fill("#mot_de_passe", MDP)
+    with page.expect_navigation():
+        page.click(ENVOYER)
+    menu = page.inner_text("header nav")
+    assert "/connexion" not in page.url and "Mon compte" in menu, pseudo
+    page.close()
+
+
+def auditer_les_comptes(
+    playwright: Any, source: str, adresse: str, adresse_sans_base: str
+) -> tuple[dict[str, dict[str, Any]], list[str], list[str]]:
+    """Les écrans des comptes, chacun dans le contexte de son visiteur."""
+    pages: dict[str, dict[str, Any]] = {}
+    console: list[str] = []
+    sans_focus: list[str] = []
+    navigateur = playwright.chromium.launch(headless=True)
+    contextes: dict[str | None, Any] = {}
+    for ecran in ECRANS_COMPTES:
+        nom, compte = ecran.nom, ecran.compte
+        if compte not in contextes:
+            contextes[compte] = navigateur.new_context()
+            if compte is not None:
+                connecter_dans(contextes[compte], adresse, compte)
+        page = contextes[compte].new_page()
+        page.on(
+            "console",
+            lambda m, nom=nom: (
+                console.append(f"{nom} : {m.text}")
+                if "Content Security Policy" in m.text
+                else None
+            ),
+        )
+        page.goto(adresse + ecran.chemin)
+        if ecran.bouton is not None:
+            page.evaluate(REMPLIR, [ecran.saisies, ecran.action])
+            with page.expect_navigation():
+                page.click(ecran.bouton)
+        titre = page.inner_text("main h1")
+        assert titre == ecran.titre, (nom, titre)
+        if page.evaluate(FOCUS) is False:
+            sans_focus.append(nom)
+        pages[nom] = auditer(page, source, adresse)
+        page.close()
+    page = navigateur.new_context().new_page()
+    page.goto(adresse_sans_base + "/connexion")
+    pages["comptes_indisponibles"] = auditer(page, source, adresse_sans_base)
+    navigateur.close()
+    return pages, console, sans_focus
 
 
 def page_version(contexte: Any, source: str) -> str:

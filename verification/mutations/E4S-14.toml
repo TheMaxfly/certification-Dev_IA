@@ -1,0 +1,7 @@
+id = "E4S-14"
+origine = "E4, lot 1, spec 03 (2026-11-08) — le pseudo hors forme envoyé tel quel à la base : un octet nul dans le formulaire de connexion produirait une erreur 500"
+fichier = "12_application/src/application/comptes.py"
+avant = '''    cle = pseudo if FORME_PSEUDO.fullmatch(pseudo) else ""'''
+apres = '''    cle = pseudo'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_comptes.py", "-k", "hors_forme"]

@@ -75,6 +75,17 @@ def normaliser(pseudo: str) -> str:
     return pseudo.strip().lower()
 
 
+def nom_valide(nom: str, maximum: int) -> bool:
+    """De 1 à `maximum` caractères, tous imprimables (ni octet nul, ni caractère de
+    contrôle) : la base refuserait l'octet nul par une erreur, pas par un refus."""
+    return 1 <= len(nom) <= maximum and nom.isprintable()
+
+
+def affichable(saisie: str, maximum: int) -> str:
+    """Une saisie rendue à son champ : ses caractères imprimables seuls, bornée."""
+    return "".join(c for c in saisie if c.isprintable())[:maximum]
+
+
 #: Les six colonnes du compte courant, dans l'ordre des requêtes de ce module.
 type LigneCompte = tuple[int, str, bool, int, bool, str]
 
@@ -129,7 +140,7 @@ async def creer(
     violation d'une règle de la base devient une erreur nommée, sans valeur : le message
     de PostgreSQL porterait la ligne refusée, pseudo et empreinte compris."""
     pseudo = normaliser(pseudo)
-    if not FORME_PSEUDO.fullmatch(pseudo) or not 1 <= len(nom_affiche) <= 60:
+    if not (FORME_PSEUDO.fullmatch(pseudo) and nom_valide(nom_affiche, 60)):
         raise CompteInvalide
     empreinte = await run_in_threadpool(hacheur.hacher, mot_de_passe)
     try:
@@ -170,11 +181,14 @@ async def authentifier(
     synchronisation du disque (`synchronous_commit = off`) : un essai perdu à un arrêt
     brutal du serveur ne coûte qu'un échec au compteur."""
     pseudo = normaliser(pseudo)
+    # Un pseudo hors forme (un octet nul, trop long…) n'atteint jamais la base : le même
+    # chemin le cherche sous une forme qui n'existe pas, et le refuse comme un inconnu.
+    cle = pseudo if FORME_PSEUDO.fullmatch(pseudo) else ""
     async with base.transaction() as cx:
         curseur = await cx.execute(
             "SELECT id, role, actif, generation, doit_changer_mdp, nom_affiche,"
             " hachage, verrou_jusqu_a FROM application.comptes WHERE pseudo = %s",
-            (pseudo,),
+            (cle,),
         )
         ligne = await curseur.fetchone()
     if ligne is None:
@@ -244,3 +258,122 @@ async def _ecriture_vide(base: Base) -> None:
             "UPDATE application.comptes SET echecs_connexion = echecs_connexion"
             " WHERE false"
         )
+
+
+# --------------------------------------------------------------------------- #
+#  Le mot de passe, les sessions, l'administration (E4, lot 1, spec 03)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True, slots=True)
+class Ligne:
+    """Une ligne de la liste d'administration : ce que l'écran montre, rien de plus."""
+
+    id: int
+    pseudo: str
+    nom_affiche: str
+    role: str
+    actif: bool
+    cree_le: datetime
+
+
+async def changer_mot_de_passe(
+    base: Base,
+    hacheur: Hacheur,
+    ident: int,
+    ancien: str,
+    nouveau: str,
+    *,
+    seuil: int,
+    duree_verrou_s: int,
+) -> Compte | Refus:
+    """L'ancien vérifié, le nouveau haché ; la génération + 1 (les autres sessions du
+    compte tombent), le mot de passe à changer levé, une ligne de journal. Un mauvais
+    ancien compte un échec, comme à la connexion — même compteur, même verrou : une
+    session laissée ouverte ne permet pas de le deviner sans limite."""
+    async with base.transaction() as cx:
+        curseur = await cx.execute(
+            "SELECT hachage, verrou_jusqu_a FROM application.comptes"
+            " WHERE id = %s AND actif",
+            (ident,),
+        )
+        ligne = await curseur.fetchone()
+    if ligne is None:
+        return Refus("inactif", ident)
+    empreinte, verrou = cast(tuple[str, datetime | None], ligne)
+    bon = await run_in_threadpool(hacheur.verifier, empreinte, ancien)
+    if verrou is not None and verrou > datetime.now(UTC):
+        return Refus("verrou", ident)
+    if not bon:
+        return await _compter_un_echec(base, ident, seuil, duree_verrou_s)
+    nouvelle = await run_in_threadpool(hacheur.hacher, nouveau)
+    async with base.transaction() as cx:
+        curseur = await cx.execute(
+            "UPDATE application.comptes SET hachage = %s, generation = generation + 1,"
+            " doit_changer_mdp = false, echecs_connexion = 0, verrou_jusqu_a = NULL,"
+            " modifie_le = now() WHERE id = %s"
+            " RETURNING id, role, actif, generation, doit_changer_mdp, nom_affiche",
+            (nouvelle, ident),
+        )
+        compte = _compte(cast(tuple[object, ...], await curseur.fetchone()))
+        await journaliser(cx, ident, "mot_de_passe_change", ident)
+    return compte
+
+
+async def couper_sessions(base: Base, ident: int) -> None:
+    """La génération + 1 : toute session du compte, toute copie de son cookie, tombe."""
+    async with base.transaction() as cx:
+        await cx.execute(
+            "UPDATE application.comptes SET generation = generation + 1 WHERE id = %s",
+            (ident,),
+        )
+
+
+async def changer_etat(
+    base: Base, ident: int, *, actif: bool, par_compte_id: int
+) -> Literal["fait", "inchange", "inconnu"]:
+    """Désactiver (génération + 1 : ses sessions tombent) ou réactiver un compte, et une
+    ligne de journal — seulement s'il change d'état : un compte déjà dans cet état ne
+    laisse aucune trace."""
+    async with base.transaction() as cx:
+        curseur = await cx.execute(
+            "UPDATE application.comptes SET actif = %s,"
+            " generation = generation + CASE WHEN %s THEN 0 ELSE 1 END,"
+            " modifie_le = now() WHERE id = %s AND actif <> %s RETURNING id",
+            (actif, actif, ident, actif),
+        )
+        if await curseur.fetchone() is None:
+            curseur = await cx.execute(
+                "SELECT 1 FROM application.comptes WHERE id = %s", (ident,)
+            )
+            return "inchange" if await curseur.fetchone() is not None else "inconnu"
+        await journaliser(
+            cx, par_compte_id, "compte_reactive" if actif else "compte_desactive", ident
+        )
+    return "fait"
+
+
+async def lister(
+    base: Base, *, role: str | None, page: int, par_page: int
+) -> tuple[list[Ligne], int, int]:
+    """Une page de la liste, par date de création ; le nombre de comptes du filtre ; la
+    page rendue (la demande, ramenée entre 1 et la dernière)."""
+    async with base.transaction() as cx:
+        curseur = await cx.execute(
+            "SELECT count(*) FROM application.comptes"
+            " WHERE %(role)s::text IS NULL OR role = %(role)s",
+            {"role": role},
+        )
+        (total,) = cast(tuple[int], await curseur.fetchone())
+        # La page demandée, ramenée entre la première et la dernière.
+        page = min(max(1, page), max(1, -(-total // par_page)))
+        curseur = await cx.execute(
+            "SELECT id, pseudo, nom_affiche, role, actif, cree_le"
+            " FROM application.comptes"
+            " WHERE %(role)s::text IS NULL OR role = %(role)s"
+            " ORDER BY cree_le, id LIMIT %(limite)s OFFSET %(decalage)s",
+            {"role": role, "limite": par_page, "decalage": (page - 1) * par_page},
+        )
+        lignes = [
+            Ligne(*cast(tuple[int, str, str, str, bool, datetime], ligne))
+            for ligne in await curseur.fetchall()
+        ]
+    return lignes, total, page

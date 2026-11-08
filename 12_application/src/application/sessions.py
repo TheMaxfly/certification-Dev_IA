@@ -142,6 +142,12 @@ def retour_local(valeur: object, defaut: str = "/") -> str:
     return valeur
 
 
+def suffixe_retour(retour: str) -> str:
+    """Le paramètre `?retour=` d'un lien vers la connexion ou l'inscription ; rien pour
+    l'accueil."""
+    return "" if retour == "/" else "?retour=" + quote(retour, safe="/")
+
+
 def chemin_de(request: Request) -> str:
     chemin = request.url.path
     return f"{chemin}?{request.url.query}" if request.url.query else chemin

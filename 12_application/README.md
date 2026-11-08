@@ -187,12 +187,49 @@ avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ a
 prix du profil actif, mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15
 par minute du compte (2026-11-03).
 
+### Les comptes (E4, lot 1)
+
+Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/inscription` | visiteur | pseudo, mot de passe, confirmation ; les règles affichées ; « ce que nous gardons » et le renvoi vers « à propos » ; succès : compte client, session ouverte, retour à la page d'origine (chemin local seul) |
+| `/connexion` | visiteur | un seul refus, « Pseudo ou mot de passe incorrect », quel que soit le cas (inconnu, mauvais mot de passe, verrouillé, désactivé), même statut (401) ; succès : retour à la page demandée, ou au changement d'un mot de passe initial |
+| `/deconnexion` (`POST`) | connecté | la génération + 1 (toute copie du cookie tombe, et les autres sessions du compte avec), la session vidée ; retour à l'accueil |
+| `/compte/mot-de-passe` | connecté | ancien, nouveau, confirmation ; succès : génération + 1 (les autres sessions tombent), la session courante rouverte, le mot de passe initial levé, une ligne au journal des actions ; un mauvais ancien compte un échec, sous le même compteur et le même verrou que la connexion |
+| `/admin/comptes` | administrateur | la liste (pseudo, nom affiché, rôle, état, date), filtrée par rôle, par pages de 25 (une page hors bornes rend la plus proche) ; créer un compte libraire ou administrateur (un rôle hors liste est refusé, nommé), au mot de passe initial saisi deux fois, à changer ; désactiver (ses sessions tombent) ou réactiver un compte — jamais le sien ; un changement sans effet ne laisse aucune trace ; aucune suppression |
+| `/libraire/critiques` | libraire, administrateur | « bientôt disponible » : la page arrive avec un prochain lot |
+
+**Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
+Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
+client — Conseiller, Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
+en plus, Mes critiques ; administrateur — en plus, Comptes. Sans base, chaque page de compte
+dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
+
+**Le premier administrateur**, par une commande : `make app-admin-creer`, avec
+`APPLICATION_ENVIRONNEMENT` et `APPLICATION_BASE_DSN` (sans mot de passe) dans
+l'environnement. Elle applique la garde d'environnement, demande le pseudo, le nom affiché,
+puis le mot de passe deux fois, sans écho (`getpass`) — sans terminal, ou si le terminal
+ne coupe pas l'écho, elle refuse (code 2) ; elle crée le compte `admin`, sans mot de passe
+à changer, et sa ligne de journal sans auteur ; un refus de la base est nommé par sa
+classe, sans son message. Jamais de mot de passe en argument, en variable ni dans une
+sortie.
+
+```bash
+APPLICATION_ENVIRONNEMENT=preproduction \
+APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_preprod' \
+  make app-admin-creer
+```
+
 ## Accessibilité
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
 - **Outil** : axe-core, vendu avec son empreinte et sa licence, lancé par Playwright dans
-  Chromium sur chaque écran et chaque cas, dans `make verify-poste`. Politique de sécurité
-  active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
+  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **80 pages** au
+  2026-11-08, dont les dix-sept du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
+  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503), sur une
+  base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
+  reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
 - **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
   sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
@@ -257,7 +294,9 @@ par minute du compte (2026-11-03).
   compte, un **numéro de génération** et le jeton CSRF — ni rôle, ni pseudo. Le rôle, l'état
   et la génération sont **relus en base à chaque requête** ; une génération différente ou
   un compte inactif vident la session. Changer son mot de passe ou être désactivé
-  incrémente la génération : toutes les sessions du compte tombent. Une connexion réussie
+  incrémente la génération : toutes les sessions du compte tombent ; la déconnexion aussi
+  (choix du lot : une copie du cookie ne survit pas à la déconnexion, au prix de fermer
+  les autres sessions du compte). Une connexion réussie
   rouvre une session neuve, au jeton neuf (pas de fixation). Les visiteurs anonymes
   reçoivent aussi le cookie : il porte leur jeton (cookie strictement nécessaire).
 - **Le verrou** : 5 échecs consécutifs (`[comptes] echecs_avant_verrou`) posent un verrou de
@@ -265,7 +304,9 @@ par minute du compte (2026-11-03).
   ou un pseudo inconnu rendent le même refus, par **le même travail** : une lecture sans
   verrou de ligne, une vérification hors transaction (rien n'est tenu pendant le calcul,
   des essais simultanés ne s'attendent pas), une écriture — le compteur, en une
-  instruction atomique, ou une écriture vide ; un succès remet le compteur à zéro.
+  instruction atomique, ou une écriture vide ; un succès remet le compteur à zéro. Un
+  pseudo hors forme (octet nul, trop long) n'atteint pas la base : il suit le chemin d'un
+  pseudo inconnu ; un nom affiché ne garde que des caractères imprimables.
 - **La garde par rôle** : une page réservée renvoie un anonyme vers la connexion (le chemin
   de retour n'accepte qu'un chemin local : ni « // », ni barre inverse, ni caractère de
   contrôle) — un formulaire réservé envoyé sans session reçoit la page 401 —, et répond
@@ -284,8 +325,9 @@ par minute du compte (2026-11-03).
   une empreinte, un pseudo, le cookie ni le jeton. Tout événement pendant une requête porte
   son identifiant. Événements des mécanismes : `session_refusee`, `csrf_refuse`,
   `acces_refuse` (gabarit de la route), `base_indisponible`, `cle_session_ephemere` ; des
-  écrans de compte (E4, lot 1, spec 03) : `connexion_reussie`, `connexion_refusee` (motif
-  borné), `verrou_pose`, `deconnexion`.
+  écrans de compte (E4, lot 1, spec 03) : `inscription`, `connexion_reussie`,
+  `connexion_refusee` (motif borné), `verrou_pose`, `deconnexion`, `mot_de_passe_change`,
+  `mot_de_passe_refuse` (motif borné).
 
 ### OWASP Top 10, mis en regard
 
@@ -427,7 +469,9 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 ## Ce que l'épreuve E4 ajoute
 
 **Lot 1 (le socle)** : la base, Argon2id, les sessions signées, le jeton CSRF, le verrou,
-la garde par rôle et d'environnement (ci-dessus). À venir : les écrans des comptes ; trois
-rôles (client, libraire, administrateur) ; page de série ; critique de libraire signée, entrant dans le
-corpus ; masquage à l'affichage des mentions de membres connues du corpus ; administrateur (profil actif, comptes, état des services) ; serveur avec préproduction
-et production ; identité visuelle, sur `theme.css`.
+la garde par rôle et d'environnement, les écrans des comptes et leurs trois rôles (client,
+libraire, administrateur), la commande du premier administrateur (ci-dessus). À venir :
+la page de série ; la critique de libraire signée, entrant dans le corpus ; le masquage à
+l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
+et de l'état des services ; le serveur avec préproduction et production ; l'identité
+visuelle, sur `theme.css`.

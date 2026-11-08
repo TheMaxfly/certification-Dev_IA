@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.mdp_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.mdp_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, focus == "avis") }}
+{% endif %}
+<form method="post" action="/compte/mot-de-passe">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+{{ c.champ("ancien", t.champ_ancien, type="password", autocomplete="current-password", erreur=erreurs.get("ancien"), max=comptes.mot_de_passe_max, focus=focus == "ancien") }}
+{{ c.champ("nouveau", t.champ_nouveau, type="password", autocomplete="new-password", aide=aide_mot_de_passe, erreur=erreurs.get("nouveau"), max=comptes.mot_de_passe_max, focus=focus == "nouveau") }}
+{{ c.champ("confirmation", t.champ_confirmation, type="password", autocomplete="new-password", erreur=erreurs.get("confirmation"), max=comptes.mot_de_passe_max, focus=focus == "confirmation") }}
+<button type="submit">{{ t.mdp_bouton }}</button>
+</form>
+{% endblock %}

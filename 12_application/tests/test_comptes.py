@@ -87,6 +87,28 @@ def etat(dsn: str, ident: int) -> tuple[int, bool, str]:
         ).fetchone()
 
 
+def changer(base: Base, ident: int, ancien: str, nouveau: str = "un autre factice"):
+    return lancer(
+        lambda: comptes.changer_mot_de_passe(
+            base,
+            HACHEUR_RAPIDE,
+            ident,
+            ancien,
+            nouveau,
+            seuil=SEUIL,
+            duree_verrou_s=VERROU_S,
+        )
+    )
+
+
+def lignes_du_journal(dsn: str) -> list[tuple[object, ...]]:
+    with psycopg.connect(dsn) as cx:
+        return cx.execute(
+            "SELECT action, par_compte_id, objet_id"
+            " FROM application.journal_actions ORDER BY id"
+        ).fetchall()
+
+
 # --------------------------------------------------------------------------- #
 #  Création et lecture
 # --------------------------------------------------------------------------- #
@@ -342,6 +364,8 @@ def test_le_pseudo_est_ramene_en_minuscules_et_l_inscription_s_attribue_le_compt
         ("avec espace", "Nom", "client"),
         ("client_essai", "", "client"),
         ("client_essai", "n" * 61, "client"),
+        ("client_essai", "Nom\x00nul", "client"),
+        ("client_essai", "Nom\nligne", "client"),
         ("client_essai", "Nom", "lecteur"),
     ],
     ids=[
@@ -349,6 +373,8 @@ def test_le_pseudo_est_ramene_en_minuscules_et_l_inscription_s_attribue_le_compt
         "pseudo hors forme",
         "nom vide",
         "nom trop long",
+        "nom à octet nul",
+        "nom à saut de ligne",
         "rôle inconnu",
     ],
 )
@@ -369,3 +395,125 @@ def test_une_valeur_hors_regle_est_refusee_sans_rien_dire_d_elle(
             )
         )
     assert str(refus.value) == "" and refus.value.__cause__ is None
+
+
+def test_le_mot_de_passe_d_un_compte_inactif_ne_change_pas(base_comptes, base_app):
+    compte = creer(base_comptes)
+    with psycopg.connect(base_app) as cx:
+        cx.execute("UPDATE application.comptes SET actif = false")
+
+    assert changer(base_comptes, compte.id, MOT_DE_PASSE) == Refus("inactif", compte.id)
+
+
+@pytest.mark.parametrize(
+    "pseudo",
+    ["client\x00essai", "\x00", "c" * 10_000, "client essai"],
+    ids=["octet nul", "octet nul seul", "très long", "avec espace"],
+)
+def test_un_pseudo_hors_forme_n_atteint_pas_la_base_et_se_refuse_comme_un_inconnu(
+    base_comptes, pseudo
+):
+    creer(base_comptes)
+    espion = Espion()
+
+    resultat = connecter(base_comptes, espion, pseudo, MOT_DE_PASSE)
+
+    assert resultat == Refus("mot_de_passe", None)
+    assert espion.factices == 1, "le même chemin, le même temps qu'un inconnu"
+
+
+# --------------------------------------------------------------------------- #
+#  Le mot de passe changé : l'ancien sous le même compteur que la connexion
+# --------------------------------------------------------------------------- #
+def test_le_mot_de_passe_change_releve_la_generation_et_se_journalise(
+    base_comptes, base_app
+):
+    compte = creer(base_comptes)
+
+    change = changer(base_comptes, compte.id, MOT_DE_PASSE)
+
+    assert isinstance(change, Compte)
+    assert change.generation == compte.generation + 1
+    assert lignes_du_journal(base_app)[-1] == (
+        "mot_de_passe_change",
+        compte.id,
+        compte.id,
+    )
+    assert connecter(base_comptes, HACHEUR_RAPIDE, "client_essai", "un autre factice")
+
+
+def test_un_mauvais_ancien_compte_un_echec_et_le_seuil_pose_le_verrou(
+    base_comptes, base_app
+):
+    compte = creer(base_comptes)
+
+    refus = [changer(base_comptes, compte.id, f"faux {i}") for i in range(SEUIL)]
+
+    assert [r.motif for r in refus] == ["mot_de_passe"] * SEUIL
+    assert [r.verrou_pose for r in refus] == [False] * (SEUIL - 1) + [True]
+    assert etat(base_app, compte.id)[:2] == (0, True)
+    # Pendant le verrou, le bon ancien ne change rien, et la connexion est refusée.
+    assert changer(base_comptes, compte.id, MOT_DE_PASSE) == Refus("verrou", compte.id)
+    assert connecter(
+        base_comptes, HACHEUR_RAPIDE, "client_essai", MOT_DE_PASSE
+    ) == Refus("verrou", compte.id)
+    assert "mot_de_passe_change" not in [
+        ligne[0] for ligne in lignes_du_journal(base_app)
+    ]
+
+
+# --------------------------------------------------------------------------- #
+#  L'état d'un compte, la liste
+# --------------------------------------------------------------------------- #
+def test_un_changement_d_etat_sans_effet_ne_laisse_aucune_trace(base_comptes, base_app):
+    admin = creer(base_comptes, "admin_essai", "admin")
+    cible = creer(base_comptes)
+
+    def etat_change(actif: bool, ident: int = cible.id) -> str:
+        return lancer(
+            lambda: comptes.changer_etat(
+                base_comptes, ident, actif=actif, par_compte_id=admin.id
+            )
+        )
+
+    assert etat_change(True) == "inchange"
+    assert etat_change(False) == "fait"
+    assert etat_change(False) == "inchange"
+    assert etat_change(True) == "fait"
+    assert etat_change(False, 999_999) == "inconnu"
+    actions = [ligne[0] for ligne in lignes_du_journal(base_app)]
+    assert actions == [
+        "compte_cree",
+        "compte_cree",
+        "compte_desactive",
+        "compte_reactive",
+    ]
+    with psycopg.connect(base_app) as cx:
+        (generation,) = cx.execute(
+            "SELECT generation FROM application.comptes WHERE id = %s", (cible.id,)
+        ).fetchone()
+    assert generation == cible.generation + 1, "seule la désactivation relève"
+
+
+@pytest.mark.parametrize(
+    ("demandee", "rendue"),
+    [(0, 1), (-3, 1), (2, 2), (3, 3), (4, 3), (10**17, 3)],
+)
+def test_la_page_demandee_est_ramenee_entre_la_premiere_et_la_derniere(
+    base_comptes, demandee, rendue
+):
+    for i in range(5):
+        creer(base_comptes, f"client_{i}")
+
+    lignes, total, page = lancer(
+        lambda: comptes.lister(base_comptes, role=None, page=demandee, par_page=2)
+    )
+
+    assert (total, page) == (5, rendue)
+    assert len(lignes) == (1 if rendue == 3 else 2)
+
+
+def test_une_liste_vide_rend_la_premiere_page(base_comptes):
+    assert lancer(
+        lambda: comptes.lister(base_comptes, role="admin", page=7, par_page=2)
+    ) == ([], 0, 1)

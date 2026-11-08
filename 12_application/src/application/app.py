@@ -29,7 +29,14 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import __version__, historique, journal, presentation, sessions
+from application import (
+    __version__,
+    historique,
+    journal,
+    pages_comptes,
+    presentation,
+    sessions,
+)
 from application.base import Base, BaseIndisponible
 from application.client_api import (
     ApiDelai,
@@ -141,20 +148,58 @@ def creer_application(
             await client.fermer()
             journal.evenement("arret")
 
-    def contexte(**valeurs: object) -> dict[str, object]:
-        """Ce que toute page reçoit : les textes, le pied de page."""
+    def suffixe_menu(request: Request | None, retour: object) -> str:
+        """Les liens « Connexion » et « Créer un compte » du menu ramènent à la page
+        d'où l'on vient : la page affichée (en `GET`), ou le retour que porte déjà la
+        page de connexion ou d'inscription ; l'accueil sinon."""
+        if request is None:
+            return ""
+        if request.url.path in ("/connexion", "/inscription"):
+            cible = retour if isinstance(retour, str) else "/"
+        elif request.method == "GET":
+            cible = request.url.path
+        else:
+            cible = "/"
+        return sessions.suffixe_retour(sessions.retour_local(cible))
+
+    def contexte(
+        request: Request | None = None, **valeurs: object
+    ) -> dict[str, object]:
+        """Ce que toute page reçoit : les textes, le pied de page ; le compte courant
+        (le menu par rôle) et le jeton de la session (le bouton de déconnexion). Une
+        page d'erreur de l'enveloppe (413, 500) n'a pas de requête : le menu anonyme."""
+        compte = getattr(request.state, "compte", None) if request else None
         return {
+            "suffixe_menu": suffixe_menu(request, valeurs.get("retour")),
             "t": t,
             "pied": presentation.pied_de_page(vue.etat, vue.info, reglages),
+            "compte": compte,
+            "connecte": (
+                presentation.dire(t, "menu_connecte", nom=compte.nom_affiche)
+                if compte is not None
+                else None
+            ),
+            "jeton": sessions.jeton_csrf(request) if request else None,
             **valeurs,
         }
 
+    def rendre(
+        request: Request, gabarit: str, statut: int = 200, **valeurs: object
+    ) -> Response:
+        return gabarits.TemplateResponse(
+            request, gabarit, contexte(request, **valeurs), status_code=statut
+        )
+
     def page_erreur(
-        statut: int, identifiant: str, textes: tuple[str, str] | None = None
+        statut: int,
+        identifiant: str,
+        textes: tuple[str, str] | None = None,
+        request: Request | None = None,
     ) -> Response:
         titre, texte = textes or PAGES_ERREUR.get(statut, PAGES_ERREUR[500])
         contenu = environnement.get_template("erreur.html").render(
             contexte(
+                request,
                 titre=t[titre],
                 texte=t[texte],
                 identifiant=presentation.dire(
@@ -184,7 +229,10 @@ def creer_application(
 
     async def erreur_http(request: Request, exc: Exception) -> Response:
         statut = exc.status_code if isinstance(exc, StarletteHTTPException) else 500
-        reponse = page_erreur(statut, str(request.state.identifiant_requete))
+        await sessions.compte_courant(request)  # le menu du compte connecté
+        reponse = page_erreur(
+            statut, str(request.state.identifiant_requete), request=request
+        )
         entetes: Mapping[str, str] | None = (
             exc.headers if isinstance(exc, StarletteHTTPException) else None
         )
@@ -203,12 +251,16 @@ def creer_application(
 
     async def acces_refuse(request: Request, exc: Exception) -> Response:
         request.state.code_erreur = "acces_refuse"
-        return page_erreur(403, identifiant_de(request))
+        return page_erreur(403, identifiant_de(request), request=request)
 
     async def jeton_refuse(request: Request, exc: Exception) -> Response:
         request.state.code_erreur = "csrf_refuse"
+        await sessions.compte_courant(request)  # le menu du compte connecté
         return page_erreur(
-            403, identifiant_de(request), ("erreur_csrf_titre", "erreur_csrf_texte")
+            403,
+            identifiant_de(request),
+            ("erreur_csrf_titre", "erreur_csrf_texte"),
+            request,
         )
 
     async def comptes_indisponibles(request: Request, exc: Exception) -> Response:
@@ -217,11 +269,12 @@ def creer_application(
             503,
             identifiant_de(request),
             ("erreur_comptes_titre", "erreur_comptes_texte"),
+            request,
         )
 
     async def non_connecte(request: Request, exc: Exception) -> Response:
         request.state.code_erreur = "non_connecte"
-        return page_erreur(401, identifiant_de(request))
+        return page_erreur(401, identifiant_de(request), request=request)
 
     app.add_exception_handler(Redirection, redirection)
     app.add_exception_handler(AccesRefuse, acces_refuse)
@@ -249,6 +302,7 @@ def creer_application(
             request,
             "index.html",
             contexte(
+                request,
                 etat=presentation.etat_du_service(vue.etat, info, reglages),
                 info_connue=info is not None,
                 options=(
@@ -289,7 +343,6 @@ def creer_application(
                 affichage=affichage,
                 encart=encart,
                 cloture=cloture,
-                jeton=sessions.jeton_csrf(request),
             ),
             status_code=statut,
         )
@@ -471,8 +524,15 @@ def creer_application(
             request,
             "a_propos.html",
             contexte(
+                request,
                 lignes=presentation.lignes_a_propos(vue.info, reglages),
                 info_connue=vue.info is not None,
+                apropos_comptes=presentation.dire(
+                    t,
+                    "apropos_comptes",
+                    seuil=reglages.comptes.echecs_avant_verrou,
+                    minutes=-(-reglages.comptes.duree_verrou_s // 60),
+                ),
             ),
         )
 
@@ -498,6 +558,8 @@ def creer_application(
             raise StarletteHTTPException(status_code=404)
         contenu, type_ = metriques.exposer()
         return Response(content=contenu, media_type=type_)
+
+    pages_comptes.installer(app, reglages, rendre)
 
     app.state.vue = vue
     app.state.metriques = metriques

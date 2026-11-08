@@ -85,6 +85,25 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
             " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
             " erreur_comptes_titre erreur_comptes_texte"
+            " menu_etiquette menu_conseiller menu_mon_compte menu_critiques"
+            " menu_comptes"
+            " menu_connexion menu_inscription menu_deconnexion champ_pseudo"
+            " champ_mot_de_passe champ_confirmation champ_ancien champ_nouveau"
+            " champ_nom_affiche champ_role champ_mot_de_passe_initial"
+            " inscription_titre inscription_collecte inscription_collecte_lien"
+            " inscription_bouton inscription_deja erreur_pseudo_pris"
+            " erreur_confirmation connexion_titre connexion_bouton connexion_refus"
+            " connexion_pas_de_compte mdp_titre mdp_bouton mdp_ancien_faux mdp_change"
+            " mdp_a_changer admin_titre admin_creer_titre admin_creer_bouton"
+            " admin_liste_titre admin_colonne_pseudo admin_colonne_nom"
+            " admin_colonne_role admin_colonne_etat admin_colonne_cree"
+            " admin_colonne_action admin_filtre_etiquette admin_filtre_tous"
+            " admin_filtre_bouton compte_role_client compte_role_libraire"
+            " compte_role_admin admin_actif admin_inactif admin_desactiver"
+            " admin_reactiver admin_cree admin_desactive admin_reactive admin_soi"
+            " admin_aucun admin_inconnu admin_precedente admin_suivante"
+            " critiques_titre critiques_bientot apropos_comptes_titre"
+            " apropos_suppression erreur_role admin_inchange"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -132,6 +151,15 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_identifiant": frozenset({"identifiant"}),
     "trace_non_cites_resume": frozenset({"titre", "n"}),
     "trace_cout_valeur": frozenset({"cout"}),
+    "menu_connecte": frozenset({"nom"}),
+    "aide_pseudo": frozenset({"min", "max"}),
+    "aide_mot_de_passe": frozenset({"min", "max"}),
+    "erreur_pseudo_forme": frozenset({"min", "max"}),
+    "erreur_mdp_longueur": frozenset({"min", "max"}),
+    "erreur_nom_longueur": frozenset({"max"}),
+    "admin_page": frozenset({"n", "total"}),
+    "mdp_verrou": frozenset({"minutes"}),
+    "apropos_comptes": frozenset({"seuil", "minutes"}),
 }
 
 
@@ -389,6 +417,42 @@ def lire_cle_session(
     return cle, False
 
 
+def lire_comptes(lecteur: _Lecteur, donnees: Table) -> Comptes:
+    comptes = lecteur.table(donnees, "comptes")
+    return Comptes(
+        duree_session_s=lecteur.entier(comptes, "duree_session_s", "comptes"),
+        echecs_avant_verrou=lecteur.entier(comptes, "echecs_avant_verrou", "comptes"),
+        duree_verrou_s=lecteur.entier(comptes, "duree_verrou_s", "comptes"),
+        pseudo_min=lecteur.entier(comptes, "pseudo_min", "comptes"),
+        pseudo_max=lecteur.entier(comptes, "pseudo_max", "comptes"),
+        mot_de_passe_min=lecteur.entier(comptes, "mot_de_passe_min", "comptes"),
+        mot_de_passe_max=lecteur.entier(comptes, "mot_de_passe_max", "comptes"),
+        nom_affiche_max=lecteur.entier(comptes, "nom_affiche_max", "comptes"),
+        delai_base_s=lecteur.positif(comptes, "delai_base_s", "comptes"),
+        par_page=lecteur.entier(comptes, "par_page", "comptes"),
+    )
+
+
+def charger_comptes(
+    environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES
+) -> tuple[str, str, Comptes]:
+    """Ce qu'il faut à la commande du premier administrateur, et rien d'autre (ni la
+    clé de l'API ni celle des sessions) : l'environnement, le DSN — obligatoire ici —
+    sous la garde d'environnement, et les règles des comptes."""
+    ecarts: list[str] = []
+    lecteur = _Lecteur(ecarts)
+    donnees = cast(Table, tomllib.loads(fichier.read_text(encoding="utf-8")))
+    environnement = lire_environnement(environ, ecarts)
+    dsn = environ.get(VARIABLE_BASE, "").strip()
+    if not dsn:
+        ecarts.append(f"{VARIABLE_BASE} : absente — la commande écrit dans la base")
+    garder_base(environnement, dsn or None, ecarts)
+    comptes = lire_comptes(lecteur, donnees)
+    if ecarts:
+        raise ConfigurationInvalide(ecarts)
+    return environnement, dsn, comptes
+
+
 def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reglages:
     """Le fichier et l'environnement, validés ; au moindre écart, une exception."""
     ecarts: list[str] = []
@@ -459,7 +523,6 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
     base_dsn = environ.get(VARIABLE_BASE, "").strip() or None
     garder_base(environnement, base_dsn, ecarts)
     cle_session, ephemere = lire_cle_session(environ, environnement, ecarts)
-    comptes = lecteur.table(donnees, "comptes")
 
     fournisseurs: dict[str, Fournisseur] = {}
     for nom, brut in lecteur.table(donnees, "fournisseurs").items():
@@ -519,20 +582,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         base_dsn=base_dsn,
         cle_session=cle_session,
         cle_session_ephemere=ephemere,
-        comptes=Comptes(
-            duree_session_s=lecteur.entier(comptes, "duree_session_s", "comptes"),
-            echecs_avant_verrou=lecteur.entier(
-                comptes, "echecs_avant_verrou", "comptes"
-            ),
-            duree_verrou_s=lecteur.entier(comptes, "duree_verrou_s", "comptes"),
-            pseudo_min=lecteur.entier(comptes, "pseudo_min", "comptes"),
-            pseudo_max=lecteur.entier(comptes, "pseudo_max", "comptes"),
-            mot_de_passe_min=lecteur.entier(comptes, "mot_de_passe_min", "comptes"),
-            mot_de_passe_max=lecteur.entier(comptes, "mot_de_passe_max", "comptes"),
-            nom_affiche_max=lecteur.entier(comptes, "nom_affiche_max", "comptes"),
-            delai_base_s=lecteur.positif(comptes, "delai_base_s", "comptes"),
-            par_page=lecteur.entier(comptes, "par_page", "comptes"),
-        ),
+        comptes=lire_comptes(lecteur, donnees),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)
