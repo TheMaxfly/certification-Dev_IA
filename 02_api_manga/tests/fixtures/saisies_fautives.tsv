@@ -1,0 +1,48 @@
+# Le jeu de saisies fautives de la recherche du catalogue (E4, lot 2b, spec 03, § 5).
+#
+# Écrit AVANT le réglage du seuil de ressemblance : la mesure s'y joue, le seuil s'en déduit.
+# Dérivé mécaniquement des 30 séries les plus votées du catalogue réel (`series_members_votes`
+# décroissant, puis `series_id`), lues en lecture seule sur la préproduction le 2026-11-08 ;
+# aucune série inventée. La règle, appliquée au titre en minuscules :
+#   rangs  1 à 10 — transposition : les deux dernières lettres adjacentes DIFFÉRENTES
+#                   échangées (« naruto » → « naruot ») ;
+#   rangs 11 à 20 — lettre manquante : l'avant-dernière lettre retirée (« berserk » →
+#                   « bersek ») ;
+#   rangs 21 à 25 — romanisation fautive : la première voyelle o → ô (sinon u → ū, sinon
+#                   a → â) ; la normalisation la couvre : correspondance directe attendue ;
+#   rangs 26 à 30 — auteur inversé : les mots du scénariste (sinon du dessinateur) dans
+#                   l'ordre inverse (« Naoki URASAWA » → « URASAWA Naoki ») ; correspondance
+#                   directe attendue. Un auteur d'un seul mot (CLAMP, xxxHoLic, 28e) n'a pas
+#                   d'ordre : la série suivante du classement (31e) le remplace.
+# Colonnes : saisie, series_id_attendu, famille (titre de la série pour le lecteur).
+saisie	series_id_attendu	famille	titre
+death noet	2027	transposition	Death Note
+naruot	745	transposition	Naruto
+one pieec	736	transposition	One Piece
+fullmetal alchemits	1629	transposition	Fullmetal Alchemist
+fairy tali	3056	transposition	Fairy Tail
+dragon blal	726	transposition	Dragon Ball
+bleahc	730	transposition	Bleach
+got	518	transposition	GTO
+love hian	565	transposition	Love Hina
+fruits baskte	548	transposition	Fruits Basket
+samurai deeper ko	559	lettre_manquante	Samurai Deeper Kyo
+d.gray-mn	2401	lettre_manquante	D.Gray-Man
+bersek	1208	lettre_manquante	Berserk
+hunter x huntr	534	lettre_manquante	Hunter X Hunter
+tsubasa reservoir chronice	1083	lettre_manquante	Tsubasa Reservoir Chronicle
+dout	6676	lettre_manquante	Doubt
+soul eatr	3384	lettre_manquante	Soul Eater
+kenshin le vagabod	558	lettre_manquante	Kenshin le Vagabond
+ubel blat	5162	lettre_manquante	Ubel Blatt
+chobis	459	lettre_manquante	Chobits
+bakūman	6679	romanisation	Bakuman
+black būtler	6353	romanisation	Black Butler
+gūnnm	1041	romanisation	Gunnm
+âir gear	2263	romanisation	Air Gear
+shâman king	605	romanisation	Shaman King
+URASAWA Naoki	746	auteur_inverse	Monster
+AKAMATSU Ken	1710	auteur_inverse	Negima !
+HINO Matsuri	5221	auteur_inverse	Vampire Knight
+YAZAWA Ai	899	auteur_inverse	Nana
+KISHIMOTO Seishi	1679	auteur_inverse	Satan 666

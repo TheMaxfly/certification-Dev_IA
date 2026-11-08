@@ -1,0 +1,7 @@
+id = "E4Q-09"
+origine = "E4, lot 2b, spec 03 (2026-11-08) — les suggestions rendues sous le seuil : « Vouliez-vous dire » proposerait n'importe quoi"
+fichier = "02_api_manga/app/main.py"
+avant = ''' WHERE x.score >= %(seuil)s'''
+apres = ''' WHERE x.score >= 0'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "suggestions_au_dessus_du_seuil"]

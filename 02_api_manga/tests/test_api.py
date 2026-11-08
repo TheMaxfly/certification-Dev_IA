@@ -34,9 +34,13 @@ def test_live_does_not_require_database() -> None:
 
 
 def test_health_reports_database_ready() -> None:
-    response = health(FakePool([(1,)]))
+    response = health(FakePool([(1,)]), normalisation="fonction")
 
-    assert response.model_dump() == {"status": "ok", "db": "ok"}
+    assert response.model_dump() == {
+        "status": "ok",
+        "db": "ok",
+        "normalisation": "fonction",
+    }
 
 
 def test_health_hides_database_error_details() -> None:
@@ -268,6 +272,9 @@ LIGNE_SERIE = (
     "Seinen",
     "Yasuhisa HARA",
     2007,
+    # Contrat 0.6.0 : le résumé Kitsu (par le moyeu) et les débuts des critiques.
+    "Kitsu synopsis",
+    [],
 )
 
 
@@ -340,7 +347,7 @@ def test_series_porte_les_sept_champs_de_la_vue_des_metadonnees() -> None:
 
 
 def test_series_sans_metadonnees_rend_des_champs_nuls() -> None:
-    ligne = LIGNE_SERIE[:31] + (None,) * 7
+    ligne = LIGNE_SERIE[:31] + (None,) * 7 + LIGNE_SERIE[38:]
 
     reponse = get_series(FakePool([ligne]), 8514)
 
