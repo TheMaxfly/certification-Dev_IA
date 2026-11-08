@@ -47,7 +47,12 @@ from application.client_api import (
     ErreurApi,
     VueApi,
 )
-from application.client_catalogue import ClientCatalogue
+from application.client_catalogue import (
+    CatalogueIndisponible,
+    ClientCatalogue,
+    CorpsInattendu,
+)
+from application.comptes import Compte
 from application.config import Reglages
 from application.enveloppe import Enveloppe
 from application.metriques import Metriques, autorisee
@@ -61,6 +66,8 @@ from application.sessions import (
 )
 
 ICI = Path(__file__).resolve().parent
+#: Un identifiant de série dans `/?serie=` : des chiffres, assez peu pour un `bigint`.
+CHIFFRES_SERIE = 18
 GABARITS = ICI / "gabarits"
 STATIQUE = ICI / "statique"
 #: Le statut d'une page d'erreur → ses textes.
@@ -73,6 +80,29 @@ PAGES_ERREUR = {
     413: ("erreur_413_titre", "erreur_413_texte"),
     500: ("erreur_500_titre", "erreur_500_texte"),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class Droits:
+    """Ce que l'écran du conseiller propose selon le rôle (E4, lot 2b, décisions 1 et
+    2) : le public — visiteur, client — n'a ni réglages, ni case, ni liste des modes ;
+    le libraire a les réglages et la liste ; l'administrateur, en plus, la case du mode
+    démonstration."""
+
+    regler: bool = False
+    demontrer: bool = False
+    choisir_mode: bool = False
+
+
+#: Le rôle → ses droits sur l'écran ; un rôle absent (visiteur, client) : aucun.
+DROITS = {
+    "libraire": Droits(regler=True, choisir_mode=True),
+    "admin": Droits(regler=True, demontrer=True, choisir_mode=True),
+}
+
+
+def droits_de(compte: Compte | None) -> Droits:
+    return DROITS.get(compte.role, Droits()) if compte is not None else Droits()
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,11 +348,15 @@ def creer_application(
         info = vue.info
         limites = vue.limites()
         f = formulaire or Formulaire()
+        droits = droits_de(getattr(request.state, "compte", None))
         reponse = gabarits.TemplateResponse(
             request,
             "index.html",
             contexte(
                 request,
+                peut_regler=droits.regler,
+                peut_demontrer=droits.demontrer,
+                peut_choisir_mode=droits.choisir_mode,
                 etat=presentation.etat_du_service(vue.etat, info, reglages),
                 info_connue=info is not None,
                 options=(
@@ -370,20 +404,48 @@ def creer_application(
             reponse.headers["Retry-After"] = str(encart.retry_after)
         return reponse
 
+    async def question_pre_remplie(request: Request) -> str:
+        """`/?serie=<id>` (le pont depuis la fiche, E4, lot 2b, décision 6) : la
+        question porte le titre exact du catalogue, lu dans le 02 — jamais un texte de
+        l'adresse.
+        Un identifiant illisible, une série inconnue, un catalogue absent ou en panne :
+        la page sans pré-remplissage, sans erreur (le conseiller ne dépend pas du
+        catalogue)."""
+        brut = request.query_params.get("serie", "")
+        if catalogue is None or not (
+            brut.isascii() and brut.isdigit() and len(brut) <= CHIFFRES_SERIE
+        ):
+            return ""
+        try:
+            fiche = await catalogue.serie(int(brut))
+        except (CatalogueIndisponible, CorpsInattendu):
+            return ""
+        if fiche is None or not fiche.title:
+            return ""
+        return presentation.dire(t, "question_pre_remplie", titre=fiche.title)
+
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def accueil(request: Request) -> Response:
         await sessions.page(request)
         await vue.rafraichir()
-        return page_principale(request)
+        question = await question_pre_remplie(request)
+        return page_principale(request, formulaire=Formulaire(question=question))
 
     def lire_formulaire(
-        donnees: FormData,
+        donnees: FormData, compte: Compte | None
     ) -> tuple[Formulaire, str | None, str | None]:
-        """Les champs, et l'erreur de formulaire : (formulaire, champ, message)."""
+        """Les champs, et l'erreur de formulaire : (formulaire, champ, message).
+
+        Ce que le rôle n'a pas sur l'écran n'existe pas pour lui (E4, lot 2b) : un
+        visiteur ou un client ne règle ni le profil, ni la température, ni la
+        reformulation, ni le mode, ni le mode démonstration — un champ forgé dans son
+        `POST` est ignoré, sans erreur ; la demande part avec les défauts, en strict. Un
+        libraire n'a pas le mode démonstration."""
         limites = vue.limites()
+        droits = droits_de(compte)
         question = champ(donnees, "question").replace("\r\n", "\n").strip()
-        profil = champ(donnees, "profil")
-        brute = champ(donnees, "temperature")
+        profil = champ(donnees, "profil") if droits.regler else ""
+        brute = champ(donnees, "temperature") if droits.regler else ""
         positions = presentation.positions_proposees(vue.info, reglages)
         try:
             temperature = float(brute) if brute else reglages.temperature_defaut
@@ -395,9 +457,13 @@ def creer_application(
             historique=champ(donnees, "historique"),
             profil=profil or None,
             temperature=temperature if admise else None,
-            reformuler="reformuler" in donnees,
-            mode_demonstration="mode_demonstration" in donnees,
-            mode=champ(donnees, "mode") or None,
+            reformuler=(
+                "reformuler" in donnees
+                if droits.regler
+                else presentation.reformuler_par_defaut(vue.info, reglages)
+            ),
+            mode_demonstration=droits.demontrer and "mode_demonstration" in donnees,
+            mode=(champ(donnees, "mode") or None) if droits.choisir_mode else None,
         )
         if not question:
             return lu, "question", t["erreur_question_vide"]
@@ -430,7 +496,7 @@ def creer_application(
             raise StarletteHTTPException(status_code=400) from None
         # Le jeton d'abord : un formulaire sans jeton valide n'atteint pas l'API.
         sessions.exiger_jeton(request, champ(donnees, sessions.CHAMP_JETON))
-        await sessions.page(request)
+        compte = await sessions.page(request)
         await vue.rafraichir()
         limites = vue.limites()
         try:
@@ -451,7 +517,7 @@ def creer_application(
             encart = presentation.Encart(texte, 200, nouvelle_conversation=True)
             return page_principale(request, encart=encart)
 
-        lu, fautif, message = lire_formulaire(donnees)
+        lu, fautif, message = lire_formulaire(donnees, compte)
         if fautif is not None:
             f = replace(lu, champ_fautif=fautif, erreur=message)
             return page_principale(request, 422, formulaire=f, tours=tours)
@@ -465,6 +531,7 @@ def creer_application(
             )
 
         reglages_reponse = info.modele_langage.reglages_reponse
+        # Le public n'a pas de mode (`lire_formulaire`) : le défaut du contrat, strict.
         mode = (
             lu.mode
             if lu.mode in reglages_reponse.mode.valeurs
@@ -532,6 +599,7 @@ def creer_application(
                 corps,
                 reglages,
                 demonstration=bool(lu.mode_demonstration),
+                complement=droits_de(compte).choisir_mode,
             ),
             cloture=cloture,
         )

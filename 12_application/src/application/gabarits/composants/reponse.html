@@ -7,6 +7,9 @@
 <p>{{ affichage.motif }}</p>
 {% endif %}
 <p><small>{{ affichage.ligne }}</small></p>
+{% if affichage.lien_catalogue %}
+<p class="zone-pont-catalogue"><a href="{{ affichage.lien_catalogue }}">{{ t.pont_vers_catalogue }}</a></p>
+{% endif %}
 {% if cloture %}
 <article>
 <div role="alert">
@@ -17,7 +20,7 @@
 {% endif %}
 {% if affichage.complement %}
 <article>
-<p><strong>{{ t.non_verifie }}</strong></p>
+<p><strong>{{ affichage.complement_etiquette }}</strong></p>
 <p>{{ affichage.complement }}</p>
 {% if affichage.complement_titres %}
 <p>{{ t.non_verifie_titres }}</p>

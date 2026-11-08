@@ -15,6 +15,9 @@ administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de 
 formulaire expiré, comptes indisponibles), sur une base jetable ; les connexions se font
 dans le navigateur, par les formulaires eux-mêmes.
 
+E4, lot 2b : les écrans du conseiller d'un rôle connecté (`Ecran.role`) passent par
+l'application à base, chaque rôle dans son contexte.
+
 E4, lot 3 : les écrans des critiques (« Mes critiques » pleine, vide, sans catalogue ;
 écrire, refus, modifier, retirer, accès refusé ; la fiche avec critiques ; la
 modération, sa liste vide, sa confirmation), sur la même base, où trois critiques
@@ -302,6 +305,12 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     ):
         navigateur = playwright.chromium.launch(headless=True)
         contexte = navigateur.new_context()
+        # E4, lot 2b : l'écran du conseiller selon le rôle, sur l'application à base,
+        # chaque rôle dans son contexte, connecté par le formulaire.
+        par_role: dict[str, Any] = {}
+        for role in sorted({e.role for e in ECRANS if e.role is not None}):
+            par_role[role] = navigateur.new_context()
+            connecter_dans(par_role[role], adresse_comptes, f"conseiller_{role}_audit")
         for ecran in ECRANS:
             httpx.post(
                 f"{adresse_doublure}/_essai/scenario",
@@ -311,7 +320,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                     "catalogue": ecran.catalogue,
                 },
             ).raise_for_status()
-            page = contexte.new_page()
+            page = (contexte if ecran.role is None else par_role[ecran.role]).new_page()
             page.on(
                 "console",
                 lambda m, nom=ecran.nom: (
@@ -321,7 +330,9 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 ),
             )
             base = adresse
-            if ecran.api_fermee:
+            if ecran.role is not None:
+                base = adresse_comptes
+            elif ecran.api_fermee:
                 base = adresse_sans_api
             elif ecran.neuve:
                 base = adresse_neuve
@@ -392,6 +403,10 @@ COMPTES_AUDIT = (
     *((f"lecteur_audit_{i:02d}", "client", False) for i in range(26)),
     ("libraire_tiers_audit", "libraire", False),
     ("libraire_vide_audit", "libraire", False),
+    # E4, lot 2b : les écrans du conseiller selon le rôle (`Ecran.role`).
+    ("conseiller_client_audit", "client", False),
+    ("conseiller_libraire_audit", "libraire", False),
+    ("conseiller_admin_audit", "admin", False),
 )
 TEXTE_AUDIT = (
     "Texte factice d'une critique d'audit, assez long pour tenir dans les bornes.\n\n"

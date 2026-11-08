@@ -175,6 +175,8 @@ class Reponse(BaseModel):
     #: Le mode enrichi, quand l'API le publiera : l'écran l'accueille sans retouche.
     complement: str | None = None
     complement_titres: list[str] | None = None
+    #: L'étiquette du complément (contrat 1.4.0, D9) ; absente, le texte du 12.
+    complement_etiquette: str | None = None
 
 
 #: L'étiquette des erreurs est fermée : le contrat type `code` en simple texte, sans

@@ -16,7 +16,17 @@ from pathlib import Path
 import httpx
 import pytest
 from bs4 import BeautifulSoup, Tag
-from conftest import ADRESSE_MEMOIRE, ENVIRONNEMENT, HACHEUR_RAPIDE, Navigateur
+from conftest import (
+    ADRESSE_MEMOIRE,
+    CLE_SESSION_ESSAI,
+    ENVIRONNEMENT,
+    HACHEUR_RAPIDE,
+    Navigateur,
+    connecter_essai,
+    creer_compte_essai,
+    dsn_du_role,
+    harnais,
+)
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
 from ecrans import ECRANS, Ecran
 from fastapi.testclient import TestClient
@@ -52,7 +62,19 @@ def rendre(client: TestClient, ecran: Ecran) -> httpx.Response:
 
 
 @pytest.fixture(scope="module")
-def pages() -> Iterator[list[Page]]:
+def base_balisage(conteneur, gabarit, fichier_pgpass) -> Iterator[str]:
+    """Une base jetable pour le module : les écrans d'un rôle connecté (E4, lot 2b) ;
+    son DSN sous le rôle de l'application."""
+    with (
+        harnais.base_depuis_gabarit(conteneur, gabarit) as dsn,
+        pytest.MonkeyPatch.context() as patch,
+    ):
+        patch.setenv("PGPASSFILE", str(fichier_pgpass))
+        yield dsn_du_role(dsn)
+
+
+@pytest.fixture(scope="module")
+def pages(base_balisage: str) -> Iterator[list[Page]]:
     """Chaque écran, rendu une fois : les tests relisent le HTML."""
     doublure = Doublure()
     charges = charger(ENVIRONNEMENT)
@@ -73,13 +95,27 @@ def pages() -> Iterator[list[Page]]:
     sans_api = creer_application(
         replace(reglages, adresse_api=fermee), hacheur=HACHEUR_RAPIDE
     )
+    avec_base = creer_application(
+        replace(reglages, base_dsn=base_balisage, cle_session=CLE_SESSION_ESSAI),
+        transport=transport,
+        hacheur=HACHEUR_RAPIDE,
+    )
     rendues: list[Page] = []
     client_ = ("127.0.0.1", 50000)
     with (
         Navigateur(avec_api, client=client_) as client,
         Navigateur(sans_api, client=client_) as client_sans_api,
         Navigateur(pressee, client=client_) as client_presse,
+        Navigateur(avec_base, client=client_) as client_base,
     ):
+        par_role: dict[str, Navigateur] = {}
+        for role in sorted({e.role for e in ECRANS if e.role is not None}):
+            port = 50001 + len(par_role)
+            connecte = Navigateur(avec_base, client=("127.0.0.1", port))
+            creer_compte_essai(base_balisage, f"{role}_balisage", role)
+            connecter_essai(connecte, f"{role}_balisage")
+            par_role[role] = connecte
+        del client_base
         for ecran in ECRANS:
             doublure.choisir(
                 info=ecran.info, reponse=ecran.reponse, catalogue=ecran.catalogue
@@ -92,6 +128,8 @@ def pages() -> Iterator[list[Page]]:
                     r = rendre(client_neuf, ecran)
             elif ecran.delai_court:
                 r = rendre(client_presse, ecran)
+            elif ecran.role is not None:
+                r = rendre(par_role[ecran.role], ecran)
             else:
                 r = rendre(client_sans_api if ecran.api_fermee else client, ecran)
             rendues.append(
@@ -343,7 +381,8 @@ def test_sans_le_mode_aucun_ecran_ne_porte_score_ni_rang_ni_section(pages):
 
 def test_nouvelle_conversation_est_un_bouton_en_tete_de_chaque_ecran(pages):
     for page in pages:
-        formulaire = page.soupe.select_one("header form")
+        # Connecté, l'en-tête porte aussi le formulaire de déconnexion (POST).
+        formulaire = page.soupe.select_one('header form[action="/"]')
         assert formulaire is not None, page.ecran.nom
         assert formulaire["method"] == "get", page.ecran.nom
         assert formulaire["action"] == "/", page.ecran.nom

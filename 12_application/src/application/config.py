@@ -78,7 +78,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " statut_termine statut_en_cours dispo_france dispo_japon dispo_inconnue"
             " passage_critique passage_resume passage_synopsis carte_sans_passage"
             " mention_carte mention_dispo details_titre details_estimes"
-            " role_appel_reformulation role_appel_reponse non_verifie"
+            " role_appel_reformulation role_appel_reponse complement_etiquette"
             " non_verifie_titres encart_titre degrade_injoignable degrade_delai"
             " degrade_recherche conversation_invalide conversation_longueur"
             " sortie_schema sortie_serie_inconnue sortie_fragment_inconnu"
@@ -166,6 +166,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " trace_temperature trace_longueur trace_cout trace_latence_recherche"
             " trace_latence_reformulation trace_latence_modele trace_latence_totale"
             " trace_identifiant trace_appels_titre"
+            # E4, lot 2b : le conseiller public, le pont fiche ↔ conseiller.
+            " conseiller_aide_public pont_vers_catalogue pont_vers_conseiller"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -226,6 +228,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "critique_lien_modifier": frozenset({"serie"}),
     "critique_lien_retirer": frozenset({"serie"}),
     "critique_lien_moderer": frozenset({"nom"}),
+    "question_pre_remplie": frozenset({"titre"}),
 }
 
 

@@ -40,6 +40,9 @@ class Ecran:
     demonstration: bool = False
     #: Le scénario du catalogue (l'API data du 02) dans la doublure.
     catalogue: str = "nominal"
+    #: Le rôle du compte connecté (E4, lot 2b : l'écran du conseiller selon le rôle) ;
+    #: None : un visiteur. Un rôle demande une base jetable.
+    role: str | None = None
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -58,7 +61,7 @@ DEGRADES = sorted(
 
 ECRANS: tuple[Ecran, ...] = (
     Ecran("page_vide"),
-    Ecran("deux_modes", info="deux_modes"),
+    Ecran("deux_modes", info="deux_modes", role="libraire"),
     Ecran("aucun_profil", info="aucun_profil"),
     Ecran("cle_refusee", info="cle_invalide", neuve=True),
     Ecran("api_indisponible", api_fermee=True),
@@ -70,16 +73,19 @@ ECRANS: tuple[Ecran, ...] = (
     ),
     Ecran("reponse_sans_passage", question=QUESTION, reponse="sans_fragment"),
     Ecran("reponse_refus_debit", question=QUESTION, reponse="refus_debit_rejoue"),
-    Ecran("reponse_complement", question=QUESTION, reponse="complement"),
+    Ecran(
+        "reponse_complement", question=QUESTION, reponse="complement", role="libraire"
+    ),
     Ecran("refus_aucun_passage", question=QUESTION, reponse="refus_aucun_passage"),
     Ecran("refus_hors_catalogue", question=QUESTION, reponse="refus_hors_catalogue"),
     Ecran("refus_inconnu", question=QUESTION, reponse="refus_inconnu"),
-    Ecran("reponse_demonstration", question=QUESTION, demonstration=True),
+    Ecran("reponse_demonstration", question=QUESTION, demonstration=True, role="admin"),
     Ecran(
         "refus_demonstration",
         question=QUESTION,
         reponse="refus_aucun_passage",
         demonstration=True,
+        role="admin",
     ),
     Ecran("conversation_3_tours", question=QUESTION, historique=echanges(1)),
     Ecran("conversation_5_tours", question=QUESTION, historique=echanges(2)),
@@ -89,8 +95,8 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("conversation_invalide", question=QUESTION, historique="{cassé"),
     Ecran("erreur_question_vide", question=""),
     Ecran("erreur_question_longue", question="x" * 501),
-    Ecran("erreur_profil", question=QUESTION, profil="profil-inconnu"),
-    Ecran("erreur_temperature", question=QUESTION, temperature="0.9"),
+    Ecran("erreur_profil", question=QUESTION, profil="profil-inconnu", role="libraire"),
+    Ecran("erreur_temperature", question=QUESTION, temperature="0.9", role="libraire"),
     *(Ecran(f"degrade_{nom}", question=QUESTION, reponse=nom) for nom in DEGRADES),
     Ecran("degrade_api_injoignable", question=QUESTION, api_fermee=True),
     Ecran("degrade_delai", question=QUESTION, reponse="delai", delai_court=True),
@@ -116,4 +122,12 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("serie_introuvable", chemin="/series/101", catalogue="serie_inconnue"),
     # E4, lot 3 : sans base, la fiche s'affiche avec l'encart des critiques du réseau.
     Ecran("serie_critiques_indisponibles", chemin="/series/102"),
+    # E4, lot 2b : l'écran du conseiller selon le rôle, le pont fiche ↔ conseiller.
+    Ecran("conseiller_public"),
+    Ecran("conseiller_client", role="client"),
+    Ecran("conseiller_libraire", info="deux_modes", role="libraire"),
+    Ecran("conseiller_admin", info="deux_modes", role="admin"),
+    Ecran("conseiller_prerempli", chemin="/?serie=101"),
+    Ecran("reponse_refus_avec_pont", question=QUESTION, reponse="refus"),
+    Ecran("reponse_sans_carte_avec_pont", question=QUESTION, reponse="sans_carte"),
 )

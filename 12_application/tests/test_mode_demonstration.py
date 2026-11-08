@@ -1,5 +1,10 @@
 """Le mode démonstration : éteint, la production ne change pas ; allumé, la page montre
-ce que l'API a déjà rendu, et rien n'est envoyé de plus."""
+ce que l'API a déjà rendu, et rien n'est envoyé de plus.
+
+E4, lot 2b (A7) : la case est réservée à l'administrateur ; les tests de ce module la
+jouent sous une session admin, sur une base jetable (`navigateur` est redéfini ici). Le
+public et le libraire, qui ne l'ont pas, sont éprouvés dans
+`test_conseiller_roles.py`."""
 
 from __future__ import annotations
 
@@ -10,7 +15,14 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup, Tag
-from conftest import ENVIRONNEMENT, Navigateur, application_sur
+from conftest import (
+    CLE_SESSION_ESSAI,
+    ENVIRONNEMENT,
+    Navigateur,
+    application_sur,
+    connecter_essai,
+    creer_compte_essai,
+)
 from ecrans import echanges
 
 from application.config import FICHIER_REGLAGES, ConfigurationInvalide, charger
@@ -29,6 +41,12 @@ SCORES = ("0,83", "0,76", "0,64", "0,52", "0,40", "0,47", "0,61")
 NON_CITES = (12, 31, 41, 51)
 #: Les séries de la recherche que le modèle n'a pas citées.
 TITRES_NON_CITES = ("Série factice C", "Série factice D", "Série factice E")
+
+
+@pytest.fixture
+def navigateur(admin: Navigateur) -> Navigateur:
+    """La case du mode démonstration n'existe que pour l'administrateur."""
+    return admin
 
 
 def soupe(reponse) -> BeautifulSoup:
@@ -591,12 +609,19 @@ def test_une_erreur_de_champ_garde_la_case(navigateur, doublure):
 
 
 def test_le_defaut_vient_de_la_configuration_et_le_libraire_garde_la_main(
-    doublure, reglages
+    doublure, reglages, base_app
 ):
-    allume = replace(reglages, mode_demonstration_defaut=True)
+    allume = replace(
+        reglages,
+        mode_demonstration_defaut=True,
+        base_dsn=base_app,
+        cle_session=CLE_SESSION_ESSAI,
+    )
     application, _ = application_sur(doublure, allume)
 
     with Navigateur(application, client=("127.0.0.1", 50000)) as client:
+        creer_compte_essai(base_app, "admin_defaut", "admin")
+        connecter_essai(client, "admin_defaut")
         assert case_cochee(soupe(client.get("/")))
         page = soupe(poser(client))
 

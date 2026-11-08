@@ -16,6 +16,7 @@
 </dl>
 <p><small>{{ t.serie_type }} : {{ fiche.type or t.valeur_inconnue }} · {{ t.serie_annee }} : {{ fiche.year or t.valeur_inconnue }}</small></p>
 </section>
+<p class="zone-pont-conseiller"><a href="/?serie={{ fiche.series_id }}">{{ t.pont_vers_conseiller }}</a></p>
 {# La note du réseau d'abord, puis celle des lecteurs : c'est l'argument (deux `p`, la
    feuille de style du lot 6 en fera un vis-à-vis). #}
 <section class="zone-note" aria-label="{{ t.serie_note_etiquette }}">

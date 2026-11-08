@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import importlib.util
+import itertools
 import json
 import secrets
 import socket
@@ -36,7 +37,7 @@ import psycopg
 import pytest
 import uvicorn
 from argon2 import PasswordHasher
-from doublure_api import CLE_ATTENDUE, Doublure
+from doublure_api import CLE_ATTENDUE, CLE_CATALOGUE_ATTENDUE, Doublure
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from psycopg import conninfo, sql
@@ -294,3 +295,86 @@ def base_app(base: str, pgpass: Path) -> str:
     """La base du test vue par l'application : son rôle, sans mot de passe au DSN."""
     del pgpass
     return dsn_du_role(base)
+
+
+# --------------------------------------------------------------------------- #
+#  Un navigateur connecté, par rôle (E4, lot 2b : l'écran du conseiller selon le rôle)
+# --------------------------------------------------------------------------- #
+MDP_ESSAI = "mot de passe factice de connexion"
+CLE_SESSION_ESSAI = "s" * 48
+
+
+def creer_compte_essai(dsn: str, pseudo: str, role: str) -> int:
+    """Un compte actif du rôle, au mot de passe factice (hacheur réduit)."""
+    with psycopg.connect(dsn) as cx:
+        ligne = cx.execute(
+            "INSERT INTO application.comptes (pseudo, nom_affiche, role, hachage)"
+            " VALUES (%s, %s, %s, %s) RETURNING id",
+            (pseudo, f"Nom {pseudo}", role, HACHEUR_RAPIDE.hacher(MDP_ESSAI)),
+        ).fetchone()
+    assert ligne is not None
+    return int(ligne[0])
+
+
+def connecter_essai(client: TestClient, pseudo: str) -> None:
+    r = client.post(
+        "/connexion",
+        data={"pseudo": pseudo, "mot_de_passe": MDP_ESSAI},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, pseudo
+
+
+@pytest.fixture
+def application_comptes(
+    doublure: Doublure, reglages: Reglages, base_app: str
+) -> Iterator[FastAPI]:
+    """L'application sur une base jetable, contre la doublure (l'API du modèle et le
+    catalogue) ; démarrée (son cycle de vie tourne une fois, sous le premier
+    navigateur)."""
+    application = creer_application(
+        replace(
+            reglages,
+            base_dsn=base_app,
+            cle_session=CLE_SESSION_ESSAI,
+            catalogue=replace(reglages.catalogue, cle=CLE_CATALOGUE_ATTENDUE),
+        ),
+        transport=httpx.ASGITransport(app=doublure.app),
+        hacheur=HACHEUR_RAPIDE,
+    )
+    with Navigateur(application, client=("127.0.0.1", 50000)):
+        yield application
+
+
+@pytest.fixture
+def connecter(
+    application_comptes: FastAPI, base_app: str
+) -> Callable[[str | None], Navigateur]:
+    """Un navigateur neuf sur `application_comptes`, connecté sous un compte du rôle
+    donné, créé pour lui (None : un visiteur)."""
+    ports = itertools.count(50001)
+
+    def ouvrir(role: str | None) -> Navigateur:
+        port = next(ports)
+        client = Navigateur(
+            application_comptes,
+            client=("127.0.0.1", port),
+            raise_server_exceptions=False,
+        )
+        if role is not None:
+            pseudo = f"{role}_essai_{port}"
+            creer_compte_essai(base_app, pseudo, role)
+            connecter_essai(client, pseudo)
+        return client
+
+    return ouvrir
+
+
+@pytest.fixture
+def libraire(connecter: Callable[[str | None], Navigateur]) -> Navigateur:
+    return connecter("libraire")
+
+
+@pytest.fixture
+def admin(connecter: Callable[[str | None], Navigateur]) -> Navigateur:
+    return connecter("admin")

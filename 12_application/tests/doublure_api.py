@@ -515,6 +515,30 @@ SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
     "complement_nul": lambda: Rendu(
         200, reponse_nominale(complement="Complément factice.", complement_titres=None)
     ),
+    # E4, lot 2b : l'étiquette du complément fournie par l'API (contrat 1.4.0, D9), ou
+    # absente (le texte du 12) ; une réponse qui ne cite aucune série ; un refus.
+    "enrichi_avec_etiquette": lambda: Rendu(
+        200,
+        reponse_nominale(
+            complement="Complément factice.",
+            complement_titres=["Titre factice hors catalogue"],
+            complement_etiquette="Étiquette factice de l'API",
+        ),
+    ),
+    "enrichi_sans_etiquette": lambda: Rendu(
+        200,
+        reponse_nominale(
+            complement="Complément factice.",
+            complement_titres=["Titre factice hors catalogue"],
+        ),
+    ),
+    "sans_carte": lambda: Rendu(
+        200,
+        reponse_nominale(
+            reponse="Réponse factice qui ne cite aucune série.", series_citees=[]
+        ),
+    ),
+    "refus": lambda: Rendu(200, reponse_refus("hors_catalogue")),
     "refus_aucun_passage": lambda: Rendu(
         200,
         reponse_refus(

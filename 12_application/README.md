@@ -8,12 +8,13 @@ et les passages cités.
 ## Ce qu'elle fait, et ce qu'elle ne fait pas
 
 - **Elle fait** : une page question → réponse ; une conversation de cinq échanges au plus ;
-  le choix du profil et deux réglages de démonstration ; un mode démonstration, éteint par
-  défaut, qui montre les scores et la trace de la recherche ; un écran nommé par cas dégradé ;
+  pour les libraires et l'administrateur, le choix du profil, deux réglages et le mode de
+  réponse ; pour l'administrateur seul, un mode démonstration, éteint par défaut, qui
+  montre les scores et la trace de la recherche ; le public (visiteur, client) n'a aucun
+  réglage, en mode strict (E4, lot 2b) ; un écran nommé par cas dégradé ;
   la mention « Vous parlez à une IA » sur chaque écran ; un audit d'accessibilité outillé.
-- **Elle ne fait pas** : aucune écriture en fichier ; mode strict seul tant que l'API n'en
-  expose pas d'autre ; aucune bascule automatique de profil : le repli reste un geste
-  humain.
+- **Elle ne fait pas** : aucune écriture en fichier ; aucun mode autre que le strict pour
+  le public ; aucune bascule automatique de profil : le repli reste un geste humain.
 - **E4, lot 1 (le socle)** : une base à elle (schéma `application`, migration `027`, rôle
   `app_rw` seul) ; mots de passe hachés par Argon2id ; sessions signées, le compte relu en
   base à chaque requête ; jeton CSRF sur chaque formulaire `POST` ; verrou après des
@@ -73,7 +74,9 @@ Un seul écran, `/`, dans l'ordre de lecture :
    script, et l'historique ne le suit pas ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
-4. le formulaire : la question ; les **Réglages**, repliés ; le champ caché de l'historique ;
+4. le formulaire : la question ; les **Réglages**, repliés, pour un libraire ou
+   l'administrateur seulement (« Le conseiller selon le rôle ») ; le champ caché de
+   l'historique ;
 5. la réponse ou le refus ; la ligne discrète (profil, fournisseur, modèle, date de l'appel,
    reformulation, coût estimé, latence) ; une carte par série citée, ses métadonnées et ses
    seuls passages cités ; les détails techniques, repliés ;
@@ -96,14 +99,45 @@ issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
 `application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
 chaque appel.
 
+### Le conseiller selon le rôle (E4, lot 2b)
+
+| Rôle | Réglages (profil, température, reformulation) | Case « mode démonstration » | Liste des modes | Mode envoyé |
+|---|---|---|---|---|
+| visiteur, client | **absents du HTML** | absente | absente | `strict`, le défaut du contrat |
+| libraire | présents, repliés | absente | si `/v1/info` déclare plus d'un mode ; `strict` choisi | celui de la liste ; hors liste, le défaut |
+| administrateur | présents | **présente** | même règle | idem |
+
+- **Un champ forgé est ignoré, pas refusé** : pour le public, `profil`, `temperature`,
+  `reformuler`, `mode` et `mode_demonstration` n'existent pas ; un `POST` qui les porte part
+  avec les défauts (profil par défaut, température par défaut, reformulation par défaut de
+  l'API, `strict`) — 200, jamais 422. Un libraire n'a pas le mode démonstration.
+- **Le complément du mode enrichi** n'est rendu que pour un rôle qui choisit le mode ; son
+  étiquette est `complement_etiquette` de l'API (contrat 1.4.0), le texte du 12 si elle
+  manque (`[textes] complement_etiquette`).
+- **Le public** lit, sous le titre, « Le conseiller répond à partir des critiques des
+  libraires du réseau » ; la mention IA reste sur chaque écran.
+- **Le pont, dans les deux sens** : la fiche d'une série porte « Demander au conseiller »
+  (`/?serie=<id>`), qui pré-remplit la question avec le **titre exact lu dans le 02**
+  (« Que pensent les libraires de *titre* ? », `[textes] question_pre_remplie`) — jamais un
+  texte de l'adresse ; un identifiant illisible, une série inconnue, un catalogue absent ou
+  en panne : la page sans pré-remplissage, sans erreur. Une réponse qui **refuse** ou ne
+  **cite aucune série** porte « Chercher ce titre dans le catalogue »
+  (`/catalogue?q=<question coupée à 100 caractères>`, absent sous 2 caractères).
+
+Tests : `tests/test_conseiller_roles.py` (un test par critère de V1, A7, L6, fin de V3) ;
+mutations `E4Q-01` (réglages servis au public), `E4Q-02` (case servie à un libraire),
+`E4Q-03` (`mode=enrichi` forgé par un visiteur accepté).
+
 ### Les réglages
+
+Pour un libraire ou l'administrateur (« Le conseiller selon le rôle »).
 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
 | Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
-| Mode démonstration | coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
+| Mode démonstration | administrateur seul ; coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
 | Mode | affiché seulement si l'API en déclare plus d'un | `strict` |
 
 Le reste (`longueur_max`, `nombre_series`, `passages_par_serie`, `catalogue_seul`) reste aux
@@ -111,8 +145,8 @@ défauts de l'API.
 
 ### Le mode démonstration
 
-Une case des réglages, **décochée par défaut** (`[reglages] mode_demonstration_defaut =
-false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
+Une case des réglages, **à l'administrateur seul** (E4, lot 2b, A7), **décochée par
+défaut** (`[reglages] mode_demonstration_defaut = false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
 « Nouvelle conversation » la remet au défaut. Ni variable d'environnement, ni cookie à
 elle (le seul cookie est celui de la session, « Sécurité et données »).
 
