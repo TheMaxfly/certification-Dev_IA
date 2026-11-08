@@ -144,6 +144,8 @@ class ReglagesAppliques(BaseModel):
 class ReglagesReponseAppliques(BaseModel):
     temperature: float | None = None
     longueur_max: int | None = None
+    #: Le mode appliqué : il range le coût du jour (E4, lot 2b), pas le mode demandé.
+    mode: str | None = None
 
 
 class ContexteReponse(BaseModel):
@@ -266,7 +268,11 @@ class Resultat:
 
 
 class ClientApi:
-    """La clé n'est gardée que dans le client HTTP ; `repr` ne la montre pas."""
+    """La clé n'est gardée que dans le client HTTP ; `repr` ne la montre pas.
+
+    E4, lot 2b (décision 5) : une clé **par appel** — celle des comptes pour un compte
+    connecté, la publique sinon (`reponse(demande, cle=…)`) ; sans clé passée, la
+    publique, celle du constructeur. Jamais deux clients distincts."""
 
     def __init__(
         self,
@@ -279,7 +285,7 @@ class ClientApi:
         self.adresse = adresse
         self._delais = delais
         self._metriques = metriques
-        self._entetes = {ENTETE_CLE: cle}
+        self._cle = cle
         self._http = httpx.AsyncClient(
             base_url=adresse, transport=transport, follow_redirects=False
         )
@@ -298,6 +304,7 @@ class ClientApi:
         corps: object | None = None,
         *,
         avec_cle: bool = True,
+        cle: str | None = None,
     ) -> httpx.Response:
         """La requête ; ses échecs de transport en deux exceptions, sans leur cause. Le
         délai borne l'appel entier, pas seulement chaque lecture."""
@@ -310,7 +317,7 @@ class ClientApi:
                     route,
                     json=corps,
                     timeout=delais,
-                    headers=self._entetes if avec_cle else None,
+                    headers={ENTETE_CLE: cle or self._cle} if avec_cle else None,
                 )
         except (httpx.ConnectError, httpx.ConnectTimeout):
             self._noter(route, "injoignable", "api_injoignable")
@@ -386,10 +393,13 @@ class ClientApi:
             return False
         return reponse.status_code == 200
 
-    async def reponse(self, demande: Mapping[str, object]) -> Resultat:
-        """`POST /v1/reponse` ; `demande` : le corps, tel que le contrat le décrit."""
+    async def reponse(
+        self, demande: Mapping[str, object], cle: str | None = None
+    ) -> Resultat:
+        """`POST /v1/reponse` ; `demande` : le corps, tel que le contrat le décrit ;
+        `cle` : celle de l'appel (None : la publique)."""
         reponse = await self._appeler(
-            "POST", ROUTE_REPONSE, self._delais.reponse_s, dict(demande)
+            "POST", ROUTE_REPONSE, self._delais.reponse_s, dict(demande), cle=cle
         )
         identifiant = reponse.headers.get(ENTETE_IDENTIFIANT)
         if not 200 <= reponse.status_code < 300:

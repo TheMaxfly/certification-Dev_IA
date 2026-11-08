@@ -3,7 +3,7 @@
 - **Date** : 2026-11-08.
 - **Outil** : axe-core 4.14.0, dans Chromium 156.0.8078.4.
 - **Niveau visé** : WCAG 2.1 AA (étiquettes : wcag2a, wcag2aa, wcag21a, wcag21aa, best-practice).
-- **Pages auditées** : 107, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
+- **Pages auditées** : 112, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
 - **Violations par gravité** : critical 0, serious 0, moderate 0, minor 0.
 - **Violations de la politique de sécurité en console** : 0.
 
@@ -43,10 +43,14 @@ Aucun.
 | `connexion_refusee` | 35 | 0 | 1 | 55 |
 | `connexion_requise` | 30 | 0 | 0 | 60 |
 | `conseiller_admin` | 36 | 0 | 1 | 54 |
+| `conseiller_budget_atteint` | 39 | 0 | 0 | 51 |
 | `conseiller_client` | 34 | 0 | 0 | 56 |
+| `conseiller_debit_atteint` | 39 | 0 | 0 | 51 |
 | `conseiller_libraire` | 36 | 0 | 1 | 54 |
 | `conseiller_prerempli` | 34 | 0 | 0 | 56 |
 | `conseiller_public` | 34 | 0 | 0 | 56 |
+| `conseiller_quota_atteint` | 39 | 0 | 0 | 51 |
+| `conseiller_quota_client_atteint` | 39 | 0 | 0 | 51 |
 | `conversation_3_tours` | 39 | 0 | 0 | 51 |
 | `conversation_5_tours` | 39 | 0 | 0 | 51 |
 | `conversation_close` | 43 | 0 | 0 | 47 |
@@ -101,6 +105,7 @@ Aucun.
 | `erreur_temperature` | 36 | 0 | 1 | 54 |
 | `formulaire_expire` | 30 | 0 | 0 | 60 |
 | `inscription` | 36 | 0 | 0 | 54 |
+| `inscription_bornee` | 41 | 0 | 0 | 49 |
 | `inscription_refusee` | 36 | 0 | 1 | 54 |
 | `introuvable_connecte` | 30 | 0 | 0 | 60 |
 | `mot_de_passe` | 35 | 0 | 0 | 55 |

@@ -22,13 +22,15 @@ from conftest import (
     ENVIRONNEMENT,
     HACHEUR_RAPIDE,
     Navigateur,
+    bornes_larges,
     connecter_essai,
     creer_compte_essai,
     dsn_du_role,
     harnais,
 )
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import ECRANS, Ecran
+from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, Ecran
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from application.app import GABARITS, STATIQUE, creer_application
@@ -61,6 +63,35 @@ def rendre(client: TestClient, ecran: Ecran) -> httpx.Response:
     return client.post("/question", data=donnees)
 
 
+def inscrire(client: TestClient, pseudo: str) -> httpx.Response:
+    return client.post(
+        "/inscription",
+        data={
+            "pseudo": pseudo,
+            "mot_de_passe": MDP_INSCRIPTION,
+            "confirmation": MDP_INSCRIPTION,
+            "retour": "/",
+        },
+        follow_redirects=False,
+    )
+
+
+def rendre_borne(application: FastAPI, ecran: Ecran, base: str) -> httpx.Response:
+    """Un écran borné (E4, lot 2b) : sur son application, un premier passage, puis la
+    page qui dépasse la borne."""
+    with Navigateur(application, client=("127.0.0.1", 50100)) as client:
+        if ecran.role is not None:
+            pseudo = f"{ecran.role}_borne_balisage"
+            creer_compte_essai(base, pseudo, ecran.role)
+            connecter_essai(client, pseudo)
+        if ecran.borne == "inscription":
+            assert inscrire(client, "inscrit_borne_1").status_code == 303
+            client.post("/deconnexion", data={})
+            return inscrire(client, "inscrit_borne_2")
+        rendre(client, ecran)
+        return rendre(client, ecran)
+
+
 @pytest.fixture(scope="module")
 def base_balisage(conteneur, gabarit, fichier_pgpass) -> Iterator[str]:
     """Une base jetable pour le module : les écrans d'un rôle connecté (E4, lot 2b) ;
@@ -77,7 +108,7 @@ def base_balisage(conteneur, gabarit, fichier_pgpass) -> Iterator[str]:
 def pages(base_balisage: str) -> Iterator[list[Page]]:
     """Chaque écran, rendu une fois : les tests relisent le HTML."""
     doublure = Doublure()
-    charges = charger(ENVIRONNEMENT)
+    charges = bornes_larges(charger(ENVIRONNEMENT))
     reglages = replace(
         charges,
         adresse_api=ADRESSE_MEMOIRE,
@@ -128,6 +159,17 @@ def pages(base_balisage: str) -> Iterator[list[Page]]:
                     r = rendre(client_neuf, ecran)
             elif ecran.delai_court:
                 r = rendre(client_presse, ecran)
+            elif ecran.borne is not None:
+                serree = replace(
+                    reglages,
+                    base_dsn=base_balisage,
+                    cle_session=CLE_SESSION_ESSAI,
+                    bornes=replace(reglages.bornes, **BORNES_SERREES[ecran.borne]),
+                )
+                application = creer_application(
+                    serree, transport=transport, hacheur=HACHEUR_RAPIDE
+                )
+                r = rendre_borne(application, ecran, base_balisage)
             elif ecran.role is not None:
                 r = rendre(par_role[ecran.role], ecran)
             else:
@@ -163,6 +205,17 @@ def test_le_catalogue_couvre_chaque_cas_et_rend_ce_qui_est_attendu(pages):
     assert statuts["catalogue_erreur_saisie"] == 422
     assert statuts["catalogue_indisponible"] == 503
     assert statuts["serie_introuvable"] == 404
+    for nom in (
+        "conseiller_quota_atteint",
+        "conseiller_quota_client_atteint",
+        "conseiller_debit_atteint",
+        "inscription_bornee",
+    ):
+        assert statuts[nom] == 429, nom
+    assert statuts["conseiller_budget_atteint"] == 503
+    for nom in ("conseiller_quota_atteint", "conseiller_budget_atteint"):
+        page = next(p for p in pages if p.ecran.nom == nom)
+        assert page.entetes["Retry-After"].isdigit(), nom
     cle = next(p for p in pages if p.ecran.nom == "cle_refusee").soupe
     assert "refuse l'accès" in cle.get_text()
     assert not cle.select_one("button[type=submit]").has_attr("disabled")

@@ -34,8 +34,9 @@ def test_le_gabarit_porte_le_schema_de_l_application(base):
         "listes",
         "couts_jour",
         "reglages",
+        "questions_jour",  # 029, E4, lot 2b : le quota des comptes clients
     }
-    assert derniere >= "027"
+    assert derniere >= "029"
 
 
 def test_le_dsn_de_l_application_ne_porte_aucun_mot_de_passe(base_app):

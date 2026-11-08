@@ -830,7 +830,7 @@ def test_api_injoignable_a_la_question_l_encart_le_dit(demarrer, port_ferme):
 
 
 def test_api_coupee_entre_la_liste_et_la_question(navigateur, doublure, monkeypatch):
-    async def coupee(_demande):
+    async def coupee(_demande, cle=None):
         from application.client_api import ApiInjoignable
 
         raise ApiInjoignable

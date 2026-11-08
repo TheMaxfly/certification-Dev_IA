@@ -779,6 +779,9 @@ class Encart:
     profil_a_revoir: bool = False
     #: La conversation s'arrête là : le lien vers une nouvelle est proposé.
     nouvelle_conversation: bool = False
+    #: Le titre de l'encart, s'il en a un à lui (les bornes, E4, lot 2b) ; None : le
+    #: titre commun.
+    titre: str | None = None
 
 
 CODES_RECHERCHE = frozenset(

@@ -85,7 +85,8 @@ Un seul écran, `/`, dans l'ordre de lecture :
 `/a-propos` : ce qui est transmis, tous les profils proposés et leur hébergement, ce qui
 n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API ; il
 porte `api`, `base` et `catalogue` (`ok`, `indisponible`, `non_configure` : un `GET /live`
-du catalogue, sans clé, délai court).
+du catalogue, sans clé, délai court), et `cles_api` (`une`, `deux` : la clé des comptes
+posée ou non, E4, lot 2b).
 `/metrics` : Prometheus, sur le bouclage, ou le réseau de collecte déclaré
 (`APPLICATION_METRIQUES_RESEAUX`). `application_requetes_total{route, statut}` : `route` est
 le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour le reste.
@@ -127,6 +128,46 @@ chaque appel.
 Tests : `tests/test_conseiller_roles.py` (un test par critère de V1, A7, L6, fin de V3) ;
 mutations `E4Q-01` (réglages servis au public), `E4Q-02` (case servie à un libraire),
 `E4Q-03` (`mode=enrichi` forgé par un visiteur accepté).
+
+### Les bornes du conseiller (E4, lot 2b)
+
+Le conseiller public appelle un modèle payant : quatre bornes le tiennent, toutes en
+configuration (`[conseiller.limites]`), vérifiées **avant** l'appel, dans cet ordre, et un
+refus n'appelle jamais l'API.
+
+| Borne | Qui | Valeur, et son repère | Mécanisme | Dépassement |
+|---|---|---|---|---|
+| Quota par session | visiteurs | **10 questions / heure** — un visiteur en boutique, le temps d'un choix | les horodatages des questions de l'heure dans le cookie signé (`quota`), purgés et **bornés** à 10 à chaque lecture (un cookie forgé ne fait rien enfler) ; compté après une réponse 200 seulement | 429, `Retry-After`, « Vous avez posé 10 questions cette heure-ci ; revenez à HH:MM (fuseau du serveur) » ; la question reste au formulaire |
+| Quota par compte client | clients connectés (ni libraires, ni administrateur) | **10 questions / jour civil UTC** — la borne classique d'un service gratuit sans abonnement | `application.questions_jour` (migration `029`), relu avant, incrémenté après une réponse 200 ; il **suit le compte**, pas le cookie | 429, `Retry-After` jusqu'à minuit UTC, « … vos 10 questions du jour ; le conseiller vous revient demain à HH:MM » |
+| Plafond de débit | les appels partis avec la **clé publique** | **10 / minute**, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min | en mémoire du processus : **valable avec un processus** ; plusieurs demanderaient un compteur partagé | 429, `Retry-After`, « Le conseiller est très sollicité ; réessayez dans une minute » |
+| Plafond de coût du jour | tout le monde, strict et enrichi | **0,50 $ / jour** — environ 250 questions au coût mesuré | `application.couts_jour` (027) : la somme du jour, relue avant chaque appel ; après chaque réponse, le `cout_estime_usd` reçu (0 s'il manque, journalisé `cout_absent`) sous le profil et le mode **rendus par l'API** ; base indisponible : le plafond n'est **pas vérifiable**, le conseiller répond quand même (`plafond_non_verifiable`, état `inconnu`) | 503, `Retry-After` jusqu'à minuit UTC, « Le conseiller a atteint son budget du jour ; il reprend demain » |
+
+- **Les deux clés** (décision 5) : `APPLICATION_CLE_API` (publique, visiteurs) et
+  `APPLICATION_CLE_API_COMPTES` (facultative : client, libraire, administrateur), prises
+  **par appel** par le même client HTTP. Sans clé des comptes, la publique sert aux deux
+  (`cle_comptes_absente` au démarrage, `/sante` : `"cles_api": "une"`, sinon `"deux"`) :
+  les comptes passent alors sous le plafond de débit des visiteurs — la protection de D7
+  (une rafale de visiteurs ne bloque pas un libraire) suppose la seconde clé, posée au
+  trousseau de l'API au lot de livraison continue.
+- **L'inscription bornée** : 3 comptes par heure et par session (`inscriptions` dans le
+  cookie, même mécanisme, gardé à l'ouverture et à la fermeture d'une session) ; au-delà,
+  429, `Retry-After`, un encart au formulaire, aucune ligne en base.
+- **Limites assumées** : un cookie effacé remet à zéro le quota de session et le compteur
+  d'inscriptions (le quota d'un compte, lui, suit le compte) ; deux questions simultanées
+  peuvent passer ensemble le plafond de coût (relu, pas réservé) ; une réponse en erreur de
+  l'API (503) ne porte pas son coût : il n'est pas compté.
+- **Métriques** : `application_questions_total{mode, issue}` (`reponse`, `refus`, `quota`,
+  `debit`, `plafond_cout`, `api_erreur`, `api_indisponible`),
+  `application_quota_refus_total{motif}` (`session`, `client`, `debit`, `cout`,
+  `inscription`), `application_cout_jour_usd` (lu avant chaque question),
+  `application_plafond_cout_etat{etat}` (`ok`, `atteint`, `inconnu`) ; la latence du
+  conseiller est `application_latence_secondes{route="/question"}` (histogramme existant,
+  borné). Toutes déclarées à zéro dès le démarrage.
+
+Tests : `tests/test_bornes.py` (horloge injectée : la fenêtre glisse, minuit passe, sans
+attendre) ; mutations `E4Q-04` (quota de session jamais incrémenté), `E4Q-05` (plafond de
+débit retiré), `E4Q-06` (coût non relu avant l'appel), `E4Q-07` (clé des comptes retirée),
+`E4Q-08` (inscription sans borne), `E4Q-12` (quota du compte client jamais relu).
 
 ### Les réglages
 
@@ -471,7 +512,8 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
 | Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
-| Consommation de ressources (A04), authentification (A07) : l'inscription | **non couvert à ce lot** : un même poste peut créer des comptes à la chaîne ; couvert au lot du conseiller public avec le quota par session et le plafond global |
+| Consommation de ressources non bornée (A04) : le conseiller | **couvert** (E4, lot 2b) : quatre bornes vérifiées avant l'appel — quota par session, quota par compte client, débit de la clé publique, budget du jour persisté (« Les bornes du conseiller ») ; un refus n'appelle jamais l'API ; mutations E4Q-04 à 07, E4Q-12 |
+| Authentification (A07) : l'inscription | **couvert, par session** (E4, lot 2b) : 3 comptes par heure et par navigateur, aucune ligne au-delà ; limite assumée : un cookie effacé remet le compteur à zéro ; mutation E4Q-08 |
 
 ## Configuration
 

@@ -1,0 +1,7 @@
+id = "E4Q-04"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — le quota de session jamais incrémenté : un visiteur poserait des questions sans fin"
+fichier = "12_application/src/application/app.py"
+avant = '''            quotas.noter(request.session, quotas.CLE_QUOTA, instant, fenetre, plafond)'''
+apres = '''            pass'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "dix_questions_passent_la_onzieme"]

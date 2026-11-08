@@ -4,6 +4,12 @@
 {% block contenu %}
 <h1>{{ t.inscription_titre }}</h1>
 <p>{{ t.inscription_collecte }} <a href="/a-propos#comptes">{{ t.inscription_collecte_lien }}</a></p>
+{% if bornee %}
+<article><div role="alert">
+<h2 tabindex="-1" autofocus aria-describedby="inscription-bornee">{{ t.inscription_bornee_titre }}</h2>
+<p id="inscription-bornee">{{ bornee }}</p>
+</div></article>
+{% endif %}
 <form method="post" action="/inscription">
 <input type="hidden" name="jeton" value="{{ jeton }}">
 <input type="hidden" name="retour" value="{{ retour }}">

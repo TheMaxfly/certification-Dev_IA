@@ -2,7 +2,9 @@
 
 **Le cookie** (`SessionMiddleware` de Starlette, signé par `itsdangerous`, expiration
 vérifiée côté serveur) ne porte que l'identifiant du compte, sa génération et le jeton
-CSRF — ni rôle, ni pseudo (E4, lot 1, décision 5). `HttpOnly`, `SameSite=Lax`, `Secure`
+CSRF — ni rôle, ni pseudo (E4, lot 1, décision 5) ; et, depuis le lot 2b, les
+horodatages des questions d'un visiteur (`quota`) et des inscriptions (`inscriptions`),
+bornés (`quotas`). `HttpOnly`, `SameSite=Lax`, `Secure`
 hors développement. Les visiteurs anonymes le reçoivent aussi : il porte leur jeton.
 
 **Le compte courant** est relu en base à chaque requête d'un visiteur connecté : rôle,
@@ -35,6 +37,14 @@ NOM_COOKIE = "conseiller_session"
 CHAMP_JETON = "jeton"
 #: Les chemins qu'un compte au mot de passe à changer peut encore ouvrir.
 CHEMINS_AVANT_CHANGEMENT = frozenset({"/compte/mot-de-passe", "/deconnexion"})
+#: Ce qui survit à l'ouverture et à la fermeture d'une session (E4, lot 2b) : le
+#: compteur des inscriptions de ce navigateur — sinon s'inscrire, se déconnecter et
+#: recommencer le remettrait à zéro.
+CONSERVES = ("inscriptions",)
+
+
+def conserves(request: Request) -> dict[str, object]:
+    return {cle: request.session[cle] for cle in CONSERVES if cle in request.session}
 
 
 class NonConnecte(Exception):
@@ -112,20 +122,25 @@ def exiger_jeton(request: Request, valeur: object) -> None:
 
 
 def ouvrir(request: Request, compte: Compte) -> None:
-    """Une session neuve : nouveau contenu, nouveau jeton (pas de fixation)."""
+    """Une session neuve : nouveau contenu, nouveau jeton (pas de fixation) ; seul le
+    compteur des inscriptions est repris (`CONSERVES`)."""
+    gardes = conserves(request)
     request.session.clear()
     request.session.update(
         {
             "compte": compte.id,
             "generation": compte.generation,
             "csrf": secrets.token_urlsafe(32),
+            **gardes,
         }
     )
     request.state.compte = compte
 
 
 def fermer(request: Request) -> None:
+    gardes = conserves(request)
     request.session.clear()
+    request.session.update(gardes)
     request.state.compte = None
 
 

@@ -79,9 +79,23 @@ def journal_complet(caplog: pytest.LogCaptureFixture) -> str:
     return "\n".join(forme.format(r) for r in caplog.records)
 
 
+def bornes_larges(reglages: Reglages) -> Reglages:
+    """Les bornes du conseiller (E4, lot 2b) écartées : un test qui pose des dizaines
+    de questions d'une même session n'éprouve pas les quotas. Ceux qui les éprouvent
+    (`test_bornes.py`) reprennent les valeurs de la configuration."""
+    larges = replace(
+        reglages.bornes,
+        quota_session_questions=10_000,
+        quota_client_questions_jour=10_000,
+        debit_public_par_minute=10_000,
+        inscriptions_session_max=10_000,
+    )
+    return replace(reglages, bornes=larges)
+
+
 @pytest.fixture
 def reglages() -> Reglages:
-    return replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE)
+    return bornes_larges(replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE))
 
 
 @pytest.fixture

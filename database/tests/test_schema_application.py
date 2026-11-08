@@ -298,6 +298,8 @@ def test_la_migration_ne_cree_aucun_role_de_connexion():
 #  Le schéma, ses tables, les droits lus dans le catalogue
 # --------------------------------------------------------------------------- #
 def test_027_cree_le_schema_et_ses_six_tables(base_migree):
+    """Les six tables de la 027 ; la base migrée jusqu'au dernier fichier porte aussi
+    celle de la 029 (`questions_jour`, E4, lot 2b : `test_quota_comptes.py`)."""
     with psycopg.connect(base_migree) as cx:
         tables = [r.split(".")[1] for r in relations(cx, "application")]
         (proprietaire,) = cx.execute(
@@ -305,7 +307,7 @@ def test_027_cree_le_schema_et_ses_six_tables(base_migree):
             " 'application'"
         ).fetchone()
 
-    assert sorted(tables) == sorted(TABLES)
+    assert sorted(tables) == sorted((*TABLES, "questions_jour"))
     assert proprietaire == "postgres"
 
 

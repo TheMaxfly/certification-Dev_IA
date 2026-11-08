@@ -1,0 +1,7 @@
+id = "E4Q-05"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — le plafond de débit de la clé publique retiré : une rafale de visiteurs passerait"
+fichier = "12_application/src/application/app.py"
+avant = '''            attente = limiteur.admettre()'''
+apres = '''            attente = None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "dix_appels_publics_par_minute"]

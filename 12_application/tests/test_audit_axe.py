@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,7 +41,7 @@ import psycopg
 import pytest
 from conftest import HACHEUR_RAPIDE, ServeurLocal
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import ECRANS, Ecran
+from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, Ecran
 
 from application.app import creer_application
 
@@ -105,6 +106,28 @@ def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
     )
     with page.expect_navigation():
         page.click("button[type=submit]")
+
+
+def inscrire_dans(page: Any, adresse: str, pseudo: str) -> None:
+    page.goto(adresse + "/inscription")
+    page.fill("#pseudo", pseudo)
+    page.fill("#mot_de_passe", MDP_INSCRIPTION)
+    page.fill("#confirmation", MDP_INSCRIPTION)
+    with page.expect_navigation():
+        page.click("main form button[type=submit]")
+
+
+def ouvrir_borne(page: Any, adresse: str, ecran: Ecran) -> None:
+    """Un écran borné (E4, lot 2b) : un premier passage, puis la page qui dépasse la
+    borne de son application (serrée à une unité)."""
+    if ecran.borne == "inscription":
+        inscrire_dans(page, adresse, "inscrit_borne_audit_1")
+        with page.expect_navigation():
+            page.click('header form[action="/deconnexion"] button')
+        inscrire_dans(page, adresse, "inscrit_borne_audit_2")
+        return
+    ouvrir_ecran(page, adresse, ecran)
+    ouvrir_ecran(page, adresse, ecran)
 
 
 def resume(brut: dict[str, Any], adresse: str) -> dict[str, Any]:
@@ -311,6 +334,15 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
         for role in sorted({e.role for e in ECRANS if e.role is not None}):
             par_role[role] = navigateur.new_context()
             connecter_dans(par_role[role], adresse_comptes, f"conseiller_{role}_audit")
+        reglages_comptes = replace(
+            reglages,
+            adresse_api=adresse_doublure,
+            base_dsn=base_app,
+            cle_session="a" * 48,
+            catalogue=replace(
+                reglages.catalogue, adresse=adresse_doublure, cle=CLE_CATALOGUE_ATTENDUE
+            ),
+        )
         for ecran in ECRANS:
             httpx.post(
                 f"{adresse_doublure}/_essai/scenario",
@@ -320,7 +352,30 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                     "catalogue": ecran.catalogue,
                 },
             ).raise_for_status()
-            page = (contexte if ecran.role is None else par_role[ecran.role]).new_page()
+            pile = ExitStack()
+            if ecran.borne is not None:
+                # Son application, sa borne serrée, un contexte neuf (les cookies ne
+                # séparent pas les ports).
+                serree = replace(
+                    reglages_comptes,
+                    bornes=replace(
+                        reglages_comptes.bornes, **BORNES_SERREES[ecran.borne]
+                    ),
+                )
+                adresse_borne = pile.enter_context(
+                    ServeurLocal(creer_application(serree, hacheur=HACHEUR_RAPIDE))
+                )
+                contexte_page = navigateur.new_context()
+                pile.callback(contexte_page.close)
+                if ecran.role is not None:
+                    connecter_dans(
+                        contexte_page, adresse_borne, f"conseiller_{ecran.role}_audit"
+                    )
+            elif ecran.role is not None:
+                contexte_page = par_role[ecran.role]
+            else:
+                contexte_page = contexte
+            page = contexte_page.new_page()
             page.on(
                 "console",
                 lambda m, nom=ecran.nom: (
@@ -330,7 +385,9 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 ),
             )
             base = adresse
-            if ecran.role is not None:
+            if ecran.borne is not None:
+                base = adresse_borne
+            elif ecran.role is not None:
                 base = adresse_comptes
             elif ecran.api_fermee:
                 base = adresse_sans_api
@@ -338,7 +395,10 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 base = adresse_neuve
             elif ecran.delai_court:
                 base = adresse_pressee
-            ouvrir_ecran(page, base, ecran)
+            if ecran.borne is not None:
+                ouvrir_borne(page, base, ecran)
+            else:
+                ouvrir_ecran(page, base, ecran)
             if page.evaluate(FOCUS) is False:
                 sans_focus.append(ecran.nom)
             if (page.query_selector("#trace") is not None) != ecran.demonstration:
@@ -347,6 +407,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
             page.evaluate(source)
             pages[ecran.nom] = resume(page.evaluate(LANCER, ETIQUETTES), base)
             page.close()
+            pile.close()
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()

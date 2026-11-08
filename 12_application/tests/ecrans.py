@@ -43,6 +43,10 @@ class Ecran:
     #: Le rôle du compte connecté (E4, lot 2b : l'écran du conseiller selon le rôle) ;
     #: None : un visiteur. Un rôle demande une base jetable.
     role: str | None = None
+    #: Une borne atteinte avant l'écran (E4, lot 2b) : `session`, `client`, `debit`,
+    #: `budget`, `inscription`. Son application la serre à une unité
+    #: (`BORNES_SERREES`) ; l'écran vient après un premier passage. Une base jetable.
+    borne: str | None = None
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -130,4 +134,27 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("conseiller_prerempli", chemin="/?serie=101"),
     Ecran("reponse_refus_avec_pont", question=QUESTION, reponse="refus"),
     Ecran("reponse_sans_carte_avec_pont", question=QUESTION, reponse="sans_carte"),
+    # E4, lot 2b : chaque borne du conseiller, atteinte.
+    Ecran("conseiller_quota_atteint", question=QUESTION, borne="session"),
+    Ecran(
+        "conseiller_quota_client_atteint",
+        question=QUESTION,
+        borne="client",
+        role="client",
+    ),
+    Ecran("conseiller_debit_atteint", question=QUESTION, borne="debit"),
+    Ecran("conseiller_budget_atteint", question=QUESTION, borne="budget"),
+    Ecran("inscription_bornee", chemin="/inscription", borne="inscription"),
 )
+
+#: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le
+#: premier passage la dépasse.
+BORNES_SERREES: dict[str, dict[str, float]] = {
+    "session": {"quota_session_questions": 1},
+    "client": {"quota_client_questions_jour": 1},
+    "debit": {"debit_public_par_minute": 1},
+    "budget": {"cout_jour_max_usd": 0.0001},
+    "inscription": {"inscriptions_session_max": 1},
+}
+#: Le mot de passe des inscriptions des écrans bornés.
+MDP_INSCRIPTION = "mot de passe factice de l'inscription bornée"

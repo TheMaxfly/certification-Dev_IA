@@ -523,6 +523,15 @@ SCENARIOS_REPONSE: dict[str, Callable[[], Rendu]] = {
             complement="Complément factice.",
             complement_titres=["Titre factice hors catalogue"],
             complement_etiquette="Étiquette factice de l'API",
+            contexte=contexte(
+                reglages_appliques={
+                    "temperature": 0.0,
+                    "longueur_max": 400,
+                    "mode": "enrichi",
+                    "top_p": 1.0,
+                    "reasoning_effort": None,
+                }
+            ),
         ),
     ),
     "enrichi_sans_etiquette": lambda: Rendu(

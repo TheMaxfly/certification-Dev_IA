@@ -1,0 +1,7 @@
+id = "E4Q-07"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — la clé des comptes retirée du chemin : un libraire partirait avec la clé publique alors que celle des comptes existe"
+fichier = "12_application/src/application/app.py"
+avant = '''            return reglages.cle_api_comptes'''
+apres = '''            return None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "la_cle_de_l_appel_selon_le_compte"]

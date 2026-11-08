@@ -5,7 +5,9 @@ Le schéma `application` de la base `apimanga` : les données que l'application 
 des actions, les coûts du modèle de langage, les réglages qu'un administrateur change.
 Il est créé, avec toutes ses tables, par **une seule migration**,
 `database/migrations/027_schema_application.sql` (E4, lot 1) : les lots suivants s'en
-servent sans repasser par la production.
+servent sans repasser par la production. Une exception, décidée : le compteur des
+questions des comptes clients, `questions_jour`, ajouté par la `029` (E4, lot 2b), quand
+le quota est passé du cookie au compte.
 
 L'application n'y entre que par le rôle de connexion `app_conseiller`, membre du rôle de
 groupe `app_rw`. Le catalogue (schéma `manga`), elle ne le lit pas en base : elle le lit par
@@ -18,6 +20,7 @@ comptes ──< critiques            (compte_id, ON DELETE RESTRICT)
 comptes ──< listes               (compte_id, ON DELETE CASCADE)
 comptes ──< journal_actions      (par_compte_id, ON DELETE SET NULL)
 comptes ──< reglages             (modifie_par, ON DELETE SET NULL)
+comptes ──< questions_jour       (compte_id, ON DELETE CASCADE ; migration 029)
 couts_jour                       (aucun lien : un agrégat)
 
 series_id (critiques, listes) → le catalogue, par valeur : AUCUNE clé étrangère
@@ -106,7 +109,20 @@ Clé primaire `(compte_id, series_id)` : un état par série et par compte.
 | `appels` | `integer` | 0 par défaut, ≥ 0 |
 | `cout_usd` | `numeric(12,6)` | 0 par défaut, ≥ 0 : la somme des `contexte.cout_estime_usd` |
 
-Clé primaire `(jour, profil, mode)`.
+Clé primaire `(jour, profil, mode)`. Depuis le lot 2b d'E4 : le plafond de coût du jour
+du conseiller, la somme du jour (UTC) relue avant chaque appel ; le profil et le mode
+sont ceux que l'API rend.
+
+### `questions_jour` (migration `029`, E4, lot 2b)
+
+| Colonne | Type | Règle |
+|---|---|---|
+| `compte_id` | `bigint` | → `comptes`, `ON DELETE CASCADE` : les compteurs partent avec le compte |
+| `jour` | `date` | le jour civil UTC, celui de `couts_jour` |
+| `questions` | `integer` | 0 par défaut, ≥ 0 : les questions posées au conseiller ce jour-là |
+
+Clé primaire `(compte_id, jour)`. Le quota des comptes clients (10 par jour) ; aucun texte,
+un compteur. `app_rw` : `SELECT`, `INSERT`, `UPDATE`, pas de `DELETE`.
 
 ### `reglages`
 

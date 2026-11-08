@@ -13,9 +13,12 @@ jeton CSRF sur chaque formulaire `POST` — celui du conseiller compris.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator, Mapping
+import time
+from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
@@ -31,12 +34,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from application import (
     __version__,
+    couts,
     historique,
     journal,
     pages_catalogue,
     pages_comptes,
     pages_critiques,
     presentation,
+    quotas,
     sessions,
 )
 from application.base import Base, BaseIndisponible
@@ -45,6 +50,8 @@ from application.client_api import (
     ApiInjoignable,
     ClientApi,
     ErreurApi,
+    ReglagesReponseAppliques,
+    Reponse,
     VueApi,
 )
 from application.client_catalogue import (
@@ -141,12 +148,15 @@ def creer_application(
     transport: httpx.AsyncBaseTransport | None = None,
     hacheur: Hacheur | None = None,
     transport_catalogue: httpx.AsyncBaseTransport | None = None,
+    horloge: Callable[[], float] | None = None,
 ) -> FastAPI:
     """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
 
     `transport` : la doublure de l'API en mémoire (tests), qui sert aussi le catalogue
     sauf `transport_catalogue` ; `hacheur` : un moteur Argon2id aux paramètres réduits
-    (tests) — la production prend les défauts."""
+    (tests) — la production prend les défauts ; `horloge` : l'instant, en secondes
+    depuis l'époque (tests : une horloge qu'on avance) — `time.time` sinon."""
+    maintenant = horloge if horloge is not None else time.time
     metriques = Metriques()
     catalogue = (
         ClientCatalogue(
@@ -166,6 +176,9 @@ def creer_application(
         reglages.adresse_api, reglages.cle_api, reglages.delais, metriques, transport
     )
     vue = VueApi(client, reglages.limites, metriques)
+    bornes = reglages.bornes
+    #: Le plafond global de débit de la clé publique (un processus : README).
+    limiteur = quotas.Limiteur(bornes.debit_public_par_minute, maintenant)
     environnement = environnement_gabarits()
     gabarits = Jinja2Templates(env=environnement)
     t = reglages.textes
@@ -186,6 +199,10 @@ def creer_application(
                 "base": "configuree" if base.configuree else "non_configuree",
             },
         )
+        if reglages.cle_api_comptes is None:
+            # Repli (décision 5) : la clé publique sert aussi aux comptes, qui passent
+            # alors sous le plafond de débit des visiteurs.
+            journal.evenement("cle_comptes_absente", niveau=logging.WARNING)
         if reglages.cle_session_ephemere:
             # Développement seul (la configuration l'impose ailleurs) : la clé est tirée
             # au démarrage, les sessions se perdent quand l'application redémarre.
@@ -486,6 +503,119 @@ def creer_application(
                 return lu, "profil", t["erreur_profil"]
         return lu, None, None
 
+    def cle_de(compte: Compte | None) -> str | None:
+        """La clé de l'appel : celle des comptes pour un compte connecté, si elle
+        existe ; None, la publique (celle du client)."""
+        if compte is not None and reglages.cle_api_comptes is not None:
+            return reglages.cle_api_comptes
+        return None
+
+    def borne(motif: str, encart: presentation.Encart) -> presentation.Encart:
+        """Un refus par une borne : sa métrique, son code au journal des requêtes."""
+        metriques.quota_refus.labels(motif=motif).inc()
+        return encart
+
+    async def borne_atteinte(
+        request: Request, compte: Compte | None, instant: float
+    ) -> tuple[presentation.Encart, str] | None:
+        """Les bornes, dans l'ordre : quota de la session (visiteur) ou du compte
+        (client), débit de la clé publique, budget du jour. Le premier dépassement :
+        son encart et son issue ; None, la question part."""
+        base: Base = request.app.state.base
+        jour = quotas.jour_utc(instant)
+        if compte is None:
+            fenetre = bornes.quota_session_fenetre_min * 60
+            plafond = bornes.quota_session_questions
+            gardes = quotas.horodatages(
+                request.session, quotas.CLE_QUOTA, instant, fenetre, plafond
+            )
+            attente = quotas.attente(gardes, instant, fenetre, plafond)
+            if attente is not None:
+                retour = datetime.fromtimestamp(instant + attente, UTC)
+                texte = presentation.dire(
+                    t, "quota_session", n=plafond, heure=quotas.heure_locale(retour)
+                )
+                encart = presentation.Encart(
+                    texte, 429, attente, titre=t["quota_titre"]
+                )
+                return borne("session", encart), "quota"
+        elif compte.role == "client":
+            posees = await quotas.questions_posees(base, compte.id, jour)
+            if posees >= bornes.quota_client_questions_jour:
+                minuit = quotas.minuit_suivant(instant)
+                texte = presentation.dire(
+                    t,
+                    "quota_client",
+                    n=bornes.quota_client_questions_jour,
+                    heure=quotas.heure_locale(minuit),
+                )
+                encart = presentation.Encart(
+                    texte,
+                    429,
+                    quotas.secondes_jusqu_a(minuit, instant),
+                    titre=t["quota_titre"],
+                )
+                return borne("client", encart), "quota"
+        if cle_de(compte) is None:
+            attente = limiteur.admettre()
+            if attente is not None:
+                encart = presentation.Encart(
+                    t["debit_public"], 429, attente, titre=t["debit_titre"]
+                )
+                return borne("debit", encart), "debit"
+        try:
+            cumul = await couts.cumul_du_jour(base, jour)
+        except BaseIndisponible:
+            # Non vérifiable : le conseiller répond quand même (décision 11 du lot 1).
+            metriques.etat_plafond("inconnu")
+            journal.evenement_requete(request, "plafond_non_verifiable")
+            return None
+        metriques.cout_jour.set(float(cumul))
+        if cumul >= Decimal(str(bornes.cout_jour_max_usd)):
+            metriques.etat_plafond("atteint")
+            minuit = quotas.minuit_suivant(instant)
+            encart = presentation.Encart(
+                t["budget_atteint"],
+                503,
+                quotas.secondes_jusqu_a(minuit, instant),
+                titre=t["budget_titre"],
+            )
+            return borne("cout", encart), "plafond_cout"
+        metriques.etat_plafond("ok")
+        return None
+
+    async def compter(
+        request: Request,
+        compte: Compte | None,
+        instant: float,
+        corps: Reponse,
+        mode: str,
+    ) -> None:
+        """Après une réponse (200) seulement : la question au quota de la session ou du
+        compte, le coût reçu au jour, sous le profil et le mode rendus par l'API."""
+        base: Base = request.app.state.base
+        jour = quotas.jour_utc(instant)
+        if compte is None:
+            fenetre = bornes.quota_session_fenetre_min * 60
+            plafond = bornes.quota_session_questions
+            quotas.noter(request.session, quotas.CLE_QUOTA, instant, fenetre, plafond)
+        elif compte.role == "client":
+            try:
+                await quotas.compter_question(base, compte.id, jour)
+            except BaseIndisponible:
+                journal.evenement_requete(request, "quota_non_compte")
+        contexte_api = corps.contexte
+        cout = contexte_api.cout_estime_usd
+        if cout is None:
+            journal.evenement_requete(request, "cout_absent")
+        rendu = (contexte_api.reglages_appliques or ReglagesReponseAppliques()).mode
+        if rendu not in couts.MODES:
+            rendu = mode
+        try:
+            await couts.ajouter(base, jour, contexte_api.profil, rendu, cout or 0.0)
+        except BaseIndisponible:
+            journal.evenement_requete(request, "cout_non_compte")
+
     @app.post("/question", response_class=HTMLResponse, include_in_schema=False)
     async def question(request: Request) -> Response:
         identifiant = str(request.state.identifiant_requete)
@@ -537,6 +667,15 @@ def creer_application(
             if lu.mode in reglages_reponse.mode.valeurs
             else reglages_reponse.mode.defaut
         )
+        instant = maintenant()
+        atteinte = await borne_atteinte(request, compte, instant)
+        if atteinte is not None:
+            encart, issue = atteinte
+            request.state.code_erreur = f"borne_{issue}"
+            metriques.question(mode, issue)
+            return page_principale(
+                request, encart.statut, formulaire=lu, tours=tours, encart=encart
+            )
         demande: dict[str, object] = {
             "question": lu.question,
             "historique": historique.en_liste(tours),
@@ -547,8 +686,9 @@ def creer_application(
             "identite": reglages.identite,
         }
         try:
-            resultat = await client.reponse(demande)
+            resultat = await client.reponse(demande, cle=cle_de(compte))
         except (ApiInjoignable, ApiDelai) as exc:
+            metriques.question(mode, "api_indisponible")
             delai = isinstance(exc, ApiDelai)
             request.state.code_erreur = "api_delai" if delai else "api_injoignable"
             encart = presentation.encart_transport(delai, reglages)
@@ -556,6 +696,7 @@ def creer_application(
                 request, encart.statut, formulaire=lu, tours=tours, encart=encart
             )
         except ErreurApi as exc:
+            metriques.question(mode, "api_erreur")
             request.state.code_erreur = exc.code
             if exc.identifiant_requete:
                 request.state.identifiant_api = exc.identifiant_requete
@@ -573,6 +714,8 @@ def creer_application(
         request.state.identifiant_api = (
             resultat.identifiant_api or corps.contexte.identifiant_requete
         )
+        metriques.question(mode, "refus" if corps.refus else "reponse")
+        await compter(request, compte, instant, corps, mode)
         suivants = [
             *tours,
             historique.Tour("libraire", lu.question),
@@ -621,6 +764,12 @@ def creer_application(
                     seuil=reglages.comptes.echecs_avant_verrou,
                     minutes=-(-reglages.comptes.duree_verrou_s // 60),
                 ),
+                apropos_quotas=presentation.dire(
+                    t,
+                    "apropos_quotas",
+                    visiteur=bornes.quota_session_questions,
+                    client=bornes.quota_client_questions_jour,
+                ),
             ),
         )
 
@@ -640,6 +789,7 @@ def creer_application(
                 "api": "ok" if api_ok else "indisponible",
                 "base": await base.sonder() if base.configuree else base.etat,
                 "catalogue": etat_catalogue,
+                "cles_api": "une" if reglages.cle_api_comptes is None else "deux",
                 "version": __version__,
             }
         )
@@ -661,4 +811,5 @@ def creer_application(
     app.state.base = base
     app.state.hacheur = hacheur if hacheur is not None else Hacheur()
     app.state.reglages = reglages
+    app.state.horloge = maintenant
     return app

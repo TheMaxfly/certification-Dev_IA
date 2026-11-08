@@ -1,0 +1,7 @@
+id = "E4Q-12"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — le quota du compte client jamais relu avant l'appel : un client poserait des questions sans fin"
+fichier = "12_application/src/application/app.py"
+avant = '''            posees = await quotas.questions_posees(base, compte.id, jour)'''
+apres = '''            posees = 0'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "un_client_dix_questions_par_jour"]

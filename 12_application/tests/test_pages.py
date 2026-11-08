@@ -179,6 +179,7 @@ def test_api_injoignable_l_application_demarre_et_le_dit(demarrer, port_ferme):
         "api": "indisponible",
         "base": "non_configuree",
         "catalogue": "non_configure",
+        "cles_api": "une",
         "version": application.__version__,
     }
     sortie = navigateur.get("/metrics").text
@@ -277,6 +278,7 @@ def test_sante_ok(navigateur):
         "api": "ok",
         "base": "non_configuree",
         "catalogue": "non_configure",
+        "cles_api": "une",
         "version": application.__version__,
     }
 

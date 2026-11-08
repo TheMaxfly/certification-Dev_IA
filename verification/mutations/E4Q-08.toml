@@ -1,0 +1,7 @@
+id = "E4Q-08"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — l'inscription sans borne : un même navigateur créerait des comptes à la chaîne"
+fichier = "12_application/src/application/pages_comptes.py"
+avant = '''        attente = inscriptions_epuisees(request, instant)'''
+apres = '''        attente = None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "trois_inscriptions_passent"]
