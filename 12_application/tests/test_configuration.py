@@ -267,6 +267,9 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
         "APPLICATION_ENVIRONNEMENT",
         "APPLICATION_BASE_DSN",
         "APPLICATION_CLE_SESSION",
+        # E4, lot 2a : le catalogue (l'API data du 02).
+        "APPLICATION_CLE_CATALOGUE",
+        "CATALOGUE_ADRESSE",
     }
     assert all(valeur == "" for _, valeur in affectations)
 
