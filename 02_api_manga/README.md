@@ -82,7 +82,7 @@ Exemple de `.env` :
 APP_ENV=development
 APP_NAME=API Manga
 
-API_KEYS=app_backend:une-cle-de-32-caracteres-minimum-ici
+API_KEYS=app_backend:<une clé de 32 caractères au moins>
 
 DB_HOST=host.docker.internal
 DB_PORT=5432
