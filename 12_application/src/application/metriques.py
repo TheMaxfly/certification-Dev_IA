@@ -62,6 +62,14 @@ class Metriques:
             ["etat"],
             registry=self.registre,
         )
+        self.base_etat = Gauge(
+            "application_base_etat",
+            "L'état de la base des comptes à sa dernière lecture (1 sur l'état"
+            " constaté)"
+            " : ok, indisponible (elle ne répond pas), non_configuree (aucun DSN).",
+            ["etat"],
+            registry=self.registre,
+        )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",

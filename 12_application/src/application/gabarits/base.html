@@ -13,6 +13,25 @@
 <header>
 <p>{{ t.nom_librairie }}</p>
 <p>{{ t.mention_courte }}</p>
+<nav aria-label="{{ t.menu_etiquette }}">
+<ul>
+<li><a href="/">{{ t.menu_conseiller }}</a></li>
+{% if compte %}
+<li><a href="/compte/mot-de-passe">{{ t.menu_mon_compte }}</a></li>
+{% if compte.role in ("libraire", "admin") %}
+<li><a href="/libraire/critiques">{{ t.menu_critiques }}</a></li>
+{% endif %}
+{% if compte.role == "admin" %}
+<li><a href="/admin/comptes">{{ t.menu_comptes }}</a></li>
+{% endif %}
+<li>{{ connecte }}</li>
+<li><form method="post" action="/deconnexion"><input type="hidden" name="jeton" value="{{ jeton }}"><button>{{ t.menu_deconnexion }}</button></form></li>
+{% else %}
+<li><a href="/connexion{{ suffixe_menu }}">{{ t.menu_connexion }}</a></li>
+<li><a href="/inscription{{ suffixe_menu }}">{{ t.menu_inscription }}</a></li>
+{% endif %}
+</ul>
+</nav>
 <form method="get" action="/"><button>{{ t.nouvelle_conversation }}</button></form>
 </header>
 <main id="contenu">

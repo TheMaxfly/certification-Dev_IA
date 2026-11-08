@@ -1,0 +1,16 @@
+{# Un champ de formulaire : son étiquette, son aide et son erreur, reliées par aria-describedby. #}
+{% macro champ(nom, etiquette, type="text", autocomplete=none, aide=none, erreur=none, valeur=none, max=none, focus=false) -%}
+{%- set decrit = [] -%}
+{%- if aide %}{% set decrit = decrit + [nom ~ "-aide"] %}{% endif -%}
+{%- if erreur %}{% set decrit = decrit + [nom ~ "-erreur"] %}{% endif -%}
+<label for="{{ nom }}">{{ etiquette }}</label>
+<input id="{{ nom }}" name="{{ nom }}" type="{{ type }}" required{% if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{% if max %} maxlength="{{ max }}"{% endif %}{% if valeur %} value="{{ valeur }}"{% endif %}{% if decrit %} aria-describedby="{{ decrit | join(' ') }}"{% endif %}{% if erreur %} aria-invalid="true"{% endif %}{% if focus %} autofocus{% endif %}>
+{% if aide %}<small id="{{ nom }}-aide">{{ aide }}</small>
+{% endif %}{% if erreur %}<p id="{{ nom }}-erreur">{{ erreur }}</p>
+{% endif %}
+{%- endmacro %}
+
+{# L'avis d'une action réussie : annoncé, et le focus y va quand aucune erreur ne le prend. #}
+{% macro avis(texte, focus=false) -%}
+<div id="avis" role="status"{% if focus %} tabindex="-1" autofocus{% endif %}><p>{{ texte }}</p></div>
+{%- endmacro %}

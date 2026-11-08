@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.admin_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.admin_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, focus == "avis") }}
+{% endif %}
+<section>
+<h2>{{ t.admin_creer_titre }}</h2>
+<form method="post" action="/admin/comptes">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+{{ c.champ("pseudo", t.champ_pseudo, autocomplete="off", aide=aide_pseudo, erreur=erreurs.get("pseudo"), valeur=valeurs.get("pseudo"), max=comptes.pseudo_max, focus=focus == "pseudo") }}
+{{ c.champ("nom_affiche", t.champ_nom_affiche, autocomplete="off", erreur=erreurs.get("nom_affiche"), valeur=valeurs.get("nom_affiche"), max=comptes.nom_affiche_max, focus=focus == "nom_affiche") }}
+<label for="role">{{ t.champ_role }}</label>
+<select id="role" name="role"{% if erreurs.get("role") %} aria-describedby="role-erreur" aria-invalid="true"{% endif %}{% if focus == "role" %} autofocus{% endif %}>
+{% for role in roles_administres %}
+<option value="{{ role }}"{% if valeurs.get("role") == role %} selected{% endif %}>{{ libelles_roles[role] }}</option>
+{% endfor %}
+</select>
+{% if erreurs.get("role") %}<p id="role-erreur">{{ erreurs.role }}</p>
+{% endif %}
+{{ c.champ("mot_de_passe", t.champ_mot_de_passe_initial, type="password", autocomplete="new-password", aide=aide_mot_de_passe, erreur=erreurs.get("mot_de_passe"), max=comptes.mot_de_passe_max, focus=focus == "mot_de_passe") }}
+{{ c.champ("confirmation", t.champ_confirmation, type="password", autocomplete="new-password", erreur=erreurs.get("confirmation"), max=comptes.mot_de_passe_max, focus=focus == "confirmation") }}
+<button type="submit">{{ t.admin_creer_bouton }}</button>
+</form>
+</section>
+<section>
+<h2>{{ t.admin_liste_titre }}</h2>
+<form method="get" action="/admin/comptes">
+<label for="filtre-role">{{ t.admin_filtre_etiquette }}</label>
+<select id="filtre-role" name="role">
+<option value=""{% if not filtre %} selected{% endif %}>{{ t.admin_filtre_tous }}</option>
+{% for role in roles %}
+<option value="{{ role }}"{% if filtre == role %} selected{% endif %}>{{ libelles_roles[role] }}</option>
+{% endfor %}
+</select>
+<button type="submit">{{ t.admin_filtre_bouton }}</button>
+</form>
+{% if lignes %}
+<table>
+<thead>
+<tr><th scope="col">{{ t.admin_colonne_pseudo }}</th><th scope="col">{{ t.admin_colonne_nom }}</th><th scope="col">{{ t.admin_colonne_role }}</th><th scope="col">{{ t.admin_colonne_etat }}</th><th scope="col">{{ t.admin_colonne_cree }}</th><th scope="col">{{ t.admin_colonne_action }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr>
+<td>{{ ligne.pseudo }}</td><td>{{ ligne.nom_affiche }}</td><td>{{ libelles_roles[ligne.role] }}</td>
+<td>{% if ligne.actif %}{{ t.admin_actif }}{% else %}{{ t.admin_inactif }}{% endif %}</td>
+<td>{{ ligne.cree_le.strftime("%d/%m/%Y") }}</td>
+<td>{% if ligne.id != compte.id %}<form method="post" action="/admin/comptes/{{ ligne.id }}/{% if ligne.actif %}desactiver{% else %}reactiver{% endif %}"><input type="hidden" name="jeton" value="{{ jeton }}"><button type="submit" aria-label="{% if ligne.actif %}{{ t.admin_desactiver }}{% else %}{{ t.admin_reactiver }}{% endif %} {{ ligne.pseudo }}">{% if ligne.actif %}{{ t.admin_desactiver }}{% else %}{{ t.admin_reactiver }}{% endif %}</button></form>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p>{{ t.admin_aucun }}</p>
+{% endif %}
+{% if pages > 1 %}
+<nav aria-label="{{ page_texte }}">
+<p>{{ page_texte }}</p>
+{% if page > 1 %}<a href="/admin/comptes?page={{ page - 1 }}{% if filtre %}&amp;role={{ filtre }}{% endif %}">{{ t.admin_precedente }}</a>{% endif %}
+{% if page < pages %}<a href="/admin/comptes?page={{ page + 1 }}{% if filtre %}&amp;role={{ filtre }}{% endif %}">{{ t.admin_suivante }}</a>{% endif %}
+</nav>
+{% endif %}
+</section>
+{% endblock %}

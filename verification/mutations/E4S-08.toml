@@ -1,0 +1,7 @@
+id = "E4S-08"
+origine = "E4, lot 1, spec 02 (2026-11-08) — la génération n'est plus comparée : un changement de mot de passe ne couperait plus les autres sessions"
+fichier = "12_application/src/application/sessions.py"
+avant = '''        if lu is None or not lu.actif or lu.generation != generation:'''
+apres = '''        if lu is None or not lu.actif:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sessions.py", "-k", "perimee"]

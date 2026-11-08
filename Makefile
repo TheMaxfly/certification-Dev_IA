@@ -12,6 +12,9 @@
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
 #   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
 #   make app-compose-arret   les arrête
+#   make app-admin-creer     le premier administrateur de l'application (mot de passe au
+#                            clavier, sans écho) ; APPLICATION_ENVIRONNEMENT et
+#                            APPLICATION_BASE_DSN (sans mot de passe) viennent de l'environnement
 #   make demo-direct         la démonstration en direct : l'application, le Swagger de
 #                            l'API et MLflow (CONSTRUIRE=1 reconstruit les images d'abord) ;
 #                            demo-direct-etat dit ce qui répond, demo-direct-arret arrête
@@ -52,7 +55,7 @@ MOTIF ?=
 # Les fichiers suivent la base : la préproduction écrit ses échantillons dans le sien.
 EQUIVALENCE_DOSSIER ?= $(CURDIR)/09_service_embedding/mesures/equivalence_preprod
 
-.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret \
+.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret app-admin-creer \
 	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret \
 	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat
 
@@ -74,6 +77,11 @@ app-compose:
 
 app-compose-arret:
 	@$(APP_COMPOSE) down
+
+# Le premier administrateur : la commande du module 12, dans son environnement. Le mot de
+# passe est demandé au clavier, deux fois, sans écho ; jamais en argument ni en variable.
+app-admin-creer:
+	@cd 12_application && uv run --quiet --locked python -m application.admin creer-admin
 
 # Le même Compose, plus le fichier du mode démonstration, et MLflow à côté.
 DEMO_COMPOSE = $(APP_COMPOSE) -f 12_application/compose.demo.yaml

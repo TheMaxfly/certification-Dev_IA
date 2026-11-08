@@ -1,0 +1,13 @@
+# Migrations présentes au dépôt et volontairement absentes de la production (apimanga).
+#
+# Lu par l'étape « état d'apimanga » de `make verify-poste` (verification/etat_apimanga.sh,
+# par verification/migrations_en_attente.py). Elle admet : migrations appliquées en
+# production = fichiers du dépôt MOINS cette liste, sommes de contrôle égales pour les
+# appliquées. Échec si une migration manque à la production sans être listée, ou si une
+# migration listée y est appliquée (liste périmée), ou listée sans fichier au dépôt.
+#
+# Une ligne par migration : sa version, son motif, le lot qui l'appliquera en production.
+# La liste se vide quand l'étape de déploiement applique les migrations en attente.
+#
+# version	motif	appliquée en production par
+027	schéma application et rôle app_rw (E4, lot 1) ; appliquée en préproduction seulement	le lot de livraison continue

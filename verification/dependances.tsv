@@ -18,7 +18,8 @@
 #            verrou (chargé par son chemin ; versions du calcul comparées), et
 #            `atteignabilite.py` du 05, que le 10 charge
 #   12     ← le contrat du 11 (la doublure de l'API est validée contre lui) et son Compose
-#            (le fichier de fusion du 12 s'y ajoute) ; aucun code
+#            (le fichier de fusion du 12 s'y ajoute) ; aucun code ; `database/` (bases
+#            jetables, schéma `application` de la 027 ; E4, lot 1)
 #   14     ← les modules dont il lance les commandes (05, 09, 10, 11), et `indicatif.yml`
 #            (son test compare les déclencheurs du README aux workflows)
 #   demo   ← 04, 05, 07 (états et actions), `database/`
@@ -34,7 +35,7 @@
 09	09_service_embedding/ database/
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 11	11_api_modele/ database/ 09_service_embedding/ 10_mesures_recherche/src/ 10_mesures_recherche/uv.lock 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
-12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml
+12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml database/
 13	13_monitorage/ 09_service_embedding/src/ 09_service_embedding/config/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml 11_api_modele/src/api_modele/metriques.py 12_application/compose.yaml 12_application/src/application/metriques.py
 14	14_chaine/ 05_nettoyage_agregation_bdd/ 09_service_embedding/ 10_mesures_recherche/ 11_api_modele/ .github/workflows/indicatif.yml
 database	database/ sauvegarde/sauvegarder.sh

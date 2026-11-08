@@ -11,12 +11,18 @@ et les passages cités.
   le choix du profil et deux réglages de démonstration ; un mode démonstration, éteint par
   défaut, qui montre les scores et la trace de la recherche ; un écran nommé par cas dégradé ;
   la mention « Vous parlez à une IA » sur chaque écran ; un audit d'accessibilité outillé.
-- **Elle ne fait pas** : pas de compte, pas de mémoire côté serveur, aucune écriture, en
-  base ou en fichier ; mode strict seul tant que l'API n'en expose pas d'autre ; aucune
-  bascule automatique de profil : le repli reste un geste humain.
+- **Elle ne fait pas** : aucune écriture en fichier ; mode strict seul tant que l'API n'en
+  expose pas d'autre ; aucune bascule automatique de profil : le repli reste un geste
+  humain.
+- **E4, lot 1 (le socle)** : une base à elle (schéma `application`, migration `027`, rôle
+  `app_rw` seul) ; mots de passe hachés par Argon2id ; sessions signées, le compte relu en
+  base à chaque requête ; jeton CSRF sur chaque formulaire `POST` ; verrou après des
+  échecs ; garde par rôle ; garde d'environnement. Sans base configurée, ou base
+  injoignable, le conseiller fonctionne comme avant.
 
 C'est le tronc de l'application de l'épreuve E4 : même module, même pile. Le dossier
-`schema/` garde la place de son schéma de données, vide à ce stade.
+`schema/` décrit son modèle de données, le schéma `application` de la base (migration
+`027`, E4, lot 1) : `schema/README.md`.
 
 ## Architecture
 
@@ -101,7 +107,8 @@ défauts de l'API.
 
 Une case des réglages, **décochée par défaut** (`[reglages] mode_demonstration_defaut =
 false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
-« Nouvelle conversation » la remet au défaut. Ni cookie, ni variable d'environnement.
+« Nouvelle conversation » la remet au défaut. Ni variable d'environnement, ni cookie à
+elle (le seul cookie est celui de la session, « Sécurité et données »).
 
 **Ce qu'il montre**, coché, tout venant de la même réponse de `/v1/reponse` :
 
@@ -180,12 +187,49 @@ avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ a
 prix du profil actif, mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15
 par minute du compte (2026-11-03).
 
+### Les comptes (E4, lot 1)
+
+Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/inscription` | visiteur | pseudo, mot de passe, confirmation ; les règles affichées ; « ce que nous gardons » et le renvoi vers « à propos » ; succès : compte client, session ouverte, retour à la page d'origine (chemin local seul) |
+| `/connexion` | visiteur | un seul refus, « Pseudo ou mot de passe incorrect », quel que soit le cas (inconnu, mauvais mot de passe, verrouillé, désactivé), même statut (401) ; succès : retour à la page demandée, ou au changement d'un mot de passe initial |
+| `/deconnexion` (`POST`) | connecté | la génération + 1 (toute copie du cookie tombe, et les autres sessions du compte avec), la session vidée ; retour à l'accueil |
+| `/compte/mot-de-passe` | connecté | ancien, nouveau, confirmation ; succès : génération + 1 (les autres sessions tombent), la session courante rouverte, le mot de passe initial levé, une ligne au journal des actions ; un mauvais ancien compte un échec, sous le même compteur et le même verrou que la connexion |
+| `/admin/comptes` | administrateur | la liste (pseudo, nom affiché, rôle, état, date), filtrée par rôle, par pages de 25 (une page hors bornes rend la plus proche) ; créer un compte libraire ou administrateur (un rôle hors liste est refusé, nommé), au mot de passe initial saisi deux fois, à changer ; désactiver (ses sessions tombent) ou réactiver un compte — jamais le sien ; un changement sans effet ne laisse aucune trace ; aucune suppression |
+| `/libraire/critiques` | libraire, administrateur | « bientôt disponible » : la page arrive avec un prochain lot |
+
+**Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
+Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
+client — Conseiller, Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
+en plus, Mes critiques ; administrateur — en plus, Comptes. Sans base, chaque page de compte
+dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
+
+**Le premier administrateur**, par une commande : `make app-admin-creer`, avec
+`APPLICATION_ENVIRONNEMENT` et `APPLICATION_BASE_DSN` (sans mot de passe) dans
+l'environnement. Elle applique la garde d'environnement, demande le pseudo, le nom affiché,
+puis le mot de passe deux fois, sans écho (`getpass`) — sans terminal, ou si le terminal
+ne coupe pas l'écho, elle refuse (code 2) ; elle crée le compte `admin`, sans mot de passe
+à changer, et sa ligne de journal sans auteur ; un refus de la base est nommé par sa
+classe, sans son message. Jamais de mot de passe en argument, en variable ni dans une
+sortie.
+
+```bash
+APPLICATION_ENVIRONNEMENT=preproduction \
+APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_preprod' \
+  make app-admin-creer
+```
+
 ## Accessibilité
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
 - **Outil** : axe-core, vendu avec son empreinte et sa licence, lancé par Playwright dans
-  Chromium sur chaque écran et chaque cas, dans `make verify-poste`. Politique de sécurité
-  active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
+  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **80 pages** au
+  2026-11-08, dont les dix-sept du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
+  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503), sur une
+  base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
+  reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
 - **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
   sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
@@ -219,25 +263,93 @@ par minute du compte (2026-11-03).
   toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
   `Referrer-Policy`, `Cache-Control: no-store` sur les pages de conversation.
 - **Formulaire** : en `POST`, corps borné, gabarits échappés, aucun marquage « sûr » d'un
-  texte venu de l'API.
+  texte venu de l'API ; **un jeton CSRF** dans chaque formulaire `POST` (celui du conseiller
+  compris), comparé en temps constant au jeton de la session : absent ou faux, un 403 et la
+  page « Ce formulaire a expiré, rechargez la page », avant tout appel à l'API.
+- **La base de l'application** (E4, lot 1) : le schéma `application` d'`apimanga`
+  (`schema/README.md`), par le rôle de connexion `app_conseiller`, membre de `app_rw` seul
+  — rien hors du schéma, pas même en lecture ; requêtes paramétrées seules ; une
+  connexion par opération, refermée aussitôt, pas de pool (quelques requêtes par minute,
+  10 connexions au plus pour le rôle) ; délai borné (`[comptes] delai_base_s`) pour se
+  connecter, pour une instruction et pour attendre un verrou. DSN **sans mot de passe**
+  (`~/.pgpass` sur le poste, un fichier monté dans un conteneur) : un DSN qui en porte un
+  empêche de démarrer. Base absente ou injoignable : les pages de compte disent 503,
+  le conseiller fonctionne ; `/sante` et la métrique `application_base_etat` disent son
+  état, sans détail.
+- **Les mots de passe** : **Argon2id**, par `argon2-cffi` directement, aux paramètres par
+  défaut de la bibliothèque, relevés le 2026-11-08 (argon2-cffi 25.1.0) : **temps 3, mémoire
+  65 536 Kio (64 Mio), parallélisme 4**, empreinte de 32 octets, sel de 16 octets ; un
+  nouveau hachage à la connexion si les paramètres changent. Le hachage tourne hors de la
+  boucle d'événements, **quatre calculs au plus à la fois** (la mémoire reste bornée). Un
+  pseudo inconnu passe par une **vérification factice** (empreinte de référence calculée
+  au démarrage).
+- **Les sessions** : `SessionMiddleware` de Starlette, cookie signé (`itsdangerous`,
+  expiration vérifiée côté serveur), `HttpOnly`, `SameSite=Lax`, `Secure` hors
+  développement, durée `[comptes] duree_session_s` **après la dernière page** (le jeton
+  réécrit à chaque page renvoie le cookie). **Un cookie par environnement** :
+  `conseiller_session` en développement, `conseiller_session_preproduction`,
+  `conseiller_session_production`, et une signature liée à l'environnement — avec la
+  même clé, une session de préproduction ne vaudrait pas en production ; **une clé par
+  environnement** reste la règle. Il ne porte que l'identifiant du
+  compte, un **numéro de génération** et le jeton CSRF — ni rôle, ni pseudo. Le rôle, l'état
+  et la génération sont **relus en base à chaque requête** ; une génération différente ou
+  un compte inactif vident la session. Changer son mot de passe ou être désactivé
+  incrémente la génération : toutes les sessions du compte tombent ; la déconnexion aussi
+  (choix du lot : une copie du cookie ne survit pas à la déconnexion, au prix de fermer
+  les autres sessions du compte). Une connexion réussie
+  rouvre une session neuve, au jeton neuf (pas de fixation). Les visiteurs anonymes
+  reçoivent aussi le cookie : il porte leur jeton (cookie strictement nécessaire).
+- **Le verrou** : 5 échecs consécutifs (`[comptes] echecs_avant_verrou`) posent un verrou de
+  15 minutes (`duree_verrou_s`) ; un compte verrouillé, inactif, un mauvais mot de passe
+  ou un pseudo inconnu rendent le même refus, par **le même travail** : une lecture sans
+  verrou de ligne, une vérification hors transaction (rien n'est tenu pendant le calcul,
+  des essais simultanés ne s'attendent pas), une écriture — le compteur, en une
+  instruction atomique, ou une écriture vide ; un succès remet le compteur à zéro. Un
+  pseudo hors forme (octet nul, trop long) n'atteint pas la base : il suit le chemin d'un
+  pseudo inconnu ; un nom affiché ne garde que des caractères imprimables.
+- **La garde par rôle** : une page réservée renvoie un anonyme vers la connexion (le chemin
+  de retour n'accepte qu'un chemin local : ni « // », ni barre inverse, ni caractère de
+  contrôle) — un formulaire réservé envoyé sans session reçoit la page 401 —, et répond
+  403 à un compte sans le rôle. `Cache-Control: no-store` sur les
+  pages de compte et d'administration.
+- **Le 401 sans `WWW-Authenticate`** : écart déclaré à la RFC 9110 (§ 11.6.1), qui veut cet
+  en-tête avec tout 401. L'authentification se fait par formulaire, aucun schéma n'est
+  normalisé pour elle, et l'en-tête n'aurait aucun sens pour un navigateur ; même règle
+  pour le 401 de la connexion refusée.
+- **La garde d'environnement** : `APPLICATION_ENVIRONNEMENT` ; la base du DSN doit être celle
+  de l'environnement (`preproduction` ↔ `apimanga_preprod`, `production` ↔ `apimanga`) ; en
+  développement, `apimanga` est refusée. Un écart empêche de démarrer, sans montrer le DSN.
 - **Ce qui est transmis, et par qui** : l'API envoie au fournisseur du profil utilisé la
   question, l'historique et les passages. L'application ne parle jamais à un fournisseur.
-- **Ce qui est conservé par l'application : rien.** Son journal porte route, statut, durée,
-  identifiants, code d'erreur, nombre de tours et taille de l'historique ; jamais la
-  question, l'historique, la réponse ni la clé.
+- **Ce qui est conservé par l'application** : rien des conversations. Les comptes, en
+  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel).
+  Son journal, une ligne JSON par requête et par événement, porte route, statut, durée,
+  identifiants (de la requête, du compte), code d'erreur, nombre de tours et taille de
+  l'historique ; **jamais** la question, l'historique, la réponse, la clé, un mot de passe,
+  une empreinte, un pseudo, le cookie ni le jeton. Tout événement pendant une requête porte
+  son identifiant. Événements des mécanismes : `session_refusee`, `csrf_refuse`,
+  `acces_refuse` (gabarit de la route), `base_indisponible`, `cle_session_ephemere` ; des
+  écrans de compte (E4, lot 1, spec 03) : `inscription`, `connexion_reussie`,
+  `connexion_refusee` (motif borné), `verrou_pose`, `deconnexion`, `mot_de_passe_change`,
+  `mot_de_passe_refuse` (motif borné).
 
 ### OWASP Top 10, mis en regard
 
 | Risque | Ici |
 |---|---|
-| Injection | aucun accès à la base ; l'API seule, par son contrat |
+| Injection | requêtes paramétrées seules, sur le schéma `application` ; le rôle n'a rien ailleurs (refus `42501` éprouvés) ; l'API par son contrat |
 | XSS | échappement des gabarits, politique de sécurité du contenu sans script |
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
-| Authentification, sessions, contrôle d'accès, journalisation des accès | **relèvent de l'épreuve E4** : pas de comptes ici |
+| Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
+| Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
+| Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
+| Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
+| Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
-| Requêtes intersites | **non contrôlées à ce stade** : `POST /question` ne lit ni `Origin` ni `Sec-Fetch-Site`. Sans compte ni cookie, il n'y a rien à voler, mais un site tiers ouvert sur le poste du libraire pourrait déclencher un appel facturé. Limite déclarée, à traiter avec les sessions de l'épreuve E4 |
+| Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
+| Consommation de ressources (A04), authentification (A07) : l'inscription | **non couvert à ce lot** : un même poste peut créer des comptes à la chaîne ; couvert au lot du conseiller public avec le quota par session et le plafond global |
 
 ## Configuration
 
@@ -256,11 +368,15 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
+| `[comptes]` | session 8 h après la dernière page ; verrou après 5 échecs, 15 min ; pseudo 3 à 30, nom affiché 60 au plus (les bornes de la migration `027`, comparées par un test) ; mot de passe 12 à 128 (décision 7) ; base 3 s ; 25 comptes par page | voir « Sécurité et données » |
 | `[textes]` | tous les textes des écrans | une seule source ; un texte absent empêche de démarrer |
 
-| Variable (`.env.example`) | Rôle |
+| Variable | Rôle |
 |---|---|
 | `APPLICATION_CLE_API` | la clé de l'application, obligatoire |
+| `APPLICATION_ENVIRONNEMENT` | `developpement` (défaut), `preproduction`, `production` : la garde d'environnement |
+| `APPLICATION_BASE_DSN` | le DSN de la base des comptes, **sans mot de passe** ; facultatif : sans lui, le conseiller seul |
+| `APPLICATION_CLE_SESSION` | la clé de signature des sessions, 32 octets au moins, **une par environnement** ; obligatoire en préproduction et en production ; absente en développement, une clé éphémère est tirée au démarrage (avertissement au journal, sessions perdues au redémarrage) |
 | `API_MODELE_ADRESSE` | l'adresse de l'API |
 | `APPLICATION_ECOUTE` | `hôte:port` |
 | `APPLICATION_METRIQUES_RESEAUX` | les réseaux admis à lire `/metrics`, séparés par des virgules |
@@ -358,7 +474,10 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 ## Ce que l'épreuve E4 ajoute
 
-Comptes avec mot de passe haché et sessions signées à expiration ; trois rôles (client,
-libraire, administrateur) ; page de série ; critique de libraire signée, entrant dans le
-corpus ; masquage à l'affichage des mentions de membres connues du corpus ; administrateur (profil actif, comptes, état des services) ; serveur avec préproduction
-et production ; identité visuelle, sur `theme.css`.
+**Lot 1 (le socle)** : la base, Argon2id, les sessions signées, le jeton CSRF, le verrou,
+la garde par rôle et d'environnement, les écrans des comptes et leurs trois rôles (client,
+libraire, administrateur), la commande du premier administrateur (ci-dessus). À venir :
+la page de série ; la critique de libraire signée, entrant dans le corpus ; le masquage à
+l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
+et de l'état des services ; le serveur avec préproduction et production ; l'identité
+visuelle, sur `theme.css`.

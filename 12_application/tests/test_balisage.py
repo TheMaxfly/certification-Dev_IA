@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 import pytest
 from bs4 import BeautifulSoup, Tag
-from conftest import ADRESSE_MEMOIRE, ENVIRONNEMENT
+from conftest import ADRESSE_MEMOIRE, ENVIRONNEMENT, HACHEUR_RAPIDE, Navigateur
 from doublure_api import Doublure
 from ecrans import ECRANS, Ecran
 from fastapi.testclient import TestClient
@@ -57,25 +57,31 @@ def pages() -> Iterator[list[Page]]:
     doublure = Doublure()
     reglages = replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE)
     transport = httpx.ASGITransport(app=doublure.app)
-    avec_api = creer_application(reglages, transport=transport)
+    avec_api = creer_application(reglages, transport=transport, hacheur=HACHEUR_RAPIDE)
     delais = replace(reglages.delais, connexion_s=0.05, reponse_s=0.05)
-    pressee = creer_application(replace(reglages, delais=delais), transport=transport)
+    pressee = creer_application(
+        replace(reglages, delais=delais), transport=transport, hacheur=HACHEUR_RAPIDE
+    )
     with socket.socket() as prise:
         prise.bind(("127.0.0.1", 0))
         fermee = f"http://127.0.0.1:{prise.getsockname()[1]}"
-    sans_api = creer_application(replace(reglages, adresse_api=fermee))
+    sans_api = creer_application(
+        replace(reglages, adresse_api=fermee), hacheur=HACHEUR_RAPIDE
+    )
     rendues: list[Page] = []
     client_ = ("127.0.0.1", 50000)
     with (
-        TestClient(avec_api, client=client_) as client,
-        TestClient(sans_api, client=client_) as client_sans_api,
-        TestClient(pressee, client=client_) as client_presse,
+        Navigateur(avec_api, client=client_) as client,
+        Navigateur(sans_api, client=client_) as client_sans_api,
+        Navigateur(pressee, client=client_) as client_presse,
     ):
         for ecran in ECRANS:
             doublure.choisir(info=ecran.info, reponse=ecran.reponse)
             if ecran.neuve:
-                neuve = creer_application(reglages, transport=transport)
-                with TestClient(neuve, client=client_) as client_neuf:
+                neuve = creer_application(
+                    reglages, transport=transport, hacheur=HACHEUR_RAPIDE
+                )
+                with Navigateur(neuve, client=client_) as client_neuf:
                     r = rendre(client_neuf, ecran)
             elif ecran.delai_court:
                 r = rendre(client_presse, ecran)

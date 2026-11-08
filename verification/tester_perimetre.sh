@@ -63,8 +63,8 @@ cas "les métriques du 12"              "12 13 statique"                        
 cas "le Compose du 12"                 "12 13 statique"                        12_application/compose.yaml
 cas "un fichier du 13"                 "13 statique"                           13_monitorage/src/monitorage/x.py
 cas "un fichier du 14"                 "14 statique"                           14_chaine/src/chaine/x.py
-cas "une migration"                    "02 05 08 09 10 11 database demo statique" database/migrations/099_x.sql
-cas "un outil de database"             "05 08 09 10 11 database demo statique" database/outils/x.sh
+cas "une migration"                    "02 05 08 09 10 11 12 database demo statique" database/migrations/099_x.sql
+cas "un outil de database"             "05 08 09 10 11 12 database demo statique" database/outils/x.sh
 cas "un autre workflow"                "14 statique"                            .github/workflows/indicatif.yml
 cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 12 13 14 database demo statique" .github/workflows/verify.yml
 cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 12 13 14 database demo statique" verification/verifier.sh

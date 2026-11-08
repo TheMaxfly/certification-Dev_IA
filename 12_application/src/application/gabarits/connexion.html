@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.connexion_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.connexion_titre }}</h1>
+<form method="post" action="/connexion">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<input type="hidden" name="retour" value="{{ retour }}">
+{{ c.champ("pseudo", t.champ_pseudo, autocomplete="username", erreur=t.connexion_refus if refus else none, valeur=valeurs.get("pseudo"), max=comptes.pseudo_max, focus=refus) }}
+{{ c.champ("mot_de_passe", t.champ_mot_de_passe, type="password", autocomplete="current-password", max=comptes.mot_de_passe_max) }}
+<button type="submit">{{ t.connexion_bouton }}</button>
+</form>
+<p><a href="/inscription{{ suffixe_retour }}">{{ t.connexion_pas_de_compte }}</a></p>
+{% endblock %}

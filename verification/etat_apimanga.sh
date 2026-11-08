@@ -16,7 +16,8 @@
 #   - les empreintes des corpus v1 et v2 (documents, fragments, vecteurs, encodages),
 #     de `eval_mesures`, de `eval_runs`, du journal des promotions ;
 #   - le jeu v2, l'encodage en service, les corpus et leur clôture ;
-#   - les migrations appliquées, égales aux fichiers (versions et sommes de contrôle).
+#   - les migrations appliquées, égales aux fichiers (versions et sommes de contrôle),
+#     hors des attentes déclarées dans verification/migrations_en_attente.tsv.
 # Puis le contrôle du module 09 (`service_embedding.verification`), et les 11 tests qui
 # sautent ailleurs faute de base : 4 du 05, 3 du 08, 4 de `demo`. Ils doivent passer,
 # aucun ne doit sauter.
@@ -108,20 +109,36 @@ SELECT '-', 'corpus', corpus_id, nb_documents, nb_fragments, clos_le IS NOT NULL
 SELECT '-', 'encodage_en_service', encodage_id, corpus_id FROM bench.v_encodage_en_service;
 SELECT '-', 'jeu', version, empreinte FROM bench.eval_jeux ORDER BY version;
 SQL
-  (cd "$RACINE/database" && "${PROPRE[@]}" APIMANGA_VERIF_DSN="$DSN" uv run --locked python - <<'PY'
+  # « Égales aux fichiers » : hors des migrations attendues en attente, déclarées dans
+  # verification/migrations_en_attente.tsv (verification/migrations_en_attente.py).
+  (cd "$RACINE/database" && "${PROPRE[@]}" APIMANGA_VERIF_DSN="$DSN" \
+    CONTROLE_ATTENTES="$RACINE/verification/migrations_en_attente.py" \
+    uv run --locked python - <<'PY'
 import hashlib
+import importlib.util
 import os
+import sys
 
 import psycopg
 
 import migrate
 
+spec = importlib.util.spec_from_file_location("attentes", os.environ["CONTROLE_ATTENTES"])
+assert spec is not None and spec.loader is not None
+attentes = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(attentes)
+
 fichiers = {m.version: m.checksum for m in migrate.decouvrir()}
 with psycopg.connect(os.environ["APIMANGA_VERIF_DSN"]) as cx:
     base = dict(cx.execute("SELECT version, checksum FROM public.schema_migrations").fetchall())
+attendues = attentes.lire()
+ecarts = attentes.ecarts(base, fichiers, attendues)
 lignes = "".join(f"{v}\t{c}\n" for v, c in sorted(base.items()))
 print(f"-\tmigrations\t{len(base)}\t{hashlib.sha256(lignes.encode()).hexdigest()}")
-print(f"-\tmigrations_egales_aux_fichiers\t{'oui' if base == fichiers else 'non'}")
+print(f"-\tmigrations_egales_aux_fichiers\t{'non' if ecarts else 'oui'}")
+# Un écart arrête le relevé : ni contrôle conforme, ni référence relevée (--relever).
+if not attentes.annoncer(ecarts, attendues, sys.stderr):
+    sys.exit(1)
 PY
   )
 }

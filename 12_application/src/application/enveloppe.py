@@ -39,8 +39,26 @@ ENTETES_SECURITE = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
 }
-#: Les pages qui portent une question ou une conversation : jamais en cache.
-SANS_CACHE = ("/", "/question")
+#: Les pages qui portent une question ou une conversation : jamais en cache ; de même
+#: les pages de compte et d'administration (E4, lot 1), sous leurs préfixes.
+SANS_CACHE = (
+    "/",
+    "/question",
+    "/connexion",
+    "/inscription",
+    "/deconnexion",
+    "/compte",
+    "/admin",
+    "/libraire",
+)
+PREFIXES_SANS_CACHE = ("/compte/", "/admin/", "/libraire/")
+
+
+def sans_cache(chemin: object) -> bool:
+    return isinstance(chemin, str) and (
+        chemin in SANS_CACHE or chemin.startswith(PREFIXES_SANS_CACHE)
+    )
+
 
 type PageErreur = Callable[[int, str], Response]
 
@@ -65,6 +83,7 @@ class Enveloppe:
         ident = str(uuid.uuid4())
         etat: dict[str, Any] = scope.setdefault("state", {})
         etat["identifiant_requete"] = ident
+        jeton_contexte = journal.IDENTIFIANT_REQUETE.set(ident)
         debut = time.perf_counter()
         reponse: dict[str, Any] = {"statut": 500, "commencee": False}
 
@@ -76,7 +95,7 @@ class Enveloppe:
                 entetes[ENTETE_IDENTIFIANT] = ident
                 for nom, valeur in ENTETES_SECURITE.items():
                     entetes[nom] = valeur
-                if scope.get("path") in SANS_CACHE:
+                if sans_cache(scope.get("path")):
                     entetes["Cache-Control"] = "no-store"
             await send(message)
 
@@ -97,6 +116,7 @@ class Enveloppe:
             await self.page_erreur(500, ident)(scope, receive, envoyer)
         finally:
             self._consigner(scope, etat, reponse["statut"], time.perf_counter() - debut)
+            journal.IDENTIFIANT_REQUETE.reset(jeton_contexte)
 
     async def _lire_corps(self, scope: Scope, receive: Receive) -> tuple[bytes, bool]:
         """Le corps entier, ou (b"", True) dès qu'il dépasse le maximum."""
@@ -147,6 +167,10 @@ class Enveloppe:
         for cle in ("identifiant_api", "nb_tours_historique", "taille_historique"):
             if cle in etat:
                 champs[cle] = etat[cle]
+        # Le compte courant : son identifiant interne seul, jamais son pseudo.
+        compte: object = etat.get("compte")
+        if compte is not None:
+            champs["compte_id"] = getattr(compte, "id", None)
         journal.requete(champs)
 
 

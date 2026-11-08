@@ -1,0 +1,7 @@
+id = "E4S-09"
+origine = "E4, lot 1, spec 02 (2026-11-08) — le verrou n'est jamais posé : les essais de mots de passe seraient illimités"
+fichier = "12_application/src/application/comptes.py"
+avant = '''            " verrou_jusqu_a = CASE WHEN echecs_connexion + 1 >= %(seuil)s"'''
+apres = '''            " verrou_jusqu_a = CASE WHEN false"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_comptes.py", "-k", "verrou"]

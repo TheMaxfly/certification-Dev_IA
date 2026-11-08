@@ -1,0 +1,7 @@
+id = "E4S-03"
+origine = "E4, lot 1, spec 01 bis (2026-11-08) — un app_rw déjà présent avec LOGIN serait repris en silence"
+fichier = "database/migrations/027_schema_application.sql"
+avant = '''    IF connexion THEN'''
+apres = '''    IF connexion AND false THEN'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_schema_application.py", "-k", "attribut_fautif"]

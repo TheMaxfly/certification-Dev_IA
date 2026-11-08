@@ -1,0 +1,7 @@
+id = "E4S-07"
+origine = "E4, lot 1, spec 02 (2026-11-08) — la vérification du jeton CSRF retirée : un formulaire venu d'un autre site serait accepté"
+fichier = "12_application/src/application/sessions.py"
+avant = '''    if not jeton_valide(request, valeur):'''
+apres = '''    if False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sessions.py", "-k", "sans_jeton or autre_session"]
