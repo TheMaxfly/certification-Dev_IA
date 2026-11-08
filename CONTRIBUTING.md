@@ -46,7 +46,8 @@ commande sur le poste et sur GitHub.
   périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
   (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
   du contrôle des pseudonymes des passages de l'API
-  (`verification/tester_pseudonymes_passages.py`) et de la sauvegarde
+  (`verification/tester_pseudonymes_passages.py`), des migrations attendues en attente
+  (`verification/tester_migrations_en_attente.py`) et de la sauvegarde
   (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
   graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
@@ -116,6 +117,14 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   service ; les migrations appliquées, égales aux fichiers. Puis le contrôle du module
   09, et les tests qui ne peuvent tourner que sur la base réelle (05, 08, `demo`) :
   ils doivent passer, aucun ne doit sauter.
+- **Les migrations attendues en attente** : une migration appliquée d'abord en
+  préproduction et livrée plus tard est déclarée dans
+  `verification/migrations_en_attente.tsv` (version, motif, lot qui l'appliquera).
+  Dans la référence, `migrations_egales_aux_fichiers` à `oui` signifie « égales aux
+  fichiers, hors attentes déclarées » : les migrations appliquées en production sont les
+  fichiers du dépôt moins la liste, avec les mêmes sommes de contrôle. Une migration
+  absente de la production sans être listée, ou listée mais appliquée (liste périmée),
+  est un échec. La liste se vide quand le déploiement applique les migrations en attente.
 - **Les pseudonymes des passages rendus par l'API du modèle** : l'étape d'équivalence,
   jouée juste avant, écrit les identifiants des fragments que l'API a rendus ;
   `verification/pseudonymes_passages.py` relit leur texte et y cherche les

@@ -1,0 +1,7 @@
+id = "E4S-04"
+origine = "E4, lot 1, spec 01 bis (2026-11-08) — une migration listée en attente mais appliquée en production (liste périmée) passerait"
+fichier = "verification/migrations_en_attente.py"
+avant = '''        elif version in base:'''
+apres = '''        elif version in base and False:'''
+dossier = "."
+commande = ["uv", "run", "--no-project", "python", "-I", "verification/tester_migrations_en_attente.py"]

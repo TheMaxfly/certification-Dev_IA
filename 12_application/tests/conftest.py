@@ -1,25 +1,42 @@
-"""Harnais du module 12 : la doublure de l'API, en mémoire et sur un port du bouclage.
+"""Harnais du module 12 : la doublure de l'API, en mémoire et sur un port du bouclage ;
+la base de l'application, jetable.
 
-Pas de base, donc pas de harnais de bases jetables. La garde réseau, sur toute la
-suite : une requête de httpx vers un hôte hors du bouclage n'est pas envoyée et fait
-échouer le test ; aucun test n'atteint l'API réelle ni un fournisseur.
+La garde réseau, sur toute la suite : une requête de httpx vers un hôte hors du bouclage
+n'est pas envoyée et fait échouer le test ; aucun test n'atteint l'API réelle ni un
+fournisseur.
+
+La base (E4, lot 1) : le harnais partagé des bases jetables (`database/harnais_tests/`),
+chargé par son chemin comme dans les modules 05, 08, 09, 10 et 11. Le DSN est fabriqué
+par lui, à partir du conteneur qu'il lance ; aucune variable d'environnement n'est lue,
+et l'absence de Docker fait sauter les tests à base — jamais de repli sur `apimanga`.
+Les fixtures sont paresseuses : un test qui n'en demande aucune ne démarre pas de
+conteneur. L'application y tourne sous un rôle de connexion de test, membre de `app_rw`
+seul (migration 027), sans mot de passe dans le DSN (un `.pgpass` jetable) — jamais
+sous `postgres`.
 """
 
 from __future__ import annotations
 
+import importlib.util
+import secrets
 import socket
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import replace
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
 import uvicorn
 from doublure_api import CLE_ATTENDUE, Doublure
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from psycopg import conninfo, sql
 
 from application.app import creer_application
 from application.config import Reglages, charger
@@ -150,3 +167,88 @@ def demarrer(
     yield lancer
     for client in ouverts:
         client.__exit__(None, None, None)
+
+
+# --------------------------------------------------------------------------- #
+#  La base de l'application : jetable, migrée par le runner du dépôt
+# --------------------------------------------------------------------------- #
+RACINE_DEPOT = Path(__file__).resolve().parents[2]
+ROLE_APPLICATION = "essai_app_conseiller"
+
+
+def _charger_harnais() -> ModuleType:
+    """Le harnais partagé des bases jetables (`database/harnais_tests/`), par chemin."""
+    spec = importlib.util.spec_from_file_location(
+        "harnais_tests", RACINE_DEPOT / "database" / "harnais_tests" / "__init__.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["harnais_tests"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+harnais = _charger_harnais()
+
+
+@pytest.fixture(scope="session")
+def conteneur() -> Iterator[str]:
+    """Un PostgreSQL jetable pour la session, lancé au premier test qui le demande."""
+    raison = harnais.raison_de_sauter()
+    if raison:
+        pytest.skip(raison)
+    with harnais.conteneur("application-test") as dsn:
+        yield dsn
+
+
+@pytest.fixture(scope="session")
+def gabarit(conteneur: str) -> str:
+    """La base gabarit, migrée une fois par session par le runner du dépôt."""
+    return harnais.creer_gabarit(conteneur)
+
+
+@pytest.fixture
+def base(conteneur: str, gabarit: str) -> Iterator[str]:
+    """Une base neuve par test, copiée du gabarit migré (DSN d'administration)."""
+    with harnais.base_depuis_gabarit(conteneur, gabarit) as dsn:
+        yield dsn
+
+
+@pytest.fixture(scope="session")
+def fichier_pgpass(
+    conteneur: str, gabarit: str, tmp_path_factory: pytest.TempPathFactory
+) -> Path:
+    """Le rôle de connexion de test, membre de app_rw seul, et son `.pgpass` jetable."""
+    del gabarit  # app_rw existe dès que le gabarit est migré
+    mot_de_passe = secrets.token_urlsafe(24)
+    with psycopg.connect(conteneur, autocommit=True) as cx:
+        cx.execute(
+            sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE app_rw").format(
+                sql.Identifier(ROLE_APPLICATION), sql.Literal(mot_de_passe)
+            )
+        )
+    chemin = tmp_path_factory.mktemp("pgpass") / "pgpass"
+    chemin.write_text(f"*:*:*:{ROLE_APPLICATION}:{mot_de_passe}\n", encoding="utf-8")
+    chemin.chmod(0o600)
+    return chemin
+
+
+@pytest.fixture
+def pgpass(fichier_pgpass: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("PGPASSFILE", str(fichier_pgpass))
+    return fichier_pgpass
+
+
+def dsn_du_role(dsn_admin: str) -> str:
+    """Le DSN de la base du test, sous le rôle de l'application, sans mot de passe."""
+    parametres = conninfo.conninfo_to_dict(dsn_admin)
+    parametres.pop("password", None)
+    parametres["user"] = ROLE_APPLICATION
+    return conninfo.make_conninfo(**parametres)
+
+
+@pytest.fixture
+def base_app(base: str, pgpass: Path) -> str:
+    """La base du test vue par l'application : son rôle, sans mot de passe au DSN."""
+    del pgpass
+    return dsn_du_role(base)

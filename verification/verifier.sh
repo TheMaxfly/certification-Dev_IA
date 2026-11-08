@@ -83,7 +83,7 @@ MODULES=(
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
   "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
-  "12|12_application|12_application|pytest|--extra dev||application||pyright,bandit,pip-audit"
+  "12|12_application|12_application|pytest|--extra dev||application|database|pyright,bandit,pip-audit"
   "13|13_monitorage|13_monitorage|pytest|--extra dev||monitorage||pyright,bandit,pip-audit"
   "14|14_chaine|14_chaine|pytest|--extra dev||chaine||pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
@@ -439,6 +439,8 @@ verifier_statique() {
     uv run --no-project python -I verification/rejouer_mutations.py --controler
   controle "essais du contrôle des pseudonymes des passages de l'API" \
     uv run --no-project python -I verification/tester_pseudonymes_passages.py
+  controle "essais des migrations attendues en attente en production" \
+    uv run --no-project python -I verification/tester_migrations_en_attente.py
   controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \

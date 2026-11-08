@@ -69,6 +69,7 @@ uv run --extra dev pytest tests/         # suite sur base jetable (Docker)
 | `024_vue_pseudonymes.sql` | **la vue `manga.v_pseudonymes`** : les pseudonymes distincts, seule chose que `modele_ro` lit de la table des critiques, pour le contrôle « aucun nom de membre » de la route de réponse ; un droit, élévation déclarée |
 | `025_vue_metadonnees_serie.sql` | **la vue `manga.v_metadonnees_serie`** : disponibilité, nombre de tomes et sa source, statut, public, année française par série, calculés à la lecture sur les volumes, la fiche, le moyeu et Kitsu, règles dans `COMMENT ON VIEW` ; un droit pour `modele_ro`, élévation déclarée, aucune table, aucune donnée |
 | `026_auteurs_metadonnees_serie.sql` | **les auteurs dans `manga.v_metadonnees_serie`** : le scénariste puis le dessinateur, tels quels, un même nom une fois, une colonne de plus sur la vue (`CREATE OR REPLACE`) ; aucun droit, aucune table, aucune donnée |
+| `027_schema_application.sql` | **le schéma `application`** (E4) : les six tables de l'application du libraire — `comptes`, `critiques`, `journal_actions`, `listes`, `couts_jour`, `reglages` —, toutes en une migration ; le rôle de groupe `app_rw`, qui écrit là et n'a **rien** ailleurs, pas même en lecture ; journal en ajout seul et critiques sans suppression, **par les droits** ; aucune clé étrangère vers le catalogue (cf. « L'écriture de l'application ») |
 
 ## `000` — la frontière héritage / versionné
 
@@ -107,9 +108,17 @@ sauvegarde), `023` le 2026-10-20 (11:53 UTC, après sauvegarde, rôle de connexi
 `modele_api` créé par son script), `024` le 2026-10-27 (00:22 UTC, après sauvegarde),
 `025` le 2026-11-02 (23:35 UTC, après sauvegarde), `026` le 2026-11-03 (10:30 UTC, après
 sauvegarde) ; `000` y a été **marquée appliquée** le
-2026-07-15, sans exécution. Le contrôle affiche **27 migrations appliquées et 0 en
-attente**, et `outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
+2026-07-15, sans exécution. Le contrôle affiche **27 migrations appliquées**, et
+`outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
 2026-11-03).
+
+**`027` n'est pas appliquée à `apimanga`** : elle l'est d'abord en préproduction
+(`apimanga_preprod`, E4, lot 1), et la production la recevra avec la `028` au lot de
+livraison continue, après la sauvegarde et l'accord de Max. D'ici là, elle est
+**déclarée en attente** dans `verification/migrations_en_attente.tsv` : l'état
+d'`apimanga` (`make verify-poste`) l'admet, et refuserait toute autre migration absente
+(cf. `CONTRIBUTING.md`, « L'état d'`apimanga` »). `migrate.py status` sur la production
+l'affiche « en attente », ce qui est voulu.
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
 (1 et 2 sur le v1, 3 sur le v2). Le journal des promotions a deux lignes : la reprise
@@ -385,6 +394,76 @@ MODELE_API_PASSWORD="$(openssl rand -hex 24)" \
 # puis ~/.pgpass : localhost:5432:apimanga:modele_api:<mot de passe>
 ```
 
+### L'écriture de l'application : `app_rw` (`027`)
+
+L'application du libraire (module 12) garde ses données — comptes, critiques signées,
+listes, journal des actions, coûts du modèle de langage, réglages — dans un schéma à elle,
+`application`, sous un rôle qui n'écrit que là. Même construction que `012`, `022`, `023` :
+
+| Rôle | Nature | Créé par | Porte un secret |
+| --- | --- | --- | --- |
+| `app_rw` | groupe, `NOLOGIN` ; droits sur le schéma `application` seul | migration `027` | non |
+| `app_conseiller` | connexion, `LOGIN`, membre de `app_rw`, 10 connexions au plus, rien d'autre | `outils/creer_role_application.sh` | oui |
+
+| Objet | Accordé à `app_rw` |
+| --- | --- |
+| schéma `application` | `USAGE` (et `CONNECT` sur la base courante, comme `012`, `022`, `023`) |
+| `comptes`, `listes` | `SELECT`, `INSERT`, `UPDATE`, `DELETE` |
+| `critiques` | `SELECT`, `INSERT`, `UPDATE` — **pas de `DELETE`** : un retrait est un statut |
+| `journal_actions` | `SELECT`, `INSERT` — **ni `UPDATE` ni `DELETE`** : ajout seul, garanti par les droits |
+| `couts_jour`, `reglages` | `SELECT`, `INSERT`, `UPDATE` |
+| séquences des colonnes d'identité | **rien** : l'insertion n'en demande aucun droit (éprouvé) |
+| `manga`, `bench`, `staging`, `public` | **rien**, pas même en lecture : aucune table, aucune colonne, aucune séquence (restent, comme pour tout rôle, ce que `PUBLIC` a par défaut : l'usage du schéma `public` et `TEMP` sur la base) |
+| objets créés plus tard | **rien** — aucun `ALTER DEFAULT PRIVILEGES` |
+
+- **Aucune clé étrangère vers le catalogue** : `series_id` est l'identifiant du catalogue,
+  validé par l'API data du module 02 au moment de l'écriture ; le schéma `application` ne
+  dépend pas des instantanés du catalogue, qui se rechargent.
+- **Le journal ne porte jamais de texte libre ni de secret** dans `details` (ni mot de
+  passe, ni empreinte, ni pseudo, ni texte saisi) : des identifiants et des codes.
+- Un compte qui a des critiques ne se supprime pas (`ON DELETE RESTRICT`) ; les listes
+  partent avec leur compte (`CASCADE`) ; le journal garde ses lignes, l'auteur mis à nul
+  (`SET NULL`, fait par la base : `app_rw` n'a pas `UPDATE` sur le journal).
+- Le modèle de données complet (colonnes, contraintes) est dans
+  `12_application/schema/README.md`.
+
+**Le rôle déjà présent** (décision de Max du 8 novembre 2026). Un rôle est un objet du
+**serveur** : `apimanga` et `apimanga_preprod` sont sur le même, et le harnais rejoue les
+migrations dans un conteneur où les rôles existent déjà. Absent, `app_rw` est créé ;
+présent, ses attributs sont **vérifiés** (`NOLOGIN`, ni superutilisateur, ni `CREATEDB`, ni
+`CREATEROLE`, ni réplication, ni `BYPASSRLS`, membre d'aucun rôle) — un écart arrête la
+migration en nommant l'attribut, et le rôle conforme est repris **sans aucun `ALTER ROLE`**.
+
+**Conséquence pour la production.** Le rôle de connexion `app_conseiller`, créé en
+préproduction, **existe aussi pour la production** (même serveur). Au lot de livraison
+continue, il ne sera **pas recréé** : seule une ligne `~/.pgpass` pour `apimanga`
+s'ajoutera, avec le même mot de passe (le rôle est unique). L'outil garde son refus si le
+rôle existe.
+
+**L'outil** demande le mot de passe **au clavier, deux fois, sans écho** : c'est
+`\password` de psql, qui n'envoie au serveur que l'empreinte SCRAM — le mot de passe
+n'entre ni dans un argument, ni dans une variable, ni dans l'historique, ni dans un ordre
+SQL, ni dans un journal du serveur. Il ne vise que `apimanga` ou `apimanga_preprod`, exige
+le groupe `app_rw` et le schéma `application` dans la base visée, et refuse un
+`app_conseiller` existant (aucune réinitialisation silencieuse) :
+
+```bash
+sh outils/creer_role_application.sh 'postgresql://postgres@localhost:5432/apimanga_preprod'
+# puis ~/.pgpass : localhost:5432:apimanga_preprod:app_conseiller:<mot de passe>
+```
+
+`tests/test_schema_application.py` prouve la table des droits exactement, chaque refus
+`42501` sous un rôle de test membre de `app_rw` (journal, critiques, lecture de toute
+relation et écriture — `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` — de toute table de
+`manga`, `bench`, `staging`, `public`), les droits effectifs nuls hors du schéma (ceux de
+`PUBLIC` et par colonne compris), le refus d'un rôle hors de `app_rw` sur le schéma, les
+droits qui marchent, chaque contrainte, et les trois cas du rôle (absent, sur un serveur
+neuf ; présent et conforme, intact — un commentaire témoin survit au rejeu ; présent et
+fautif, refus nommé, un par attribut).
+`tests/test_role_application.py` joue l'outil dans un pseudo-terminal : gardes (argument,
+terminal, nom de base, groupe, schéma), création conforme sans que le mot de passe
+paraisse, saisies différentes sans trace, rôle existant intact.
+
 ### Ce qui n'est volontairement pas fait
 
 - **`REVOKE CONNECT ON DATABASE … FROM PUBLIC`** n'est pas exécuté. Par défaut,
@@ -403,7 +482,7 @@ MODELE_API_PASSWORD="$(openssl rand -hex 24)" \
 
 ## Tests
 
-`uv run --extra dev pytest tests/` — 234 tests (2026-10-19). Le harnais lance un
+`uv run --extra dev pytest tests/` — 473 tests (2026-11-08). Le harnais lance un
 PostgreSQL **jetable** en conteneur — `pgvector/pgvector:0.6.0-pg16`, épinglée par
 digest (PostgreSQL 16 et pgvector 0.6.0, la version d'`apimanga`) : depuis `020`,
 la chaîne crée l'extension `vector`, que `postgres:16-alpine` n'embarque pas. La

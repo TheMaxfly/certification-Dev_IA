@@ -1,12 +1,12 @@
-"""Harnais partagé des bases PostgreSQL JETABLES de test : database, 05, 08, 09, 10.
+"""Harnais partagé des bases PostgreSQL JETABLES de test : database, 05, 08 à 12.
 
 - **Un conteneur par session**, lancé ici, sans durabilité (une base jetable n'a que
   faire de `fsync`) ; arrêté à la fin.
 - **Une base gabarit par session**, migrée une seule fois par le vrai runner
   (`database/migrate.py`, dans le processus) : la base de test est celle du dépôt.
 - **Une base neuve par test**, copiée du gabarit (`CREATE DATABASE … TEMPLATE`), et
-  les droits de niveau base que la copie ne reporte pas (les `GRANT CONNECT` de 012
-  et 022) reportés depuis le gabarit : la copie vaut une base migrée.
+  les droits de niveau base que la copie ne reporte pas (les `GRANT CONNECT` de 012,
+  022, 023 et 027) reportés depuis le gabarit : la copie vaut une base migrée.
 - **Une base vide**, pour les tests qui jouent les migrations eux-mêmes, pas à pas.
 
 Garde-fou central : le DSN est toujours fabriqué ici, à partir du conteneur lancé

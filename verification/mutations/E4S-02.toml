@@ -1,0 +1,8 @@
+id = "E4S-02"
+origine = "E4, lot 1, spec 01 (2026-11-08) — app_rw lit le catalogue : le refus 42501 hors du schéma application tombe"
+fichier = "database/migrations/027_schema_application.sql"
+avant = '''GRANT USAGE ON SCHEMA application TO app_rw;'''
+apres = '''GRANT USAGE ON SCHEMA application, manga TO app_rw;
+GRANT SELECT ON ALL TABLES IN SCHEMA manga TO app_rw;'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_schema_application.py", "-k", "rien_dans or hors_du_schema"]

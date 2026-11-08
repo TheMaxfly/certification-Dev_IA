@@ -16,7 +16,8 @@ et les passages cités.
   bascule automatique de profil : le repli reste un geste humain.
 
 C'est le tronc de l'application de l'épreuve E4 : même module, même pile. Le dossier
-`schema/` garde la place de son schéma de données, vide à ce stade.
+`schema/` décrit son modèle de données, le schéma `application` de la base (migration
+`027`, E4, lot 1) : `schema/README.md`.
 
 ## Architecture
 
