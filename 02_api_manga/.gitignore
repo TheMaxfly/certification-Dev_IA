@@ -11,6 +11,9 @@ venv/
 
 # Env files
 .env
+# Le mot de passe de manga_api pour le service catalogue de la pile (E4, lot 2a) :
+# hors dépôt, mode 600, monté comme secret.
+.pgpass.conteneur
 
 # IDE
 .vscode/
