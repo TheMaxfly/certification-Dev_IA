@@ -263,6 +263,10 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
         "API_MODELE_ADRESSE",
         "APPLICATION_ECOUTE",
         "APPLICATION_METRIQUES_RESEAUX",
+        # E4, lot 1 : l'environnement, la base, la clé des sessions.
+        "APPLICATION_ENVIRONNEMENT",
+        "APPLICATION_BASE_DSN",
+        "APPLICATION_CLE_SESSION",
     }
     assert all(valeur == "" for _, valeur in affectations)
 
