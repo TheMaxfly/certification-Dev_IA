@@ -857,13 +857,12 @@ def test_le_delai_depasse_est_dit(doublure, doublure_sur_port, demarrer):
 
 
 def test_une_cle_refusee_sans_liste_connue_le_dit_a_la_question(doublure, reglages):
-    from conftest import application_sur
-    from fastapi.testclient import TestClient
+    from conftest import Navigateur, application_sur
 
     doublure.choisir(info="cle_invalide")
     application, _ = application_sur(doublure, reglages)
 
-    with TestClient(application, client=("127.0.0.1", 50000)) as navigateur:
+    with Navigateur(application, client=("127.0.0.1", 50000)) as navigateur:
         r = poser(navigateur, profil="")
 
     assert r.status_code == 503

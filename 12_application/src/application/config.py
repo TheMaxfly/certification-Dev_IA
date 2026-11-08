@@ -4,11 +4,27 @@ Tout est lu et validé au démarrage ; un écart empêche de démarrer, et le me
 la variable ou le réglage, jamais une valeur. La clé de l'API n'est jamais dans un
 fichier suivi, et son `repr` ne la montre pas (même forme que `Cle` du module 11,
 réécrite : ce module ne connaît le 11 que par HTTP).
+
+E4, lot 1 — la base et les sessions :
+- `APPLICATION_ENVIRONNEMENT` : `developpement` (défaut), `preproduction`,
+  `production` ;
+- `APPLICATION_BASE_DSN` : facultatif, SANS mot de passe (`~/.pgpass` sur le poste, un
+  fichier monté dans un conteneur) ; absent, le conseiller fonctionne et les comptes
+  attendent (décision 11) ;
+- `APPLICATION_CLE_SESSION` : 32 octets au moins ; obligatoire en préproduction et en
+  production ; absente en développement, une clé éphémère est tirée au démarrage (les
+  sessions se perdent au redémarrage ; journal d'avertissement) ;
+- **la garde d'environnement** (décision 10) : la base nommée par le DSN doit être celle
+  de l'environnement — `preproduction` ↔ `apimanga_preprod`, `production` ↔ `apimanga` ;
+  en développement, `apimanga` est refusée. Le message nomme la base attendue, jamais
+  le DSN.
+Ni le DSN ni la clé de session n'entrent dans un `repr` ni dans le journal.
 """
 
 from __future__ import annotations
 
 import ipaddress
+import secrets
 import string
 import tomllib
 from collections.abc import Mapping
@@ -17,9 +33,20 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import urlsplit
 
+from psycopg import ProgrammingError, conninfo
+
 RACINE_MODULE = Path(__file__).resolve().parents[2]
 FICHIER_REGLAGES = RACINE_MODULE / "config" / "reglages.toml"
 VARIABLE_CLE = "APPLICATION_CLE_API"
+VARIABLE_ENVIRONNEMENT = "APPLICATION_ENVIRONNEMENT"
+VARIABLE_BASE = "APPLICATION_BASE_DSN"
+VARIABLE_CLE_SESSION = "APPLICATION_CLE_SESSION"
+ENVIRONNEMENTS = ("developpement", "preproduction", "production")
+#: L'environnement → la seule base qu'il admet ; le développement admet toute base,
+#: sauf celle de la production.
+BASES_EXIGEES = {"preproduction": "apimanga_preprod", "production": "apimanga"}
+BASE_PRODUCTION = "apimanga"
+CLE_SESSION_OCTETS_MIN = 32
 
 type Reseau = ipaddress.IPv4Network | ipaddress.IPv6Network
 type Table = dict[str, object]
@@ -55,7 +82,9 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " apropos_conserve_titre apropos_conserve apropos_registre_titre"
             " apropos_registre apropos_licences_titre apropos_licences"
             " erreur_400_titre erreur_400_texte erreur_404_titre erreur_404_texte"
-            " erreur_405_titre erreur_405_texte"
+            " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
+            " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
+            " erreur_comptes_titre erreur_comptes_texte"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -143,6 +172,22 @@ class Limites:
 
 
 @dataclass(frozen=True, slots=True)
+class Comptes:
+    """Les réglages des comptes et des sessions (`[comptes]`)."""
+
+    duree_session_s: int
+    echecs_avant_verrou: int
+    duree_verrou_s: int
+    pseudo_min: int
+    pseudo_max: int
+    mot_de_passe_min: int
+    mot_de_passe_max: int
+    nom_affiche_max: int
+    delai_base_s: float
+    par_page: int
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -168,6 +213,11 @@ class Reglages:
     metriques_reseaux: tuple[Reseau, ...]
     fournisseurs: Mapping[str, Fournisseur]
     textes: Mapping[str, str]
+    environnement: str
+    base_dsn: str | None = field(repr=False)
+    cle_session: str = field(repr=False)
+    cle_session_ephemere: bool
+    comptes: Comptes
 
 
 class _Lecteur:
@@ -287,6 +337,58 @@ def lire_ecoute(valeur: str, ecarts: list[str]) -> tuple[str, int] | None:
     return hote, int(port)
 
 
+def lire_environnement(environ: Mapping[str, str], ecarts: list[str]) -> str:
+    valeur = environ.get(VARIABLE_ENVIRONNEMENT, "").strip() or "developpement"
+    if valeur not in ENVIRONNEMENTS:
+        ecarts.append(f"{VARIABLE_ENVIRONNEMENT} : attendu {', '.join(ENVIRONNEMENTS)}")
+    return valeur
+
+
+def garder_base(environnement: str, dsn: str | None, ecarts: list[str]) -> None:
+    """La garde d'environnement : la base du DSN est celle de l'environnement."""
+    if dsn is None:
+        return
+    try:
+        parametres = conninfo.conninfo_to_dict(dsn)
+    except ProgrammingError:
+        ecarts.append(f"{VARIABLE_BASE} : illisible")
+        return
+    if parametres.get("password"):
+        ecarts.append(
+            f"{VARIABLE_BASE} : porte un mot de passe — il se range dans ~/.pgpass"
+            " (ou un fichier monté), jamais dans le DSN"
+        )
+    nom = parametres.get("dbname")
+    exigee = BASES_EXIGEES.get(environnement)
+    if not nom:
+        ecarts.append(f"{VARIABLE_BASE} : la base n'est pas nommée")
+    elif exigee is not None and nom != exigee:
+        ecarts.append(f"garde d'environnement : {environnement} exige la base {exigee}")
+    elif exigee is None and nom == BASE_PRODUCTION:
+        ecarts.append(
+            "garde d'environnement : la base de production est refusée en développement"
+        )
+
+
+def lire_cle_session(
+    environ: Mapping[str, str], environnement: str, ecarts: list[str]
+) -> tuple[str, bool]:
+    """La clé de signature des sessions, et si elle est éphémère."""
+    cle = environ.get(VARIABLE_CLE_SESSION, "").strip()
+    if not cle:
+        if environnement in BASES_EXIGEES:
+            ecarts.append(
+                f"{VARIABLE_CLE_SESSION} : absente — obligatoire en {environnement}"
+            )
+        return secrets.token_urlsafe(48), True
+    if len(cle.encode()) < CLE_SESSION_OCTETS_MIN:
+        ecarts.append(
+            f"{VARIABLE_CLE_SESSION} : trop courte"
+            f" ({CLE_SESSION_OCTETS_MIN} octets au moins)"
+        )
+    return cle, False
+
+
 def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reglages:
     """Le fichier et l'environnement, validés ; au moindre écart, une exception."""
     ecarts: list[str] = []
@@ -353,6 +455,12 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         )
     )
 
+    environnement = lire_environnement(environ, ecarts)
+    base_dsn = environ.get(VARIABLE_BASE, "").strip() or None
+    garder_base(environnement, base_dsn, ecarts)
+    cle_session, ephemere = lire_cle_session(environ, environnement, ecarts)
+    comptes = lecteur.table(donnees, "comptes")
+
     fournisseurs: dict[str, Fournisseur] = {}
     for nom, brut in lecteur.table(donnees, "fournisseurs").items():
         table = cast(Table, brut) if isinstance(brut, dict) else {}
@@ -407,6 +515,24 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         metriques_reseaux=tuple(reseaux),
         fournisseurs=fournisseurs,
         textes=lire_textes(lecteur.table(donnees, "textes"), ecarts),
+        environnement=environnement,
+        base_dsn=base_dsn,
+        cle_session=cle_session,
+        cle_session_ephemere=ephemere,
+        comptes=Comptes(
+            duree_session_s=lecteur.entier(comptes, "duree_session_s", "comptes"),
+            echecs_avant_verrou=lecteur.entier(
+                comptes, "echecs_avant_verrou", "comptes"
+            ),
+            duree_verrou_s=lecteur.entier(comptes, "duree_verrou_s", "comptes"),
+            pseudo_min=lecteur.entier(comptes, "pseudo_min", "comptes"),
+            pseudo_max=lecteur.entier(comptes, "pseudo_max", "comptes"),
+            mot_de_passe_min=lecteur.entier(comptes, "mot_de_passe_min", "comptes"),
+            mot_de_passe_max=lecteur.entier(comptes, "mot_de_passe_max", "comptes"),
+            nom_affiche_max=lecteur.entier(comptes, "nom_affiche_max", "comptes"),
+            delai_base_s=lecteur.positif(comptes, "delai_base_s", "comptes"),
+            par_page=lecteur.entier(comptes, "par_page", "comptes"),
+        ),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

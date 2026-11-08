@@ -1,6 +1,7 @@
 <section>
 <h2>{{ t.question_titre }}</h2>
 <form method="post" action="/question">
+<input type="hidden" name="jeton" value="{{ jeton }}">
 <label for="question">{{ t.question_etiquette }}</label>
 <textarea id="question" name="question" rows="3" maxlength="{{ question_max }}" required aria-describedby="question-aide{% if formulaire.champ_fautif == "question" %} question-erreur{% endif %}"{% if formulaire.champ_fautif == "question" %} aria-invalid="true" autofocus{% endif %}>{{ formulaire.question }}</textarea>
 <small id="question-aide">{{ question_aide }}</small>

@@ -10,9 +10,8 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup, Tag
-from conftest import ENVIRONNEMENT, application_sur
+from conftest import ENVIRONNEMENT, Navigateur, application_sur
 from ecrans import echanges
-from fastapi.testclient import TestClient
 
 from application.config import FICHIER_REGLAGES, ConfigurationInvalide, charger
 
@@ -597,7 +596,7 @@ def test_le_defaut_vient_de_la_configuration_et_le_libraire_garde_la_main(
     allume = replace(reglages, mode_demonstration_defaut=True)
     application, _ = application_sur(doublure, allume)
 
-    with TestClient(application, client=("127.0.0.1", 50000)) as client:
+    with Navigateur(application, client=("127.0.0.1", 50000)) as client:
         assert case_cochee(soupe(client.get("/")))
         page = soupe(poser(client))
 

@@ -67,6 +67,19 @@ motif = "Sur le bouclage du poste. 8020, à côté de l'API : 8000 est au module
 reseaux = ["127.0.0.1/32", "::1/128"]
 motif = "/metrics ne répond qu'au bouclage, 404 ailleurs. Dans un conteneur, le client n'est pas le bouclage : surchargeable, APPLICATION_METRIQUES_RESEAUX (réseaux séparés par des virgules)."
 
+[comptes]
+duree_session_s = 28800
+echecs_avant_verrou = 5
+duree_verrou_s = 900
+pseudo_min = 3
+pseudo_max = 30
+mot_de_passe_min = 12
+mot_de_passe_max = 128
+nom_affiche_max = 60
+delai_base_s = 3.0
+par_page = 25
+motif = "La session vit 8 h après la dernière page (une journée de travail en librairie), puis se rouvre par la connexion ; l'expiration est vérifiée côté serveur. Cinq échecs consécutifs posent un verrou de 15 minutes (E4, lot 1, décision 8). Pseudo de 3 à 30 caractères et nom affiché de 60 au plus : les bornes de la migration 027, recopiées et comparées par un test ; mot de passe de 12 à 128 sans règle de composition (décision 7, NIST SP 800-63B). La base se joint, répond à une instruction et rend un verrou en 3 s, ou elle est tenue pour indisponible ; 25 comptes par page d'administration."
+
 [fournisseurs.mistral]
 nom = "Mistral"
 hebergement = "Union européenne"
@@ -240,8 +253,8 @@ apropos_colonne_profil = "Profil"
 apropos_colonne_fournisseur = "Fournisseur"
 apropos_colonne_hebergement = "Hébergement"
 apropos_liste_inconnue = "Liste inconnue : le service ne répond pas."
-apropos_conserve_titre = "Ce qui n'est pas conservé"
-apropos_conserve = "L'application ne garde rien : ni compte, ni cookie, ni fichier, ni écriture en base. La conversation vit dans la page ; fermer l'onglet l'efface. Son journal ne contient ni la question, ni la conversation, ni la réponse : des nombres et des identifiants techniques seulement."
+apropos_conserve_titre = "Ce qui est conservé, et ce qui ne l'est pas"
+apropos_conserve = "La conversation n'est pas conservée : elle vit dans la page, fermer l'onglet l'efface. Un seul cookie, strictement nécessaire : celui de la session, qui protège les formulaires (un jeton contre les envois depuis un autre site) et garde la connexion ; ni traceur ni mesure d'audience. Le journal de l'application ne contient ni la question, ni la conversation, ni la réponse : des nombres et des identifiants techniques seulement."
 apropos_registre_titre = "Registre des traitements"
 apropos_registre = "Ce traitement sera inscrit au registre des traitements du projet avant toute mise en service."
 apropos_licences_titre = "Licences"
@@ -257,5 +270,13 @@ erreur_413_titre = "Demande trop volumineuse"
 erreur_413_texte = "La question et la conversation dépassent la taille admise. Commencez une nouvelle conversation."
 erreur_500_titre = "Erreur de l'application"
 erreur_500_texte = "Une erreur imprévue est survenue."
+erreur_401_titre = "Connexion requise"
+erreur_401_texte = "Cette page demande d'être connecté."
+erreur_403_titre = "Accès refusé"
+erreur_403_texte = "Votre compte n'a pas accès à cette page."
+erreur_csrf_titre = "Formulaire expiré"
+erreur_csrf_texte = "Ce formulaire a expiré, rechargez la page."
+erreur_comptes_titre = "Comptes indisponibles"
+erreur_comptes_texte = "Les comptes sont momentanément indisponibles ; le conseiller reste accessible."
 erreur_identifiant = "Identifiant : {identifiant}"
 erreur_retour = "Retour à la page d'accueil"

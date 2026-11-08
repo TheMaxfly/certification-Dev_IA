@@ -1,12 +1,18 @@
 """L'application : routes, cycle de vie, pages.
 
 Au démarrage, `/v1/info` est lu une fois : un échec n'empêche pas de démarrer, l'écran
-le dit. L'application ne parle jamais à la base ni à un fournisseur : l'API seule, par
-son contrat.
+le dit. L'application ne parle jamais à un fournisseur ni au catalogue en base : à l'API
+du modèle seule, par son contrat. Elle a sa base à elle (schéma `application`, rôle
+`app_rw`, E4) pour les comptes : absente ou injoignable, le conseiller fonctionne, les
+pages de compte le disent (503).
+
+Les sessions (`sessions`) : un cookie signé, le compte relu en base à chaque requête, un
+jeton CSRF sur chaque formulaire `POST` — celui du conseiller compris.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
@@ -14,15 +20,17 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from python_multipart.exceptions import FormParserError
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import __version__, historique, journal, presentation
+from application import __version__, historique, journal, presentation, sessions
+from application.base import Base, BaseIndisponible
 from application.client_api import (
     ApiDelai,
     ApiInjoignable,
@@ -33,6 +41,14 @@ from application.client_api import (
 from application.config import Reglages
 from application.enveloppe import Enveloppe
 from application.metriques import Metriques, autorisee
+from application.motdepasse import Hacheur
+from application.sessions import (
+    AccesRefuse,
+    ComptesIndisponibles,
+    JetonRefuse,
+    NonConnecte,
+    Redirection,
+)
 
 ICI = Path(__file__).resolve().parent
 GABARITS = ICI / "gabarits"
@@ -40,6 +56,8 @@ STATIQUE = ICI / "statique"
 #: Le statut d'une page d'erreur → ses textes.
 PAGES_ERREUR = {
     400: ("erreur_400_titre", "erreur_400_texte"),
+    401: ("erreur_401_titre", "erreur_401_texte"),
+    403: ("erreur_403_titre", "erreur_403_texte"),
     404: ("erreur_404_titre", "erreur_404_texte"),
     405: ("erreur_405_titre", "erreur_405_texte"),
     413: ("erreur_413_titre", "erreur_413_texte"),
@@ -78,12 +96,17 @@ def environnement_gabarits() -> Environment:
 
 
 def creer_application(
-    reglages: Reglages, *, transport: httpx.AsyncBaseTransport | None = None
+    reglages: Reglages,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    hacheur: Hacheur | None = None,
 ) -> FastAPI:
     """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
 
-    `transport` : la doublure de l'API en mémoire (tests)."""
+    `transport` : la doublure de l'API en mémoire (tests) ; `hacheur` : un moteur
+    Argon2id aux paramètres réduits (tests) — la production prend les défauts."""
     metriques = Metriques()
+    base = Base(reglages.base_dsn, reglages.comptes.delai_base_s, metriques)
     client = ClientApi(
         reglages.adresse_api, reglages.cle_api, reglages.delais, metriques, transport
     )
@@ -94,6 +117,7 @@ def creer_application(
 
     @asynccontextmanager
     async def cycle(_app: FastAPI) -> AsyncGenerator[None]:
+        await run_in_threadpool(app.state.hacheur.preparer)
         await vue.rafraichir()
         metriques.api_sante_ok.set(1 if await client.sante() else 0)
         vue.limites()  # un écart aux bornes publiées se journalise dès le démarrage
@@ -103,8 +127,14 @@ def creer_application(
                 "version": __version__,
                 "etat_api": vue.etat,
                 "ecoute": f"{reglages.hote}:{reglages.port}",
+                "environnement": reglages.environnement,
+                "base": "configuree" if base.configuree else "non_configuree",
             },
         )
+        if reglages.cle_session_ephemere:
+            # Développement seul (la configuration l'impose ailleurs) : la clé est tirée
+            # au démarrage, les sessions se perdent quand l'application redémarre.
+            journal.evenement("cle_session_ephemere", niveau=logging.WARNING)
         try:
             yield
         finally:
@@ -119,8 +149,10 @@ def creer_application(
             **valeurs,
         }
 
-    def page_erreur(statut: int, identifiant: str) -> Response:
-        titre, texte = PAGES_ERREUR.get(statut, PAGES_ERREUR[500])
+    def page_erreur(
+        statut: int, identifiant: str, textes: tuple[str, str] | None = None
+    ) -> Response:
+        titre, texte = textes or PAGES_ERREUR.get(statut, PAGES_ERREUR[500])
         contenu = environnement.get_template("erreur.html").render(
             contexte(
                 titre=t[titre],
@@ -140,6 +172,9 @@ def creer_application(
         redoc_url=None,
         openapi_url=None,
     )
+    # Les sessions d'abord : l'enveloppe, ajoutée ensuite, reste la plus extérieure
+    # (ses en-têtes et ses pages 413 et 500 valent pour tout).
+    sessions.installer(app, reglages)
     app.add_middleware(
         Enveloppe,
         metriques=metriques,
@@ -158,6 +193,43 @@ def creer_application(
         return reponse
 
     app.add_exception_handler(StarletteHTTPException, erreur_http)
+
+    def identifiant_de(request: Request) -> str:
+        return str(request.state.identifiant_requete)
+
+    async def redirection(request: Request, exc: Exception) -> Response:
+        chemin = exc.chemin if isinstance(exc, Redirection) else "/"
+        return RedirectResponse(chemin, status_code=303)
+
+    async def acces_refuse(request: Request, exc: Exception) -> Response:
+        request.state.code_erreur = "acces_refuse"
+        return page_erreur(403, identifiant_de(request))
+
+    async def jeton_refuse(request: Request, exc: Exception) -> Response:
+        request.state.code_erreur = "csrf_refuse"
+        return page_erreur(
+            403, identifiant_de(request), ("erreur_csrf_titre", "erreur_csrf_texte")
+        )
+
+    async def comptes_indisponibles(request: Request, exc: Exception) -> Response:
+        request.state.code_erreur = "comptes_indisponibles"
+        return page_erreur(
+            503,
+            identifiant_de(request),
+            ("erreur_comptes_titre", "erreur_comptes_texte"),
+        )
+
+    async def non_connecte(request: Request, exc: Exception) -> Response:
+        request.state.code_erreur = "non_connecte"
+        return page_erreur(401, identifiant_de(request))
+
+    app.add_exception_handler(Redirection, redirection)
+    app.add_exception_handler(AccesRefuse, acces_refuse)
+    app.add_exception_handler(JetonRefuse, jeton_refuse)
+    app.add_exception_handler(NonConnecte, non_connecte)
+    app.add_exception_handler(ComptesIndisponibles, comptes_indisponibles)
+    # Une base perdue en cours de route, qu'une page n'a pas attrapée : 503, jamais 500.
+    app.add_exception_handler(BaseIndisponible, comptes_indisponibles)
     app.mount("/statique", StaticFiles(directory=STATIQUE), name="statique")
 
     def page_principale(
@@ -217,6 +289,7 @@ def creer_application(
                 affichage=affichage,
                 encart=encart,
                 cloture=cloture,
+                jeton=sessions.jeton_csrf(request),
             ),
             status_code=statut,
         )
@@ -226,6 +299,7 @@ def creer_application(
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def accueil(request: Request) -> Response:
+        await sessions.page(request)
         await vue.rafraichir()
         return page_principale(request)
 
@@ -275,14 +349,17 @@ def creer_application(
 
     @app.post("/question", response_class=HTMLResponse, include_in_schema=False)
     async def question(request: Request) -> Response:
-        await vue.rafraichir()
-        limites = vue.limites()
         identifiant = str(request.state.identifiant_requete)
         try:
             donnees = await request.form()
         except FormParserError:
             # Un corps qu'un navigateur n'écrit pas : pas une erreur de l'API.
             raise StarletteHTTPException(status_code=400) from None
+        # Le jeton d'abord : un formulaire sans jeton valide n'atteint pas l'API.
+        sessions.exiger_jeton(request, champ(donnees, sessions.CHAMP_JETON))
+        await sessions.page(request)
+        await vue.rafraichir()
+        limites = vue.limites()
         try:
             tours = historique.lire(champ(donnees, "historique"), limites)
         except historique.HistoriqueInvalide:
@@ -388,6 +465,7 @@ def creer_application(
 
     @app.get("/a-propos", response_class=HTMLResponse, include_in_schema=False)
     async def a_propos(request: Request) -> Response:
+        await sessions.page(request)
         await vue.rafraichir()
         return gabarits.TemplateResponse(
             request,
@@ -399,14 +477,16 @@ def creer_application(
         )
 
     @app.get("/sante", include_in_schema=False)
-    async def sante() -> JSONResponse:
+    async def sante(request: Request) -> JSONResponse:
         """Toujours 200 : l'application est vivante, et elle sert sans l'API."""
+        base: Base = request.app.state.base
         api_ok = await client.sante()
         metriques.api_sante_ok.set(1 if api_ok else 0)
         return JSONResponse(
             {
                 "application": "ok",
                 "api": "ok" if api_ok else "indisponible",
+                "base": await base.sonder() if base.configuree else base.etat,
                 "version": __version__,
             }
         )
@@ -421,4 +501,7 @@ def creer_application(
 
     app.state.vue = vue
     app.state.metriques = metriques
+    app.state.base = base
+    app.state.hacheur = hacheur if hacheur is not None else Hacheur()
+    app.state.reglages = reglages
     return app

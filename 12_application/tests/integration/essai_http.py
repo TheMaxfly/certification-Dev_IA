@@ -5,7 +5,9 @@ Il parle à l'application par le réseau du Compose, comme un navigateur :
 
 1. `/sante` : 200, l'API jointe ;
 2. `/` : la page, le profil actif, la mention, les en-têtes de sécurité ;
-3. `POST /question` : la réponse et une carte de série, depuis la doublure ;
+3. `POST /question` : la réponse et une carte de série, depuis la doublure — avec
+   le cookie de session et le jeton CSRF de la page, comme un navigateur ; sans
+   jeton, 403 ;
 4. le même, la doublure en refus de débit : l'encart, `Retry-After`, la question ;
 5. `/a-propos`, `/metrics` ; la doublure n'a vu aucun écart au contrat.
 
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -24,30 +27,49 @@ from email.message import Message
 
 BASE = os.environ["APPLICATION_URL"]
 DOUBLURE = os.environ["DOUBLURE_URL"]
+#: Le cookie de session, gardé d'une requête à l'autre (`nom=valeur`), comme un
+#: navigateur.
+COOKIE: dict[str, str] = {}
 
 
 def appeler(
     url: str, donnees: bytes | None = None, type_: str | None = None
 ) -> tuple[int, Message, str]:
     entetes = {"Content-Type": type_} if type_ else {}
+    if COOKIE and url.startswith(BASE):
+        entetes["Cookie"] = "; ".join(f"{n}={v}" for n, v in COOKIE.items())
     requete = urllib.request.Request(url, data=donnees, headers=entetes)
     try:
         with urllib.request.urlopen(requete, timeout=10) as r:  # noqa: S310
-            return r.status, r.headers, r.read().decode("utf-8")
+            reponse = r.status, r.headers, r.read().decode("utf-8")
     except urllib.error.HTTPError as e:
-        return e.code, e.headers, e.read().decode("utf-8")
+        reponse = e.code, e.headers, e.read().decode("utf-8")
+    for entete in reponse[1].get_all("Set-Cookie") or []:
+        nom, _, valeur = entete.split(";", 1)[0].partition("=")
+        COOKIE[nom] = valeur
+    return reponse
 
 
-def poser(question: str) -> tuple[int, Message, str]:
-    corps = urllib.parse.urlencode(
-        {
-            "question": question,
-            "profil": "mistral-large-2512",
-            "temperature": "0.0",
-            "reformuler": "1",
-            "historique": "",
-        }
-    ).encode()
+def jeton() -> str:
+    """Le jeton CSRF de la page du conseiller (et le cookie qui le porte)."""
+    _, _, corps = appeler(f"{BASE}/")
+    trouve = re.search(r'name="jeton" value="([^"]+)"', corps)
+    verifier(trouve is not None, "/ : le jeton du formulaire")
+    assert trouve is not None
+    return trouve.group(1)
+
+
+def poser(question: str, avec_jeton: bool = True) -> tuple[int, Message, str]:
+    champs = {
+        "question": question,
+        "profil": "mistral-large-2512",
+        "temperature": "0.0",
+        "reformuler": "1",
+        "historique": "",
+    }
+    if avec_jeton:
+        champs["jeton"] = jeton()
+    corps = urllib.parse.urlencode(champs).encode()
     return appeler(f"{BASE}/question", corps, "application/x-www-form-urlencoded")
 
 
@@ -79,6 +101,12 @@ def principal() -> None:
         "/ : les en-têtes de sécurité",
     )
     verifier("cle-jetable-essai" not in corps, "/ : la clé n'y paraît pas")
+
+    statut, _, corps = poser("Une question factice sans jeton ?", avec_jeton=False)
+    verifier(
+        statut == 403 and "Ce formulaire a expiré" in corps,
+        "/question : sans jeton, 403",
+    )
 
     statut, _, corps = poser("Un manga factice ?")
     verifier(statut == 200, "/question : 200")

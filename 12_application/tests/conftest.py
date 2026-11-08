@@ -17,7 +17,9 @@ sous `postgres`.
 
 from __future__ import annotations
 
+import base64
 import importlib.util
+import json
 import secrets
 import socket
 import sys
@@ -33,6 +35,7 @@ import httpx
 import psycopg
 import pytest
 import uvicorn
+from argon2 import PasswordHasher
 from doublure_api import CLE_ATTENDUE, Doublure
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -41,6 +44,8 @@ from psycopg import conninfo, sql
 from application.app import creer_application
 from application.config import Reglages, charger
 from application.journal import FormatJson
+from application.motdepasse import Hacheur
+from application.sessions import NOM_COOKIE
 
 BOUCLAGE = ("127.0.0.1", "localhost", "::1")
 ADRESSE_MEMOIRE = "http://127.0.0.1:8010"
@@ -86,18 +91,54 @@ def doublure() -> Iterator[Doublure]:
     assert not instance.ecarts, instance.ecarts
 
 
+#: Argon2id aux paramètres réduits : les tests hachent vite ; la production prend les
+#: défauts de la bibliothèque (`Hacheur()`, éprouvé par `test_motdepasse.py`).
+HACHEUR_RAPIDE = Hacheur(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
+
+
+def jeton_du_cookie(client: TestClient) -> str | None:
+    """Le jeton CSRF de la session du client, lu dans son cookie (signé, en clair)."""
+    valeur = client.cookies.get(NOM_COOKIE)
+    if not valeur:
+        return None
+    contenu = json.loads(base64.b64decode(valeur.split(".")[0]))
+    jeton = contenu.get("csrf")
+    return jeton if isinstance(jeton, str) else None
+
+
+class Navigateur(TestClient):
+    """Un client qui se comporte comme un navigateur pour le jeton CSRF : un formulaire
+    envoyé porte le jeton de sa session, tiré à la première page s'il le faut. Les
+    tests du jeton lui-même passent `avec_jeton=False`, ou un `jeton` explicite."""
+
+    avec_jeton = True
+
+    def post(  # type: ignore[override]
+        self, url: Any, *args: Any, **kwargs: Any
+    ) -> httpx.Response:
+        donnees = kwargs.get("data")
+        if self.avec_jeton and isinstance(donnees, dict) and "jeton" not in donnees:
+            if jeton_du_cookie(self) is None:
+                self.get("/")
+            kwargs["data"] = {**donnees, "jeton": jeton_du_cookie(self) or ""}
+        return super().post(url, *args, **kwargs)
+
+
 def application_sur(
     doublure: Doublure, reglages: Reglages
 ) -> tuple[FastAPI, httpx.ASGITransport]:
     transport = httpx.ASGITransport(app=doublure.app)
-    return creer_application(reglages, transport=transport), transport
+    return (
+        creer_application(reglages, transport=transport, hacheur=HACHEUR_RAPIDE),
+        transport,
+    )
 
 
 @pytest.fixture
 def navigateur(doublure: Doublure, reglages: Reglages) -> Iterator[TestClient]:
     """L'application contre la doublure en mémoire, vue du bouclage, démarrée."""
     application, _ = application_sur(doublure, reglages)
-    with TestClient(
+    with Navigateur(
         application, client=("127.0.0.1", 50000), raise_server_exceptions=False
     ) as client:
         yield client
@@ -155,9 +196,10 @@ def demarrer(
     def lancer(adresse: str, **delais: float) -> TestClient:
         reduits = replace(reglages.delais, **delais) if delais else reglages.delais
         application = creer_application(
-            replace(reglages, adresse_api=adresse, delais=reduits)
+            replace(reglages, adresse_api=adresse, delais=reduits),
+            hacheur=HACHEUR_RAPIDE,
         )
-        client = TestClient(
+        client = Navigateur(
             application, client=("127.0.0.1", 50000), raise_server_exceptions=False
         )
         client.__enter__()

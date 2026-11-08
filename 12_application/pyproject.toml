@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "application-conseiller"
-version = "0.1.0"
+version = "0.2.0"
 description = "L'application du libraire : une page, une question, la réponse de l'API du modèle, ses sources et ses cas dégradés"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,9 +12,13 @@ requires-python = ">=3.12"
 # les versions du verrou du module 11 ; aucun code de ce module n'est importé, l'application
 # ne connaît l'API que par HTTP. psycopg : la base de l'application (schéma `application`,
 # migration 027), par le rôle de connexion `app_conseiller`, membre de `app_rw` seul.
+# argon2-cffi : le hachage Argon2id des mots de passe, directement, sans surcouche ;
+# itsdangerous : la signature du cookie de session (`SessionMiddleware` de Starlette).
 dependencies = [
+    "argon2-cffi==25.1.0",
     "fastapi==0.139.0",
     "httpx==0.28.1",
+    "itsdangerous==2.2.0",
     "jinja2==3.1.6",
     "prometheus-client==0.26.0",
     "psycopg[binary]==3.3.6",
