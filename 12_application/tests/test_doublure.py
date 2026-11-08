@@ -77,7 +77,11 @@ def test_le_scenario_se_choisit_par_la_route_d_essai():
     )
     client.post("/_essai/scenario", json={"sante": "degrade"})
 
-    assert r.json() == {"info": "deux_modes", "reponse": "refus_inconnu"}
+    assert r.json() == {
+        "info": "deux_modes",
+        "reponse": "refus_inconnu",
+        "catalogue": "nominal",
+    }
     assert client.get("/v1/sante").status_code == 503
     corps = client.post("/v1/reponse", json={"question": "x"}).json()
     assert corps["motif_refus"] == "inconnu"

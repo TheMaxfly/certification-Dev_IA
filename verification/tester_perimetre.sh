@@ -46,6 +46,8 @@ cas "documentation seule"              "statique"                              R
 cas "hooks seuls"                      "statique"                              .githooks/pre-push .githooks/tester.sh
 cas "le script de sauvegarde"          "database statique"                     sauvegarde/sauvegarder.sh
 cas "un fichier du 01"                 "01 statique"                           01_scraping_manganews/x.py
+cas "un fichier du 02"                 "02 statique"                           02_api_manga/app/x.py
+cas "le contrat du 02"                 "02 12 statique"                        02_api_manga/openapi.json
 cas "un fichier du 05"                 "05 14 demo statique"                    05_nettoyage_agregation_bdd/src/corpus/x.py
 cas "l'atteignabilité du 05"           "05 10 11 14 demo statique"              05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 cas "Bench_embedding du 06"            "05 statique"                           06_benchmark_embeddings_llm/Bench_embedding.py

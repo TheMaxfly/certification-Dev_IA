@@ -1,7 +1,7 @@
 id = "HK-18"
 origine = "E3 étape 4, spec 03 (2026-11-03) — l'aspect du trousseau ne voit plus qu'un secret en premier élément"
 fichier = ".githooks/cles-fournisseurs"
-avant = '''([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:'''
-apres = '''[a-z0-9_-]+:'''
+avant = '''CLES_ASPECT[API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:'''
+apres = '''CLES_ASPECT[API_MODELE_CLES]="API_MODELE_CLES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[a-z0-9_-]+:'''
 dossier = "."
 commande = ["bash", ".githooks/tester.sh"]

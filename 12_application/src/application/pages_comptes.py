@@ -190,6 +190,19 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
         refus: bool = False,
         pseudo: str = "",
     ) -> Response:
+        # Le refus et sa phrase fixe, la même dans tous les cas (inconnu, mauvais mot
+        # de passe, verrouillé, désactivé) : les règles, rien sur le compte.
+        texte_refus = " ".join(
+            (
+                t["connexion_refus"],
+                presentation.dire(
+                    t,
+                    "connexion_refus_regles",
+                    seuil=regles.echecs_avant_verrou,
+                    minutes=-(-regles.duree_verrou_s // 60),
+                ),
+            )
+        )
         return rendre(
             request,
             "connexion.html",
@@ -197,6 +210,7 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
             retour=retour,
             suffixe_retour=sessions.suffixe_retour(retour),
             refus=refus,
+            texte_refus=texte_refus,
             valeurs={"pseudo": pseudo} if pseudo else {},
             comptes=regles,
         )
@@ -262,6 +276,7 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
         statut: int = 200,
         erreurs: dict[str, str] | None = None,
         avis: str | None = None,
+        reussi: bool = False,
     ) -> Response:
         erreurs = erreurs or {}
         if avis is None and compte.doit_changer_mdp:
@@ -275,6 +290,8 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
             avis=avis,
             # Sans erreur, le focus va à l'avis : le lecteur d'écran le lit d'abord.
             focus=focus if focus or avis is None else "avis",
+            # Changé : plus de formulaire, l'encart et le lien pour continuer.
+            reussi=reussi,
             comptes=regles,
             **aides(),
         )
@@ -306,7 +323,9 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
                 # tombent à leur prochaine requête.
                 sessions.ouvrir(request, change)
                 journal.evenement_requete(request, "mot_de_passe_change")
-                return page_mot_de_passe(request, change, avis=t["mdp_change"])
+                return page_mot_de_passe(
+                    request, change, avis=t["mdp_change"], reussi=True
+                )
             journal.evenement_requete(
                 request, "mot_de_passe_refuse", {"motif": change.motif}
             )

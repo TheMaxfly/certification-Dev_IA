@@ -260,6 +260,14 @@ LIGNE_SERIE = (
     3480,
     False,
     [{"code": "action", "label_fr": "Action", "type": "genre"}],
+    # Contrat 0.5.0 : les sept champs de `manga.v_metadonnees_serie`.
+    "edite_en_france",
+    77,
+    "champ",
+    "en_cours",
+    "Seinen",
+    "Yasuhisa HARA",
+    2007,
 )
 
 
@@ -300,6 +308,46 @@ def test_series_n_expose_aucune_colonne_interne() -> None:
     assert "needs_review" in champs
 
 
+def test_series_porte_les_sept_champs_de_la_vue_des_metadonnees() -> None:
+    pool = FakePool([LIGNE_SERIE])
+    reponse = get_series(pool, 8514)
+
+    assert {
+        champ: getattr(reponse, champ)
+        for champ in (
+            "disponibilite",
+            "nb_volumes",
+            "nb_volumes_source",
+            "statut",
+            "demographie",
+            "auteurs",
+            "annee_fr",
+        )
+    } == {
+        "disponibilite": "edite_en_france",
+        "nb_volumes": 77,
+        "nb_volumes_source": "champ",
+        "statut": "en_cours",
+        "demographie": "Seinen",
+        "auteurs": "Yasuhisa HARA",
+        "annee_fr": 2007,
+    }
+    sql, parametres = pool.cursor.executions[0]
+    assert "LEFT JOIN manga.v_metadonnees_serie m ON m.series_id = s.series_id" in sql
+    assert parametres == (8514,)
+    # Les champs d'avant restent tels quels.
+    assert (reponse.volume_count, reponse.statuses) == (77, ["En cours"])
+
+
+def test_series_sans_metadonnees_rend_des_champs_nuls() -> None:
+    ligne = LIGNE_SERIE[:31] + (None,) * 7
+
+    reponse = get_series(FakePool([ligne]), 8514)
+
+    assert reponse.disponibilite is None and reponse.statut is None
+    assert reponse.auteurs is None and reponse.annee_fr is None
+
+
 def test_series_404_sur_identifiant_inconnu() -> None:
     with pytest.raises(HTTPException) as erreur:
         get_series(FakePool([None]), 999999999)
@@ -336,7 +384,6 @@ def test_reviews_aligne_review_url_sur_le_referentiel_pour_trois_series(
         review_url,
         "Titre",
         8.0,
-        "lecteur",
         None,
         "jeu.",
         "volume",
@@ -358,7 +405,6 @@ def test_reviews_expose_exactement_la_liste_de_champs_arretee() -> None:
         "https://www.manga-sanctuary.com/critique/1-tome-1.html",
         "Titre",
         8.0,
-        "lecteur",
         None,
         "jeu.",
         "volume",
@@ -383,6 +429,30 @@ def test_reviews_expose_exactement_la_liste_de_champs_arretee() -> None:
         "grain",
         "body",
     }
+
+
+def test_reviews_ne_rend_jamais_l_auteur_et_ne_le_lit_pas() -> None:
+    """Les auteurs des critiques collectées sont des pseudonymes de lecteurs : ils ne
+    sortent jamais (`author` toujours nul), et la requête ne les lit même pas."""
+    ligne = (
+        1,
+        1,
+        None,
+        "https://www.manga-sanctuary.com/critique/1-tome-1.html",
+        "Titre",
+        8.0,
+        None,
+        "jeu.",
+        "volume",
+        "volume",
+        "Corps",
+    )
+    pool = FakePool([(1,), (1,), [ligne]])
+
+    reponse = get_series_reviews(pool, 736, limit=1, offset=0)
+
+    assert reponse.items[0].author is None
+    assert all("review_author" not in sql for sql, _ in pool.cursor.executions)
 
 
 def test_reviews_rend_200_et_une_liste_vide_sur_serie_sans_critique() -> None:

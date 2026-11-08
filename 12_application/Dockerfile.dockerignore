@@ -1,7 +1,9 @@
-# Contexte de construction : la RACINE du dépôt, à cause du contrat que la doublure lit.
+# Contexte de construction : la RACINE du dépôt, à cause des contrats que la doublure
+# lit (celui de l'API du modèle, celui du catalogue).
 # Liste blanche : ce que les images exécutent, ni données, ni rapports, ni secrets, ni
 # environnement. BuildKit lit ce fichier parce qu'il porte le nom du Dockerfile.
 *
+!02_api_manga/openapi.json
 !11_api_modele/contrat/openapi_v1.json
 !12_application/README.md
 !12_application/config/

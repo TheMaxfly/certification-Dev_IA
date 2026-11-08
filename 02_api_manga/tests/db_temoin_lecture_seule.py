@@ -10,6 +10,13 @@ signature d'un privilège manquant, et non d'une contrainte métier, d'une table
 absente ou d'une transaction en lecture seule — toutes portent d'autres codes,
 et passer par le code plutôt que par le message rend le test indifférent à la
 langue du serveur.
+
+Second témoin, sur la même connexion (E4, contrat 0.5.0) : la normalisation de la
+recherche du catalogue. Le SQL de `GET /series` normalise les colonnes
+(`translate(lower(…))`, la table de `app.recherche` liée en paramètres), Python
+normalise la saisie : les deux chemins doivent rendre la même chose, et un `%` de la
+saisie ne doit pas être un joker — prouvé ici sur un vrai PostgreSQL, ce que le pool
+simulé des tests unitaires ne peut pas faire.
 """
 
 from __future__ import annotations
@@ -18,6 +25,7 @@ import sys
 
 import psycopg
 
+from app import recherche
 from app.database import build_conninfo
 from app.settings import Settings
 
@@ -35,6 +43,9 @@ ECRITURES_A_REFUSER = (
 )
 
 PRIVILEGE_INSUFFISANT = "42501"
+
+#: Les saisies de la spec : accent circonflexe, macron, majuscules accentuées, rien.
+SAISIES_A_NORMALISER = ("Shônen", "Pīsu", "ÉTÉ", "naruto")
 
 
 def echouer(message: str) -> None:
@@ -87,7 +98,34 @@ def main() -> None:
                     "écrire : la restriction n'existe pas."
                 )
 
+        verifier_la_normalisation(connexion)
+
     print(f"témoin positif : {len(ECRITURES_A_REFUSER)} écritures refusées.")
+
+
+def verifier_la_normalisation(connexion: psycopg.Connection) -> None:
+    """Le SQL de la recherche et Python rendent la même forme ; `%` reste littéral."""
+    de, vers = recherche.ACCENTS
+    for saisie in SAISIES_A_NORMALISER:
+        (en_sql,) = connexion.execute(
+            "SELECT translate(lower(%s), %s, %s)", (saisie, de, vers)
+        ).fetchone()
+        if en_sql != recherche.normaliser(saisie):
+            echouer(
+                f"normalisation : {saisie!r} donne {en_sql!r} en SQL et "
+                f"{recherche.normaliser(saisie)!r} en Python."
+            )
+    motif = recherche.parametres("100%")["contient"]
+    (litteral, joker) = connexion.execute(
+        "SELECT 'x100%%y' LIKE %s ESCAPE '\\', 'x100zy' LIKE %s ESCAPE '\\'",
+        (motif, motif),
+    ).fetchone()
+    if not litteral or joker:
+        echouer("le « % » de la saisie est un joker : il n'est pas échappé.")
+    print(
+        f"normalisation : {len(SAISIES_A_NORMALISER)} saisies, SQL et Python "
+        "égaux ; « % » littéral."
+    )
 
 
 if __name__ == "__main__":

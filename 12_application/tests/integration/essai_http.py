@@ -9,7 +9,10 @@ Il parle à l'application par le réseau du Compose, comme un navigateur :
    le cookie de session et le jeton CSRF de la page, comme un navigateur ; sans
    jeton, 403 ;
 4. le même, la doublure en refus de débit : l'encart, `Retry-After`, la question ;
-5. `/a-propos`, `/metrics` ; la doublure n'a vu aucun écart au contrat.
+5. `/a-propos`, `/metrics` ;
+6. le catalogue (E4, lot 2a) : `/catalogue?q=…`, des résultats ; `/series/101`, la
+   fiche ; la doublure en panne : l'encart nommé, 503 ;
+7. la doublure n'a vu aucun écart à ses contrats.
 
 Bibliothèque standard seule ; code 1 au premier écart.
 """
@@ -128,6 +131,29 @@ def principal() -> None:
     verifier(
         statut == 200 and 'application_requetes_total{route="/question"' in corps,
         "/metrics : les requêtes comptées",
+    )
+
+    statut, _, corps = appeler(f"{BASE}/catalogue?q=factice")
+    verifier(
+        statut == 200 and 'href="/series/101"' in corps,
+        "/catalogue : des résultats, depuis le catalogue",
+    )
+    statut, _, corps = appeler(f"{BASE}/series/101")
+    verifier(
+        statut == 200 and "Les libraires du réseau" in corps,
+        "/series/101 : la fiche",
+    )
+    scenario(catalogue="indisponible")
+    statut, _, corps = appeler(f"{BASE}/catalogue?q=factice")
+    verifier(
+        statut == 503 and "Le catalogue ne répond pas" in corps,
+        "catalogue en panne : l'encart, 503",
+    )
+    scenario(catalogue="nominal")
+    statut, _, corps = appeler(f"{BASE}/sante")
+    verifier(
+        statut == 200 and json.loads(corps)["catalogue"] == "ok",
+        "/sante : le catalogue joint",
     )
 
     statut, _, corps = appeler(f"{DOUBLURE}/_essai/ecarts")

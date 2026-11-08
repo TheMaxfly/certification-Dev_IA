@@ -48,6 +48,15 @@ INSERT INTO manga.ms_series_enriched (
    'Serie C',
    NULL);
 
+-- 2 bis. La recherche du catalogue (E4, contrat 0.5.0) : un auteur, deux autres
+--    titres (dont un accentué) et une note pour 736. Valeurs d'essai.
+UPDATE manga.ms_series_enriched
+   SET series_scenariste = 'Eiichiro ODA',
+       series_other_titles = '["ワンピース", "Wan Pīsu"]'::jsonb,
+       series_members_rating = 8.69,
+       series_members_votes = 6936
+ WHERE series_id = 736;
+
 -- 3. Référentiel volumes — cible de rag_reviews_docs.volume_url.
 INSERT INTO manga.ms_volumes_enriched (volume_url, series_id) VALUES (
   'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/tome-1.html',

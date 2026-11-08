@@ -18,6 +18,7 @@ CO="Co-Author$(printf e)d-By"
 # jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
 unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME API_MODELE_CLES APPLICATION_CLE_API
 unset GRAFANA_SMTP_MOT_DE_PASSE APPLICATION_CLE_SESSION APP_CONSEILLER_MOT_DE_PASSE PGPASSFILE
+unset APPLICATION_CLE_CATALOGUE API_KEYS
 export HOME="$TRAVAIL/maison"
 mkdir -p "$HOME/.cache/huggingface"
 JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
@@ -31,6 +32,8 @@ HORS_MOTIF_A="valeur-factice-de-l-application-0044"
 HORS_MOTIF_T="valeur-factice-du-trousseau-0045"
 CLE_ACCES_FACTICE="$(printf 'a1B2c3%.0s' $(seq 1 7))"  # 42 caractères
 HORS_MOTIF_S="valeur-factice-de-la-session-0046"
+HORS_MOTIF_C="valeur-factice-du-catalogue-0047"
+HORS_MOTIF_D="valeur-factice-de-l-api-data-0048"
 MDP_ROLE="mot-de-passe-factice-du-role-0047"
 ROLE_PG="app_conseiller"  # par variable : ce fichier ne tombe pas sous le motif d'une ligne recopiée
 echecs=0
@@ -129,6 +132,7 @@ scenario refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire cle_m.
 scenario refuse "jeton Hugging Face du poste en clair" eval 'ecrire j_pp.txt "jeton : $JETON_POSTE" && git commit -q -m j_pp'
 scenario refuse "chaîne d'aspect jeton Hugging Face" eval 'ecrire j_pp2.env "TOKEN=$ASPECT" && git commit -q -m j_pp2'
 scenario refuse "aspect : clé de session de l'application" eval 'ecrire s_pp.env "APPLICATION_CLE_SESSION=$CLE_ACCES_FACTICE" && git commit -q -m s_pp'
+scenario refuse "aspect : clé du catalogue de l'application" eval 'ecrire c_pp.env "APPLICATION_CLE_CATALOGUE=$CLE_ACCES_FACTICE" && git commit -q -m c_pp'
 scenario refuse "aspect : DSN qui porte un mot de passe" eval 'ecrire d_pp.txt "postgresql://app_conseiller:$HORS_MOTIF_S@localhost:5432/apimanga" && git commit -q -m d_pp'
 # Sans -a, grep tait la ligne qui porte un octet hors UTF-8 : la mention passerait.
 scenario refuse "mention dans un texte non UTF-8" eval '
@@ -331,6 +335,26 @@ essai refuse "aspect : clé de session" eval '
     ecrire pc_kss2.env "APPLICATION_CLE_SESSION=$CLE_ACCES_FACTICE" && git commit -q -m kss2'
 essai passe  "référence à la clé de session" eval '
     ecrire pc_kss3.yml "APPLICATION_CLE_SESSION: \${APPLICATION_CLE_SESSION:-}" && git commit -q -m kss3'
+# Les clés du catalogue (E4, lot 2a) : la clé de l'application dans le .env du 12, le
+# trousseau de l'API data dans celui du 02 (découpé : une clé en second élément) ; par
+# aspect ; une référence et la forme documentée entre chevrons passent.
+essai refuse "clé du catalogue du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_CATALOGUE=%s\n" "$HORS_MOTIF_C" >mod/.env &&
+    ecrire pc_kcat.txt "note : $HORS_MOTIF_C" && git commit -q -m kcat'
+essai refuse "clé du trousseau de l'API data du poste, en second élément" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "API_KEYS=app_backend:%s,conseiller:%s\n" "$HORS_MOTIF_O" "$HORS_MOTIF_D" >mod/.env &&
+    ecrire pc_kdat.txt "note : $HORS_MOTIF_D" && git commit -q -m kdat'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : clé du catalogue" eval '
+    ecrire pc_kcat2.env "APPLICATION_CLE_CATALOGUE=$CLE_ACCES_FACTICE" && git commit -q -m kcat2'
+essai refuse "aspect : trousseau de l'API data à deux entrées" eval '
+    ecrire pc_kdat2.env "API_KEYS=app_backend:court,conseiller:$CLE_ACCES_FACTICE" && git commit -q -m kdat2'
+essai passe  "références et forme documentée des clés du catalogue" eval '
+    ecrire pc_kcat3.yml "APPLICATION_CLE_CATALOGUE: \${APPLICATION_CLE_CATALOGUE:-}" &&
+    ecrire pc_kdat3.yml "API_KEYS: \${API_KEYS:-}" &&
+    ecrire pc_kdat4.md "API_KEYS=conseiller:<clé-de-trente-deux-caractères-au-moins>" && git commit -q -m kdat3'
 # Le mot de passe du rôle de connexion : sa valeur dans le fichier de mots de passe de
 # PostgreSQL du poste (ici celui du HOME jetable, puis PGPASSFILE), lignes du rôle seules ;
 # une ligne recopiée ; la forme documentée passe.

@@ -41,6 +41,8 @@ VARIABLE_CLE = "APPLICATION_CLE_API"
 VARIABLE_ENVIRONNEMENT = "APPLICATION_ENVIRONNEMENT"
 VARIABLE_BASE = "APPLICATION_BASE_DSN"
 VARIABLE_CLE_SESSION = "APPLICATION_CLE_SESSION"
+VARIABLE_CLE_CATALOGUE = "APPLICATION_CLE_CATALOGUE"
+VARIABLE_ADRESSE_CATALOGUE = "CATALOGUE_ADRESSE"
 ENVIRONNEMENTS = ("developpement", "preproduction", "production")
 #: L'environnement → la seule base qu'il admet ; le développement admet toute base,
 #: sauf celle de la production.
@@ -104,6 +106,18 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " admin_aucun admin_inconnu admin_precedente admin_suivante"
             " critiques_titre critiques_bientot apropos_comptes_titre"
             " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
+            " mdp_continuer"
+            # E4, lot 2a : le catalogue.
+            " menu_catalogue catalogue_titre catalogue_encart_titre"
+            " catalogue_encart catalogue_vers_conseiller catalogue_champ"
+            " catalogue_bouton catalogue_resultats_titre catalogue_pagination"
+            " catalogue_precedente catalogue_suivante catalogue_aucun_conseiller"
+            " catalogue_aucun_fautes catalogue_trouve_par_auteur"
+            " serie_metadonnees serie_type serie_annee serie_note_etiquette"
+            " serie_sans_note serie_reseau_titre serie_reseau_vide"
+            " serie_listes_titre serie_listes serie_synopsis_titre"
+            " serie_sans_synopsis serie_genres_titre serie_lien_catalogue"
+            " serie_retour_catalogue"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -159,6 +173,14 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_nom_longueur": frozenset({"max"}),
     "admin_page": frozenset({"n", "total"}),
     "mdp_verrou": frozenset({"minutes"}),
+    "connexion_refus_regles": frozenset({"seuil", "minutes"}),
+    "catalogue_aide": frozenset({"min", "max"}),
+    "catalogue_note": frozenset({"note"}),
+    "catalogue_trouve_par": frozenset({"titre"}),
+    "catalogue_aucun": frozenset({"q"}),
+    "catalogue_page": frozenset({"n", "total"}),
+    "catalogue_erreur_saisie": frozenset({"min", "max"}),
+    "serie_note": frozenset({"note", "votes"}),
     "apropos_comptes": frozenset({"seuil", "minutes"}),
 }
 
@@ -216,6 +238,25 @@ class Comptes:
 
 
 @dataclass(frozen=True, slots=True)
+class DelaisCatalogue:
+    connexion_s: float
+    reponse_s: float
+
+
+@dataclass(frozen=True, slots=True)
+class Catalogue:
+    """L'API data du module 02 (`[catalogue]`) : son adresse, la clé de l'application
+    (None : non configuré — développement seulement), ses délais, ses bornes."""
+
+    adresse: str
+    cle: str | None = field(repr=False)
+    delais: DelaisCatalogue
+    par_page: int
+    q_min: int
+    q_max: int
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -246,6 +287,7 @@ class Reglages:
     cle_session: str = field(repr=False)
     cle_session_ephemere: bool
     comptes: Comptes
+    catalogue: Catalogue
 
 
 class _Lecteur:
@@ -417,6 +459,64 @@ def lire_cle_session(
     return cle, False
 
 
+#: La borne de `limit` de `GET /series` (contrat 0.5.0 du 02).
+CATALOGUE_PAR_PAGE_MAX = 50
+
+
+def lire_catalogue(
+    lecteur: _Lecteur,
+    donnees: Table,
+    environ: Mapping[str, str],
+    environnement: str,
+    ecarts: list[str],
+) -> Catalogue:
+    """L'API data du 02. Sa clé est exigée si l'adresse est posée par l'environnement
+    ou hors du développement ; absente en développement, le catalogue est « non
+    configuré » : l'encart le dit, tout le reste fonctionne."""
+    table = lecteur.table(donnees, "catalogue")
+    delais = lecteur.table(table, "delais", "catalogue.")
+    adresse_env = environ.get(VARIABLE_ADRESSE_CATALOGUE, "").strip()
+    adresse = adresse_env or lecteur.texte(table, "adresse", "catalogue")
+    decoupee = urlsplit(adresse)
+    if decoupee.scheme not in ("http", "https") or not decoupee.hostname:
+        ecarts.append("adresse du catalogue : attendu http(s)://hôte[:port]")
+    cle: str | None = environ.get(VARIABLE_CLE_CATALOGUE, "").strip() or None
+    if cle is None and (adresse_env or environnement in BASES_EXIGEES):
+        ecarts.append(
+            f"{VARIABLE_CLE_CATALOGUE} : absente — obligatoire"
+            + (
+                f" en {environnement}"
+                if environnement in BASES_EXIGEES
+                else f" quand {VARIABLE_ADRESSE_CATALOGUE} est posée"
+            )
+        )
+    elif cle is not None and not cle.isascii():
+        ecarts.append(
+            f"{VARIABLE_CLE_CATALOGUE} : caractères hors ASCII — clé illisible"
+        )
+    par_page = lecteur.entier(table, "par_page", "catalogue")
+    if par_page > CATALOGUE_PAR_PAGE_MAX:
+        ecarts.append(
+            f"reglages.toml : [catalogue.par_page] {CATALOGUE_PAR_PAGE_MAX} au plus"
+            " (la borne de l'API data)"
+        )
+    q_min = lecteur.entier(table, "q_min", "catalogue")
+    q_max = lecteur.entier(table, "q_max", "catalogue")
+    if q_min > q_max:
+        ecarts.append("reglages.toml : [catalogue] q_min au plus q_max")
+    return Catalogue(
+        adresse=adresse,
+        cle=cle,
+        delais=DelaisCatalogue(
+            connexion_s=lecteur.positif(delais, "connexion_s", "catalogue.delais"),
+            reponse_s=lecteur.positif(delais, "reponse_s", "catalogue.delais"),
+        ),
+        par_page=par_page,
+        q_min=q_min,
+        q_max=q_max,
+    )
+
+
 def lire_comptes(lecteur: _Lecteur, donnees: Table) -> Comptes:
     comptes = lecteur.table(donnees, "comptes")
     return Comptes(
@@ -583,6 +683,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         cle_session=cle_session,
         cle_session_ephemere=ephemere,
         comptes=lire_comptes(lecteur, donnees),
+        catalogue=lire_catalogue(lecteur, donnees, environ, environnement, ecarts),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

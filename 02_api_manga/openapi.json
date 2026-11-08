@@ -650,15 +650,9 @@
       "Review": {
         "properties": {
           "author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Author"
+            "description": "Always `null`: the authors of collected reviews are readers' pseudonyms, never served (project rule, E3). The field stays for existing clients.",
+            "title": "Author",
+            "type": "null"
           },
           "body": {
             "anyOf": [
@@ -778,7 +772,6 @@
           "review_url",
           "title",
           "score",
-          "author",
           "date",
           "date_raw",
           "type",
@@ -897,6 +890,30 @@
       "SeriesResponse": {
         "description": "Une série du socle catalogue Manga Sanctuary.\n\nLes colonnes internes du rapprochement (`ms_title_norm_x`,\n`_other_titles_list`, `matched_title_norm`, `fuzzy_low_score`…) ne sont PAS\nexposées : ce sont des états intermédiaires d'un calcul, pas des faits sur\nl'œuvre. Ce que le rapprochement a conclu se lit sur `/identity/{work_uid}`.",
         "properties": {
+          "annee_fr": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Year of the first volume with a French EAN.",
+            "title": "Annee Fr"
+          },
+          "auteurs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The writer then the artist, as written, joined by a comma, the same name once; a textual « inconnu » counts as absent; COLLECTIF stays.",
+            "title": "Auteurs"
+          },
           "category": {
             "anyOf": [
               {
@@ -908,6 +925,18 @@
             ],
             "title": "Category"
           },
+          "demographie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`series_category_clean`, or `series_category` when it holds a value from the same list (the three Korean categories mapped). The catalogue label, as is.",
+            "title": "Demographie"
+          },
           "dessinateur": {
             "anyOf": [
               {
@@ -918,6 +947,23 @@
               }
             ],
             "title": "Dessinateur"
+          },
+          "disponibilite": {
+            "anyOf": [
+              {
+                "enum": [
+                  "edite_en_france",
+                  "seulement_au_japon",
+                  "inconnue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`edite_en_france` when a volume carries a French EAN (9782, 97910) or the record carries the « français » badge; `seulement_au_japon` for a Manga with volumes and none of that; `inconnue` otherwise. **Published in France does not mean in stock**: the catalogue knows no stock. The value the model API carries on its cards.",
+            "title": "Disponibilite"
           },
           "experts_rating": {
             "anyOf": [
@@ -1013,6 +1059,7 @@
                 "type": "null"
               }
             ],
+            "description": "Members' rating, **out of 10**.",
             "title": "Members Rating"
           },
           "members_votes": {
@@ -1024,7 +1071,37 @@
                 "type": "null"
               }
             ],
+            "description": "Number of members' votes.",
             "title": "Members Votes"
+          },
+          "nb_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The larger of the « volumes published » field and the distinct volume numbers (a volume without a number counts as number 1), all editions mixed; a number between 1900 and 2100 is a year from the title and does not count. Read it with `nb_volumes_source`.",
+            "title": "Nb Volumes"
+          },
+          "nb_volumes_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "champ",
+                  "repli_volumes_distincts",
+                  "divergent"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`divergent` when both counts exist and differ by more than 20 % of the larger; `champ` when the field is at least the numbers; `repli_volumes_distincts` otherwise. **Any source other than `champ` reads as a minimum**: « at least N ».",
+            "title": "Nb Volumes Source"
           },
           "needs_review": {
             "anyOf": [
@@ -1116,11 +1193,28 @@
             "type": "integer"
           },
           "statuses": {
+            "description": "Status badges of the source record, **serialised as collected** (Python-formatted strings). The normalised status is `statut`.",
             "items": {
               "type": "string"
             },
             "title": "Statuses",
             "type": "array"
+          },
+          "statut": {
+            "anyOf": [
+              {
+                "enum": [
+                  "termine",
+                  "en_cours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`termine` on the « Complète » badge or Kitsu `finished`; `en_cours` on Kitsu `current` without the badge. The catalogue never writes « en cours »: no badge does not mean ongoing. `null`: unknown.",
+            "title": "Statut"
           },
           "synopsis": {
             "anyOf": [
@@ -1196,6 +1290,7 @@
                 "type": "null"
               }
             ],
+            "description": "Number of edition rows of the series **as recorded in December 2025** (a frozen field of the reference: it may lag behind the catalogue, or be missing). For the number of volumes, read `nb_volumes`.",
             "title": "Volume Count"
           },
           "work_uid": {
@@ -1251,6 +1346,204 @@
           "needs_review"
         ],
         "title": "SeriesResponse",
+        "type": "object"
+      },
+      "SeriesSearchItem": {
+        "description": "Une série trouvée par `GET /series`, et ce qui a répondu à la saisie.",
+        "properties": {
+          "auteurs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As on `/series/{series_id}`.",
+            "title": "Auteurs"
+          },
+          "correspondance": {
+            "description": "What answered the query: the main title, another title, or an author (the first of the three that answers).",
+            "enum": [
+              "titre",
+              "autre_titre",
+              "auteur"
+            ],
+            "title": "Correspondance",
+            "type": "string"
+          },
+          "disponibilite": {
+            "anyOf": [
+              {
+                "enum": [
+                  "edite_en_france",
+                  "seulement_au_japon",
+                  "inconnue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As on `/series/{series_id}`.",
+            "title": "Disponibilite"
+          },
+          "members_rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Members' rating, out of 10.",
+            "title": "Members Rating"
+          },
+          "members_votes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Members Votes"
+          },
+          "nb_volumes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As on `/series/{series_id}`.",
+            "title": "Nb Volumes"
+          },
+          "nb_volumes_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "champ",
+                  "repli_volumes_distincts",
+                  "divergent"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As on `/series/{series_id}`.",
+            "title": "Nb Volumes Source"
+          },
+          "series_id": {
+            "title": "Series Id",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "titre_correspondant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The other title that answered; `null` when the main title or an author answered.",
+            "title": "Titre Correspondant"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "series_id",
+          "title",
+          "type",
+          "year",
+          "auteurs",
+          "members_rating",
+          "members_votes",
+          "disponibilite",
+          "nb_volumes",
+          "nb_volumes_source",
+          "correspondance",
+          "titre_correspondant"
+        ],
+        "title": "SeriesSearchItem",
+        "type": "object"
+      },
+      "SeriesSearchResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesSearchItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "query": {
+            "description": "The query, stripped.",
+            "title": "Query",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query",
+          "total",
+          "limit",
+          "offset",
+          "items"
+        ],
+        "title": "SeriesSearchResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -1563,7 +1856,7 @@
   "info": {
     "description": "\nRead-only HTTP API over the manga corpus stored in PostgreSQL (schema `manga`).\n\n**Authorisation.** Data endpoints require an `X-API-Key` header. The\ndocumentation (`/docs`, `/redoc`, `/openapi.json`) and the probes (`/live`,\n`/health`) are open by design: *the documentation is open, the data is closed.*\n",
     "title": "API Manga",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2216,6 +2509,102 @@
         "summary": "Full-text search over the RAG corpus",
         "tags": [
           "search"
+        ]
+      }
+    },
+    "/series": {
+      "get": {
+        "description": "Searches the series title, its other titles (`series_other_titles`) and its authors (writer, artist).\n\n**Normalisation**: case-insensitive and accent-insensitive, through one character table applied to the columns and to the query alike.\n\n**Ranking**: exact title, then title starting with the query, then title containing it (main title or another title), then author containing it; then `members_votes` descending, then `series_id`. `correspondance` says what answered, `titre_correspondant` which other title did.\n\n**No typo tolerance**: a typo finds nothing — the application says so and points to the adviser. No result is `200` with `items: []`, never 404.\n\n`offset` is capped at 1 000: a search returning more than 1 000 series is a query that is too short.",
+        "operationId": "search_series_series_get",
+        "parameters": [
+          {
+            "description": "Title or author, 2 to 100 characters once stripped.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Title or author, 2 to 100 characters once stripped.",
+              "maxLength": 100,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 1000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid API key."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PostgreSQL is unavailable."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Search the catalogue by title, other title or author",
+        "tags": [
+          "catalogue"
         ]
       }
     },

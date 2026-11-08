@@ -3,6 +3,9 @@
 {% block titre %}{{ t.mdp_titre }}{% endblock %}
 {% block contenu %}
 <h1>{{ t.mdp_titre }}</h1>
+{% if reussi %}
+{{ c.avis(avis, true, "/", t.mdp_continuer) }}
+{% else %}
 {% if avis %}
 {{ c.avis(avis, focus == "avis") }}
 {% endif %}
@@ -13,4 +16,5 @@
 {{ c.champ("confirmation", t.champ_confirmation, type="password", autocomplete="new-password", erreur=erreurs.get("confirmation"), max=comptes.mot_de_passe_max, focus=focus == "confirmation") }}
 <button type="submit">{{ t.mdp_bouton }}</button>
 </form>
+{% endif %}
 {% endblock %}

@@ -10,7 +10,8 @@
 #   make verify TOUT=1       tous les modules
 #   make verify MODULE=05    un seul module : 01 … 05, 07 … 14, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
-#   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
+#   make app-compose         le service d'embedding, l'API, l'application et le catalogue
+#                            (l'API data du 02), conteneurisés ; trois fichiers .env
 #   make app-compose-arret   les arrête
 #   make app-admin-creer     le premier administrateur de l'application (mot de passe au
 #                            clavier, sans écho) ; APPLICATION_ENVIRONNEMENT et
@@ -68,8 +69,11 @@ verify-indicatif:
 verify-poste:
 	@FORCER=$(FORCER) bash verification/verifier.sh poste
 
-# Le Compose du 11, inchangé, et le fichier de fusion du 12 ; les deux `.env`, nommés.
+# Le Compose du 11, inchangé, et le fichier de fusion du 12 (l'application et le
+# catalogue, l'API data du 02) ; les trois `.env`, nommés — sans celui du 02, Compose
+# refuse : il nomme le fichier absent.
 APP_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	--env-file 02_api_manga/.env \
 	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml
 
 app-compose:
@@ -98,6 +102,7 @@ demo-direct-arret:
 # Le monitorage, un fichier de fusion de plus. APP_COMPOSE et DEMO_COMPOSE ne le lisent pas.
 # Le fichier d'environnement du 13 est facultatif : sans lui, le canal d'essai.
 MONITORAGE_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	--env-file 02_api_manga/.env \
 	$(if $(wildcard 13_monitorage/.env),--env-file 13_monitorage/.env) \
 	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml -f 13_monitorage/compose.yaml
 

@@ -31,6 +31,8 @@ ROUTES_PROTEGEES = {
     "/search",
     # 3b — catalogue, identité, couverture. Protégées comme les autres : la
     # règle d'accès n'a pas de variante par famille de ressource.
+    # E4 (contrat 0.5.0) : la recherche du catalogue.
+    "/series",
     "/series/{series_id}",
     "/series/{series_id}/volumes",
     "/series/{series_id}/reviews",
@@ -62,7 +64,9 @@ ROUTES_422 = {
     "/search",
     # 3b : `series_id` et `work_uid` sont bornés par `Path(ge=1)`, les
     # collections par `Query`. `/coverage` ne prend aucun paramètre et n'a
-    # donc pas de 422 à déclarer.
+    # donc pas de 422 à déclarer. `/series` borne `q`, `limit` et `offset` ; elle
+    # n'a pas de 404 : une recherche sans résultat est un 200 à liste vide.
+    "/series",
     "/series/{series_id}",
     "/series/{series_id}/volumes",
     "/series/{series_id}/reviews",

@@ -302,7 +302,11 @@ def test_cl1_le_message_est_le_meme_que_le_pseudo_existe_ou_non(appli, base):
 
     assert {r.status_code for r in reponses} == {401}
     messages = {soupe(r).select_one("#pseudo-erreur").get_text() for r in reponses}
-    assert messages == {"Pseudo ou mot de passe incorrect."}
+    assert messages == {
+        "Pseudo ou mot de passe incorrect. Après 5 essais manqués, la connexion est"
+        " suspendue 15 minutes. Un compte désactivé ne se connecte plus : adressez-vous"
+        " à l'administrateur de la librairie."
+    }, "la phrase fixe est la même dans les quatre cas"
     # La page entière est la même, aux valeurs près (le pseudo rendu, le jeton).
     pages = set()
     for reponse in reponses:
@@ -418,8 +422,30 @@ def test_cl6_l_avis_du_changement_prend_le_focus(appli, base):
     page = soupe(changer(client))
 
     assert un_seul_focus(page) == "avis"
-    assert page.select_one("#avis")["role"] == "status"
+    assert page.select_one("#avis [role=status]") is not None
     assert page.select_one("#avis")["tabindex"] == "-1"
+
+
+@pytest.mark.parametrize("initial", [False, True], ids=["choisi", "initial"])
+def test_cl6_un_changement_reussi_se_voit_et_le_formulaire_s_efface(
+    appli, base, initial
+):
+    """Passage manuel du lot 1 : après le changement, rien ne changeait à l'œil (l'avis
+    remplaçait l'avis, au-dessus du même formulaire vide)."""
+    _, client = appli
+    creer_compte(base, "libraire_essai", "libraire", doit_changer=initial)
+    connecter(client, "libraire_essai")
+    page = soupe(changer(client))
+    encart = page.select_one("main article#avis")
+
+    assert encart is not None
+    assert "Mot de passe changé et enregistré." in (
+        encart.select_one("[role=status]").get_text()
+    )
+    assert encart.select_one('a[href="/"]').get_text() == "Continuer"
+    assert page.select_one("main form") is None, "le formulaire vide reste affiché"
+    assert un_seul_focus(page) == "avis"
+    assert client.get("/", follow_redirects=False).status_code == 200
 
 
 @pytest.mark.parametrize("role", ["client", "libraire", "admin"])
@@ -601,7 +627,7 @@ def test_a1_l_avis_d_une_action_prend_le_focus(appli, base):
     page = soupe(client.get(r.headers["location"]))
 
     assert un_seul_focus(page) == "avis"
-    assert "Compte créé" in page.select_one("#avis[role=status]").get_text()
+    assert "Compte créé" in page.select_one("#avis [role=status]").get_text()
 
 
 def test_a1_reactiver_un_compte_actif_ne_change_rien_et_le_dit(appli, base):

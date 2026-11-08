@@ -33,6 +33,7 @@ from application import (
     __version__,
     historique,
     journal,
+    pages_catalogue,
     pages_comptes,
     presentation,
     sessions,
@@ -45,6 +46,7 @@ from application.client_api import (
     ErreurApi,
     VueApi,
 )
+from application.client_catalogue import ClientCatalogue
 from application.config import Reglages
 from application.enveloppe import Enveloppe
 from application.metriques import Metriques, autorisee
@@ -107,12 +109,27 @@ def creer_application(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
     hacheur: Hacheur | None = None,
+    transport_catalogue: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """L'application, prête à démarrer ; rien n'est ouvert avant son cycle de vie.
 
-    `transport` : la doublure de l'API en mémoire (tests) ; `hacheur` : un moteur
-    Argon2id aux paramètres réduits (tests) — la production prend les défauts."""
+    `transport` : la doublure de l'API en mémoire (tests), qui sert aussi le catalogue
+    sauf `transport_catalogue` ; `hacheur` : un moteur Argon2id aux paramètres réduits
+    (tests) — la production prend les défauts."""
     metriques = Metriques()
+    catalogue = (
+        ClientCatalogue(
+            reglages.catalogue.adresse,
+            reglages.catalogue.cle,
+            reglages.catalogue.delais,
+            metriques,
+            transport_catalogue if transport_catalogue is not None else transport,
+        )
+        if reglages.catalogue.cle is not None
+        else None
+    )
+    if catalogue is None:
+        metriques.etat_catalogue("non_configure")
     base = Base(reglages.base_dsn, reglages.comptes.delai_base_s, metriques)
     client = ClientApi(
         reglages.adresse_api, reglages.cle_api, reglages.delais, metriques, transport
@@ -146,6 +163,8 @@ def creer_application(
             yield
         finally:
             await client.fermer()
+            if catalogue is not None:
+                await catalogue.fermer()
             journal.evenement("arret")
 
     def suffixe_menu(request: Request | None, retour: object) -> str:
@@ -542,11 +561,16 @@ def creer_application(
         base: Base = request.app.state.base
         api_ok = await client.sante()
         metriques.api_sante_ok.set(1 if api_ok else 0)
+        if catalogue is None:
+            etat_catalogue = "non_configure"
+        else:
+            etat_catalogue = "ok" if await catalogue.sante() else "indisponible"
         return JSONResponse(
             {
                 "application": "ok",
                 "api": "ok" if api_ok else "indisponible",
                 "base": await base.sonder() if base.configuree else base.etat,
+                "catalogue": etat_catalogue,
                 "version": __version__,
             }
         )
@@ -560,6 +584,7 @@ def creer_application(
         return Response(content=contenu, media_type=type_)
 
     pages_comptes.installer(app, reglages, rendre)
+    pages_catalogue.installer(app, reglages, rendre, catalogue)
 
     app.state.vue = vue
     app.state.metriques = metriques

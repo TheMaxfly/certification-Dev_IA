@@ -25,7 +25,10 @@ MIGRATION_027 = (
 
 
 def environ(**variables: str) -> dict[str, str]:
-    return {**ENVIRONNEMENT, **variables}
+    # La clé du catalogue, exigée hors du développement (E4, lot 2a), éprouvée par
+    # `test_catalogue.py` : ici, une valeur jetable, pour que seul l'objet du test
+    # manque.
+    return {**ENVIRONNEMENT, "APPLICATION_CLE_CATALOGUE": "k" * 40, **variables}
 
 
 def ecarts(**variables: str) -> list[str]:

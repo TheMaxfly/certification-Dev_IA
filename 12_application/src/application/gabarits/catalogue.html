@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block titre %}{{ t.catalogue_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.catalogue_titre }}</h1>
+{% if indisponible %}
+<article>
+<div role="alert">
+<h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ t.catalogue_encart_titre }}</h2>
+<p id="encart-texte">{{ t.catalogue_encart }}</p>
+<p><a href="/">{{ t.catalogue_vers_conseiller }}</a></p>
+</div>
+</article>
+{% endif %}
+{# Pico aligne en ligne tout élément `role="search"` : le rôle est porté par le seul groupe
+   champ + bouton, qu'il accole ; l'étiquette au-dessus, l'aide et l'erreur en dessous. #}
+<form method="get" action="/catalogue">
+<label for="q">{{ t.catalogue_champ }}</label>
+<div role="search">
+<input id="q" name="q" type="search" minlength="{{ catalogue_regles.q_min }}" maxlength="{{ catalogue_regles.q_max }}" aria-describedby="q-aide{% if erreur %} q-erreur{% endif %}"{% if q %} value="{{ q }}"{% endif %}{% if erreur %} aria-invalid="true" autofocus{% endif %} required>
+<button type="submit">{{ t.catalogue_bouton }}</button>
+</div>
+<small id="q-aide">{{ aide }}</small>
+{% if erreur %}<p id="q-erreur">{{ erreur }}</p>
+{% endif %}
+</form>
+{% if cherche %}
+<section class="zone-resultats" aria-labelledby="resultats-titre">
+<h2 id="resultats-titre">{{ t.catalogue_resultats_titre }}</h2>
+{% if lignes %}
+<ol>
+{% for ligne in lignes %}
+<li><a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a>{% if ligne.details %}<br><small>{{ ligne.details }}</small>{% endif %}{% if ligne.trouve_par %}<br><small>{{ ligne.trouve_par }}</small>{% endif %}</li>
+{% endfor %}
+</ol>
+{% if pagination %}
+<nav aria-label="{{ t.catalogue_pagination }}">
+<p aria-current="page">{{ pagination.texte }}</p>
+{% if pagination.precedente %}<a href="{{ pagination.precedente }}">{{ t.catalogue_precedente }}</a>{% endif %}
+{% if pagination.suivante %}<a href="{{ pagination.suivante }}">{{ t.catalogue_suivante }}</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p>{{ aucun }}</p>
+<p><a href="/">{{ t.catalogue_aucun_conseiller }}</a></p>
+<p>{{ t.catalogue_aucun_fautes }}</p>
+{% endif %}
+</section>
+{% endif %}
+{% endblock %}

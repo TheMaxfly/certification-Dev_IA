@@ -395,18 +395,25 @@ integration_12() {
   local cmd=(docker compose "${COMPOSE_12[@]}" run --rm -T --build essai) rc
   local fusion publies
   dire "12 — (12_application/) docker compose config : le fichier de fusion sur celui du 11"
-  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null CATALOGUE_PGPASS=/dev/null \
+    docker compose --env-file /dev/null \
     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml config)" || return 1
-  # Seule l'application est publiée, en fusion comme écrit.
+  # L'application et le catalogue (E4, lot 2a) sont publiés, sur le bouclage seul ; l'API
+  # ne l'est pas, en fusion comme écrit.
   publies="$(grep -c 'published:' <<<"$fusion")"
-  [ "$publies" = 1 ] || { echo "fusion : $publies ports publiés, un seul attendu" >&2; return 1; }
+  [ "$publies" = 2 ] || { echo "fusion : $publies ports publiés, deux attendus" >&2; return 1; }
+  [ "$(grep -c 'host_ip: 127.0.0.1' <<<"$fusion")" = "$publies" ] ||
+    { echo "fusion : un port publié hors du bouclage" >&2; return 1; }
   # Le mode démonstration ajoute le port de l'API, et rien d'autre.
   dire "12 — (12_application/) docker compose config : le mode démonstration, en plus"
-  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null CATALOGUE_PGPASS=/dev/null \
+    docker compose --env-file /dev/null \
     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml \
     -f 12_application/compose.demo.yaml config)" || return 1
   publies="$(grep -c 'published:' <<<"$fusion")"
-  [ "$publies" = 2 ] || { echo "démonstration : $publies ports publiés, deux attendus" >&2; return 1; }
+  [ "$publies" = 3 ] || { echo "démonstration : $publies ports publiés, trois attendus" >&2; return 1; }
+  [ "$(grep -c 'host_ip: 127.0.0.1' <<<"$fusion")" = "$publies" ] ||
+    { echo "démonstration : un port publié hors du bouclage" >&2; return 1; }
   dire "12 — (12_application/) ${cmd[*]}"
   (cd "$RACINE/12_application" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/12_application" && "${PROPRE[@]}" docker compose "${COMPOSE_12[@]}" down -v >/dev/null 2>&1)

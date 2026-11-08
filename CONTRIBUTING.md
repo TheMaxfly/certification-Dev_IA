@@ -220,7 +220,7 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 91 scénarios sur 91 ; joués aussi par la tâche statique
+bash .githooks/tester.sh   # 97 scénarios sur 97 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
@@ -258,6 +258,8 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 | mot de passe du canal d'alerte | le fichier `13_monitorage/.secrets/smtp_mot_de_passe`, hors dépôt, lu par `GF_SMTP_PASSWORD__FILE` | `pre-commit` et `pre-push` : sa valeur, avec et sans ses espaces ; une affectation littérale à `GF_SMTP_PASSWORD` ; le chemin passe |
 | clé de session de l'application | `APPLICATION_CLE_SESSION`, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` passe) |
 | mot de passe du rôle de connexion de l'application | une ligne `app_conseiller` du fichier de mots de passe de PostgreSQL (`PGPASSFILE`, sinon `~/.pgpass`) | `pre-commit` et `pre-push` : sa valeur (12 caractères au moins), lue sur les seules lignes de ce rôle ; une telle ligne recopiée (la forme documentée, `<mot de passe>`, passe) |
+| clé du catalogue de l'application | `APPLICATION_CLE_CATALOGUE`, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` ou une forme entre chevrons passe) |
+| trousseau de l'API data | `API_KEYS`, `nom:clé,nom:clé`, dans le `.env` du module 02 | `pre-commit` et `pre-push` : la valeur de chaque clé ; une affectation littérale dont une entrée porte une clé de 32 caractères au moins, à toute place (la forme entre chevrons passe ; la clé jetable du harnais du 02 passe tant que sa ligne ne change pas) |
 | tout mot de passe dans un DSN | — | `pre-commit` et `pre-push` : un DSN de forme d'adresse qui porte un mot de passe (`rôle:valeur@`) ; une valeur entre chevrons ou une référence (`${…}`, `$…`) passe. Un DSN d'essai (base jetable) s'écrit donc sans mot de passe ou par référence ; ceux d'avant cette règle passent tant que leur ligne ne change pas |
 
 - Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous

@@ -25,6 +25,8 @@ from application.config import Reseau
 SEAUX_LATENCE = (0.05, 0.25, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 45.0, 75.0)
 #: Les états de l'API vus d'ici : `VueApi.etat`.
 ETATS_API = ("ok", "ko", "cle")
+#: Les états du catalogue (l'API data du 02) vus d'ici, posés à chaque appel.
+ETATS_CATALOGUE = ("ok", "indisponible", "non_configure", "cle")
 
 
 class Metriques:
@@ -70,11 +72,30 @@ class Metriques:
             ["etat"],
             registry=self.registre,
         )
+        self.catalogue_appels = Counter(
+            "application_catalogue_appels",
+            "Appels à l'API data du catalogue (module 02), par route et issue : ok,"
+            " introuvable, indisponible, cle (clé refusée), corps (hors contrat).",
+            ["route_catalogue", "statut"],
+            registry=self.registre,
+        )
+        self.catalogue_etat = Gauge(
+            "application_catalogue_etat",
+            "L'état du catalogue au dernier appel (1 sur l'état constaté) : ok,"
+            " indisponible, non_configure (aucune clé), cle (clé refusée).",
+            ["etat"],
+            registry=self.registre,
+        )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
             registry=self.registre,
         )
+
+    def etat_catalogue(self, etat: str) -> None:
+        """Pose l'état du catalogue : 1 sur l'état constaté, 0 sur les autres."""
+        for possible in ETATS_CATALOGUE:
+            self.catalogue_etat.labels(etat=possible).set(1 if possible == etat else 0)
 
     def exposer(self) -> tuple[bytes, str]:
         return generate_latest(self.registre), CONTENT_TYPE_LATEST
