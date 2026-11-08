@@ -751,7 +751,7 @@ HORS_CONTRAT = {
 
 
 # --------------------------------------------------------------------------- #
-#  Le catalogue (l'API data du module 02), tel que son contrat 0.5.0 le décrit
+#  Le catalogue (l'API data du module 02), tel que son contrat 0.6.0 le décrit
 # --------------------------------------------------------------------------- #
 def validateur_catalogue(schema: Mapping[str, Any]) -> Draft202012Validator:
     """Un schéma du contrat du 02 ; ses `$ref` se résolvent dans ses `components`."""
@@ -805,6 +805,8 @@ def fiche_catalogue(series_id: int, titre: str, **valeurs: Any) -> dict[str, Any
         "tags_source": [],
         "synopsis": "Résumé factice de la série.",
         "synopsis_enriched": "Résumé factice de la série.",
+        "synopsis_source": "manga_sanctuary",
+        "synopsis_kitsu": None,
         "popularity_rank": None,
         "members_rating": 8.69,
         "members_votes": 6936,
@@ -859,6 +861,11 @@ SCENARIOS_CATALOGUE = (
     # E4, lot 3 : les volumes d'une série.
     "sans_volume",
     "beaucoup",
+    # E4, lot 2b (contrat 0.6.0) : les suggestions, les sources du résumé.
+    "suggestions",
+    "resume_kitsu",
+    "deux_resumes",
+    "sans_resume",
 )
 #: `plusieurs_pages` : 45 séries, trois pages de 20.
 TOTAL_PLUSIEURS_PAGES = 45
@@ -940,7 +947,7 @@ def recherche_catalogue(nom: str, q: str, limit: int, offset: int) -> Rendu:
         return Rendu(401, {"detail": "Missing or invalid API key."})
     if nom == "corps_hors_contrat":
         return Rendu(200, brut=b'{"inattendu": true}')
-    if nom == "vide":
+    if nom in ("vide", "suggestions"):
         items: list[dict[str, Any]] = []
         total = 0
     elif nom in ("une_page", "plusieurs_pages"):
@@ -953,6 +960,21 @@ def recherche_catalogue(nom: str, q: str, limit: int, offset: int) -> Rendu:
         items = [dict(item) for item in RESULTATS_NOMINAUX]
         total = len(items)
     corps = {"query": q, "total": total, "limit": limit, "offset": offset}
+    if nom == "suggestions":
+        corps["suggestions"] = [
+            {
+                "series_id": 101,
+                "title": "Série factice A",
+                "score": 0.571,
+                "correspondance": "titre",
+            },
+            {
+                "series_id": 103,
+                "title": "Série factice C",
+                "score": 0.4,
+                "correspondance": "auteur",
+            },
+        ]
     return Rendu(
         200, {**corps, "items": items}, attente_s=1.0 if nom == "lent" else 0.0
     )
@@ -975,6 +997,31 @@ def fiche_selon(nom: str, series_id: int) -> Rendu:
     if nom == "serie_sans_note":
         corps = fiche_catalogue(
             series_id, titre, members_rating=None, members_votes=None
+        )
+    elif nom == "resume_kitsu":
+        corps = fiche_catalogue(
+            series_id,
+            titre,
+            synopsis="Résumé brut factice.",
+            synopsis_enriched="Factice synopsis from Kitsu.",
+            synopsis_source="kitsu",
+            synopsis_kitsu="Factice synopsis from Kitsu.",
+        )
+    elif nom == "deux_resumes":
+        corps = fiche_catalogue(
+            series_id,
+            titre,
+            synopsis_source="manga_sanctuary",
+            synopsis_kitsu="Factice synopsis from Kitsu.",
+        )
+    elif nom == "sans_resume":
+        corps = fiche_catalogue(
+            series_id,
+            titre,
+            synopsis=None,
+            synopsis_enriched=None,
+            synopsis_source=None,
+            synopsis_kitsu=None,
         )
     else:
         corps = fiche_catalogue(series_id, titre)

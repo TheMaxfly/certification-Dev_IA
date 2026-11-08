@@ -7,6 +7,9 @@ cartes du conseiller : les mêmes valeurs partout. Le catalogue absent, injoigna
 délai, ou qui refuse la clé : un encart nommé et un 503, le conseiller et les comptes
 continuent. Une série inconnue : la page introuvable de l'application.
 
+E4, lot 2b : « Vouliez-vous dire… ? » quand le 02 rend des suggestions ; la fiche dit
+la source du résumé (Kitsu, en anglais) et replie le résumé Kitsu sous le français.
+
 E4, lot 3 : la fiche porte les critiques publiées des libraires du réseau
 (`pages_critiques.reseau_de`) et leur moyenne, avant la note des lecteurs ; la base
 perdue, la fiche s'affiche quand même, avec l'encart à la place de la section.
@@ -158,6 +161,16 @@ def installer(
             lignes=lignes,
             cherche=resultats is not None,
             aucun=presentation.dire(t, "catalogue_aucun", q=q),
+            # Contrat 0.6.0 : rien ne correspond, des séries ressemblent (« Vouliez-vous
+            # dire… ? ») ; un lien par fiche, la fiche n'est pas préchargée.
+            suggestions=(
+                [
+                    (s.series_id, s.title or t["valeur_inconnue"])
+                    for s in resultats.suggestions
+                ]
+                if resultats is not None and resultats.total == 0
+                else []
+            ),
             pagination=(
                 pagination_de(q, page, resultats.total)
                 if resultats is not None and resultats.total > regles.par_page

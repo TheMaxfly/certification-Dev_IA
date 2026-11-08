@@ -1,5 +1,5 @@
 """Le seul code qui parle au catalogue — l'API data du module 02 —, par son contrat
-0.5.0.
+0.6.0 (0.5.0 lu aussi : les champs neufs sont facultatifs).
 
 Trois appels de données, `rechercher(q, page)` (`GET /series`), `serie(series_id)`
 (`GET /series/{series_id}`, 404 → None) et `volumes(series_id)` (`GET
@@ -59,12 +59,24 @@ class ResultatCatalogue(BaseModel):
     titre_correspondant: str | None
 
 
+class Suggestion(BaseModel):
+    """Une série qui ressemble à la saisie quand rien ne lui correspond (contrat
+    0.6.0) : « Vouliez-vous dire… ? »."""
+
+    series_id: int
+    title: str | None
+    score: float
+    correspondance: Literal["titre", "autre_titre", "auteur"]
+
+
 class Resultats(BaseModel):
     query: str
     total: int
     limit: int
     offset: int
     items: list[ResultatCatalogue]
+    #: Contrat 0.6.0 ; absent d'un 02 plus ancien : aucune suggestion.
+    suggestions: list[Suggestion] = Field(default_factory=list[Suggestion])
 
 
 class SerieCatalogue(BaseModel):
@@ -84,6 +96,9 @@ class SerieCatalogue(BaseModel):
     demographie: str | None = None
     annee_fr: int | None = None
     synopsis_enriched: str | None
+    #: Contrat 0.6.0 : la source du résumé servi, et le résumé Kitsu quand il existe.
+    synopsis_source: Literal["manga_sanctuary", "kitsu"] | None = None
+    synopsis_kitsu: str | None = None
     genres_source: list[str] = Field(default_factory=list[str])
     url: str | None
 

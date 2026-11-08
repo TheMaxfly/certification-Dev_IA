@@ -270,14 +270,14 @@ par minute du compte (2026-11-03).
 
 ### Le catalogue (E4, lot 2a)
 
-Deux pages publiques, servies par l'API data du module 02 (contrat 0.5.0), sous la clé
+Deux pages publiques, servies par l'API data du module 02 (contrat 0.6.0 depuis le lot 2b ; un 02 en 0.5.0 reste lu, sans suggestions ni source du résumé), sous la clé
 de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le menu porte
 « Catalogue » sur chaque page ; elles gardent le menu du compte connecté.
 
 | Page | Ce qu'elle fait |
 |---|---|
-| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé qui renvoie au conseiller, et dit que la recherche ne corrige pas encore les fautes |
-| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé, les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé ; quand le 02 rend des `suggestions` (contrat 0.6.0, la ressemblance de trigrammes au-dessus d'un seuil mesuré), **« Vouliez-vous dire… ? »** et un lien par fiche suggérée (non préchargée), puis le lien vers le conseiller ; sans suggestion, le renvoi au conseiller seul (E4, lot 2b) |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé servi par le 02 (contrat 0.6.0 : coupé avant les critiques de lecteurs que la source y avait recopiées) et sa source — un résumé Kitsu dit « Résumé fourni par Kitsu (en anglais) », `lang="en"` ; le français principal, le résumé Kitsu replié dessous dans un `<details>` (`lang="en"`) ; sans résumé, « Résumé indisponible » — ; « Demander au conseiller » (`zone-pont-conseiller`) ; les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
 
 **Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
 configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
@@ -576,7 +576,7 @@ l'API, ajouter à la ligne `API_MODELE_CLES`, séparé par une virgule,
 `application:<secret>` : une seconde ligne remplacerait la première.
 
 **Le catalogue dans la pile** (E4, lot 2a) — le service `catalogue`, l'image
-`api-catalogue:0.5.0` du module 02 :
+`api-catalogue:0.6.0` du module 02 :
 
 - dans `02_api_manga/.env` : `API_KEYS=conseiller:<clé>` (le consommateur de
   l'application) et `DB_NAME` (`apimanga`, lu seulement) ; dans le `.env` de ce module,

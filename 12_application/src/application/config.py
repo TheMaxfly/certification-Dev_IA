@@ -121,7 +121,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " catalogue_encart catalogue_vers_conseiller catalogue_champ"
             " catalogue_bouton catalogue_resultats_titre catalogue_pagination"
             " catalogue_precedente catalogue_suivante catalogue_aucun_conseiller"
-            " catalogue_aucun_fautes catalogue_trouve_par_auteur"
+            " catalogue_vouliez_vous_dire catalogue_trouve_par_auteur"
             " serie_metadonnees serie_type serie_annee serie_note_etiquette"
             " serie_sans_note serie_reseau_titre serie_reseau_vide"
             " serie_listes_titre serie_listes serie_synopsis_titre"
@@ -173,6 +173,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " conseiller_aide_public pont_vers_catalogue pont_vers_conseiller"
             " quota_titre debit_titre debit_public budget_titre budget_atteint"
             " inscription_bornee_titre apropos_quotas_titre"
+            " serie_resume_kitsu_source serie_resume_kitsu_voir"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),

@@ -134,6 +134,13 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("conseiller_prerempli", chemin="/?serie=101"),
     Ecran("reponse_refus_avec_pont", question=QUESTION, reponse="refus"),
     Ecran("reponse_sans_carte_avec_pont", question=QUESTION, reponse="sans_carte"),
+    # E4, lot 2b : « Vouliez-vous dire… ? » et les sources du résumé (contrat 0.6.0).
+    Ecran(
+        "catalogue_suggestions", chemin="/catalogue?q=narutp", catalogue="suggestions"
+    ),
+    Ecran("serie_resume_kitsu", chemin="/series/101", catalogue="resume_kitsu"),
+    Ecran("serie_deux_resumes", chemin="/series/101", catalogue="deux_resumes"),
+    Ecran("serie_sans_resume", chemin="/series/101", catalogue="sans_resume"),
     # E4, lot 2b : chaque borne du conseiller, atteinte.
     Ecran("conseiller_quota_atteint", question=QUESTION, borne="session"),
     Ecran(

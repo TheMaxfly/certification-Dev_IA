@@ -173,7 +173,76 @@ def test_v2_aucun_resultat_propose_le_conseiller(client, doublure):
     assert soupe(r).select_one('main a[href="/"]').get_text() == (
         "Décrivez ce que vous cherchez au conseiller"
     )
-    assert "La recherche ne corrige pas encore les fautes de frappe." in texte
+    assert "ne corrige pas encore" not in texte, "phrase du lot 2a retirée (2b)"
+    assert soupe(r).select_one(".zone-suggestions") is None
+
+
+def test_v2_vouliez_vous_dire_les_suggestions_puis_le_conseiller(client, doublure):
+    doublure.choisir(catalogue="suggestions")
+    r = client.get("/catalogue?q=narutp")
+    page = soupe(r)
+    zone = page.select_one(".zone-suggestions")
+
+    assert r.status_code == 200
+    assert zone.select_one("h3").get_text() == "Vouliez-vous dire… ?"
+    assert [(a["href"], a.get_text()) for a in zone.select("a")] == [
+        ("/series/101", "Série factice A"),
+        ("/series/103", "Série factice C"),
+    ]
+    liens = [a["href"] for a in page.select("main a")]
+    assert liens.index("/series/103") < liens.index("/"), "puis le conseiller"
+    assert doublure.appels_catalogue.get("/series/{series_id}") is None, (
+        "une page = un appel : les fiches suggérées ne sont pas préchargées"
+    )
+
+
+def test_v2_un_02_sans_suggestions_au_contrat_reste_lisible(client, doublure):
+    """Un 02 en 0.5.0 n'envoie pas le champ : l'écran du lot 2a, sans suggestion."""
+    doublure.choisir(catalogue="vide")
+
+    page = soupe(client.get("/catalogue?q=zz"))
+
+    assert page.select_one(".zone-suggestions") is None
+
+
+def zone_resume(client, doublure, scenario: str):
+    doublure.choisir(catalogue=scenario)
+    return soupe(client.get("/series/101")).select_one(".zone-synopsis")
+
+
+def test_v3_le_resume_francais_et_le_kitsu_replie_dessous(client, doublure):
+    zone = zone_resume(client, doublure, "deux_resumes")
+
+    assert zone.select_one("p").get_text() == "Résumé factice de la série."
+    assert not zone.select_one("p").has_attr("lang")
+    details = zone.select_one("details")
+    assert details.summary.get_text() == "Voir aussi le résumé Kitsu (en anglais)"
+    assert details.select_one("p")["lang"] == "en"
+    assert details.select_one("p").get_text() == "Factice synopsis from Kitsu."
+
+
+def test_v3_un_resume_kitsu_dit_sa_source_en_anglais(client, doublure):
+    zone = zone_resume(client, doublure, "resume_kitsu")
+
+    principal = zone.select_one("p")
+    assert principal["lang"] == "en"
+    assert principal.get_text() == "Factice synopsis from Kitsu."
+    assert "Résumé fourni par Kitsu (en anglais)." in zone.get_text()
+    assert zone.select_one("details") is None, "pas deux fois le même résumé"
+
+
+def test_v3_sans_resume_l_etat_nomme(client, doublure):
+    zone = zone_resume(client, doublure, "sans_resume")
+
+    assert zone.select_one("p").get_text() == "Résumé indisponible."
+    assert zone.select_one("details") is None
+
+
+def test_v3_un_seul_resume_francais_sans_kitsu_rien_de_replie(client, doublure):
+    zone = zone_resume(client, doublure, "nominal")
+
+    assert zone.select_one("p").get_text() == "Résumé factice de la série."
+    assert zone.select_one("details") is None
 
 
 def test_v2_sans_saisie_la_page_aide_sans_appeler_le_catalogue(client, doublure):

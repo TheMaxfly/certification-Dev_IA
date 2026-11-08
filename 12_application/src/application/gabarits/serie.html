@@ -47,7 +47,22 @@
 </section>
 <section class="zone-synopsis" aria-labelledby="synopsis-titre">
 <h2 id="synopsis-titre">{{ t.serie_synopsis_titre }}</h2>
-<p>{{ fiche.synopsis_enriched or t.serie_sans_synopsis }}</p>
+{# Contrat 0.6.0 : le résumé servi et sa source ; le résumé Kitsu, en anglais, replié
+   sous le français quand les deux existent. #}
+{% if fiche.synopsis_enriched and fiche.synopsis_source == "kitsu" %}
+<p lang="en">{{ fiche.synopsis_enriched }}</p>
+<p><small>{{ t.serie_resume_kitsu_source }}</small></p>
+{% elif fiche.synopsis_enriched %}
+<p>{{ fiche.synopsis_enriched }}</p>
+{% if fiche.synopsis_kitsu %}
+<details>
+<summary>{{ t.serie_resume_kitsu_voir }}</summary>
+<p lang="en">{{ fiche.synopsis_kitsu }}</p>
+</details>
+{% endif %}
+{% else %}
+<p>{{ t.serie_sans_synopsis }}</p>
+{% endif %}
 {% if fiche.genres_source %}
 <h3>{{ t.serie_genres_titre }}</h3>
 <ul>

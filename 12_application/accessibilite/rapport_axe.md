@@ -3,7 +3,7 @@
 - **Date** : 2026-11-08.
 - **Outil** : axe-core 4.14.0, dans Chromium 156.0.8078.4.
 - **Niveau visé** : WCAG 2.1 AA (étiquettes : wcag2a, wcag2aa, wcag21a, wcag21aa, best-practice).
-- **Pages auditées** : 112, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
+- **Pages auditées** : 116, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
 - **Violations par gravité** : critical 0, serious 0, moderate 0, minor 0.
 - **Violations de la politique de sécurité en console** : 0.
 
@@ -36,6 +36,7 @@ Aucun.
 | `catalogue_erreur_saisie` | 38 | 0 | 1 | 52 |
 | `catalogue_indisponible` | 39 | 0 | 1 | 51 |
 | `catalogue_resultats` | 38 | 0 | 1 | 52 |
+| `catalogue_suggestions` | 38 | 0 | 1 | 52 |
 | `catalogue_vide` | 38 | 0 | 1 | 52 |
 | `cle_refusee` | 34 | 0 | 0 | 56 |
 | `comptes_indisponibles` | 30 | 0 | 0 | 60 |
@@ -131,5 +132,8 @@ Aucun.
 | `serie` | 33 | 0 | 0 | 57 |
 | `serie_avec_critiques` | 39 | 0 | 0 | 51 |
 | `serie_critiques_indisponibles` | 33 | 0 | 0 | 57 |
+| `serie_deux_resumes` | 35 | 0 | 0 | 55 |
 | `serie_introuvable` | 30 | 0 | 0 | 60 |
+| `serie_resume_kitsu` | 34 | 0 | 0 | 56 |
 | `serie_sans_note` | 33 | 0 | 0 | 57 |
+| `serie_sans_resume` | 33 | 0 | 0 | 57 |
