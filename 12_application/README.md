@@ -626,6 +626,12 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 ## Limites déclarées
 
+- **Tolérance aux fautes du conseiller** : mesurée le 2026-11-08 (E4, lot 2b, D14 a) — douze
+  questions du jeu gelé, une faute mécanique chacune (auteur inversé, transposition, lettre
+  manquante, lettre doublée), posées en strict à l'API réelle depuis la préproduction :
+  **11 / 12** citent une série attendue ; résultat et méthode au rapport du lot 2b ; la
+  résolution des titres dans l'API (D14 c) reste une décision de Max.
+
 - **Une instance**, aucune mémoire partagée.
 - **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute
   (2026-11-03), est rendu à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
