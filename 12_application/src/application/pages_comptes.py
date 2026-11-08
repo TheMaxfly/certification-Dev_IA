@@ -1,6 +1,6 @@
 """Les écrans des comptes (E4, lot 1, spec 03) : inscription, connexion, déconnexion,
-changement de mot de passe, administration des comptes, et la page des critiques du
-libraire (« bientôt disponible »).
+changement de mot de passe, administration des comptes. Les critiques du libraire ont
+leurs écrans à elles (`pages_critiques`, E4, lot 3).
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire `POST` porte le jeton
 CSRF, vérifié avant toute autre chose ; chaque page de compte sonde la base d'abord :
@@ -32,7 +32,6 @@ type RoleAdministre = Literal["libraire", "admin"]
 
 Connecte = Annotated[Compte, Depends(sessions.exiger_connexion)]
 Admin = Annotated[Compte, Depends(sessions.exiger_role("admin"))]
-Libraire = Annotated[Compte, Depends(sessions.exiger_role("libraire", "admin"))]
 
 ROLES = ("client", "libraire", "admin")
 ROLES_ADMINISTRES: tuple[RoleAdministre, ...] = ("libraire", "admin")
@@ -460,10 +459,3 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
     @app.post("/admin/comptes/{ident}/reactiver", include_in_schema=False)
     async def admin_reactiver(request: Request, ident: str) -> Response:
         return await admin_changer(request, ident, actif=True)
-
-    # ------------------------------------------------------------------ #
-    #  Le libraire
-    # ------------------------------------------------------------------ #
-    @app.get("/libraire/critiques", include_in_schema=False)
-    async def critiques(request: Request, libraire: Libraire) -> Response:
-        return rendre(request, "critiques.html")

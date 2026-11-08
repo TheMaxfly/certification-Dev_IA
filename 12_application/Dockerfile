@@ -1,6 +1,6 @@
 # L'image de l'application — construite depuis la RACINE du dépôt :
 #
-#   docker build -f 12_application/Dockerfile --target application -t application-conseiller:0.3.0 .
+#   docker build -f 12_application/Dockerfile --target application -t application-conseiller:0.4.0 .
 #
 # La racine, à cause de la seule cible `doublure`, qui lit le contrat du module 11. Seuls
 # les fichiers nommés entrent dans le contexte (`Dockerfile.dockerignore`, liste blanche) :

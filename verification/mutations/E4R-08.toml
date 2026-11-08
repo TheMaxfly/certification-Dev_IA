@@ -1,0 +1,13 @@
+id = "E4R-08"
+origine = "E4, lot 3, spec 03 (2026-11-08) — l'administrateur autorisé à modifier : la garde PasLAuteur contournée pour le rôle admin (une critique à son nom deviendrait modifiable)"
+fichier = "12_application/src/application/critiques.py"
+avant = '''    if compte.role != "libraire":
+        raise PasLAuteur
+    texte = _valider(regles, texte, note, label)
+    async with base.transaction() as cx:'''
+apres = '''    if compte.role not in ("libraire", "admin"):
+        raise PasLAuteur
+    texte = _valider(regles, texte, note, label)
+    async with base.transaction() as cx:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_critiques.py", "-k", "admin_ne_modifie_aucune"]

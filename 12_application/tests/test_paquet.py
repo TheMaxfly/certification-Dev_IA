@@ -6,4 +6,4 @@ import application
 
 
 def test_le_paquet_dit_sa_version():
-    assert application.__version__ == "0.3.0"
+    assert application.__version__ == "0.4.0"

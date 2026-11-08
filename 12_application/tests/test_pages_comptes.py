@@ -502,9 +502,12 @@ def test_l1_le_libraire_se_connecte_par_le_meme_mecanisme(appli, base):
 
 
 @pytest.mark.parametrize(
-    ("role", "voit"), [("client", False), ("libraire", True), ("admin", True)]
+    ("role", "voit"), [("client", False), ("libraire", True), ("admin", False)]
 )
-def test_l1_le_libraire_voit_mes_critiques_bientot_disponible(appli, base, role, voit):
+def test_l1_mes_critiques_est_au_libraire_seul(appli, base, role, voit):
+    """Réécrit au lot 3 : « Mes critiques » n'est plus « bientôt disponible » ; elle est
+    au libraire seul — l'administrateur modère, il n'écrit pas (E4, lot 3, décision
+    2)."""
     _, client = appli
     creer_compte(base, f"{role}_essai", role)
     connecter(client, f"{role}_essai")
@@ -513,7 +516,8 @@ def test_l1_le_libraire_voit_mes_critiques_bientot_disponible(appli, base, role,
     r = client.get("/libraire/critiques")
     if voit:
         assert r.status_code == 200
-        assert "Bientôt disponible" in soupe(r).select_one("main article").get_text()
+        assert soupe(r).select_one("main h1").get_text() == "Mes critiques"
+        assert "Vous n'avez pas encore écrit de critique." in soupe(r).get_text()
     else:
         assert r.status_code == 403
 
@@ -974,7 +978,6 @@ def pages_neuves(client: Navigateur, base: str) -> dict[str, BeautifulSoup]:
         "mot_de_passe_refuse": changer(client, ancien="faux"),
         "admin_comptes": client.get("/admin/comptes"),
         "admin_refuse": creer_par_admin(client, "ab"),
-        "critiques": client.get("/libraire/critiques"),
     }
     return {nom: soupe(r) for nom, r in rendues.items()}
 
@@ -1088,6 +1091,13 @@ ROUTES = [
     ("POST", "/admin/comptes/1/desactiver"),
     ("POST", "/admin/comptes/1/reactiver"),
     ("GET", "/libraire/critiques"),
+    # E4, lot 3 : les critiques et la modération, sans base.
+    ("GET", "/libraire/critiques/nouvelle?series_id=101"),
+    ("POST", "/libraire/critiques/nouvelle"),
+    ("GET", "/libraire/critiques/1/modifier"),
+    ("POST", "/libraire/critiques/1/retirer"),
+    ("GET", "/admin/critiques"),
+    ("POST", "/admin/critiques/1/retirer"),
 ]
 
 
@@ -1139,7 +1149,7 @@ def test_un_mot_de_passe_initial_est_annonce_a_changer(appli, base):
         (None, {"Conseiller", "Connexion", "Créer un compte"}, {"Mon compte"}),
         ("client", {"Mon compte", "Déconnexion"}, {"Mes critiques", "Comptes"}),
         ("libraire", {"Mon compte", "Mes critiques"}, {"Comptes", "Connexion"}),
-        ("admin", {"Mon compte", "Mes critiques", "Comptes"}, {"Créer un compte"}),
+        ("admin", {"Mon compte", "Comptes", "Critiques"}, {"Mes critiques"}),
     ],
     ids=["anonyme", "client", "libraire", "admin"],
 )

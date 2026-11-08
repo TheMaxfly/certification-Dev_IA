@@ -3,7 +3,7 @@
 - **Date** : 2026-11-08.
 - **Outil** : axe-core 4.14.0, dans Chromium 156.0.8078.4.
 - **Niveau visé** : WCAG 2.1 AA (étiquettes : wcag2a, wcag2aa, wcag21a, wcag21aa, best-practice).
-- **Pages auditées** : 88, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
+- **Pages auditées** : 100, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
 - **Violations par gravité** : critical 0, serious 0, moderate 0, minor 0.
 - **Violations de la politique de sécurité en console** : 0.
 
@@ -15,7 +15,7 @@ Aucun.
 
 ## À revoir à la main
 
-- `color-contrast`, sur `#ancien`, `#filtre-role`, `#mode`, `#profil`, `#pseudo`, `#q`, `#question`, `#role` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
+- `color-contrast`, sur `#ancien`, `#filtre-libraire`, `#filtre-role`, `#filtre-statut`, `#label`, `#mode`, `#note`, `#profil`, `#pseudo`, `#q`, `#question`, `#role`, `#texte`, `#volume_url` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
 
 ## Par page
 
@@ -25,6 +25,9 @@ Aucun.
 | `a_propos_sans_api` | 30 | 0 | 0 | 60 |
 | `acces_refuse` | 30 | 0 | 0 | 60 |
 | `admin_comptes` | 42 | 0 | 1 | 48 |
+| `admin_critique_retirer` | 32 | 0 | 0 | 58 |
+| `admin_critiques` | 40 | 0 | 1 | 50 |
+| `admin_critiques_vide` | 34 | 0 | 1 | 56 |
 | `admin_refuse` | 42 | 0 | 1 | 48 |
 | `admin_seconde_page_et_avis` | 47 | 0 | 1 | 43 |
 | `api_indisponible` | 35 | 0 | 0 | 55 |
@@ -45,7 +48,14 @@ Aucun.
 | `conversation_invalide` | 41 | 0 | 1 | 49 |
 | `conversation_pleine` | 41 | 0 | 1 | 49 |
 | `conversation_trop_longue` | 44 | 0 | 1 | 46 |
-| `critiques` | 30 | 0 | 0 | 60 |
+| `critique_acces_refuse` | 30 | 0 | 0 | 60 |
+| `critique_modifier` | 35 | 0 | 1 | 55 |
+| `critique_nouvelle` | 35 | 0 | 1 | 55 |
+| `critique_nouvelle_refusee` | 35 | 0 | 1 | 55 |
+| `critique_retirer` | 32 | 0 | 0 | 58 |
+| `critiques_catalogue_indisponible` | 40 | 0 | 1 | 50 |
+| `critiques_liste` | 40 | 0 | 1 | 50 |
+| `critiques_vide` | 34 | 0 | 1 | 56 |
 | `degrade_api_injoignable` | 40 | 0 | 0 | 50 |
 | `degrade_base_indisponible` | 41 | 0 | 1 | 49 |
 | `degrade_cle_invalide` | 41 | 0 | 1 | 49 |
@@ -107,5 +117,7 @@ Aucun.
 | `reponse_sans_passage` | 39 | 0 | 1 | 51 |
 | `reponse_titres` | 40 | 0 | 1 | 50 |
 | `serie` | 33 | 0 | 0 | 57 |
+| `serie_avec_critiques` | 39 | 0 | 0 | 51 |
+| `serie_critiques_indisponibles` | 33 | 0 | 0 | 57 |
 | `serie_introuvable` | 30 | 0 | 0 | 60 |
 | `serie_sans_note` | 33 | 0 | 0 | 57 |

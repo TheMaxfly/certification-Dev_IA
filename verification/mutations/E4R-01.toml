@@ -1,0 +1,7 @@
+id = "E4R-01"
+origine = "E4, lot 3, spec 01 (2026-11-08) — la garde d'auteur retirée de la modification : un libraire modifierait la critique d'un autre"
+fichier = "12_application/src/application/critiques.py"
+avant = '''            " WHERE id = %s AND compte_id = %s AND statut = 'publiee'"'''
+apres = '''            " WHERE id = %s AND (compte_id = %s OR true) AND statut = 'publiee'"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_critiques.py", "-k", "un_autre_libraire_ne_modifie_pas"]

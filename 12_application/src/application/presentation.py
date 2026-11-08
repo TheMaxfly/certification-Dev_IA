@@ -827,3 +827,29 @@ def encart_erreur(
         ),
         erreur.statut if erreur.statut == 422 else 502,
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Les critiques signées (E4, lot 3)
+# --------------------------------------------------------------------------- #
+MOIS = (
+    "janvier février mars avril mai juin juillet août septembre octobre novembre"
+    " décembre"
+).split()
+
+
+def date_en_lettres(moment: datetime) -> str:
+    """« 12 novembre 2026 », « 1er décembre 2026 » : la date d'une critique, dans le
+    fuseau de la base (celui de la session)."""
+    jour = "1er" if moment.day == 1 else str(moment.day)
+    return f"{jour} {MOIS[moment.month - 1]} {moment.year}"
+
+
+def paragraphes_critique(texte: str) -> list[list[str]]:
+    """Le texte d'une critique en paragraphes (sur les lignes vides), chacun en lignes :
+    le gabarit les sépare, échappées ; rien n'est jamais marqué « sûr »."""
+    return [
+        [ligne.strip() for ligne in bloc.split("\n") if ligne.strip()]
+        for bloc in re.split(r"\n\s*\n", texte)
+        if bloc.strip()
+    ]

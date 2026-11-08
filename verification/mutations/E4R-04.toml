@@ -1,0 +1,7 @@
+id = "E4R-04"
+origine = "E4, lot 3, spec 01 (2026-11-08) — la moyenne des libraires qui compterait les critiques retirées"
+fichier = "12_application/src/application/critiques.py"
+avant = '''            " WHERE series_id = %s AND statut = 'publiee'",'''
+apres = '''            " WHERE series_id = %s",'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_critiques.py", "-k", "moyenne_exclut"]

@@ -1,0 +1,7 @@
+id = "E4R-03"
+origine = "E4, lot 3, spec 01 (2026-11-08) — un label hors de la liste fixe accepté : la forme du code tient la contrainte de la 027, seule la configuration le refuse"
+fichier = "12_application/src/application/critiques.py"
+avant = '''    if label is not None and label not in regles.codes:'''
+apres = '''    if label is not None and label == "":'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_critiques.py", "-k", "label_hors_liste"]

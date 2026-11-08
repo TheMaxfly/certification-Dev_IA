@@ -86,6 +86,13 @@ class Metriques:
             ["etat"],
             registry=self.registre,
         )
+        self.critiques = Counter(
+            "application_critiques",
+            "Critiques de libraires écrites par l'application (E4, lot 3), par action :"
+            " publiee, modifiee, retiree (par son auteur ou par la modération).",
+            ["action"],
+            registry=self.registre,
+        )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",

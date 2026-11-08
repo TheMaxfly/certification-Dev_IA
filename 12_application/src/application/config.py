@@ -24,6 +24,7 @@ Ni le DSN ni la clé de session n'entrent dans un `repr` ni dans le journal.
 from __future__ import annotations
 
 import ipaddress
+import re
 import secrets
 import string
 import tomllib
@@ -49,6 +50,11 @@ ENVIRONNEMENTS = ("developpement", "preproduction", "production")
 BASES_EXIGEES = {"preproduction": "apimanga_preprod", "production": "apimanga"}
 BASE_PRODUCTION = "apimanga"
 CLE_SESSION_OCTETS_MIN = 32
+#: Les bornes du texte d'une critique dans la base (migration 027,
+#: `critiques_texte_longueur`) : celles de l'application doivent y tenir.
+TEXTE_CRITIQUE_BASE = (1, 10000)
+#: La forme d'un code de label dans la base (027, `critiques_label_forme`).
+FORME_LABEL = re.compile(r"[a-z_]{1,40}")
 
 type Reseau = ipaddress.IPv4Network | ipaddress.IPv6Network
 type Table = dict[str, object]
@@ -104,7 +110,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " compte_role_admin admin_actif admin_inactif admin_desactiver"
             " admin_reactiver admin_cree admin_desactive admin_reactive admin_soi"
             " admin_aucun admin_inconnu admin_precedente admin_suivante"
-            " critiques_titre critiques_bientot apropos_comptes_titre"
+            " critiques_titre apropos_comptes_titre"
             " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
             " mdp_continuer"
             # E4, lot 2a : le catalogue.
@@ -118,6 +124,33 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " serie_listes_titre serie_listes serie_synopsis_titre"
             " serie_sans_synopsis serie_genres_titre serie_lien_catalogue"
             " serie_retour_catalogue"
+            # E4, lot 3 : les critiques signées.
+            " menu_moderation critiques_l5 critiques_vide critiques_vers_catalogue"
+            " critiques_colonne_serie critiques_colonne_tome critiques_colonne_note"
+            " critiques_colonne_label critiques_colonne_statut"
+            " critiques_colonne_dates critiques_colonne_action critiques_serie_entiere"
+            " critiques_statut_publiee critiques_statut_retiree"
+            " critiques_titre_indisponible critiques_filtre_etiquette"
+            " critiques_filtre_toutes critiques_filtre_bouton critiques_modifier"
+            " critiques_retirer critiques_avis_publiee critiques_avis_modifiee"
+            " critiques_avis_retiree critiques_avis_deja_retiree critiques_precedente"
+            " critiques_suivante critique_nouvelle_titre critique_modifier_titre"
+            " critique_serie_rappel critique_champ_tome critique_tome_serie"
+            " critique_champ_texte critique_champ_note critique_note_choisir"
+            " critique_champ_label critique_label_aucun critique_publier"
+            " critique_enregistrer critique_annuler critique_tome_fixe"
+            " critique_erreur_note critique_erreur_label critique_erreur_tome"
+            " critique_erreur_controle critique_erreur_base critique_deja_publiee"
+            " critique_deja_lien"
+            " critique_serie_inconnue_titre critique_serie_inconnue"
+            " critique_retiree_titre critique_retiree_texte critique_retirer_titre"
+            " critique_retirer_texte critique_retirer_bouton critique_ecrire"
+            " critique_moderer serie_reseau_indisponible serie_reseau_sans_avis"
+            " admin_critiques_titre admin_critiques_vide admin_critiques_filtre"
+            " admin_critiques_tous admin_critiques_colonne_libraire"
+            " admin_critiques_colonne_debut admin_critiques_colonne_date"
+            " admin_critique_retirer_titre admin_critique_retirer_texte"
+            " admin_critiques_inactif"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -182,6 +215,17 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "catalogue_erreur_saisie": frozenset({"min", "max"}),
     "serie_note": frozenset({"note", "votes"}),
     "apropos_comptes": frozenset({"seuil", "minutes"}),
+    "critique_bornes": frozenset({"min", "max"}),
+    "critique_erreur_longueur": frozenset({"min", "max", "n"}),
+    "critique_note": frozenset({"note"}),
+    "critique_date": frozenset({"date"}),
+    "critique_modifiee_le": frozenset({"date"}),
+    "critiques_page": frozenset({"n", "total"}),
+    "serie_reseau_moyenne": frozenset({"note", "n"}),
+    "serie_reseau_moyenne_une": frozenset({"note"}),
+    "critique_lien_modifier": frozenset({"serie"}),
+    "critique_lien_retirer": frozenset({"serie"}),
+    "critique_lien_moderer": frozenset({"nom"}),
 }
 
 
@@ -257,6 +301,33 @@ class Catalogue:
 
 
 @dataclass(frozen=True, slots=True)
+class Label:
+    """Un label de critique : son code (gardé en base) et son libellé (affiché)."""
+
+    code: str
+    libelle: str
+
+
+@dataclass(frozen=True, slots=True)
+class Critiques:
+    """Les règles des critiques signées (`[critiques]`) : bornes du texte, liste fixe
+    des labels, taille d'une page de liste."""
+
+    texte_min: int
+    texte_max: int
+    par_page: int
+    labels: tuple[Label, ...]
+
+    @property
+    def codes(self) -> frozenset[str]:
+        return frozenset(label.code for label in self.labels)
+
+    def libelle(self, code: str | None) -> str | None:
+        """Le libellé d'un code de la liste ; None pour un code absent ou inconnu."""
+        return next((lab.libelle for lab in self.labels if lab.code == code), None)
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -288,6 +359,7 @@ class Reglages:
     cle_session_ephemere: bool
     comptes: Comptes
     catalogue: Catalogue
+    critiques: Critiques
 
 
 class _Lecteur:
@@ -533,6 +605,47 @@ def lire_comptes(lecteur: _Lecteur, donnees: Table) -> Comptes:
     )
 
 
+def lire_critiques(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Critiques:
+    """Les bornes dans celles de la base (027), les labels conformes à sa forme, uniques
+    et libellés ; une liste vide est refusée."""
+    table = lecteur.table(donnees, "critiques")
+    texte_min = lecteur.entier(table, "texte_min", "critiques")
+    texte_max = lecteur.entier(table, "texte_max", "critiques")
+    base_min, base_max = TEXTE_CRITIQUE_BASE
+    if not base_min <= texte_min <= texte_max <= base_max:
+        ecarts.append(
+            "reglages.toml : [critiques] texte_min ≤ texte_max, entre"
+            f" {base_min} et {base_max} (les bornes de la migration 027)"
+        )
+    labels: list[Label] = []
+    brutes = table.get("labels")
+    if not isinstance(brutes, list) or not brutes:
+        ecarts.append("reglages.toml : [critiques.labels] liste non vide attendue")
+        brutes = []
+    for brute in cast(list[object], brutes):
+        if not isinstance(brute, dict):
+            ecarts.append("reglages.toml : [critiques.labels] table attendue")
+            continue
+        entree = cast(Table, brute)
+        code = lecteur.texte(entree, "code", "critiques.labels")
+        libelle = lecteur.texte(entree, "libelle", "critiques.labels")
+        if code and not FORME_LABEL.fullmatch(code):
+            ecarts.append(
+                "reglages.toml : [critiques.labels] code hors forme"
+                " (^[a-z_]{1,40}$, la forme de la migration 027)"
+            )
+        labels.append(Label(code, libelle))
+    codes = [label.code for label in labels]
+    if len(set(codes)) != len(codes):
+        ecarts.append("reglages.toml : [critiques.labels] code en double")
+    return Critiques(
+        texte_min=texte_min,
+        texte_max=texte_max,
+        par_page=lecteur.entier(table, "par_page", "critiques"),
+        labels=tuple(labels),
+    )
+
+
 def charger_comptes(
     environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES
 ) -> tuple[str, str, Comptes]:
@@ -684,6 +797,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         cle_session_ephemere=ephemere,
         comptes=lire_comptes(lecteur, donnees),
         catalogue=lire_catalogue(lecteur, donnees, environ, environnement, ecarts),
+        critiques=lire_critiques(lecteur, donnees, ecarts),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

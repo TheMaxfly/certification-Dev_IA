@@ -202,7 +202,7 @@ de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le m
 | Page | Ce qu'elle fait |
 |---|---|
 | `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé qui renvoie au conseiller, et dit que la recherche ne corrige pas encore les fautes |
-| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes ; « Les libraires du réseau » (état vide nommé, le lot 3 la remplit) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé, les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé, les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
 
 **Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
 configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
@@ -212,8 +212,59 @@ identifiant hors forme → la page introuvable (404). L'application **n'appelle 
 doublure compte ses appels, zéro sur cette route).
 
 **Ce que le lot 2a ne fait pas** : la tolérance aux fautes de frappe et « Vouliez-vous
-dire ? », le pont de la fiche vers le conseiller (lot 2b) ; les critiques des libraires
-(lot 3) ; les listes (lot 4).
+dire ? », le pont de la fiche vers le conseiller (lot 2b) ; les listes (lot 4).
+
+### Les critiques signées (E4, lot 3)
+
+C'est l'argument du projet : un libraire publie une critique signée, notée sur 10, sur une
+série ou sur un tome ; elle paraît **à l'instant** sur la fiche de la série, face à la note
+des lecteurs. Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`,
+avec son jeton ; `Cache-Control: no-store`.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/series/{series_id}` | tous | « Les libraires du réseau » : les critiques **publiées**, les plus récentes d'abord — le nom affiché du libraire (jamais son pseudo), la date, « Tome N » s'il y a lieu, la note « 8/10 » en texte, le badge du label, « modifiée le … », le texte en entier, en paragraphes, **échappé** ; dans la zone de la note, « Vos libraires : 8,5/10 (3 critiques) » **avant** « Note des lecteurs : … » ; un libraire connecté y voit « Écrire une critique » et « Modifier » sur les siennes, un administrateur « Retirer (modération) » sur chacune, les autres aucun de ces liens ; la base perdue : la fiche s'affiche avec l'encart « Les critiques du réseau sont momentanément indisponibles » (200) |
+| `/libraire/critiques/nouvelle?series_id=…` | libraire | le formulaire : la série rappelée ; le tome, facultatif (« La série entière », puis les volumes lus dans le 02, libellés « Tome N — titre ») ; le texte, ses bornes affichées (50 à 2 000 caractères) ; la note de 0 à 10, obligatoire, aucune présélectionnée ; le label, facultatif, dans la liste fixe ; « vous en avez déjà une » avec le lien « Modifier » ; succès : **303 vers la fiche**, où la critique est déjà là, avec l'avis du délai d'intégration ; une saisie refusée : le formulaire, les valeurs saisies (texte compris), l'erreur au champ et le focus sur le premier champ fautif (422) ; série inconnue du catalogue : page nommée (404) ; catalogue injoignable : 503 nommé |
+| `/libraire/critiques/{id}/modifier` | l'auteur | texte, note, label — la série et le tome affichés, non modifiables ; une retirée : page nommée (404) ; celle d'un autre : **403**, base inchangée |
+| `/libraire/critiques/{id}/retirer` | l'auteur | une page de confirmation (rappel, « le retrait est définitif ») puis le `POST` ; celle d'un autre : **403** |
+| `/libraire/critiques` | libraire | « Mes critiques » : la phrase du délai en tête ; toutes ses critiques, publiées et retirées (filtre sans JavaScript), 25 par page — titre de la série lu dans le 02 (« titre indisponible » et l'encart si le catalogue manque, la page reste à 200), tome ou « série entière », note, label, statut, dates, liens « Modifier » et « Retirer » sur les publiées ; état vide nommé, qui mène au catalogue |
+| `/admin/critiques` | administrateur | toutes les critiques publiées, 25 par page, filtre par libraire (actifs et inactifs) : libraire, série, tome, note, label, date, début du texte (120 caractères, échappé), « Retirer » |
+| `/admin/critiques/{id}/retirer` | administrateur | la critique **en entier** (l'administrateur lit avant de retirer), « le retrait est tracé au journal à votre nom », puis le `POST` |
+
+**Les règles** (`config/reglages.toml`, `[critiques]` : modifiables sans code, validées au
+démarrage, comparées à la migration 027 par un test) : texte de 50 à 2 000 caractères
+(espaces des bords retirés, sauts de ligne normalisés, aucun caractère de contrôle hors du
+saut de ligne ; gardé tel que saisi, jamais reformulé) ; note entière de 0 à 10,
+obligatoire ; un label au plus, facultatif : Coup de cœur, Découverte du mois, À offrir,
+Pour débuter, Valeur sûre. **Une critique publiée par libraire, série et tome** (l'index de
+la base le garantit ; deux envois croisés rendent le même refus nommé, jamais une erreur
+500) ; plusieurs tomes d'une même série sont possibles. La série est validée par le 02 ; le
+tome doit être l'un de ses volumes, et son libellé est **copié** à l'écriture (l'éditeur ne
+l'est pas : défaut de source connu du 02).
+
+**Les droits** : un libraire écrit, modifie et retire **les siennes** ; un administrateur
+retire **n'importe laquelle** et n'en écrit ni n'en modifie aucune — un administrateur qui
+veut écrire se crée un compte libraire ; un client ou un visiteur n'a aucun bouton, et 403
+ou la page de connexion sur toute route de critique. Le jeton d'abord, puis le rôle, puis
+l'identifiant du chemin (hors forme : 404).
+
+**Ce que fait un retrait** : le statut `retiree` et la date de modification, **jamais une
+suppression** (le rôle `app_rw` n'a pas le droit de supprimer une critique) ; la critique
+disparaît de tous les écrans publics et de la moyenne ; elle reste dans « Mes critiques »
+avec son statut ; une nouvelle critique sur le même couple redevient possible. Retirer une
+critique déjà retirée ne change rien et ne laisse aucune trace.
+
+**Le journal** : chaque publication, modification, retrait écrit, **dans la même
+transaction**, sa ligne au journal des actions (`critique_publiee`, `critique_modifiee`,
+`critique_retiree`, au nom de qui agit, `details` : la série, s'il s'agit d'un tome, `par`
+auteur ou administrateur) ; le journal applicatif dit l'événement et les identifiants.
+**Jamais le texte d'une critique**, ni à l'un ni à l'autre (tests sur le journal complet et
+sur la table). Métrique : `application_critiques_total{action}`.
+
+**Le délai d'intégration** : « Votre critique est visible sur la fiche ; elle sera intégrée
+aux recommandations du conseiller à la prochaine mise à jour du corpus » — après la
+publication et en tête de « Mes critiques ». Les critiques collectées (celles des lecteurs)
+ne sont toujours pas affichées : aucun appel à `/series/{id}/reviews`.
 
 ### Les comptes (E4, lot 1)
 
@@ -226,12 +277,14 @@ Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, ave
 | `/deconnexion` (`POST`) | connecté | la génération + 1 (toute copie du cookie tombe, et les autres sessions du compte avec), la session vidée ; retour à l'accueil |
 | `/compte/mot-de-passe` | connecté | ancien, nouveau, confirmation ; succès : génération + 1 (les autres sessions tombent), la session courante rouverte, le mot de passe initial levé, une ligne au journal des actions ; la page ne montre plus le formulaire mais un encart « Mot de passe changé et enregistré » et un lien « Continuer » ; un mauvais ancien compte un échec, sous le même compteur et le même verrou que la connexion |
 | `/admin/comptes` | administrateur | la liste (pseudo, nom affiché, rôle, état, date), filtrée par rôle, par pages de 25 (une page hors bornes rend la plus proche) ; créer un compte libraire ou administrateur (un rôle hors liste est refusé, nommé), au mot de passe initial saisi deux fois, à changer ; désactiver (ses sessions tombent) ou réactiver un compte — jamais le sien ; un changement sans effet ne laisse aucune trace ; aucune suppression |
-| `/libraire/critiques` | libraire, administrateur | « bientôt disponible » : la page arrive avec un prochain lot |
+| `/libraire/critiques` | libraire | « Mes critiques » (E4, lot 3, ci-dessous) |
+| `/admin/critiques` | administrateur | la modération des critiques (E4, lot 3, ci-dessous) |
 
 **Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
 Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
 client — Conseiller, Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
-en plus, Mes critiques ; administrateur — en plus, Comptes. Sans base, chaque page de compte
+en plus, Mes critiques ; administrateur — en plus, Comptes et Critiques (la modération ;
+pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
 dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
 
 **Le premier administrateur**, par une commande : `make app-admin-creer`, avec
@@ -253,12 +306,14 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
 - **Outil** : axe-core, vendu avec son empreinte et sa licence, lancé par Playwright dans
-  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **88 pages** au
-  2026-11-08, dont les dix-sept du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
-  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503) et les huit
+  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **100 pages** au
+  2026-11-08, dont les seize du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
+  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503), les huit
   du lot 2a (la recherche, ses résultats paginés, son état vide, sa saisie fautive, le
-  catalogue indisponible, la fiche, la fiche sans note, la série introuvable), sur une
-  base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
+  catalogue indisponible, la fiche, la fiche sans note, la série introuvable) et les
+  treize du lot 3 (« Mes critiques » pleine, vide, sans catalogue ; écrire, son refus,
+  modifier, retirer, l'accès refusé ; la fiche avec critiques, et sans base ; la
+  modération, sa liste vide, sa confirmation), sur une base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
   reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
 - **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
@@ -377,6 +432,8 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
+| Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
+| Injection (A03) : le texte des critiques | requêtes paramétrées ; le texte rendu **échappé** par les gabarits, jamais marqué « sûr » (test avec `<script>`, `<b>`, `<img onerror>` : rendus littéralement, aucun élément créé ; mutation E4R-07) ; politique de sécurité du contenu sans script |
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
 | Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
@@ -503,6 +560,8 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 - **Au-delà de 75 s**, l'écran dit « délai dépassé » pendant que l'API peut continuer, et
   l'appel peut être facturé.
 - **Un texte presque tout en japonais** peut dépasser les 16 Kio du corps : page d'erreur.
+  De même une critique de 2 000 caractères presque toute en japonais (environ 18 Kio
+  encodée) : la page 413, dont le texte parle de la conversation.
 - **Le texte du modèle** : `*x*` et `**x**` sont rendus en emphase, et un titre repéré avant
   ou après sa marque ; une emphase qui ouvre avant le titre et le ferme après lui
   (`*Un : Titre* [S:1]`) laisse ses astérisques ; un saut de ligne simple ne coupe pas le
@@ -533,7 +592,9 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 **Lot 1 (le socle)** : la base, Argon2id, les sessions signées, le jeton CSRF, le verrou,
 la garde par rôle et d'environnement, les écrans des comptes et leurs trois rôles (client,
 libraire, administrateur), la commande du premier administrateur (ci-dessus). **Lot 2a
-(le catalogue)** : la recherche et la page de série, par l'API data du 02. À venir : la critique de libraire signée, entrant dans le corpus ; le masquage à
+(le catalogue)** : la recherche et la page de série, par l'API data du 02. **Lot 3 (les
+critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
+lecteurs (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
 et de l'état des services ; le serveur avec préproduction et production ; l'identité
 visuelle, sur `theme.css`.

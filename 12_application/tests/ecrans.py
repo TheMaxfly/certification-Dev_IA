@@ -114,4 +114,6 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("serie", chemin="/series/101"),
     Ecran("serie_sans_note", chemin="/series/101", catalogue="serie_sans_note"),
     Ecran("serie_introuvable", chemin="/series/101", catalogue="serie_inconnue"),
+    # E4, lot 3 : sans base, la fiche s'affiche avec l'encart des critiques du réseau.
+    Ecran("serie_critiques_indisponibles", chemin="/series/102"),
 )
