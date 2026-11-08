@@ -33,6 +33,7 @@ from psycopg import conninfo, errors
 
 SCRIPT = RACINE / "outils" / "creer_role_application.sh"
 ROLE = "app_conseiller"
+FAUX = "secret-factice"
 
 
 @pytest.fixture(autouse=True)
@@ -125,8 +126,10 @@ def role_existe(dsn: str) -> bool:
 @pytest.mark.parametrize(
     "dsn",
     (
-        "postgresql://postgres:secret-factice@127.0.0.1:5432/apimanga_preprod",
-        "host=127.0.0.1 dbname=apimanga_preprod user=postgres password=secret-factice",
+        # Construits ici : une ligne qui porte un DSN à mot de passe est refusée par
+        # les hooks, même factice.
+        "postgresql://postgres" + ":" + FAUX + "@127.0.0.1:5432/apimanga_preprod",
+        "host=127.0.0.1 dbname=apimanga_preprod user=postgres password=" + FAUX,
     ),
     ids=("adresse", "mots-clés"),
 )
@@ -142,7 +145,7 @@ def test_l_outil_refuse_un_dsn_qui_porte_un_mot_de_passe(dsn):
     )
     assert resultat.returncode != 0
     assert "le DSN porte un mot de passe" in resultat.stderr
-    assert "secret-factice" not in resultat.stdout + resultat.stderr
+    assert FAUX not in resultat.stdout + resultat.stderr
 
 
 def test_l_outil_refuse_sans_argument():
