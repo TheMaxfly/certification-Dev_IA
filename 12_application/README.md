@@ -80,7 +80,9 @@ Un seul écran, `/`, dans l'ordre de lecture :
 6. le pied de page : la mention complète, « À propos et données », les versions.
 
 `/a-propos` : ce qui est transmis, tous les profils proposés et leur hébergement, ce qui
-n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API.
+n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API ; il
+porte `api`, `base` et `catalogue` (`ok`, `indisponible`, `non_configure` : un `GET /live`
+du catalogue, sans clé, délai court).
 `/metrics` : Prometheus, sur le bouclage, ou le réseau de collecte déclaré
 (`APPLICATION_METRIQUES_RESEAUX`). `application_requetes_total{route, statut}` : `route` est
 le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour le reste.
@@ -88,7 +90,11 @@ le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour l
 **Deux jauges pour l'état de l'API** : `application_api_info_etat{etat}` (`ok`, `ko`, `cle` : la
 clé est refusée), lue au démarrage et à chaque page ; `application_api_sante_ok`, lue au
 démarrage et à chaque `/sante`. Aucune ne se relit seule : une panne de l'API se lit sur la
-cible de Prometheus.
+cible de Prometheus. **Le catalogue** (E4, lot 2a) :
+`application_catalogue_appels_total{route_catalogue, statut}` (routes `series`, `serie` ;
+issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
+`application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
+chaque appel.
 
 ### Les réglages
 
@@ -187,6 +193,28 @@ avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ a
 prix du profil actif, mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15
 par minute du compte (2026-11-03).
 
+### Le catalogue (E4, lot 2a)
+
+Deux pages publiques, servies par l'API data du module 02 (contrat 0.5.0), sous la clé
+de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le menu porte
+« Catalogue » sur chaque page ; elles gardent le menu du compte connecté.
+
+| Page | Ce qu'elle fait |
+|---|---|
+| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé qui renvoie au conseiller, et dit que la recherche ne corrige pas encore les fautes |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes ; « Les libraires du réseau » (état vide nommé, le lot 3 la remplit) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé, les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+
+**Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
+configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
+conseiller reste accessible », **503**, sur les deux pages ; une série inconnue ou un
+identifiant hors forme → la page introuvable (404). L'application **n'appelle jamais**
+`/series/{id}/reviews` : les critiques collectées portent des pseudonymes de lecteurs (la
+doublure compte ses appels, zéro sur cette route).
+
+**Ce que le lot 2a ne fait pas** : la tolérance aux fautes de frappe et « Vouliez-vous
+dire ? », le pont de la fiche vers le conseiller (lot 2b) ; les critiques des libraires
+(lot 3) ; les listes (lot 4).
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -225,9 +253,11 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
 - **Outil** : axe-core, vendu avec son empreinte et sa licence, lancé par Playwright dans
-  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **80 pages** au
+  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **88 pages** au
   2026-11-08, dont les dix-sept du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
-  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503), sur une
+  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503) et les huit
+  du lot 2a (la recherche, ses résultats paginés, son état vide, sa saisie fautive, le
+  catalogue indisponible, la fiche, la fiche sans note, la série introuvable), sur une
   base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
   reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
@@ -342,6 +372,7 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
+| Clé du catalogue | dans l'environnement, jamais en page ni au journal (prouvé par test, sur le journal complet) ; gardée dans le seul client HTTP ; un refus (401) journalisé sans elle |
 | Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
@@ -368,6 +399,7 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
+| `[catalogue]` | `http://127.0.0.1:8000` ; 20 par page (50 au plus) ; saisie de 2 à 100 ; connexion 3 s, réponse 5 s | l'API data du 02 sur le poste ; ses bornes, recopiées et comparées au contrat par un test ; la recherche répond en 116 ms de médiane (2026-11-08) |
 | `[comptes]` | session 8 h après la dernière page ; verrou après 5 échecs, 15 min ; pseudo 3 à 30, nom affiché 60 au plus (les bornes de la migration `027`, comparées par un test) ; mot de passe 12 à 128 (décision 7) ; base 3 s ; 25 comptes par page | voir « Sécurité et données » |
 | `[textes]` | tous les textes des écrans | une seule source ; un texte absent empêche de démarrer |
 
@@ -378,6 +410,8 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `APPLICATION_BASE_DSN` | le DSN de la base des comptes, **sans mot de passe** ; facultatif : sans lui, le conseiller seul |
 | `APPLICATION_CLE_SESSION` | la clé de signature des sessions, 32 octets au moins, **une par environnement** ; obligatoire en préproduction et en production ; absente en développement, une clé éphémère est tirée au démarrage (avertissement au journal, sessions perdues au redémarrage) |
 | `API_MODELE_ADRESSE` | l'adresse de l'API |
+| `APPLICATION_CLE_CATALOGUE` | la clé de l'application auprès du catalogue (l'API data du 02, consommateur `conseiller`) ; obligatoire si `CATALOGUE_ADRESSE` est posée et en préproduction et production ; absente en développement : catalogue non configuré, l'encart le dit, le reste fonctionne |
+| `CATALOGUE_ADRESSE` | l'adresse du catalogue ; défaut `[catalogue] adresse`, `http://catalogue:8000` dans la pile |
 | `APPLICATION_ECOUTE` | `hôte:port` |
 | `APPLICATION_METRIQUES_RESEAUX` | les réseaux admis à lire `/metrics`, séparés par des virgules |
 | `APPLICATION_PORT_PUBLIE` | le port publié par le Compose ; défaut 8020 |
@@ -476,8 +510,8 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 **Lot 1 (le socle)** : la base, Argon2id, les sessions signées, le jeton CSRF, le verrou,
 la garde par rôle et d'environnement, les écrans des comptes et leurs trois rôles (client,
-libraire, administrateur), la commande du premier administrateur (ci-dessus). À venir :
-la page de série ; la critique de libraire signée, entrant dans le corpus ; le masquage à
+libraire, administrateur), la commande du premier administrateur (ci-dessus). **Lot 2a
+(le catalogue)** : la recherche et la page de série, par l'API data du 02. À venir : la critique de libraire signée, entrant dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
 et de l'état des services ; le serveur avec préproduction et production ; l'identité
 visuelle, sur `theme.css`.

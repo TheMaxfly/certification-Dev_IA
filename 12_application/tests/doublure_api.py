@@ -6,10 +6,17 @@ requête hors contrat est un écart, noté et rendu en 500 ; un code d'erreur qu
 contrat n'énumère pas aussi. Seuls les corps hors contrat et les scénarios sans
 réponse y échappent, exprès.
 
+Elle sert aussi le **catalogue** — l'API data du module 02, `GET /series`,
+`GET /series/{series_id}`, et `/live` —, chaque réponse validée contre le contrat du 02
+(`02_api_manga/openapi.json`, second contrat, même mécanisme), sous une clé distincte
+(sans clé : 401, comme le 02). Elle compte ses appels par route, `/series/{id}/reviews`
+comprise : l'application ne doit jamais l'appeler.
+
 Un seul mécanisme de pilotage : `POST /_essai/scenario`, qui choisit `{info, sante,
-reponse}` ; il vaut en mémoire (`httpx.ASGITransport`) comme sur un port du bouclage
-(audit d'accessibilité, Compose). L'application n'en sait rien, et aucune question ne
-porte de commande. Noms et textes factices : aucune donnée réelle, aucun pseudonyme.
+reponse, catalogue}` ; il vaut en mémoire (`httpx.ASGITransport`) comme sur un port du
+bouclage (audit d'accessibilité, Compose). L'application n'en sait rien, et aucune
+question ne porte de commande. Noms et textes factices : aucune donnée réelle, aucun
+pseudonyme.
 """
 
 from __future__ import annotations
@@ -34,6 +41,14 @@ CONTRAT_CHEMIN = (
 )
 CONTRAT: dict[str, Any] = json.loads(CONTRAT_CHEMIN.read_text(encoding="utf-8"))
 CLE_ATTENDUE = "a" * 40
+CONTRAT_CATALOGUE_CHEMIN = (
+    Path(__file__).resolve().parents[2] / "02_api_manga" / "openapi.json"
+)
+CONTRAT_CATALOGUE: dict[str, Any] = json.loads(
+    CONTRAT_CATALOGUE_CHEMIN.read_text(encoding="utf-8")
+)
+#: La clé de l'application auprès du catalogue : distincte de celle de l'API du modèle.
+CLE_CATALOGUE_ATTENDUE = "c" * 40
 
 
 def validateur(schema: Mapping[str, Any]) -> Draft202012Validator:
@@ -701,6 +716,166 @@ HORS_CONTRAT = {
 }
 
 
+# --------------------------------------------------------------------------- #
+#  Le catalogue (l'API data du module 02), tel que son contrat 0.5.0 le décrit
+# --------------------------------------------------------------------------- #
+def validateur_catalogue(schema: Mapping[str, Any]) -> Draft202012Validator:
+    """Un schéma du contrat du 02 ; ses `$ref` se résolvent dans ses `components`."""
+    return Draft202012Validator(
+        {**schema, "components": CONTRAT_CATALOGUE["components"]}
+    )
+
+
+def schema_catalogue(route: str, statut: int) -> Mapping[str, Any] | None:
+    decrite = CONTRAT_CATALOGUE["paths"][route]["get"]["responses"].get(str(statut))
+    return None if decrite is None else decrite["content"]["application/json"]["schema"]
+
+
+def resultat_catalogue(series_id: int, titre: str, **valeurs: Any) -> dict[str, Any]:
+    return {
+        "series_id": series_id,
+        "title": titre,
+        "type": "Manga",
+        "year": 2001,
+        "auteurs": "Autrice FACTICE",
+        "members_rating": 8.25,
+        "members_votes": 1234,
+        "disponibilite": "edite_en_france",
+        "nb_volumes": 12,
+        "nb_volumes_source": "champ",
+        "correspondance": "titre",
+        "titre_correspondant": None,
+        **valeurs,
+    }
+
+
+def fiche_catalogue(series_id: int, titre: str, **valeurs: Any) -> dict[str, Any]:
+    """Une fiche complète : les champs obligatoires du contrat, factices ; ses sept
+    métadonnées sont celles des cartes de l'API du modèle (`metadonnees()`) : une
+    fiche et une carte aux mêmes valeurs doivent rendre la même ligne de titre."""
+    return {
+        "series_id": series_id,
+        "work_uid": None,
+        "title": titre,
+        "url": f"https://catalogue.invalid/serie/{series_id}",
+        "type": "Manga",
+        "category": "Shonen",
+        "year": 2001,
+        "other_titles": ["Titre factice second"],
+        "dessinateur": "Auteur factice",
+        "scenariste": "Auteur factice",
+        "magazine_prepublication": None,
+        "statuses": [],
+        "genres_source": ["Aventure", "Comédie"],
+        "genres_enriched": [],
+        "tags_source": [],
+        "synopsis": "Résumé factice de la série.",
+        "synopsis_enriched": "Résumé factice de la série.",
+        "popularity_rank": None,
+        "members_rating": 8.69,
+        "members_votes": 6936,
+        "experts_rating": None,
+        "experts_votes": None,
+        "volume_count": 12,
+        "review_count": 0,
+        "score_mean": None,
+        "score_min": None,
+        "score_max": None,
+        "first_review_date": None,
+        "last_review_date": None,
+        "kitsu_id": None,
+        "needs_review": False,
+        **metadonnees(),
+        **valeurs,
+    }
+
+
+#: Trois séries factices : une trouvée par son titre, une par un autre titre, une par
+#: son auteur.
+RESULTATS_NOMINAUX = (
+    resultat_catalogue(101, "Série factice A"),
+    resultat_catalogue(
+        102,
+        "Série factice B",
+        correspondance="autre_titre",
+        titre_correspondant="Titre factice second",
+        disponibilite="seulement_au_japon",
+    ),
+    resultat_catalogue(
+        103,
+        "Série factice C",
+        correspondance="auteur",
+        members_rating=None,
+        members_votes=None,
+        nb_volumes_source="repli_volumes_distincts",
+    ),
+)
+SERIES_FACTICES = {r["series_id"] for r in RESULTATS_NOMINAUX}
+SCENARIOS_CATALOGUE = (
+    "nominal",
+    "vide",
+    "une_page",
+    "plusieurs_pages",
+    "serie_sans_note",
+    "serie_inconnue",
+    "indisponible",
+    "cle_refusee",
+    "lent",
+    "corps_hors_contrat",
+)
+#: `plusieurs_pages` : 45 séries, trois pages de 20.
+TOTAL_PLUSIEURS_PAGES = 45
+
+
+def recherche_catalogue(nom: str, q: str, limit: int, offset: int) -> Rendu:
+    """`GET /series` selon le scénario."""
+    if nom == "indisponible":
+        return Rendu(503, {"detail": "database unavailable"})
+    if nom == "cle_refusee":
+        return Rendu(401, {"detail": "Missing or invalid API key."})
+    if nom == "corps_hors_contrat":
+        return Rendu(200, brut=b'{"inattendu": true}')
+    if nom == "vide":
+        items: list[dict[str, Any]] = []
+        total = 0
+    elif nom in ("une_page", "plusieurs_pages"):
+        total = limit if nom == "une_page" else TOTAL_PLUSIEURS_PAGES
+        items = [
+            resultat_catalogue(1000 + i, f"Série factice {i + 1}")
+            for i in range(offset, min(offset + limit, total))
+        ]
+    else:
+        items = [dict(item) for item in RESULTATS_NOMINAUX]
+        total = len(items)
+    corps = {"query": q, "total": total, "limit": limit, "offset": offset}
+    return Rendu(
+        200, {**corps, "items": items}, attente_s=1.0 if nom == "lent" else 0.0
+    )
+
+
+def fiche_selon(nom: str, series_id: int) -> Rendu:
+    """`GET /series/{series_id}` selon le scénario."""
+    if nom == "indisponible":
+        return Rendu(503, {"detail": "database unavailable"})
+    if nom == "cle_refusee":
+        return Rendu(401, {"detail": "Missing or invalid API key."})
+    if nom == "corps_hors_contrat":
+        return Rendu(200, brut=b'{"series_id": "pas un entier"}')
+    if nom == "serie_inconnue" or series_id not in SERIES_FACTICES | {1000}:
+        return Rendu(404, {"detail": "series_id not found"})
+    titre = next(
+        (r["title"] for r in RESULTATS_NOMINAUX if r["series_id"] == series_id),
+        "Série factice",
+    )
+    if nom == "serie_sans_note":
+        corps = fiche_catalogue(
+            series_id, titre, members_rating=None, members_votes=None
+        )
+    else:
+        corps = fiche_catalogue(series_id, titre)
+    return Rendu(200, corps, attente_s=1.0 if nom == "lent" else 0.0)
+
+
 def connu(nom: str, scenarios: Mapping[str, Any]) -> str:
     """Un scénario du catalogue ; un nom inconnu est une erreur de test."""
     if nom not in scenarios:
@@ -715,6 +890,11 @@ class Doublure:
         self.scenario_info = "nominale"
         self.scenario_sante = "ok"
         self.scenario_reponse = "nominale"
+        self.scenario_catalogue = "nominal"
+        self.cles_catalogue: list[str | None] = []
+        self.appels_catalogue: dict[str, int] = {}
+        #: Les recherches reçues : (q, limit, offset).
+        self.recherches: list[tuple[str, int, int]] = []
         self.corps_recus: list[dict[str, Any]] = []
         self.cles_recues: list[str | None] = []
         self.cles_sante: list[str | None] = []
@@ -727,7 +907,12 @@ class Doublure:
         info: str | None = None,
         sante: str | None = None,
         reponse: str | None = None,
+        catalogue: str | None = None,
     ) -> None:
+        if catalogue is not None:
+            if catalogue not in SCENARIOS_CATALOGUE:
+                raise KeyError(catalogue)
+            self.scenario_catalogue = catalogue
         if info is not None:
             self.scenario_info = connu(info, SCENARIOS_INFO)
         if sante is not None:
@@ -778,8 +963,13 @@ class Doublure:
                 info=demande.get("info"),
                 sante=demande.get("sante"),
                 reponse=demande.get("reponse"),
+                catalogue=demande.get("catalogue"),
             )
-            return {"info": self.scenario_info, "reponse": self.scenario_reponse}
+            return {
+                "info": self.scenario_info,
+                "reponse": self.scenario_reponse,
+                "catalogue": self.scenario_catalogue,
+            }
 
         @app.get("/_essai/ecarts")
         async def ecarts() -> list[str]:
@@ -812,7 +1002,77 @@ class Doublure:
             rendu = SCENARIOS_REPONSE[nom]()
             return await self._rendre("/v1/reponse", "post", nom, rendu)
 
+        self._creer_catalogue(app)
         return app
+
+    async def _rendre_catalogue(self, route: str, nom: str, rendu: Rendu) -> Response:
+        """Le corps d'un scénario du catalogue contre le contrat du 02 : un écart est
+        noté et rendu en 500 ; un corps hors contrat voulu y échappe."""
+        if rendu.brut is None:
+            schema = schema_catalogue(route, rendu.statut)
+            if schema is None:
+                ecart = f"{route} {rendu.statut} : statut absent du contrat du 02"
+            else:
+                erreurs = [
+                    e.message
+                    for e in validateur_catalogue(schema).iter_errors(rendu.corps)
+                ]
+                ecart = f"{route} ({nom}) : {erreurs[0]}" if erreurs else None
+            if ecart is not None:
+                self.ecarts.append(ecart)
+                return JSONResponse({"detail": "erreur"}, status_code=500)
+        if rendu.attente_s:
+            await asyncio.sleep(rendu.attente_s)
+        if rendu.brut is not None:
+            return Response(rendu.brut, status_code=rendu.statut)
+        return JSONResponse(rendu.corps, status_code=rendu.statut)
+
+    def _compter(self, route: str, request: Request) -> str | None:
+        self.appels_catalogue[route] = self.appels_catalogue.get(route, 0) + 1
+        cle = request.headers.get("X-API-Key")
+        self.cles_catalogue.append(cle)
+        return cle
+
+    def _creer_catalogue(self, app: FastAPI) -> None:
+        sans_cle = Rendu(401, {"detail": "Missing or invalid API key."})
+
+        @app.get("/live")
+        async def route_live() -> Response:
+            self.appels_catalogue["/live"] = self.appels_catalogue.get("/live", 0) + 1
+            return JSONResponse({"status": "ok", "db": "not_checked"})
+
+        @app.get("/series")
+        async def route_series(request: Request) -> Response:
+            nom = self.scenario_catalogue
+            if not self._compter("/series", request):
+                return await self._rendre_catalogue("/series", nom, sans_cle)
+            parametres = request.query_params
+            demande = (
+                parametres.get("q", ""),
+                int(parametres.get("limit", "20")),
+                int(parametres.get("offset", "0")),
+            )
+            self.recherches.append(demande)
+            rendu = recherche_catalogue(nom, *demande)
+            return await self._rendre_catalogue("/series", nom, rendu)
+
+        @app.get("/series/{series_id}")
+        async def route_serie(request: Request, series_id: int) -> Response:
+            nom = self.scenario_catalogue
+            route = "/series/{series_id}"
+            if not self._compter(route, request):
+                return await self._rendre_catalogue(route, nom, sans_cle)
+            return await self._rendre_catalogue(route, nom, fiche_selon(nom, series_id))
+
+        @app.get("/series/{series_id}/reviews")
+        async def route_critiques(request: Request, series_id: int) -> Response:
+            # Comptée pour prouver qu'elle n'est jamais appelée ; rendue conforme.
+            self._compter("/series/{series_id}/reviews", request)
+            vide = {"series_id": series_id, "total": 0, "limit": 50, "offset": 0}
+            rendu = Rendu(200, {**vide, "items": []})
+            return await self._rendre_catalogue(
+                "/series/{series_id}/reviews", "", rendu
+            )
 
 
 # L'application servie telle quelle (conteneur de l'essai Compose, port du bouclage).

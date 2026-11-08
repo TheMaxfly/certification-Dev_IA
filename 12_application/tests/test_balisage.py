@@ -17,7 +17,7 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup, Tag
 from conftest import ADRESSE_MEMOIRE, ENVIRONNEMENT, HACHEUR_RAPIDE, Navigateur
-from doublure_api import Doublure
+from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
 from ecrans import ECRANS, Ecran
 from fastapi.testclient import TestClient
 
@@ -55,7 +55,12 @@ def rendre(client: TestClient, ecran: Ecran) -> httpx.Response:
 def pages() -> Iterator[list[Page]]:
     """Chaque écran, rendu une fois : les tests relisent le HTML."""
     doublure = Doublure()
-    reglages = replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE)
+    charges = charger(ENVIRONNEMENT)
+    reglages = replace(
+        charges,
+        adresse_api=ADRESSE_MEMOIRE,
+        catalogue=replace(charges.catalogue, cle=CLE_CATALOGUE_ATTENDUE),
+    )
     transport = httpx.ASGITransport(app=doublure.app)
     avec_api = creer_application(reglages, transport=transport, hacheur=HACHEUR_RAPIDE)
     delais = replace(reglages.delais, connexion_s=0.05, reponse_s=0.05)
@@ -76,7 +81,9 @@ def pages() -> Iterator[list[Page]]:
         Navigateur(pressee, client=client_) as client_presse,
     ):
         for ecran in ECRANS:
-            doublure.choisir(info=ecran.info, reponse=ecran.reponse)
+            doublure.choisir(
+                info=ecran.info, reponse=ecran.reponse, catalogue=ecran.catalogue
+            )
             if ecran.neuve:
                 neuve = creer_application(
                     reglages, transport=transport, hacheur=HACHEUR_RAPIDE
@@ -113,6 +120,11 @@ def test_le_catalogue_couvre_chaque_cas_et_rend_ce_qui_est_attendu(pages):
     assert statuts["degrade_debit_depasse"] == 429
     assert statuts["degrade_base_indisponible"] == 503
     assert statuts["degrade_api_injoignable"] == statuts["degrade_delai"] == 503
+    assert statuts["catalogue"] == statuts["catalogue_resultats"] == 200
+    assert statuts["catalogue_vide"] == statuts["serie"] == statuts["serie_sans_note"]
+    assert statuts["catalogue_erreur_saisie"] == 422
+    assert statuts["catalogue_indisponible"] == 503
+    assert statuts["serie_introuvable"] == 404
     cle = next(p for p in pages if p.ecran.nom == "cle_refusee").soupe
     assert "refuse l'accès" in cle.get_text()
     assert not cle.select_one("button[type=submit]").has_attr("disabled")
@@ -174,7 +186,9 @@ def test_wcag_3_3_1_les_erreurs_de_champ_sont_liees(pages):
             for identifiant in lies:
                 assert page.soupe.select_one(f"#{identifiant}"), page.ecran.nom
             vues += 1
-    assert vues == 4, "question vide, question longue, profil, température"
+    assert vues == 5, (
+        "question vide, question longue, profil, température, saisie du catalogue"
+    )
     fautive = next(p for p in pages if p.ecran.nom == "erreur_temperature")
     assert fautive.soupe.select_one("fieldset")["aria-describedby"] == (
         "temperature-erreur"
@@ -370,3 +384,39 @@ def test_axe_est_vendu_avec_son_empreinte_et_sa_licence():
     assert "Mozilla Public License" in (ACCESSIBILITE / "LICENCE-axe").read_text(
         encoding="utf-8"
     )
+
+
+def test_wcag_1_3_1_2_4_8_la_pagination_du_catalogue_dit_la_page_courante(pages):
+    resultats = next(p for p in pages if p.ecran.nom == "catalogue_resultats").soupe
+    nav = resultats.select_one("main nav[aria-label]")
+
+    assert nav.select_one("[aria-current=page]").get_text() == "Page 2 sur 3"
+    assert {a.get_text() for a in nav.select("a")} == {
+        "Page précédente",
+        "Page suivante",
+    }
+    assert resultats.select_one("main form[role=search] label[for=q]") is not None
+
+
+def test_wcag_2_4_4_le_lien_vers_le_site_du_catalogue_se_dit_externe(pages):
+    for nom in ("serie", "serie_sans_note"):
+        fiche = next(p for p in pages if p.ecran.nom == nom).soupe
+        externes = [
+            a for a in fiche.select("main a") if a["href"].startswith("https://")
+        ]
+        assert externes, nom
+        for lien in externes:
+            assert "noopener" in lien["rel"], nom
+            assert "(site externe)" in lien.get_text(), nom
+
+
+def test_la_fiche_porte_ses_zones_nommees_pour_l_habillage(pages):
+    fiche = next(p for p in pages if p.ecran.nom == "serie").soupe
+    for zone in (
+        "zone-titre",
+        "zone-note",
+        "zone-critiques-reseau",
+        "zone-listes",
+        "zone-synopsis",
+    ):
+        assert len(fiche.select(f"section.{zone}")) == 1, zone

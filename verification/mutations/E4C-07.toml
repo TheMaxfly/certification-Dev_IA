@@ -1,0 +1,7 @@
+id = "E4C-07"
+origine = "E4, lot 2a, spec 02 (2026-11-08) — le client demanderait les critiques collectées (/reviews), qui portent des pseudonymes de lecteurs"
+fichier = "12_application/src/application/client_catalogue.py"
+avant = '''        reponse = await self._appeler(f"{ROUTE_RECHERCHE}/{series_id}", "serie")'''
+apres = '''        reponse = await self._appeler(f"{ROUTE_RECHERCHE}/{series_id}/reviews", "serie")'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_catalogue.py", "-k", "jamais_demandees"]

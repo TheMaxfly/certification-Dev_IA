@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titre %}{{ titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ titre }}</h1>
+<section class="zone-titre" aria-label="{{ t.serie_metadonnees }}">
+<dl>
+{% for nom, valeur in metadonnees %}
+<dt>{{ nom }}</dt>
+<dd>{{ valeur }}</dd>
+{% endfor %}
+</dl>
+<p><small>{{ t.serie_type }} : {{ fiche.type or t.valeur_inconnue }} · {{ t.serie_annee }} : {{ fiche.year or t.valeur_inconnue }}</small></p>
+</section>
+<section class="zone-note" aria-label="{{ t.serie_note_etiquette }}">
+<p>{% if note %}{{ note }}{% else %}{{ t.serie_sans_note }}{% endif %}</p>
+</section>
+<section class="zone-critiques-reseau" aria-labelledby="reseau-titre">
+<h2 id="reseau-titre">{{ t.serie_reseau_titre }}</h2>
+<p>{{ t.serie_reseau_vide }}</p>
+</section>
+<section class="zone-listes" aria-labelledby="listes-titre">
+<h2 id="listes-titre">{{ t.serie_listes_titre }}</h2>
+<p>{{ t.serie_listes }}</p>
+</section>
+<section class="zone-synopsis" aria-labelledby="synopsis-titre">
+<h2 id="synopsis-titre">{{ t.serie_synopsis_titre }}</h2>
+<p>{{ fiche.synopsis_enriched or t.serie_sans_synopsis }}</p>
+{% if fiche.genres_source %}
+<h3>{{ t.serie_genres_titre }}</h3>
+<ul>
+{% for genre in fiche.genres_source %}
+<li>{{ genre }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</section>
+{% if lien_catalogue %}
+<p><a href="{{ lien_catalogue }}" rel="noopener noreferrer">{{ t.serie_lien_catalogue }}</a></p>
+{% endif %}
+<p><a href="/catalogue">{{ t.serie_retour_catalogue }}</a></p>
+{% endblock %}

@@ -38,6 +38,8 @@ class Ecran:
     delai_court: bool = False
     #: La case « Mode démonstration », cochée dans le formulaire envoyé.
     demonstration: bool = False
+    #: Le scénario du catalogue (l'API data du 02) dans la doublure.
+    catalogue: str = "nominal"
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -95,4 +97,21 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("a_propos", chemin="/a-propos"),
     Ecran("a_propos_sans_api", chemin="/a-propos", api_fermee=True),
     Ecran("page_404", chemin="/route-inconnue"),
+    # E4, lot 2a : le catalogue et la fiche de série.
+    Ecran("catalogue", chemin="/catalogue"),
+    Ecran(
+        "catalogue_resultats",
+        chemin="/catalogue?q=factice&page=2",
+        catalogue="plusieurs_pages",
+    ),
+    Ecran("catalogue_vide", chemin="/catalogue?q=zz", catalogue="vide"),
+    Ecran("catalogue_erreur_saisie", chemin="/catalogue?q=a"),
+    Ecran(
+        "catalogue_indisponible",
+        chemin="/catalogue?q=factice",
+        catalogue="indisponible",
+    ),
+    Ecran("serie", chemin="/series/101"),
+    Ecran("serie_sans_note", chemin="/series/101", catalogue="serie_sans_note"),
+    Ecran("serie_introuvable", chemin="/series/101", catalogue="serie_inconnue"),
 )

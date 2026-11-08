@@ -30,7 +30,7 @@ import httpx
 import psycopg
 import pytest
 from conftest import HACHEUR_RAPIDE, ServeurLocal
-from doublure_api import Doublure
+from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
 from ecrans import ECRANS, Ecran
 
 from application.app import creer_application
@@ -242,7 +242,13 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
 
     def adresse_de(reglee: str, **delais: float) -> Any:
         reduits = replace(reglages.delais, **delais)
-        return creer_application(replace(reglages, adresse_api=reglee, delais=reduits))
+        # Le catalogue (E4, lot 2a) : servi par la même doublure, sous sa clé.
+        catalogue = replace(
+            reglages.catalogue, adresse=adresse_doublure, cle=CLE_CATALOGUE_ATTENDUE
+        )
+        return creer_application(
+            replace(reglages, adresse_api=reglee, delais=reduits, catalogue=catalogue)
+        )
 
     with (
         ServeurLocal(doublure.app) as adresse_doublure,
@@ -268,7 +274,11 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
         for ecran in ECRANS:
             httpx.post(
                 f"{adresse_doublure}/_essai/scenario",
-                json={"info": ecran.info, "reponse": ecran.reponse},
+                json={
+                    "info": ecran.info,
+                    "reponse": ecran.reponse,
+                    "catalogue": ecran.catalogue,
+                },
             ).raise_for_status()
             page = contexte.new_page()
             page.on(

@@ -16,6 +16,7 @@
 <nav aria-label="{{ t.menu_etiquette }}">
 <ul>
 <li><a href="/">{{ t.menu_conseiller }}</a></li>
+<li><a href="/catalogue">{{ t.menu_catalogue }}</a></li>
 {% if compte %}
 <li><a href="/compte/mot-de-passe">{{ t.menu_mon_compte }}</a></li>
 {% if compte.role in ("libraire", "admin") %}

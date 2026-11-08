@@ -1,0 +1,7 @@
+id = "E4C-06"
+origine = "E4, lot 2a, spec 02 (2026-11-08) — un catalogue indisponible deviendrait une erreur 500 au lieu de l'encart nommé et du 503"
+fichier = "12_application/src/application/pages_catalogue.py"
+avant = '''            return indisponible(request, exc.motif, q)'''
+apres = '''            raise'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_catalogue.py", "-k", "encart_503"]

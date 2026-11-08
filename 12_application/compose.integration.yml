@@ -1,7 +1,8 @@
 # L'essai d'intégration de `make verify MODULE=12`, sur le poste comme sur GitHub :
 # l'image de l'application, construite, non root, contre la doublure de l'API,
 # conteneurisée. Aucune API réelle, aucun fournisseur, aucune base ; réseau sans sortie.
-# La clé est jetable, et courte : la doublure ne la juge pas.
+# Les clés sont jetables, et courtes : la doublure ne les juge pas ; elle sert aussi le
+# catalogue (l'API data du 02), sous son contrat.
 
 name: application-integration
 
@@ -38,6 +39,8 @@ services:
     environment:
       APPLICATION_CLE_API: cle-jetable-essai
       API_MODELE_ADRESSE: http://doublure:8010
+      APPLICATION_CLE_CATALOGUE: cle-catalogue-jetable
+      CATALOGUE_ADRESSE: http://doublure:8010
       # L'essai lit /metrics depuis son conteneur : le réseau de l'essai est admis.
       APPLICATION_METRIQUES_RESEAUX: 0.0.0.0/0
     networks: [essai]

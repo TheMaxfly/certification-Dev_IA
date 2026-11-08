@@ -1,0 +1,7 @@
+id = "E4C-05"
+origine = "E4, lot 2a, spec 02 (2026-11-08) — la clé du catalogue retirée du client : l'appel partirait sans X-API-Key"
+fichier = "12_application/src/application/client_catalogue.py"
+avant = '''                    headers=self._entetes,'''
+apres = '''                    headers=None,'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_catalogue.py", "-k", "porte_la_cle"]

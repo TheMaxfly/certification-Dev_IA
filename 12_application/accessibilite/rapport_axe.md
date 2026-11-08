@@ -3,7 +3,7 @@
 - **Date** : 2026-11-08.
 - **Outil** : axe-core 4.14.0, dans Chromium 156.0.8078.4.
 - **Niveau visé** : WCAG 2.1 AA (étiquettes : wcag2a, wcag2aa, wcag21a, wcag21aa, best-practice).
-- **Pages auditées** : 80, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
+- **Pages auditées** : 88, chaque écran et chaque cas dégradé, servis contre la doublure de l'API ; politique de sécurité du contenu active, `<details>` ouverts, formulaire soumis dans le navigateur.
 - **Violations par gravité** : critical 0, serious 0, moderate 0, minor 0.
 - **Violations de la politique de sécurité en console** : 0.
 
@@ -15,7 +15,7 @@ Aucun.
 
 ## À revoir à la main
 
-- `color-contrast`, sur `#ancien`, `#filtre-role`, `#mode`, `#profil`, `#pseudo`, `#question`, `#role` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
+- `color-contrast`, sur `#ancien`, `#filtre-role`, `#mode`, `#profil`, `#pseudo`, `#q`, `#q-aide`, `#question`, `#role` : le chevron d'une liste déroulante ou l'icône d'un champ invalide est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces champs est fixé par `theme.css`, et son contraste calculé par un test (`test_wcag_1_4_3_…`). À relire à l'œil.
 
 ## Par page
 
@@ -29,6 +29,11 @@ Aucun.
 | `admin_seconde_page_et_avis` | 47 | 0 | 1 | 43 |
 | `api_indisponible` | 35 | 0 | 0 | 55 |
 | `aucun_profil` | 35 | 0 | 0 | 55 |
+| `catalogue` | 38 | 0 | 1 | 52 |
+| `catalogue_erreur_saisie` | 38 | 0 | 1 | 52 |
+| `catalogue_indisponible` | 39 | 0 | 1 | 51 |
+| `catalogue_resultats` | 38 | 0 | 1 | 52 |
+| `catalogue_vide` | 38 | 0 | 1 | 52 |
 | `cle_refusee` | 35 | 0 | 0 | 55 |
 | `comptes_indisponibles` | 30 | 0 | 0 | 60 |
 | `connexion` | 35 | 0 | 0 | 55 |
@@ -101,3 +106,6 @@ Aucun.
 | `reponse_refus_debit` | 40 | 0 | 1 | 50 |
 | `reponse_sans_passage` | 39 | 0 | 1 | 51 |
 | `reponse_titres` | 40 | 0 | 1 | 50 |
+| `serie` | 33 | 0 | 0 | 57 |
+| `serie_introuvable` | 30 | 0 | 0 | 60 |
+| `serie_sans_note` | 33 | 0 | 0 | 57 |
