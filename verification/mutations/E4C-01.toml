@@ -4,4 +4,4 @@ fichier = "02_api_manga/app/recherche.py"
 avant = '''    forme = normaliser(saisie)'''
 apres = '''    forme = saisie'''
 dossier = "02_api_manga"
-commande = ["uv", "run", "--locked", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "parametres_lies"]
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "parametres_lies"]
