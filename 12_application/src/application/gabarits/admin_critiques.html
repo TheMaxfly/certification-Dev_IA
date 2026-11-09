@@ -2,6 +2,7 @@
 {% import "composants/champ.html" as c %}
 {% block titre %}{{ t.admin_critiques_titre }}{% endblock %}
 {% block contenu %}
+{% include "composants/onglets_admin.html" %}
 <h1>{{ t.admin_critiques_titre }}</h1>
 {% if avis %}
 {{ c.avis(avis, focus == "avis") }}

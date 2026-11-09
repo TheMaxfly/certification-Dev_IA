@@ -4,6 +4,14 @@
 {% import "composants/listes.html" as l %}
 {% block contenu %}
 <h1>{{ t.titre_application }}</h1>
+{% if profil_actif_indisponible %}
+<article class="zone-profil-actif-indisponible">
+<div role="status">
+<h2>{{ t.profil_actif_indisponible_titre }}</h2>
+<p>{{ profil_actif_indisponible }} <a href="/admin/reglages">{{ t.profil_actif_indisponible_lien }}</a></p>
+</div>
+</article>
+{% endif %}
 {% if avis %}
 {{ c.avis(avis, true) }}
 {% endif %}

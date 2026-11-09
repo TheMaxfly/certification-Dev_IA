@@ -1,0 +1,11 @@
+{# La barre d'onglets de l'administration (E4, lot 5) : des liens, la page courante dite par
+   aria-current ; les onglets viennent des routes enregistrées (`pages_admin.onglets`). #}
+{% if onglets %}
+<nav class="onglets" aria-label="{{ t.menu_administration }}">
+<ul>
+{% for onglet in onglets %}
+<li><a href="{{ onglet.chemin }}"{% if onglet.courant %} aria-current="page"{% endif %}>{{ onglet.libelle }}</a></li>
+{% endfor %}
+</ul>
+</nav>
+{% endif %}

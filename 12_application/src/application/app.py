@@ -36,12 +36,14 @@ from application import (
     couts,
     historique,
     journal,
+    pages_admin,
     pages_catalogue,
     pages_comptes,
     pages_critiques,
     pages_listes,
     presentation,
     quotas,
+    reglages_app,
     sessions,
 )
 from application.base import Base, BaseIndisponible
@@ -241,6 +243,15 @@ def creer_application(
             "t": t,
             "pied": presentation.pied_de_page(vue.etat, vue.info, reglages),
             "compte": compte,
+            # La barre de l'administration (E4, lot 5) : ses pages seulement.
+            "onglets": (
+                pages_admin.onglets(request.app, request.url.path, t)
+                if request is not None
+                and compte is not None
+                and compte.role == "admin"
+                and request.url.path.startswith("/admin/")
+                else []
+            ),
             "connecte": (
                 presentation.dire(t, "menu_connecte", nom=compte.nom_affiche)
                 if compte is not None
@@ -352,6 +363,36 @@ def creer_application(
     app.add_exception_handler(BaseIndisponible, comptes_indisponibles)
     app.mount("/statique", StaticFiles(directory=STATIQUE), name="statique")
 
+    async def profil_regle(request: Request) -> str | None:
+        """Le profil actif réglé par l'administrateur (E4, lot 5, D12), relu en base à
+        chaque requête — une fois par requête, aucun cache au-delà. None : aucun
+        réglage, ou la base ne répond pas (la question part avec le défaut de l'API :
+        décision 11 du lot 1). Un réglage qui n'est plus proposé se journalise ; la
+        jauge du profil actif suit ce qui part."""
+        if hasattr(request.state, "profil_regle"):
+            return request.state.profil_regle
+        regle: str | None = None
+        base: Base = request.app.state.base
+        if base.configuree:
+            try:
+                lu = await reglages_app.lire(base, "profil_actif")
+            except BaseIndisponible:
+                journal.evenement_requete(request, "profil_actif_non_lu")
+            else:
+                regle = None if lu is None else lu.valeur
+        request.state.profil_regle = regle
+        info = vue.info
+        if info is not None:
+            if presentation.regle_indisponible(info, reglages, regle):
+                journal.evenement_requete(
+                    request, "profil_actif_indisponible", {"profil": regle}
+                )
+            metriques.profil_actif(
+                presentation.profil_par_defaut(info, reglages, regle),
+                [p.nom for p in info.modele_langage.profils],
+            )
+        return regle
+
     def page_principale(
         request: Request,
         statut: int = 200,
@@ -367,7 +408,16 @@ def creer_application(
         info = vue.info
         limites = vue.limites()
         f = formulaire or Formulaire()
-        droits = droits_de(getattr(request.state, "compte", None))
+        compte = getattr(request.state, "compte", None)
+        droits = droits_de(compte)
+        regle: str | None = getattr(request.state, "profil_regle", None)
+        # L'encart du profil actif devenu indisponible : une session admin seulement.
+        indisponible = (
+            compte is not None
+            and compte.role == "admin"
+            and info is not None
+            and presentation.regle_indisponible(info, reglages, regle)
+        )
         reponse = gabarits.TemplateResponse(
             request,
             "index.html",
@@ -376,12 +426,12 @@ def creer_application(
                 peut_regler=droits.regler,
                 peut_demontrer=droits.demontrer,
                 peut_choisir_mode=droits.choisir_mode,
-                etat=presentation.etat_du_service(vue.etat, info, reglages),
+                etat=presentation.etat_du_service(vue.etat, info, reglages, regle),
                 info_connue=info is not None,
                 options=(
                     []
                     if info is None
-                    else presentation.options_profils(info, reglages, f.profil)
+                    else presentation.options_profils(info, reglages, f.profil, regle)
                 ),
                 positions=presentation.positions_proposees(info, reglages),
                 temperature=(
@@ -418,6 +468,16 @@ def creer_application(
                 cloture=cloture,
                 avis=avis,
                 zones_cartes=zones_cartes or {},
+                profil_actif_indisponible=(
+                    presentation.dire(
+                        t,
+                        "profil_actif_indisponible",
+                        profil=regle,
+                        defaut=presentation.profil_par_defaut(info, reglages),
+                    )
+                    if indisponible and info is not None
+                    else None
+                ),
             ),
             status_code=statut,
         )
@@ -449,6 +509,7 @@ def creer_application(
     async def accueil(request: Request) -> Response:
         await sessions.page(request)
         await vue.rafraichir()
+        await profil_regle(request)
         question = await question_pre_remplie(request)
         # E4, lot 4 : après la suppression du compte, l'avis à l'accueil (PRG).
         supprime = request.query_params.get("etat") == "compte_supprime"
@@ -459,7 +520,7 @@ def creer_application(
         )
 
     def lire_formulaire(
-        donnees: FormData, compte: Compte | None
+        donnees: FormData, compte: Compte | None, regle: str | None = None
     ) -> tuple[Formulaire, str | None, str | None]:
         """Les champs, et l'erreur de formulaire : (formulaire, champ, message).
 
@@ -467,7 +528,8 @@ def creer_application(
         visiteur ou un client ne règle ni le profil, ni la température, ni la
         reformulation, ni le mode, ni le mode démonstration — un champ forgé dans son
         `POST` est ignoré, sans erreur ; la demande part avec les défauts, en strict. Un
-        libraire n'a pas le mode démonstration."""
+        libraire n'a pas le mode démonstration. Le profil par défaut est le profil actif
+        de l'application (`regle`, E4, lot 5) s'il est proposé, celui de l'API sinon."""
         limites = vue.limites()
         droits = droits_de(compte)
         question = champ(donnees, "question").replace("\r\n", "\n").strip()
@@ -507,7 +569,11 @@ def creer_application(
         if vue.info is not None:
             noms = [p.nom for p in presentation.profils_proposes(vue.info, reglages)]
             # Sans champ (page rendue sans liste) : le défaut, jamais un profil exclu.
-            profil = profil or presentation.profil_par_defaut(vue.info, reglages) or ""
+            profil = (
+                profil
+                or presentation.profil_par_defaut(vue.info, reglages, regle)
+                or ""
+            )
             lu = replace(lu, profil=profil or None)
             if profil not in noms:
                 return lu, "profil", t["erreur_profil"]
@@ -642,6 +708,7 @@ def creer_application(
         sessions.exiger_jeton(request, champ(donnees, sessions.CHAMP_JETON))
         compte = await sessions.page(request)
         await vue.rafraichir()
+        regle = await profil_regle(request)
         limites = vue.limites()
         try:
             tours = historique.lire(champ(donnees, "historique"), limites)
@@ -661,7 +728,7 @@ def creer_application(
             encart = presentation.Encart(texte, 200, nouvelle_conversation=True)
             return page_principale(request, encart=encart)
 
-        lu, fautif, message = lire_formulaire(donnees, compte)
+        lu, fautif, message = lire_formulaire(donnees, compte, regle)
         if fautif is not None:
             f = replace(lu, champ_fautif=fautif, erreur=message)
             return page_principale(request, 422, formulaire=f, tours=tours)
@@ -774,12 +841,13 @@ def creer_application(
     async def a_propos(request: Request) -> Response:
         await sessions.page(request)
         await vue.rafraichir()
+        regle = await profil_regle(request)
         return gabarits.TemplateResponse(
             request,
             "a_propos.html",
             contexte(
                 request,
-                lignes=presentation.lignes_a_propos(vue.info, reglages),
+                lignes=presentation.lignes_a_propos(vue.info, reglages, regle),
                 info_connue=vue.info is not None,
                 apropos_comptes=presentation.dire(
                     t,
@@ -806,13 +874,22 @@ def creer_application(
             etat_catalogue = "non_configure"
         else:
             etat_catalogue = "ok" if await catalogue.sante() else "indisponible"
+        etat_base = await base.sonder() if base.configuree else base.etat
+        # Le profil actif de l'application (E4, lot 5) : celui que l'administrateur a
+        # réglé, s'il s'applique ; `defaut` sinon (aucun réglage, base absente, ou un
+        # profil que le dernier `/v1/info` ne propose plus).
+        regle = await profil_regle(request) if etat_base == "ok" else None
+        applique = regle is not None and not presentation.regle_indisponible(
+            vue.info, reglages, regle
+        )
         return JSONResponse(
             {
                 "application": "ok",
                 "api": "ok" if api_ok else "indisponible",
-                "base": await base.sonder() if base.configuree else base.etat,
+                "base": etat_base,
                 "catalogue": etat_catalogue,
                 "cles_api": "une" if reglages.cle_api_comptes is None else "deux",
+                "profil_actif": regle if applique else "defaut",
                 "version": __version__,
             }
         )
@@ -829,6 +906,7 @@ def creer_application(
     pages_catalogue.installer(app, reglages, rendre, catalogue)
     pages_critiques.installer(app, reglages, rendre, catalogue, metriques)
     pages_listes.installer(app, reglages, rendre, catalogue, metriques)
+    pages_admin.installer(app, reglages, rendre, vue, metriques)
 
     app.state.vue = vue
     app.state.metriques = metriques

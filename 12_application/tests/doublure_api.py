@@ -691,6 +691,22 @@ SCENARIOS_INFO: dict[str, Callable[[], Rendu]] = {
             ]
         ),
     ),
+    # E4, lot 5 : la page du profil actif — un profil proposé de chaque fournisseur, un
+    # exclu par la configuration (mistral-large-4), un indisponible (gpt-6-sol).
+    "administration": lambda: Rendu(
+        200,
+        info(
+            [
+                profil("mistral-large-2512"),
+                profil("mistral-large-4", statut="apercu"),
+                profil("gpt-6-luna", "openai"),
+                profil("gpt-6-sol", "openai", disponible=False),
+            ]
+        ),
+    ),
+    # E4, lot 5 : l'API répond, mais en erreur — l'état « ko » des pages
+    # d'administration.
+    "erreur_interne": lambda: Rendu(500, erreur("erreur_interne")),
     "aucun_profil": lambda: Rendu(
         200, info([profil("mistral-large-4", statut="apercu")], actif="mistral-large-4")
     ),

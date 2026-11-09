@@ -1,0 +1,7 @@
+id = "E4A-02"
+origine = "E4, lot 5, spec 01 (2026-11-09) — un profil hors de la liste proposée est accepté et écrit comme profil actif"
+fichier = "12_application/src/application/pages_admin.py"
+avant = '''        if profil not in noms:'''
+apres = '''        if not profil:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_admin_reglages.py", "-k", "hors_liste"]

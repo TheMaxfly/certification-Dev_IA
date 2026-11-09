@@ -159,7 +159,28 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("serie_listes_visiteur", chemin="/series/101"),
     Ecran("serie_listes_client", chemin="/series/102", role="client"),
     Ecran("reponse_cartes_client", question=QUESTION, role="client"),
+    # E4, lot 5 : l'administration. La base de ces écrans porte le réglage
+    # `profil_actif = mistral-large-2512` (`REGLAGE_ECRANS`) : le scénario
+    # `actif_indisponible` le rend indisponible, l'encart paraît.
+    Ecran(
+        "admin_reglages", chemin="/admin/reglages", info="administration", role="admin"
+    ),
+    Ecran(
+        "admin_reglages_indisponible",
+        chemin="/admin/reglages",
+        info="actif_indisponible",
+        role="admin",
+    ),
+    Ecran(
+        "admin_reglages_api_absente",
+        chemin="/admin/reglages",
+        info="erreur_interne",
+        role="admin",
+    ),
 )
+#: Le réglage posé dans la base des écrans d'un rôle (E4, lot 5) : le profil actif de
+#: l'application, égal au défaut de l'API — aucun autre écran n'en change.
+REGLAGE_ECRANS = ("profil_actif", "mistral-large-2512")
 
 #: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le
 #: premier passage la dépasse.

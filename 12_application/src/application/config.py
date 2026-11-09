@@ -97,7 +97,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
             " erreur_comptes_titre erreur_comptes_texte"
             " menu_etiquette menu_conseiller menu_mon_compte menu_critiques"
-            " menu_comptes"
+            " menu_administration"
             " menu_connexion menu_inscription menu_deconnexion champ_pseudo"
             " champ_mot_de_passe champ_confirmation champ_ancien champ_nouveau"
             " champ_nom_affiche champ_role champ_mot_de_passe_initial"
@@ -127,8 +127,17 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " serie_listes_titre serie_synopsis_titre"
             " serie_sans_synopsis serie_genres_titre serie_lien_catalogue"
             " serie_retour_catalogue"
+            # E4, lot 5 : l'administration — onglets, profil actif.
+            " onglet_comptes onglet_moderation onglet_reglages onglet_cles"
+            " onglet_couts onglet_services admin_reglages_titre admin_reglages_intro"
+            " admin_reglages_legende admin_reglages_bouton admin_reglages_defaut"
+            " admin_reglages_statut_stable admin_reglages_statut_apercu"
+            " admin_reglages_indisponibles_titre admin_reglages_indisponibles_aide"
+            " admin_reglages_api_absente_titre admin_reglages_api_absente"
+            " admin_reglages_actuel_aucun admin_reglages_erreur"
+            " profil_actif_indisponible_titre profil_actif_indisponible_lien"
             # E4, lot 3 : les critiques signées.
-            " menu_moderation critiques_l5 critiques_vide critiques_vers_catalogue"
+            " critiques_l5 critiques_vide critiques_vers_catalogue"
             " critiques_colonne_serie critiques_colonne_tome critiques_colonne_note"
             " critiques_colonne_label critiques_colonne_statut"
             " critiques_colonne_dates critiques_colonne_action critiques_serie_entiere"
@@ -266,6 +275,17 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "liste_ajoutee_le": frozenset({"date"}),
     "serie_listes_etat": frozenset({"liste"}),
     "carte_listes_groupe": frozenset({"titre"}),
+    "admin_reglages_option": frozenset(
+        {"nom", "fournisseur", "hebergement", "modele", "statut"}
+    ),
+    "admin_reglages_choisi": frozenset({"nom", "date"}),
+    "admin_reglages_choisi_anonyme": frozenset({"date"}),
+    "admin_reglages_aucun": frozenset({"profil"}),
+    "admin_reglages_exclus": frozenset({"n"}),
+    "admin_reglages_actuel": frozenset({"profil"}),
+    "admin_reglages_avis_applique": frozenset({"profil"}),
+    "admin_reglages_avis_inchange": frozenset({"profil"}),
+    "profil_actif_indisponible": frozenset({"profil", "defaut"}),
 }
 
 

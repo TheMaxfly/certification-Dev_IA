@@ -420,6 +420,13 @@ listes, journal des actions, coûts du modèle de langage, réglages — dans un
 | `manga`, `bench`, `staging`, `public` | **rien**, pas même en lecture : aucune table, aucune colonne, aucune séquence (restent, comme pour tout rôle, ce que `PUBLIC` a par défaut : l'usage du schéma `public` et `TEMP` sur la base) |
 | objets créés plus tard | **rien** — aucun `ALTER DEFAULT PRIVILEGES` |
 
+`application.reglages` : une ligne par réglage que l'administrateur change, sa clé dans une
+liste fermée du code de l'application. E4, lot 5 : **`profil_actif`** — le nom du profil IA
+qui part avec chaque question (lu à chaque question, appliqué s'il est disponible et non
+exclu dans `/v1/info`) ; chaque changement écrit `profil_actif_change` au journal des actions
+(`objet_type = 'reglage'`, `details = {"profil": …}`). Pas de `DELETE` : un réglage se
+remplace.
+
 - **Aucune clé étrangère vers le catalogue** : `series_id` est l'identifiant du catalogue,
   validé par l'API data du module 02 au moment de l'écriture ; le schéma `application` ne
   dépend pas des instantanés du catalogue, qui se rechargent.

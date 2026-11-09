@@ -161,6 +161,14 @@ class Metriques:
         for mode in MODES_QUESTION:
             for issue in ISSUES_QUESTION:
                 self.questions.labels(mode=mode, issue=issue)
+        self.profil_actif_info = Gauge(
+            "application_profil_actif_info",
+            "Le profil IA actif de l'application (E4, lot 5) : 1 sur le profil qui part"
+            " avec une question sans choix, 0 sur les autres profils de /v1/info ;"
+            " rafraîchie à chaque lecture du réglage.",
+            ["profil"],
+            registry=self.registre,
+        )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
@@ -180,6 +188,11 @@ class Metriques:
     def etat_plafond(self, etat: str) -> None:
         for possible in ETATS_PLAFOND:
             self.plafond_cout.labels(etat=possible).set(1 if possible == etat else 0)
+
+    def profil_actif(self, actif: str | None, profils: Iterable[str]) -> None:
+        """1 sur le profil actif, 0 sur les autres profils connus de `/v1/info`."""
+        for nom in profils:
+            self.profil_actif_info.labels(profil=nom).set(1 if nom == actif else 0)
 
     def exposer(self) -> tuple[bytes, str]:
         return generate_latest(self.registre), CONTENT_TYPE_LATEST

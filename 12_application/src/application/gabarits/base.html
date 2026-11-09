@@ -26,8 +26,7 @@
 <li><a href="/libraire/critiques">{{ t.menu_critiques }}</a></li>
 {% endif %}
 {% if compte.role == "admin" %}
-<li><a href="/admin/comptes">{{ t.menu_comptes }}</a></li>
-<li><a href="/admin/critiques">{{ t.menu_moderation }}</a></li>
+<li><a href="/admin/comptes">{{ t.menu_administration }}</a></li>
 {% endif %}
 <li>{{ connecte }}</li>
 <li><form method="post" action="/deconnexion"><input type="hidden" name="jeton" value="{{ jeton }}"><button>{{ t.menu_deconnexion }}</button></form></li>

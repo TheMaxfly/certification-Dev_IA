@@ -180,7 +180,7 @@ Pour un libraire ou l'administrateur (« Le conseiller selon le rôle »).
 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
-| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
+| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le **profil actif de l'application**, choisi par l'administration (E4, lot 5) ; sans réglage, ou réglé sur un profil qui n'est plus proposé : le profil actif de l'API ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
 | Mode démonstration | administrateur seul ; coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
@@ -406,6 +406,47 @@ physiquement et immédiatement.
   compte supprimé n'est pas une inscription de plus). Métrique :
   `application_comptes_supprimes_total`.
 
+### L'administration (E4, lot 5)
+
+Toutes les pages `/admin/*` exigent le rôle **administrateur** : un autre rôle reçoit 403,
+un visiteur la page de connexion (`GET`) ou 401 (`POST`) ; chaque `POST` porte son jeton.
+Elles partagent une **barre d'onglets** (`nav.onglets`, `aria-label` « Administration »),
+dans cet ordre : Comptes · Modération · Réglages · Clés · Coûts · Services. La barre est
+construite à partir des **routes enregistrées** (`pages_admin.ONGLETS`, filtrée) : un onglet
+n'apparaît que si sa page existe ; la page courante porte `aria-current="page"`. Le menu
+principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
+
+**Le profil IA actif** (`/admin/reglages`, story A2, décision D12) :
+
+- **où il est gardé** : la clé `profil_actif` de la table `application.reglages` (027), une
+  ligne, sa valeur, son auteur (`modifie_par`) et sa date. Un réglage se **remplace**, il ne
+  s'efface pas (`app_rw` n'a pas `DELETE`) ; les clés écrites forment une liste fermée dans
+  le code (`reglages_app.CLES`), jamais une clé venue d'un formulaire ;
+- **ce que la page propose** : les profils de `/v1/info` **disponibles et non exclus**
+  (fournisseur, hébergement, modèle, statut `stable` / `aperçu`), un bouton radio chacun ;
+  l'actif coché — sans réglage, le défaut, dit « défaut de l'application » ; qui l'a choisi
+  (nom affiché) et quand ; les indisponibles **à part, sans bouton** ; les exclus **comptés,
+  jamais nommés** (l'exclusion est une décision du dépôt, `[reglages] profils_exclus`).
+  Le choix est **validé contre cette liste** avant toute écriture (hors liste : 422, rien
+  d'écrit) ; l'API injoignable : un encart et la valeur enregistrée, sans formulaire ;
+- **quand il est lu** : **à chaque question** (une lecture par requête, aucun cache au-delà),
+  et à chaque page du conseiller ; il part avec **toute** question — celle du public, qui n'a
+  pas de réglages, et, présélectionné, celle d'un libraire ou de l'administration, qui
+  **gardent leur liste** : le choix par question reste un geste de démonstration (lot 2b) et
+  ne modifie jamais le réglage. L'état du service, la page « à propos » et `/sante`
+  (`profil_actif: <nom> | defaut`) nomment le profil actif de l'application ;
+- **s'il devient indisponible** (l'API le dit à `/v1/info`) : la question part avec le
+  **défaut de l'API** ; un encart nommé paraît sur `/admin/reglages` et sur la page du
+  conseiller **d'une session administrateur seulement** ; l'événement
+  `profil_actif_indisponible` entre au journal applicatif ; le réglage **n'est pas effacé** :
+  il s'applique de nouveau quand le profil revient. Base injoignable pendant une question :
+  le défaut, l'événement `profil_actif_non_lu`, et le conseiller répond (décision 11) ;
+- **le journal** : chaque changement écrit, dans la même transaction, une ligne
+  `profil_actif_change` (`objet_type = 'reglage'`, `details = {"profil": "<nom>"}` — un nom
+  de profil, ni texte libre ni secret) ; la même valeur qu'avant n'écrit rien ;
+- **la métrique** : `application_profil_actif_info{profil}`, 1 sur le profil actif, 0 sur les
+  autres profils de `/v1/info`, rafraîchie à chaque lecture.
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -423,8 +464,9 @@ Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, ave
 **Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
 Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
 client — Conseiller, Mes listes (E4, lot 4), Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
-en plus, Mes critiques ; administrateur — en plus, Comptes et Critiques (la modération ;
-pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
+en plus, Mes critiques ; administrateur — en plus, **une seule entrée « Administration »**
+(`/admin/comptes`, E4, lot 5 : elle remplace « Comptes » et « Critiques » ; les pages de
+l'administration ont leur barre d'onglets ; pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
 dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
 
 **Le premier administrateur**, par une commande : `make app-admin-creer`, avec
@@ -587,6 +629,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
+| Contrôle d'accès (A01) : l'administration | **toute page `/admin/*` exige le rôle admin** (`sessions.exiger_role("admin")`, en `GET` comme en `POST`) : un client, un libraire reçoivent 403, un visiteur la connexion ; le profil choisi est validé contre la liste de `/v1/info` avant d'être écrit ; mutations E4A-02 (profil hors liste), **E4A-03** (garde de rôle retirée) |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
 | Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
 | Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |

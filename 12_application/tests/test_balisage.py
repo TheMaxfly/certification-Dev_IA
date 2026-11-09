@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
 from bs4 import BeautifulSoup, Tag
 from conftest import (
@@ -29,7 +30,7 @@ from conftest import (
     harnais,
 )
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, Ecran
+from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, REGLAGE_ECRANS, Ecran
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -101,6 +102,11 @@ def base_balisage(conteneur, gabarit, fichier_pgpass) -> Iterator[str]:
         pytest.MonkeyPatch.context() as patch,
     ):
         patch.setenv("PGPASSFILE", str(fichier_pgpass))
+        with psycopg.connect(dsn) as cx:
+            cx.execute(
+                "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)",
+                REGLAGE_ECRANS,
+            )
         yield dsn_du_role(dsn)
 
 
