@@ -22,11 +22,13 @@ API_KEY_LABEL_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 API_KEY_MIN_LENGTH = 32
 
 # Le seuil de ressemblance des suggestions de la recherche (« Vouliez-vous dire… ? »,
-# E4, lot 2b) : SEARCH_SIMILARITY_THRESHOLD. Choisi sur la mesure du 2026-11-08, sur le
-# jeu de saisies fautives (`tests/fixtures/saisies_fautives.tsv`) : aucun seuil ne garde
-# 90 % de rappel sur les 20 fautes de frappe (80 % de 0,2 à 0,4) ; la règle dit alors
-# 0,3, la mesure à côté (README).
-SEUIL_RESSEMBLANCE_DEFAUT = 0.3
+# E4, lot 2b) : SEARCH_SIMILARITY_THRESHOLD. Choisi sur la mesure du 2026-11-09 (seconde
+# mesure, E4, lot 4), sur le jeu de saisies fautives complété de 10 saisies sans espace
+# (`tests/fixtures/saisies_fautives.tsv`, 40 lignes) : 0,4 garde le rappel de 0,3
+# (16 / 20 fautes de frappe, 10 / 10 espaces retirées) avec une meilleure précision
+# (0,29 contre 0,22) ; la première mesure (2026-11-08) avait pris 0,3 faute de seuil à
+# 90 % (README).
+SEUIL_RESSEMBLANCE_DEFAUT = 0.4
 # Le plancher d'un résumé coupé avant ses extraits de critiques : SYNOPSIS_MIN_CHARS.
 # Choisi sur la mesure du 2026-11-08 : la distribution des longueurs après coupe a un
 # creux de 20 à 120 caractères ; 100 y tombe (README).

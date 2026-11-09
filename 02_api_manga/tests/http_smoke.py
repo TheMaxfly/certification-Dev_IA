@@ -531,7 +531,7 @@ def verifier_la_recherche() -> None:
     assert faute["total"] == 0 and faute["items"] == []
     assert faute["suggestions"][0]["series_id"] == 736
     assert faute["suggestions"][0]["correspondance"] == "titre"
-    assert 0.3 <= faute["suggestions"][0]["score"] <= 1
+    assert 0.4 <= faute["suggestions"][0]["score"] <= 1
     # « eiichiro odda » (une lettre doublée dans l'auteur) : par l'auteur.
     auteur_faute = get_json("/series?q=eiichiro%20odda")
     assert auteur_faute["total"] == 0

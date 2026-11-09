@@ -85,7 +85,7 @@ L’API lit les variables suivantes (avec valeurs par défaut si non définies) 
 | `DB_POOL_TIMEOUT` | `5` | Attente maximale d'une connexion du pool |
 | `DB_POOL_MIN_SIZE` | `1` | Nombre minimal de connexions du pool |
 | `DB_POOL_MAX_SIZE` | `5` | Nombre maximal de connexions du pool |
-| `SEARCH_SIMILARITY_THRESHOLD` | `0.3` | Seuil de ressemblance des suggestions de `GET /series` (0 à 1), choisi sur la mesure du 2026-11-08 (« Les suggestions ») |
+| `SEARCH_SIMILARITY_THRESHOLD` | `0.4` | Seuil de ressemblance des suggestions de `GET /series` (0 à 1), choisi sur la seconde mesure du 2026-11-09 (« Les suggestions ») |
 | `SYNOPSIS_MIN_CHARS` | `100` | Plancher d'un résumé coupé avant ses extraits de critiques, choisi sur la mesure du 2026-11-08 (« Le résumé servi ») |
 
 Exemple de `.env` :
@@ -372,7 +372,8 @@ trigrammes (`pg_trgm`) atteint le **seuil** — `similarity` sur le titre et le 
 autres titres, `word_similarity` sur les auteurs (l'ordre des noms n'y compte pas) —,
 **cinq au plus**, la plus ressemblante d'abord (puis les votes), chacune avec son
 `score` (0 à 1) et ce qui lui ressemble (`correspondance`). Le seuil est lié en
-paramètre (`SEARCH_SIMILARITY_THRESHOLD`, **0,3** par défaut). **En repli,
+paramètre (`SEARCH_SIMILARITY_THRESHOLD`, **0,4** par défaut depuis la seconde mesure du
+2026-11-09). **En repli,
 `suggestions` est toujours vide** : la ressemblance demande la fonction.
 
 **Le seuil, choisi sur la mesure du 2026-11-08** (préproduction, lecture seule). Un jeu de
@@ -400,6 +401,30 @@ transpositions, 10 lettres manquantes, 5 romanisations fautives, 5 auteurs inver
   hors sujet sur cinq coûtent peu ; une suggestion juste manquée coûte la recherche.
 - Latence sur le poste : recherche directe **65 ms** de médiane (97 ms au plus), une
   suggestion **129 ms** (157 ms), sur les 30 saisies.
+
+**Seconde mesure du 2026-11-09 — les saisies sans espace ; le seuil passe à 0,4.** En
+recette, « onepice » ne suggérait pas *One Piece* (0,29 sous 0,3 : une espace retirée **et**
+une lettre manquante). Le jeu est complété, avant la mesure, de **10 saisies « espace
+retirée »** (règle mécanique en tête du fichier : les 10 premières séries du jeu dont le
+titre a une espace, privé de sa première espace — « onepiece »), soit **40 saisies**. Quatre
+variantes, la règle de décision écrite avant : rappel ≥ 16 / 20 sur les fautes de frappe et
+≥ 8 / 10 sur les espaces, puis la meilleure précision, puis la plus simple ; latence
+médiane > 300 ms écartée. Le cinquième terme compare titre et saisie **sans leurs espaces**
+(`similarity(replace(…, ' ', ''), replace(…, ' ', ''))`).
+
+| Variante | Seuil | Cinquième terme | Rappel fautes (/20) | Rappel espaces (/10) | Contrôle direct (/10) | Rendues | Hors sujet | Précision | Latence médiane / max |
+|---|---:|:---:|---:|---:|---:|---:|---:|---:|---:|
+| A | 0,3 | — | 16 | 10 | 10 | 120 | 94 | 0,22 | 121 / 164 ms |
+| **B** | **0,4** | — | **16** | **10** | **10** | **91** | **65** | **0,29** | **127 / 162 ms** |
+| C | 0,3 | oui | 16 | 10 | 10 | 122 | 96 | 0,21 | 154 / 200 ms |
+| D | 0,4 | oui | 16 | 10 | 10 | 94 | 68 | 0,28 | 154 / 195 ms |
+
+- **Retenue : B**, le seuil à **0,4** — un chiffre de configuration, aucune ligne de code.
+  Les quatre tiennent les deux rappels ; B a la meilleure précision. Une espace retirée
+  seule ne fait pas tomber la ressemblance sous le seuil (*One Piece* à 0,58 pour
+  « onepiece ») : le cinquième terme n'apporte rien sur ce jeu et coûte ~30 ms.
+- **« onepice » reste sans *One Piece*** (deux fautes : 0,29 < 0,4) ; le cinquième terme le
+  rattraperait (0,55) — un cas que le jeu à une faute ne mesure pas.
 
 **Le résumé servi (contrat 0.6.0).** La collecte du référentiel a recopié, dans des
 résumés Manga Sanctuary, des critiques de lecteurs à la suite du résumé : **1 844

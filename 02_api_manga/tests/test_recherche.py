@@ -425,7 +425,7 @@ def test_un_seuil_hors_de_0_a_1_empeche_de_demarrer(monkeypatch, valeur: str) ->
 
 def test_les_valeurs_par_defaut_sont_celles_de_la_mesure() -> None:
     assert (Settings().search_similarity_threshold, Settings().synopsis_min_chars) == (
-        0.3,
+        0.4,
         100,
     )
 
@@ -433,7 +433,7 @@ def test_les_valeurs_par_defaut_sont_celles_de_la_mesure() -> None:
 JEU = MODULE / "tests" / "fixtures" / "saisies_fautives.tsv"
 
 
-def test_le_jeu_de_saisies_fautives_a_trente_lignes_et_ses_quatre_familles() -> None:
+def test_le_jeu_de_saisies_fautives_a_quarante_lignes_et_ses_cinq_familles() -> None:
     lignes = [
         ligne.rstrip("\n").split("\t")
         for ligne in JEU.read_text(encoding="utf-8").splitlines()
@@ -448,5 +448,12 @@ def test_le_jeu_de_saisies_fautives_a_trente_lignes_et_ses_quatre_familles() -> 
         "lettre_manquante": 10,
         "romanisation": 5,
         "auteur_inverse": 5,
+        "espace_retiree": 10,
     }
     assert all(identifiant.isdigit() for _, identifiant, _, _ in jeu)
+    # La règle du complément (lot 4) : le titre, sans sa première espace.
+    assert all(
+        saisie == titre.lower().replace(" ", "", 1)
+        for saisie, _, famille, titre in jeu
+        if famille == "espace_retiree"
+    )
