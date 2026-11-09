@@ -1,0 +1,9 @@
+id = "E4Q-01"
+origine = "E4, lot 2b, spec 01 (2026-11-08) — les réglages servis au public : un visiteur verrait le profil, la température, la reformulation"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''{% if peut_regler %}
+<details'''
+apres = '''{% if true %}
+<details'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_conseiller_roles.py", "-k", "html_public_ne_porte"]

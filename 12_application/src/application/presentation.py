@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlencode
 
 from application import __version__
 from application.client_api import (
@@ -378,8 +379,13 @@ class Affichage:
     sans_carte: str | None
     complement: str | None
     complement_titres: tuple[str, ...]
+    #: L'étiquette du complément : celle de l'API (D9), le texte du 12 en repli.
+    complement_etiquette: str = ""
     #: None hors du mode démonstration : la section n'existe pas.
     trace: Trace | None = None
+    #: Le pont vers le catalogue (E4, lot 2b, décision 6) : une réponse qui refuse ou
+    #: ne cite aucune série propose de chercher la question dans le catalogue.
+    lien_catalogue: str | None = None
 
 
 def tomes_de(m: Metadonnees, t: Mapping[str, str]) -> str:
@@ -686,15 +692,28 @@ def appels_de(corps: Reponse, t: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(lignes)
 
 
+def lien_vers_catalogue(question: str, reglages: Reglages) -> str | None:
+    """`/catalogue?q=` : la question coupée à la borne du catalogue, sans les espaces
+    des bords ; trop courte pour une recherche, pas de lien."""
+    regles = reglages.catalogue
+    q = question[: regles.q_max].strip()
+    if len(q) < regles.q_min:
+        return None
+    return "/catalogue?" + urlencode({"q": q})
+
+
 def affichage_de(
     question: str,
     corps: Reponse,
     reglages: Reglages,
     *,
     demonstration: bool = False,
+    complement: bool = False,
 ) -> Affichage:
     """La zone de réponse ; le mode démonstration n'ajoute que ce que l'API a déjà
-    rendu, et, éteint, rien de cela n'atteint le gabarit."""
+    rendu, et, éteint, rien de cela n'atteint le gabarit. Le complément du mode enrichi
+    n'atteint le gabarit que pour un rôle qui choisit le mode (`complement`) : le
+    public est en strict, et son HTML n'en porte jamais le bloc."""
     t = reglages.textes
     motifs = {
         "aucun_passage": t["motif_aucun_passage"],
@@ -734,9 +753,15 @@ def affichage_de(
             if sans_carte
             else None
         ),
-        complement=corps.complement,
-        complement_titres=tuple(corps.complement_titres or ()),
+        complement=corps.complement if complement else None,
+        complement_titres=tuple(corps.complement_titres or ()) if complement else (),
+        complement_etiquette=corps.complement_etiquette or t["complement_etiquette"],
         trace=trace_de(question, corps, t) if demonstration else None,
+        lien_catalogue=(
+            lien_vers_catalogue(question, reglages)
+            if corps.refus or not cartes
+            else None
+        ),
     )
 
 
@@ -754,6 +779,9 @@ class Encart:
     profil_a_revoir: bool = False
     #: La conversation s'arrête là : le lien vers une nouvelle est proposé.
     nouvelle_conversation: bool = False
+    #: Le titre de l'encart, s'il en a un à lui (les bornes, E4, lot 2b) ; None : le
+    #: titre commun.
+    titre: str | None = None
 
 
 CODES_RECHERCHE = frozenset(

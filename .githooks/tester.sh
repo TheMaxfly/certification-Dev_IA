@@ -18,7 +18,7 @@ CO="Co-Author$(printf e)d-By"
 # jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
 unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME API_MODELE_CLES APPLICATION_CLE_API
 unset GRAFANA_SMTP_MOT_DE_PASSE APPLICATION_CLE_SESSION APP_CONSEILLER_MOT_DE_PASSE PGPASSFILE
-unset APPLICATION_CLE_CATALOGUE API_KEYS
+unset APPLICATION_CLE_CATALOGUE API_KEYS APPLICATION_CLE_API_COMPTES
 export HOME="$TRAVAIL/maison"
 mkdir -p "$HOME/.cache/huggingface"
 JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
@@ -34,6 +34,7 @@ CLE_ACCES_FACTICE="$(printf 'a1B2c3%.0s' $(seq 1 7))"  # 42 caractères
 HORS_MOTIF_S="valeur-factice-de-la-session-0046"
 HORS_MOTIF_C="valeur-factice-du-catalogue-0047"
 HORS_MOTIF_D="valeur-factice-de-l-api-data-0048"
+HORS_MOTIF_K="valeur-factice-des-comptes-0049"
 MDP_ROLE="mot-de-passe-factice-du-role-0047"
 ROLE_PG="app_conseiller"  # par variable : ce fichier ne tombe pas sous le motif d'une ligne recopiée
 echecs=0
@@ -133,6 +134,7 @@ scenario refuse "jeton Hugging Face du poste en clair" eval 'ecrire j_pp.txt "je
 scenario refuse "chaîne d'aspect jeton Hugging Face" eval 'ecrire j_pp2.env "TOKEN=$ASPECT" && git commit -q -m j_pp2'
 scenario refuse "aspect : clé de session de l'application" eval 'ecrire s_pp.env "APPLICATION_CLE_SESSION=$CLE_ACCES_FACTICE" && git commit -q -m s_pp'
 scenario refuse "aspect : clé du catalogue de l'application" eval 'ecrire c_pp.env "APPLICATION_CLE_CATALOGUE=$CLE_ACCES_FACTICE" && git commit -q -m c_pp'
+scenario refuse "aspect : clé des comptes de l'application" eval 'ecrire k_pp.env "APPLICATION_CLE_API_COMPTES=$CLE_ACCES_FACTICE" && git commit -q -m k_pp'
 scenario refuse "aspect : DSN qui porte un mot de passe" eval 'ecrire d_pp.txt "postgresql://app_conseiller:$HORS_MOTIF_S@localhost:5432/apimanga" && git commit -q -m d_pp'
 # Sans -a, grep tait la ligne qui porte un octet hors UTF-8 : la mention passerait.
 scenario refuse "mention dans un texte non UTF-8" eval '
@@ -355,6 +357,20 @@ essai passe  "références et forme documentée des clés du catalogue" eval '
     ecrire pc_kcat3.yml "APPLICATION_CLE_CATALOGUE: \${APPLICATION_CLE_CATALOGUE:-}" &&
     ecrire pc_kdat3.yml "API_KEYS: \${API_KEYS:-}" &&
     ecrire pc_kdat4.md "API_KEYS=conseiller:<clé-de-trente-deux-caractères-au-moins>" && git commit -q -m kdat3'
+# La clé « comptes » de l'application (E4, lot 2b) : elle n'existe pas encore sur le
+# poste ; le scénario « valeur du poste » en pose une factice dans le .env d'un module ;
+# par aspect ; une référence et la forme entre chevrons passent.
+essai refuse "clé des comptes du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_API_COMPTES=%s\n" "$HORS_MOTIF_K" >mod/.env &&
+    ecrire pc_kcpt.txt "note : $HORS_MOTIF_K" && git commit -q -m kcpt'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : clé des comptes" eval '
+    ecrire pc_kcpt2.env "APPLICATION_CLE_API_COMPTES=$CLE_ACCES_FACTICE" && git commit -q -m kcpt2'
+essai passe  "référence et forme documentée de la clé des comptes" eval '
+    ecrire pc_kcpt3.yml "APPLICATION_CLE_API_COMPTES: \${APPLICATION_CLE_API_COMPTES:-}" &&
+    ecrire pc_kcpt4.md "APPLICATION_CLE_API_COMPTES=<clé-de-trente-deux-caractères-au-moins>" &&
+    git commit -q -m kcpt3'
 # Le mot de passe du rôle de connexion : sa valeur dans le fichier de mots de passe de
 # PostgreSQL du poste (ici celui du HOME jetable, puis PGPASSFILE), lignes du rôle seules ;
 # une ligne recopiée ; la forme documentée passe.

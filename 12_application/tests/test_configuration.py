@@ -44,6 +44,29 @@ def test_une_cle_hors_ascii_empeche_de_demarrer_sans_la_montrer():
     assert ecarts == ["APPLICATION_CLE_API : caractères hors ASCII — clé illisible"]
 
 
+def test_la_cle_des_comptes_est_facultative_et_jamais_montree():
+    assert charger(ENV).cle_api_comptes is None
+    avec = charger({**ENV, "APPLICATION_CLE_API_COMPTES": "k" * 40})
+    assert avec.cle_api_comptes == "k" * 40
+    assert "k" * 40 not in repr(avec)
+    ecarts = ecarts_de({**ENV, "APPLICATION_CLE_API_COMPTES": "clé-é" * 8})
+    assert ecarts == [
+        "APPLICATION_CLE_API_COMPTES : caractères hors ASCII — clé illisible"
+    ]
+
+
+def test_les_bornes_du_conseiller_sont_celles_decidees():
+    bornes = charger(ENV).bornes
+    assert (
+        bornes.quota_visiteur_questions_jour,
+        bornes.quota_client_questions_jour,
+        bornes.debit_public_par_minute,
+        bornes.cout_jour_max_usd,
+        bornes.inscriptions_session_max,
+        bornes.inscriptions_fenetre_min,
+    ) == (5, 20, 10, 0.50, 3, 60)
+
+
 def test_le_lancement_sans_cle_nomme_la_variable_et_rend_2(monkeypatch, capsys):
     monkeypatch.setattr("application.__main__.journal.configurer", lambda: None)
     monkeypatch.delenv("APPLICATION_CLE_API", raising=False)
@@ -189,6 +212,23 @@ def fichier_modifie(tmp_path: Path, avant: str, apres: str) -> Path:
         ('bouton = "Demander"', "bouton = 3", "bouton : texte attendu"),
         ('bouton = "Demander"', 'bouton = "{variable}"', "variable inconnue"),
         ('bouton = "Demander"', 'bouton = "{"', "accolades invalides"),
+        # E4, lot 2b : les bornes du conseiller, positives.
+        (
+            "quota_visiteur_questions_jour = 5",
+            "quota_visiteur_questions_jour = 0",
+            "conseiller.limites.quota_visiteur_questions_jour",
+        ),
+        (
+            "quota_client_questions_jour = 20",
+            "quota_client_questions_jour = 2.5",
+            "conseiller.limites.quota_client_questions_jour",
+        ),
+        (
+            "cout_jour_max_usd = 0.50",
+            "cout_jour_max_usd = 0",
+            "conseiller.limites.cout_jour_max_usd",
+        ),
+        ("[conseiller.limites]", "[conseiller.autres]", "conseiller.limites"),
     ],
 )
 def test_un_fichier_fautif_empeche_de_demarrer(tmp_path, avant, apres, attendu):

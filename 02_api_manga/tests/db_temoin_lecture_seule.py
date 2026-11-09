@@ -122,9 +122,20 @@ def verifier_la_normalisation(connexion: psycopg.Connection) -> None:
     ).fetchone()
     if not litteral or joker:
         echouer("le « % » de la saisie est un joker : il n'est pas échappé.")
+    # La fonction de la 028 (le harnais migre jusqu'au dernier fichier) rend la même
+    # forme que la table du repli sur ces saisies, sans ligature.
+    for saisie in SAISIES_A_NORMALISER:
+        (par_fonction,) = connexion.execute(
+            "SELECT manga.normaliser(%s)", (saisie,)
+        ).fetchone()
+        if par_fonction != recherche.normaliser(saisie):
+            echouer(
+                f"normalisation : {saisie!r} donne {par_fonction!r} par la fonction "
+                f"et {recherche.normaliser(saisie)!r} par la table."
+            )
     print(
-        f"normalisation : {len(SAISIES_A_NORMALISER)} saisies, SQL et Python "
-        "égaux ; « % » littéral."
+        f"normalisation : {len(SAISIES_A_NORMALISER)} saisies, SQL, fonction et "
+        "Python égaux ; « % » littéral."
     )
 
 

@@ -41,8 +41,17 @@
 {% endif %}
 {% else %}
 <p>{{ aucun }}</p>
+{% if suggestions %}
+<section class="zone-suggestions" aria-labelledby="suggestions-titre">
+<h3 id="suggestions-titre">{{ t.catalogue_vouliez_vous_dire }}</h3>
+<ul>
+{% for series_id, titre in suggestions %}
+<li><a href="/series/{{ series_id }}">{{ titre }}</a></li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
 <p><a href="/">{{ t.catalogue_aucun_conseiller }}</a></p>
-<p>{{ t.catalogue_aucun_fautes }}</p>
 {% endif %}
 </section>
 {% endif %}

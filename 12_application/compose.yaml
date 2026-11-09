@@ -33,7 +33,7 @@ services:
   catalogue:
     build:
       context: ../02_api_manga
-    image: api-catalogue:0.5.0
+    image: api-catalogue:0.6.0
     environment:
       APP_ENV: ${CATALOGUE_APP_ENV:-production}
       # Vide : le 02 refuse de démarrer (le refus lui appartient, en un seul endroit).
@@ -62,7 +62,7 @@ services:
       context: ..
       dockerfile: 12_application/Dockerfile
       target: application
-    image: application-conseiller:0.4.0
+    image: application-conseiller:0.5.0
     depends_on:
       api:
         condition: service_healthy

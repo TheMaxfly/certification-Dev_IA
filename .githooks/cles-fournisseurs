@@ -96,6 +96,15 @@ CLES_FOURNISSEUR[APPLICATION_CLE_CATALOGUE]="du catalogue de l'application"
 CLES_FOURNISSEUR[API_KEYS]="du trousseau de l'API data"
 CLES_ASPECT[APPLICATION_CLE_CATALOGUE]="APPLICATION_CLE_CATALOGUE[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$<>]{32,}"
 CLES_ASPECT[API_KEYS]="API_KEYS[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"'\$<>]{32,}"
+# La clé « comptes » de l'application auprès de l'API du modèle (E4, lot 2b), posée AVANT
+# que ce secret existe sur le poste (il sera posé au lot de livraison continue) :
+#   - APPLICATION_CLE_API_COMPTES : la clé des comptes connectés (client, libraire,
+#     administrateur), dans le .env du 12 ; sa valeur, et une affectation littérale de
+#     32 caractères au moins (une référence « ${…} » ou une forme entre chevrons n'en est
+#     pas une). Le motif de APPLICATION_CLE_API ne la voit pas : « _COMPTES » le rompt.
+CLES_VARIABLES+=(APPLICATION_CLE_API_COMPTES)
+CLES_FOURNISSEUR[APPLICATION_CLE_API_COMPTES]="des comptes de l'application"
+CLES_ASPECT[APPLICATION_CLE_API_COMPTES]="APPLICATION_CLE_API_COMPTES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$<>]{32,}"
 # Le fichier où l'outil du fournisseur range la valeur du poste.
 declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
 CLES_FICHIER[GRAFANA_SMTP_MOT_DE_PASSE]="$(git rev-parse --show-toplevel 2>/dev/null)/13_monitorage/.secrets/smtp_mot_de_passe"

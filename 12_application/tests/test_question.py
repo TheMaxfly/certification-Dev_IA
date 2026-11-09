@@ -66,8 +66,8 @@ def test_la_requete_porte_les_seuls_champs_decides(navigateur, doublure):
     assert set(doublure.cles_recues) == {d.CLE_ATTENDUE}
 
 
-def test_les_reglages_sont_transmis(navigateur, doublure):
-    navigateur.post(
+def test_les_reglages_sont_transmis(libraire, doublure):
+    libraire.post(
         "/question",
         data={"question": QUESTION, "profil": "gpt-6-luna", "temperature": "0.7"},
     )
@@ -117,10 +117,10 @@ def test_un_seul_mode_impose_strict_meme_si_le_formulaire_dit_autre_chose(
     assert doublure.corps_recus[0]["mode"] == "strict"
 
 
-def test_avec_deux_modes_le_choix_est_retenu_par_le_selecteur(navigateur, doublure):
+def test_avec_deux_modes_le_choix_est_retenu_par_le_selecteur(libraire, doublure):
     doublure.choisir(info="deux_modes", reponse="profil_inconnu")
 
-    r = poser(navigateur, mode="strict")
+    r = poser(libraire, mode="strict")
 
     choisi = soupe(r).select_one("select#mode option[selected]")
     assert choisi["value"] == "strict"
@@ -325,11 +325,11 @@ def test_une_carte_sans_passage_le_dit(navigateur, doublure):
     assert "Aucun passage cité pour cette série." in soupe(poser(navigateur)).get_text()
 
 
-def test_le_bloc_non_verifie_n_apparait_qu_avec_un_complement(navigateur, doublure):
-    assert "Non vérifié" not in soupe(poser(navigateur)).get_text()
+def test_le_bloc_non_verifie_n_apparait_qu_avec_un_complement(libraire, doublure):
+    assert "Non vérifié" not in soupe(poser(libraire)).get_text()
 
     doublure.choisir(reponse="complement")
-    texte = soupe(poser(navigateur)).get_text()
+    texte = soupe(poser(libraire)).get_text()
 
     assert "Non vérifié — connaissances du modèle, sans source" in texte
     assert "Complément factice." in texte
@@ -369,11 +369,11 @@ def test_le_nouvel_historique_part_dans_le_champ_cache_et_la_question_se_vide(
     assert soupe(r).select_one("textarea#question").get_text() == ""
 
 
-def test_le_complement_n_entre_pas_dans_l_historique(navigateur, doublure):
+def test_le_complement_n_entre_pas_dans_l_historique(libraire, doublure):
     """Seule `reponse` part dans le champ caché : le complément « non vérifié » et
     ses titres n'entrent jamais dans la conversation renvoyée à l'API (spec 06, C.7)."""
     doublure.choisir(reponse="complement")
-    r = poser(navigateur)
+    r = poser(libraire)
 
     assert "Complément factice." in soupe(r).get_text(), "le bloc est affiché"
     cache = champ_cache(r)
@@ -383,8 +383,8 @@ def test_le_complement_n_entre_pas_dans_l_historique(navigateur, doublure):
         assert absent not in cache, absent
 
 
-def test_les_reglages_restent_choisis_d_un_tour_a_l_autre(navigateur):
-    r = navigateur.post(
+def test_les_reglages_restent_choisis_d_un_tour_a_l_autre(libraire):
+    r = libraire.post(
         "/question",
         data={"question": QUESTION, "profil": "gpt-6-luna", "temperature": "0.3"},
     )
@@ -553,8 +553,8 @@ def test_sans_profil_proposable_rien_ne_part(navigateur, doublure):
 
 
 @pytest.mark.parametrize("profil", ["mistral-large-4", "profil-inconnu"])
-def test_un_profil_hors_liste_est_refuse(navigateur, doublure, profil):
-    r = poser(navigateur, profil=profil)
+def test_un_profil_hors_liste_est_refuse(libraire, doublure, profil):
+    r = poser(libraire, profil=profil)
     page = soupe(r)
 
     assert r.status_code == 422
@@ -567,8 +567,8 @@ def test_un_profil_hors_liste_est_refuse(navigateur, doublure, profil):
 
 
 @pytest.mark.parametrize("temperature", ["0.9", "chaud", "nan"])
-def test_une_temperature_hors_position_est_refusee(navigateur, doublure, temperature):
-    r = poser(navigateur, temperature=temperature)
+def test_une_temperature_hors_position_est_refusee(libraire, doublure, temperature):
+    r = poser(libraire, temperature=temperature)
     page = soupe(r)
 
     assert r.status_code == 422
@@ -805,11 +805,11 @@ def test_un_clic_trop_tot_recoit_un_nouveau_refus_et_le_meme_encart(
 
 
 def test_le_refus_d_un_profil_recharge_la_liste_et_revient_au_defaut(
-    navigateur, doublure
+    libraire, doublure
 ):
     doublure.choisir(reponse="profil_indisponible")
 
-    page = soupe(poser(navigateur, profil="gpt-6-sol"))
+    page = soupe(poser(libraire, profil="gpt-6-sol"))
 
     assert page.select_one("select#profil option[selected]")["value"] == (
         "mistral-large-2512"
@@ -830,7 +830,7 @@ def test_api_injoignable_a_la_question_l_encart_le_dit(demarrer, port_ferme):
 
 
 def test_api_coupee_entre_la_liste_et_la_question(navigateur, doublure, monkeypatch):
-    async def coupee(_demande):
+    async def coupee(_demande, cle=None):
         from application.client_api import ApiInjoignable
 
         raise ApiInjoignable

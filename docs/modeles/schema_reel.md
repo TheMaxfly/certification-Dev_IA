@@ -1,6 +1,6 @@
 # Schema reel — inventaire extrait de la base
 
-> Extrait de `apimanga` le 2026-08-25 par `extraire_schema.py`, sous le role de consultation `manga_api` en session `default_transaction_read_only = on` (lecture seule : uniquement des SELECT sur `pg_catalog`).
+> Extrait de `apimanga_preprod` le 2026-11-08 par `extraire_schema.py`, sous le role `verif_lecture` en session `default_transaction_read_only = on` (lecture seule : uniquement des SELECT sur `pg_catalog`).
 
 Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **preuve de fidelite** : rien n'y est saisi a la main, tout vient de la base. Une table dessinee qui ne figurerait pas ici serait une invention.
 
@@ -8,18 +8,18 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 | Element | Nombre |
 | --- | --- |
-| Tables `manga` | 32 |
-| Tables `staging` | 11 |
-| Vues (`manga`) | 8 |
-| Colonnes (total) | 659 |
-| Cles etrangeres | 20 |
-| Index (dont UNIQUE) | 100 |
-| Contraintes declarees | 78 |
+| Tables `manga` | 36 |
+| Tables `staging` | 15 |
+| Vues (`manga`) | 10 |
+| Colonnes (total) | 735 |
+| Cles etrangeres | 23 |
+| Index (dont UNIQUE) | 123 |
+| Contraintes declarees | 100 |
 
 ## Confrontation base <-> toutes les migrations versionnees
 
-- tables `manga` + `staging` **declarees par les migrations** : **43**
-- tables `manga` + `staging` **presentes en base** : **43**
+- tables `manga` + `staging` **declarees par les migrations** : **51**
+- tables `manga` + `staging` **presentes en base** : **51**
 
 **Aucun ecart.** Chaque table de la base est creee par une migration du depot, et chaque table declaree existe en base. Le depot sait reconstruire ce qu'il decrit.
 
@@ -38,6 +38,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `009_referentiel_kitsu_staff_meta.sql` | `manga.kitsu_meta`, `manga.kitsu_staff`, `staging.kitsu_staff` |
 | `010_avis_llm.sql` | `manga.llm_avis` |
 | `013_referentiel_genres.sql` | `manga.genre_mapping`, `manga.genre_ref` |
+| `015_personnages_multisources.sql` | `manga.character_descriptions`, `manga.character_forms`, `manga.character_work`, `manga.characters`, `staging.character_descriptions`, `staging.character_forms`, `staging.character_work`, `staging.characters` |
 
 ## Vues
 
@@ -50,12 +51,17 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `manga.rag_export_docs` | manga.rag_docs_scored |
 | `manga.rag_ms_hybrid_docs` | manga.ms_kitsu_map, manga.rag_kitsu_docs, manga.rag_reviews_docs |
 | `manga.v_match_current` | manga.match_decision |
+| `manga.v_metadonnees_serie` | manga.kitsu_series_core, manga.ms_series_enriched, manga.ms_volumes_enriched, manga.work_identity |
 | `manga.v_mi_ean_multiples` | manga.mi_sorties |
+| `manga.v_pseudonymes` | manga.ms_reviews_all |
 
 ## Cles etrangeres (toutes)
 
 | Source | Colonnes | Cible | Colonnes cible |
 | --- | --- | --- | --- |
+| `manga.character_descriptions` | character_uid | `manga.characters` | character_uid |
+| `manga.character_forms` | character_uid | `manga.characters` | character_uid |
+| `manga.character_work` | character_uid | `manga.characters` | character_uid |
 | `manga.genre_mapping` | code | `manga.genre_ref` | code |
 | `manga.genre_ref` | parent | `manga.genre_ref` | code |
 | `manga.kitsu_series_authors` | kitsu_id | `manga.kitsu_series_core` | kitsu_id |
@@ -78,6 +84,94 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `manga.wd_formes` | qid | `manga.wd_pivot` | qid |
 
 ## Detail par table
+
+### `manga.character_descriptions`
+
+39569 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `description_id` | int8 | NON |  |
+| `character_uid` | int8 | NON |  |
+| `source` | text | NON |  |
+| `lang` | text | oui |  |
+| `texte` | text | NON |  |
+| `licence` | text | oui |  |
+| `provenance` | text | oui |  |
+| `longueur` | int4 | oui |  |
+| `loaded_at` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX character_descriptions_pkey ON manga.character_descriptions USING btree (description_id)`
+- **UNIQUE** : `CREATE UNIQUE INDEX character_descriptions_unique ON manga.character_descriptions USING btree (character_uid, source)`
+- **FK** : (character_uid) -> `manga.characters`(character_uid)
+- **CHECK** `character_descriptions_lang_connue` : `CHECK (((lang IS NULL) OR (lang = ANY (ARRAY['en'::text, 'ja'::text, 'fr'::text]))))`
+- **CHECK** `character_descriptions_source_non_vide` : `CHECK ((btrim(source) <> ''::text))`
+- **CHECK** `character_descriptions_texte_non_vide` : `CHECK ((btrim(texte) <> ''::text))`
+
+### `manga.character_forms`
+
+126446 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `forme_id` | int8 | NON |  |
+| `character_uid` | int8 | NON |  |
+| `forme` | text | NON |  |
+| `forme_norm` | text | NON |  |
+| `forme_type` | text | NON |  |
+| `forme_lang` | text | oui |  |
+| `source` | text | NON |  |
+| `loaded_at` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX character_forms_pkey ON manga.character_forms USING btree (forme_id)`
+- **UNIQUE** : `CREATE UNIQUE INDEX character_forms_unique ON manga.character_forms USING btree (character_uid, forme_norm, forme_type, source)`
+- **FK** : (character_uid) -> `manga.characters`(character_uid)
+- **CHECK** `character_forms_non_vide` : `CHECK ((btrim(forme) <> ''::text))`
+- **CHECK** `character_forms_source_non_vide` : `CHECK ((btrim(source) <> ''::text))`
+- **CHECK** `character_forms_type_connu` : `CHECK ((forme_type = ANY (ARRAY['canonical'::text, 'name_lang'::text, 'alias'::text])))`
+
+### `manga.character_work`
+
+52864 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `lien_id` | int8 | NON |  |
+| `character_uid` | int8 | NON |  |
+| `oeuvre_source` | text | NON |  |
+| `oeuvre_id` | text | NON |  |
+| `role_source` | text | oui |  |
+| `role_normalise` | text | oui |  |
+| `source` | text | NON |  |
+| `loaded_at` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX character_work_pkey ON manga.character_work USING btree (lien_id)`
+- **UNIQUE** : `CREATE UNIQUE INDEX character_work_unique ON manga.character_work USING btree (character_uid, oeuvre_source, oeuvre_id, source)`
+- **FK** : (character_uid) -> `manga.characters`(character_uid)
+- **CHECK** `character_work_oeuvre_non_vide` : `CHECK ((btrim(oeuvre_id) <> ''::text))`
+- **CHECK** `character_work_role_connu` : `CHECK (((role_normalise IS NULL) OR (role_normalise = ANY (ARRAY['principal'::text, 'secondaire'::text, 'recurrent'::text, 'apparition'::text]))))`
+- **CHECK** `character_work_source_non_vide` : `CHECK ((btrim(source) <> ''::text))`
+
+### `manga.characters`
+
+47394 lignes.
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `character_uid` | int8 | NON |  |
+| `source` | text | NON |  |
+| `source_id` | text | NON |  |
+| `slug` | text | oui |  |
+| `canonical_name` | text | NON |  |
+| `mal_id` | text | oui |  |
+| `source_created_at` | timestamptz | oui |  |
+| `source_updated_at` | timestamptz | oui |  |
+| `loaded_at` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX characters_pkey ON manga.characters USING btree (character_uid)`
+- **UNIQUE** : `CREATE UNIQUE INDEX characters_source_id_unique ON manga.characters USING btree (source, source_id)`
+- **CHECK** `characters_nom_non_vide` : `CHECK ((btrim(canonical_name) <> ''::text))`
+- **CHECK** `characters_source_non_vide` : `CHECK ((btrim(source) <> ''::text))`
 
 ### `manga.genre_mapping`
 
@@ -348,7 +442,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.match_decision`
 
-10347 lignes.
+11516 lignes.
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -363,7 +457,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `details` | jsonb | oui |  |
 
 - **PK** : `CREATE UNIQUE INDEX match_decision_pkey ON manga.match_decision USING btree (decision_id)`
-- **CHECK** `match_decision_method_check` : `CHECK ((method = ANY (ARRAY['kitsu_bridge'::text, 'exact'::text, 'exact_author'::text, 'exact_kitsu'::text, 'exact_kitsu_author'::text, 'trgm'::text, 'embedding'::text, 'llm_review'::text, 'human_review'::text, 'manual'::text])))`
+- **CHECK** `match_decision_method_check` : `CHECK ((method = ANY (ARRAY['kitsu_bridge'::text, 'exact'::text, 'exact_author'::text, 'exact_kitsu'::text, 'exact_kitsu_author'::text, 'trgm'::text, 'embedding'::text, 'llm_review'::text, 'human_review'::text, 'kitsu_propagation'::text, 'manual'::text])))`
 - **CHECK** `match_decision_status_check` : `CHECK ((status = ANY (ARRAY['auto'::text, 'validated'::text, 'rejected'::text, 'needs_review'::text])))`
 
 ### `manga.mi_series`
@@ -845,6 +939,71 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **UNIQUE** *(partiel)* : `CREATE UNIQUE INDEX work_identity_wikidata_qid_uniq ON manga.work_identity USING btree (wikidata_qid) WHERE (wikidata_qid IS NOT NULL)`
 - **CHECK** `work_identity_disponibilite_check` : `CHECK ((disponibilite = ANY (ARRAY['vf_disponible'::text, 'vf_epuisee'::text, 'vo_seulement'::text, 'non_licencie'::text])))`
 
+### `staging.character_descriptions`
+
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `source` | text | oui |  |
+| `source_id` | text | oui |  |
+| `lang` | text | oui |  |
+| `texte` | text | oui |  |
+| `licence` | text | oui |  |
+| `provenance` | text | oui |  |
+| `loaded_at` | timestamptz | oui | now() |
+| `source_file` | text | oui |  |
+
+
+### `staging.character_forms`
+
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `source` | text | oui |  |
+| `source_id` | text | oui |  |
+| `forme` | text | oui |  |
+| `forme_norm` | text | oui |  |
+| `forme_type` | text | oui |  |
+| `forme_lang` | text | oui |  |
+| `loaded_at` | timestamptz | oui | now() |
+| `source_file` | text | oui |  |
+
+
+### `staging.character_work`
+
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `source` | text | oui |  |
+| `source_id` | text | oui |  |
+| `oeuvre_source` | text | oui |  |
+| `oeuvre_id` | text | oui |  |
+| `role_source` | text | oui |  |
+| `role_normalise` | text | oui |  |
+| `loaded_at` | timestamptz | oui | now() |
+| `source_file` | text | oui |  |
+
+
+### `staging.characters`
+
+Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `source` | text | oui |  |
+| `source_id` | text | oui |  |
+| `slug` | text | oui |  |
+| `canonical_name` | text | oui |  |
+| `mal_id` | text | oui |  |
+| `source_created_at` | text | oui |  |
+| `source_updated_at` | text | oui |  |
+| `loaded_at` | timestamptz | oui | now() |
+| `source_file` | text | oui |  |
+
+
 ### `staging.kitsu_formes`
 
 Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
@@ -1106,4 +1265,5 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 | `anilist_id` | text | oui |  |
 | `loaded_at` | timestamptz | NON | now() |
 | `source_file` | text | oui |  |
+
 

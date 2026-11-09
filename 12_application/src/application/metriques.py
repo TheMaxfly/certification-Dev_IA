@@ -27,6 +27,23 @@ SEAUX_LATENCE = (0.05, 0.25, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 45.0, 75.0)
 ETATS_API = ("ok", "ko", "cle")
 #: Les états du catalogue (l'API data du 02) vus d'ici, posés à chaque appel.
 ETATS_CATALOGUE = ("ok", "indisponible", "non_configure", "cle")
+#: L'issue d'une question au conseiller (E4, lot 2b) : une liste fermée.
+ISSUES_QUESTION = (
+    "reponse",
+    "refus",
+    "quota",
+    "debit",
+    "plafond_cout",
+    "api_erreur",
+    "api_indisponible",
+)
+#: Les modes d'une question : ceux de la table des coûts (027) ; tout autre, `autre`.
+MODES_QUESTION = ("strict", "enrichi")
+#: Les motifs d'un refus par une borne : quota de session, quota du compte, débit de
+#: la clé publique, budget du jour, inscriptions de la session.
+MOTIFS_REFUS = ("session", "client", "debit", "cout", "inscription")
+#: L'état du plafond de coût à sa dernière lecture.
+ETATS_PLAFOND = ("ok", "atteint", "inconnu")
 
 
 class Metriques:
@@ -93,6 +110,39 @@ class Metriques:
             ["action"],
             registry=self.registre,
         )
+        self.questions = Counter(
+            "application_questions",
+            "Questions au conseiller (E4, lot 2b), par mode et issue : reponse, refus,"
+            " quota, debit, plafond_cout, api_erreur, api_indisponible.",
+            ["mode", "issue"],
+            registry=self.registre,
+        )
+        self.quota_refus = Counter(
+            "application_quota_refus",
+            "Refus par une borne du conseiller, par motif : session (quota d'un"
+            " visiteur), client (quota d'un compte client), debit (clé publique), cout"
+            " (budget du jour), inscription.",
+            ["motif"],
+            registry=self.registre,
+        )
+        self.cout_jour = Gauge(
+            "application_cout_jour_usd",
+            "Coût estimé du jour (UTC), en dollars, à sa dernière lecture dans"
+            " application.couts_jour (avant chaque question).",
+            registry=self.registre,
+        )
+        self.plafond_cout = Gauge(
+            "application_plafond_cout_etat",
+            "Le plafond de coût du jour à sa dernière lecture (1 sur l'état constaté) :"
+            " ok, atteint, inconnu (base indisponible : non vérifiable).",
+            ["etat"],
+            registry=self.registre,
+        )
+        for motif in MOTIFS_REFUS:
+            self.quota_refus.labels(motif=motif)
+        for mode in MODES_QUESTION:
+            for issue in ISSUES_QUESTION:
+                self.questions.labels(mode=mode, issue=issue)
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
@@ -103,6 +153,15 @@ class Metriques:
         """Pose l'état du catalogue : 1 sur l'état constaté, 0 sur les autres."""
         for possible in ETATS_CATALOGUE:
             self.catalogue_etat.labels(etat=possible).set(1 if possible == etat else 0)
+
+    def question(self, mode: str, issue: str) -> None:
+        """Une question et son issue ; un mode hors de la liste compte sous `autre`."""
+        etiquette = mode if mode in MODES_QUESTION else "autre"
+        self.questions.labels(mode=etiquette, issue=issue).inc()
+
+    def etat_plafond(self, etat: str) -> None:
+        for possible in ETATS_PLAFOND:
+            self.plafond_cout.labels(etat=possible).set(1 if possible == etat else 0)
 
     def exposer(self) -> tuple[bytes, str]:
         return generate_latest(self.registre), CONTENT_TYPE_LATEST

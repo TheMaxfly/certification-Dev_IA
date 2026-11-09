@@ -40,6 +40,13 @@ class Ecran:
     demonstration: bool = False
     #: Le scénario du catalogue (l'API data du 02) dans la doublure.
     catalogue: str = "nominal"
+    #: Le rôle du compte connecté (E4, lot 2b : l'écran du conseiller selon le rôle) ;
+    #: None : un visiteur. Un rôle demande une base jetable.
+    role: str | None = None
+    #: Une borne atteinte avant l'écran (E4, lot 2b) : `session`, `client`, `debit`,
+    #: `budget`, `inscription`. Son application la serre à une unité
+    #: (`BORNES_SERREES`) ; l'écran vient après un premier passage. Une base jetable.
+    borne: str | None = None
 
 
 QUESTION = "Un manga factice pour débuter ?"
@@ -58,7 +65,7 @@ DEGRADES = sorted(
 
 ECRANS: tuple[Ecran, ...] = (
     Ecran("page_vide"),
-    Ecran("deux_modes", info="deux_modes"),
+    Ecran("deux_modes", info="deux_modes", role="libraire"),
     Ecran("aucun_profil", info="aucun_profil"),
     Ecran("cle_refusee", info="cle_invalide", neuve=True),
     Ecran("api_indisponible", api_fermee=True),
@@ -70,16 +77,19 @@ ECRANS: tuple[Ecran, ...] = (
     ),
     Ecran("reponse_sans_passage", question=QUESTION, reponse="sans_fragment"),
     Ecran("reponse_refus_debit", question=QUESTION, reponse="refus_debit_rejoue"),
-    Ecran("reponse_complement", question=QUESTION, reponse="complement"),
+    Ecran(
+        "reponse_complement", question=QUESTION, reponse="complement", role="libraire"
+    ),
     Ecran("refus_aucun_passage", question=QUESTION, reponse="refus_aucun_passage"),
     Ecran("refus_hors_catalogue", question=QUESTION, reponse="refus_hors_catalogue"),
     Ecran("refus_inconnu", question=QUESTION, reponse="refus_inconnu"),
-    Ecran("reponse_demonstration", question=QUESTION, demonstration=True),
+    Ecran("reponse_demonstration", question=QUESTION, demonstration=True, role="admin"),
     Ecran(
         "refus_demonstration",
         question=QUESTION,
         reponse="refus_aucun_passage",
         demonstration=True,
+        role="admin",
     ),
     Ecran("conversation_3_tours", question=QUESTION, historique=echanges(1)),
     Ecran("conversation_5_tours", question=QUESTION, historique=echanges(2)),
@@ -89,8 +99,8 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("conversation_invalide", question=QUESTION, historique="{cassé"),
     Ecran("erreur_question_vide", question=""),
     Ecran("erreur_question_longue", question="x" * 501),
-    Ecran("erreur_profil", question=QUESTION, profil="profil-inconnu"),
-    Ecran("erreur_temperature", question=QUESTION, temperature="0.9"),
+    Ecran("erreur_profil", question=QUESTION, profil="profil-inconnu", role="libraire"),
+    Ecran("erreur_temperature", question=QUESTION, temperature="0.9", role="libraire"),
     *(Ecran(f"degrade_{nom}", question=QUESTION, reponse=nom) for nom in DEGRADES),
     Ecran("degrade_api_injoignable", question=QUESTION, api_fermee=True),
     Ecran("degrade_delai", question=QUESTION, reponse="delai", delai_court=True),
@@ -116,4 +126,42 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("serie_introuvable", chemin="/series/101", catalogue="serie_inconnue"),
     # E4, lot 3 : sans base, la fiche s'affiche avec l'encart des critiques du réseau.
     Ecran("serie_critiques_indisponibles", chemin="/series/102"),
+    # E4, lot 2b : l'écran du conseiller selon le rôle, le pont fiche ↔ conseiller.
+    Ecran("conseiller_public"),
+    Ecran("conseiller_client", role="client"),
+    Ecran("conseiller_libraire", info="deux_modes", role="libraire"),
+    Ecran("conseiller_admin", info="deux_modes", role="admin"),
+    Ecran("conseiller_prerempli", chemin="/?serie=101"),
+    Ecran("reponse_refus_avec_pont", question=QUESTION, reponse="refus"),
+    Ecran("reponse_sans_carte_avec_pont", question=QUESTION, reponse="sans_carte"),
+    # E4, lot 2b : « Vouliez-vous dire… ? » et les sources du résumé (contrat 0.6.0).
+    Ecran(
+        "catalogue_suggestions", chemin="/catalogue?q=narutp", catalogue="suggestions"
+    ),
+    Ecran("serie_resume_kitsu", chemin="/series/101", catalogue="resume_kitsu"),
+    Ecran("serie_deux_resumes", chemin="/series/101", catalogue="deux_resumes"),
+    Ecran("serie_sans_resume", chemin="/series/101", catalogue="sans_resume"),
+    # E4, lot 2b : chaque borne du conseiller, atteinte.
+    Ecran("conseiller_quota_atteint", question=QUESTION, borne="session"),
+    Ecran(
+        "conseiller_quota_client_atteint",
+        question=QUESTION,
+        borne="client",
+        role="client",
+    ),
+    Ecran("conseiller_debit_atteint", question=QUESTION, borne="debit"),
+    Ecran("conseiller_budget_atteint", question=QUESTION, borne="budget"),
+    Ecran("inscription_bornee", chemin="/inscription", borne="inscription"),
 )
+
+#: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le
+#: premier passage la dépasse.
+BORNES_SERREES: dict[str, dict[str, float]] = {
+    "session": {"quota_visiteur_questions_jour": 1},
+    "client": {"quota_client_questions_jour": 1},
+    "debit": {"debit_public_par_minute": 1},
+    "budget": {"cout_jour_max_usd": 0.0001},
+    "inscription": {"inscriptions_session_max": 1},
+}
+#: Le mot de passe des inscriptions des écrans bornés.
+MDP_INSCRIPTION = "mot de passe factice de l'inscription bornée"

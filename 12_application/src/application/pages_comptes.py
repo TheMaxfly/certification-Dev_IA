@@ -13,6 +13,7 @@ empreinte, le cookie ni le jeton.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Request
@@ -21,7 +22,7 @@ from python_multipart.exceptions import FormParserError
 from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import comptes, journal, presentation, sessions
+from application import comptes, journal, presentation, quotas, sessions
 from application.base import Base
 from application.comptes import Compte, PseudoPris, Refus
 from application.config import Reglages
@@ -120,12 +121,14 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
         statut: int = 200,
         erreurs: dict[str, str] | None = None,
         valeurs: dict[str, str] | None = None,
+        bornee: str | None = None,
     ) -> Response:
         erreurs = erreurs or {}
         return rendre(
             request,
             "inscription.html",
             statut,
+            bornee=bornee,
             retour=retour,
             suffixe_retour=sessions.suffixe_retour(retour),
             erreurs=erreurs,
@@ -143,11 +146,48 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
         retour = sessions.retour_local(request.query_params.get("retour"))
         return page_inscription(request, retour)
 
+    bornes = reglages.bornes
+    fenetre_inscriptions = bornes.inscriptions_fenetre_min * 60
+
+    def inscriptions_epuisees(request: Request, instant: float) -> int | None:
+        """Les secondes avant qu'une inscription de plus tienne dans la fenêtre de la
+        session ; None : elle tient (E4, lot 2b, décision 7)."""
+        gardes = quotas.horodatages(
+            request.session,
+            quotas.CLE_INSCRIPTIONS,
+            instant,
+            fenetre_inscriptions,
+            bornes.inscriptions_session_max,
+        )
+        return quotas.attente(
+            gardes, instant, fenetre_inscriptions, bornes.inscriptions_session_max
+        )
+
     @app.post("/inscription", include_in_schema=False)
     async def inscrire(request: Request) -> Response:
         donnees = await formulaire(request)
         await disponibles(request)
         retour = sessions.retour_local(champ(donnees, "retour"))
+        instant = request.app.state.horloge()
+        attente = inscriptions_epuisees(request, instant)
+        if attente is not None:
+            request.state.code_erreur = "inscription_bornee"
+            request.app.state.metriques.quota_refus.labels(motif="inscription").inc()
+            heure = quotas.heure_locale(datetime.fromtimestamp(instant + attente, UTC))
+            reponse = page_inscription(
+                request,
+                retour,
+                429,
+                valeurs={"pseudo": rendu(comptes.normaliser(champ(donnees, "pseudo")))},
+                bornee=presentation.dire(
+                    t,
+                    "inscription_bornee",
+                    n=bornes.inscriptions_session_max,
+                    heure=heure,
+                ),
+            )
+            reponse.headers["Retry-After"] = str(attente)
+            return reponse
         pseudo = comptes.normaliser(champ(donnees, "pseudo"))
         mot_de_passe = champ(donnees, "mot_de_passe")
         erreurs: dict[str, str] = {}
@@ -173,6 +213,13 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
                 erreurs["pseudo"] = t["erreur_pseudo_pris"]
             else:
                 sessions.ouvrir(request, compte)
+                quotas.noter(
+                    request.session,
+                    quotas.CLE_INSCRIPTIONS,
+                    instant,
+                    fenetre_inscriptions,
+                    bornes.inscriptions_session_max,
+                )
                 journal.evenement_requete(request, "inscription")
                 return RedirectResponse(retour, status_code=303)
         request.state.code_erreur = "inscription_refusee"

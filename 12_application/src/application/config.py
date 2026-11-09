@@ -39,6 +39,9 @@ from psycopg import ProgrammingError, conninfo
 RACINE_MODULE = Path(__file__).resolve().parents[2]
 FICHIER_REGLAGES = RACINE_MODULE / "config" / "reglages.toml"
 VARIABLE_CLE = "APPLICATION_CLE_API"
+#: La clé des comptes connectés (E4, lot 2b, décision 5) ; facultative : absente, la
+#: clé publique sert aux deux.
+VARIABLE_CLE_COMPTES = "APPLICATION_CLE_API_COMPTES"
 VARIABLE_ENVIRONNEMENT = "APPLICATION_ENVIRONNEMENT"
 VARIABLE_BASE = "APPLICATION_BASE_DSN"
 VARIABLE_CLE_SESSION = "APPLICATION_CLE_SESSION"
@@ -78,7 +81,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " statut_termine statut_en_cours dispo_france dispo_japon dispo_inconnue"
             " passage_critique passage_resume passage_synopsis carte_sans_passage"
             " mention_carte mention_dispo details_titre details_estimes"
-            " role_appel_reformulation role_appel_reponse non_verifie"
+            " role_appel_reformulation role_appel_reponse complement_etiquette"
             " non_verifie_titres encart_titre degrade_injoignable degrade_delai"
             " degrade_recherche conversation_invalide conversation_longueur"
             " sortie_schema sortie_serie_inconnue sortie_fragment_inconnu"
@@ -118,7 +121,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " catalogue_encart catalogue_vers_conseiller catalogue_champ"
             " catalogue_bouton catalogue_resultats_titre catalogue_pagination"
             " catalogue_precedente catalogue_suivante catalogue_aucun_conseiller"
-            " catalogue_aucun_fautes catalogue_trouve_par_auteur"
+            " catalogue_vouliez_vous_dire catalogue_trouve_par_auteur"
             " serie_metadonnees serie_type serie_annee serie_note_etiquette"
             " serie_sans_note serie_reseau_titre serie_reseau_vide"
             " serie_listes_titre serie_listes serie_synopsis_titre"
@@ -166,6 +169,11 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " trace_temperature trace_longueur trace_cout trace_latence_recherche"
             " trace_latence_reformulation trace_latence_modele trace_latence_totale"
             " trace_identifiant trace_appels_titre"
+            # E4, lot 2b : le conseiller public, le pont fiche ↔ conseiller, les bornes.
+            " conseiller_aide_public pont_vers_catalogue pont_vers_conseiller"
+            " quota_titre debit_titre debit_public budget_titre budget_atteint"
+            " inscription_bornee_titre apropos_quotas_titre"
+            " serie_resume_kitsu_source serie_resume_kitsu_voir"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -226,6 +234,11 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "critique_lien_modifier": frozenset({"serie"}),
     "critique_lien_retirer": frozenset({"serie"}),
     "critique_lien_moderer": frozenset({"nom"}),
+    "question_pre_remplie": frozenset({"titre"}),
+    "quota_visiteur": frozenset({"n", "heure", "client"}),
+    "quota_client": frozenset({"n", "heure"}),
+    "inscription_bornee": frozenset({"n", "heure"}),
+    "apropos_quotas": frozenset({"visiteur", "client"}),
 }
 
 
@@ -328,6 +341,20 @@ class Critiques:
 
 
 @dataclass(frozen=True, slots=True)
+class Bornes:
+    """Les bornes du conseiller (`[conseiller.limites]`, E4, lot 2b) : quota journalier
+    des visiteurs (par session) et des comptes clients (par compte), plafond de débit de
+    la clé publique, plafond de coût du jour, inscriptions par session."""
+
+    quota_visiteur_questions_jour: int
+    quota_client_questions_jour: int
+    debit_public_par_minute: int
+    cout_jour_max_usd: float
+    inscriptions_session_max: int
+    inscriptions_fenetre_min: int
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -336,6 +363,8 @@ class Fournisseur:
 @dataclass(frozen=True, slots=True)
 class Reglages:
     cle_api: str = field(repr=False)
+    #: None : la clé publique sert aussi aux comptes (repli, journalisé au démarrage).
+    cle_api_comptes: str | None = field(repr=False)
     adresse_api: str
     identite: str
     delais: Delais
@@ -360,6 +389,7 @@ class Reglages:
     comptes: Comptes
     catalogue: Catalogue
     critiques: Critiques
+    bornes: Bornes
 
 
 class _Lecteur:
@@ -646,6 +676,39 @@ def lire_critiques(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Crit
     )
 
 
+def lire_bornes(lecteur: _Lecteur, donnees: Table) -> Bornes:
+    """Des valeurs positives ; le coût en dollars, les autres en entiers."""
+    table = lecteur.table(
+        lecteur.table(donnees, "conseiller"), "limites", "conseiller."
+    )
+    chemin = "conseiller.limites"
+    return Bornes(
+        quota_visiteur_questions_jour=lecteur.entier(
+            table, "quota_visiteur_questions_jour", chemin
+        ),
+        quota_client_questions_jour=lecteur.entier(
+            table, "quota_client_questions_jour", chemin
+        ),
+        debit_public_par_minute=lecteur.entier(
+            table, "debit_public_par_minute", chemin
+        ),
+        cout_jour_max_usd=lecteur.positif(table, "cout_jour_max_usd", chemin),
+        inscriptions_session_max=lecteur.entier(
+            table, "inscriptions_session_max", chemin
+        ),
+        inscriptions_fenetre_min=lecteur.entier(
+            table, "inscriptions_fenetre_min", chemin
+        ),
+    )
+
+
+def lire_cle_comptes(environ: Mapping[str, str], ecarts: list[str]) -> str | None:
+    cle = environ.get(VARIABLE_CLE_COMPTES, "").strip() or None
+    if cle is not None and not cle.isascii():
+        ecarts.append(f"{VARIABLE_CLE_COMPTES} : caractères hors ASCII — clé illisible")
+    return cle
+
+
 def charger_comptes(
     environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES
 ) -> tuple[str, str, Comptes]:
@@ -747,6 +810,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
 
     resultat = Reglages(
         cle_api=cle,
+        cle_api_comptes=lire_cle_comptes(environ, ecarts),
         adresse_api=adresse,
         identite=lecteur.texte(api, "identite", "api"),
         delais=Delais(
@@ -798,6 +862,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         comptes=lire_comptes(lecteur, donnees),
         catalogue=lire_catalogue(lecteur, donnees, environ, environnement, ecarts),
         critiques=lire_critiques(lecteur, donnees, ecarts),
+        bornes=lire_bornes(lecteur, donnees),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

@@ -1,0 +1,7 @@
+id = "E4Q-13"
+origine = "E4, lot 2b, spec 03 (2026-11-08) — le 02 qui ne bascule pas : sur une base sans la 028 (la production), il appellerait manga.normaliser et chaque recherche échouerait"
+fichier = "02_api_manga/app/main.py"
+avant = '''    return recherche.FONCTION if ligne and ligne[0] else recherche.REPLI'''
+apres = '''    return recherche.FONCTION'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_recherche.py", "-k", "detection_dit"]

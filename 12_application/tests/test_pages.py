@@ -42,32 +42,32 @@ def test_la_page_dit_le_profil_actif_et_son_modele(navigateur):
     )
 
 
-def test_mistral_large_4_n_est_jamais_propose(navigateur):
-    options = options_du_selecteur(navigateur.get("/"))
+def test_mistral_large_4_n_est_jamais_propose(libraire):
+    options = options_du_selecteur(libraire.get("/"))
 
     assert "mistral-large-4" not in options
     assert options == ["mistral-large-2512", "gpt-6-luna", "gpt-6-sol"]
 
 
-def test_chaque_option_dit_son_fournisseur_et_son_hebergement(navigateur):
+def test_chaque_option_dit_son_fournisseur_et_son_hebergement(libraire):
     textes = [
-        o.get_text() for o in soupe(navigateur.get("/")).select("select#profil option")
+        o.get_text() for o in soupe(libraire.get("/")).select("select#profil option")
     ]
 
     assert textes[0] == ("mistral-large-2512 — Mistral, Union européenne (actif)")
     assert textes[1] == "gpt-6-luna — OpenAI, hors Union européenne par défaut"
 
 
-def test_le_profil_actif_est_choisi_par_defaut(navigateur):
-    choisi = soupe(navigateur.get("/")).select_one("select#profil option[selected]")
+def test_le_profil_actif_est_choisi_par_defaut(libraire):
+    choisi = soupe(libraire.get("/")).select_one("select#profil option[selected]")
 
     assert choisi["value"] == "mistral-large-2512"
 
 
-def test_un_profil_indisponible_n_est_pas_propose(navigateur, doublure):
+def test_un_profil_indisponible_n_est_pas_propose(libraire, doublure):
     doublure.choisir(info="profil_indisponible")
 
-    assert options_du_selecteur(navigateur.get("/")) == ["mistral-large-2512"]
+    assert options_du_selecteur(libraire.get("/")) == ["mistral-large-2512"]
 
 
 @pytest.mark.parametrize(
@@ -75,11 +75,11 @@ def test_un_profil_indisponible_n_est_pas_propose(navigateur, doublure):
     [("large_4_actif", "mistral-large-2512"), ("actif_indisponible", "gpt-6-luna")],
 )
 def test_un_actif_exclu_ou_indisponible_cede_au_premier_propose(
-    navigateur, doublure, scenario, attendu
+    libraire, doublure, scenario, attendu
 ):
     doublure.choisir(info=scenario)
 
-    choisi = soupe(navigateur.get("/")).select_one("select#profil option[selected]")
+    choisi = soupe(libraire.get("/")).select_one("select#profil option[selected]")
 
     assert choisi["value"] == attendu
 
@@ -95,10 +95,10 @@ def test_sans_profil_proposable_le_formulaire_est_inactif(navigateur, doublure):
     assert page.select_one("button[type=submit]").has_attr("disabled")
 
 
-def test_un_fournisseur_inconnu_est_dit_inconnu(navigateur, doublure):
+def test_un_fournisseur_inconnu_est_dit_inconnu(libraire, doublure):
     doublure.choisir(info="fournisseur_inconnu")
 
-    page = soupe(navigateur.get("/"))
+    page = soupe(libraire.get("/"))
 
     assert "autre — fournisseur-x, inconnu" in page.get_text()
 
@@ -106,33 +106,29 @@ def test_un_fournisseur_inconnu_est_dit_inconnu(navigateur, doublure):
 @pytest.mark.parametrize(
     ("scenario", "selecteur"), [("nominale", False), ("deux_modes", True)]
 )
-def test_le_selecteur_de_mode_suit_le_contrat(
-    navigateur, doublure, scenario, selecteur
-):
+def test_le_selecteur_de_mode_suit_le_contrat(libraire, doublure, scenario, selecteur):
     doublure.choisir(info=scenario)
 
-    assert (
-        soupe(navigateur.get("/")).select_one("select#mode") is not None
-    ) is selecteur
+    assert (soupe(libraire.get("/")).select_one("select#mode") is not None) is selecteur
 
 
-def test_les_positions_de_temperature_sont_proposees(navigateur):
-    radios = soupe(navigateur.get("/")).select("input[name=temperature]")
+def test_les_positions_de_temperature_sont_proposees(libraire):
+    radios = soupe(libraire.get("/")).select("input[name=temperature]")
 
     assert [r["value"] for r in radios] == ["0.0", "0.3", "0.7"]
     assert [r.has_attr("checked") for r in radios] == [True, False, False]
 
 
-def test_une_position_hors_des_bornes_de_l_api_n_est_pas_proposee(navigateur, doublure):
+def test_une_position_hors_des_bornes_de_l_api_n_est_pas_proposee(libraire, doublure):
     doublure.choisir(info="temperature_bornee")
 
-    radios = soupe(navigateur.get("/")).select("input[name=temperature]")
+    radios = soupe(libraire.get("/")).select("input[name=temperature]")
 
     assert [r["value"] for r in radios] == ["0.0", "0.3"]
 
 
-def test_la_reformulation_est_cochee_par_defaut(navigateur):
-    assert soupe(navigateur.get("/")).select_one("#reformuler").has_attr("checked")
+def test_la_reformulation_est_cochee_par_defaut(libraire):
+    assert soupe(libraire.get("/")).select_one("#reformuler").has_attr("checked")
 
 
 def test_les_bornes_publiees_l_emportent_et_l_ecart_est_journalise(
@@ -183,6 +179,7 @@ def test_api_injoignable_l_application_demarre_et_le_dit(demarrer, port_ferme):
         "api": "indisponible",
         "base": "non_configuree",
         "catalogue": "non_configure",
+        "cles_api": "une",
         "version": application.__version__,
     }
     sortie = navigateur.get("/metrics").text
@@ -212,11 +209,11 @@ def test_une_cle_refusee_est_dite_sans_la_cle(navigateur, doublure):
     assert "API indisponible" in page.text
 
 
-def test_un_debit_depasse_garde_la_derniere_liste(navigateur, doublure):
-    navigateur.get("/")
+def test_un_debit_depasse_garde_la_derniere_liste(libraire, doublure):
+    libraire.get("/")
     doublure.choisir(info="debit_depasse")
 
-    page = navigateur.get("/")
+    page = libraire.get("/")
 
     assert "Service disponible" in page.text
     assert options_du_selecteur(page) == [
@@ -281,6 +278,7 @@ def test_sante_ok(navigateur):
         "api": "ok",
         "base": "non_configuree",
         "catalogue": "non_configure",
+        "cles_api": "une",
         "version": application.__version__,
     }
 
@@ -390,14 +388,12 @@ def test_un_ecart_aux_bornes_publiees_se_journalise_des_le_demarrage(
     assert [r for r in caplog.records if r.getMessage() == "ecart_bornes"]
 
 
-def test_le_defaut_de_reformulation_est_celui_de_l_api(
-    navigateur, doublure, monkeypatch
-):
+def test_le_defaut_de_reformulation_est_celui_de_l_api(libraire, doublure, monkeypatch):
     corps = d.info()
     corps["modele_langage"]["reglages_reponse"]["reformuler"]["defaut"] = False
     monkeypatch.setitem(d.SCENARIOS_INFO, "nominale", lambda: d.Rendu(200, corps))
 
-    assert not soupe(navigateur.get("/")).select_one("#reformuler").has_attr("checked")
+    assert not soupe(libraire.get("/")).select_one("#reformuler").has_attr("checked")
 
 
 def test_une_route_inconnue_rend_la_page_404_avec_son_identifiant(navigateur):
@@ -616,9 +612,7 @@ def test_la_cle_n_apparait_nulle_part(navigateur, caplog):
     assert d.CLE_ATTENDUE not in journal_complet(caplog)
 
 
-def test_les_gabarits_echappent_le_texte_venu_de_l_api(
-    navigateur, doublure, monkeypatch
-):
+def test_les_gabarits_echappent_le_texte_venu_de_l_api(libraire, doublure, monkeypatch):
     doublure.choisir(info="fournisseur_inconnu")
     monkeypatch.setitem(
         d.SCENARIOS_INFO,
@@ -634,7 +628,7 @@ def test_les_gabarits_echappent_le_texte_venu_de_l_api(
         ),
     )
 
-    page = navigateur.get("/")
+    page = libraire.get("/")
 
     assert "<script>x" not in page.text
     assert "&lt;script&gt;x" in page.text

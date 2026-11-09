@@ -8,12 +8,13 @@ et les passages cités.
 ## Ce qu'elle fait, et ce qu'elle ne fait pas
 
 - **Elle fait** : une page question → réponse ; une conversation de cinq échanges au plus ;
-  le choix du profil et deux réglages de démonstration ; un mode démonstration, éteint par
-  défaut, qui montre les scores et la trace de la recherche ; un écran nommé par cas dégradé ;
+  pour les libraires et l'administrateur, le choix du profil, deux réglages et le mode de
+  réponse ; pour l'administrateur seul, un mode démonstration, éteint par défaut, qui
+  montre les scores et la trace de la recherche ; le public (visiteur, client) n'a aucun
+  réglage, en mode strict (E4, lot 2b) ; un écran nommé par cas dégradé ;
   la mention « Vous parlez à une IA » sur chaque écran ; un audit d'accessibilité outillé.
-- **Elle ne fait pas** : aucune écriture en fichier ; mode strict seul tant que l'API n'en
-  expose pas d'autre ; aucune bascule automatique de profil : le repli reste un geste
-  humain.
+- **Elle ne fait pas** : aucune écriture en fichier ; aucun mode autre que le strict pour
+  le public ; aucune bascule automatique de profil : le repli reste un geste humain.
 - **E4, lot 1 (le socle)** : une base à elle (schéma `application`, migration `027`, rôle
   `app_rw` seul) ; mots de passe hachés par Argon2id ; sessions signées, le compte relu en
   base à chaque requête ; jeton CSRF sur chaque formulaire `POST` ; verrou après des
@@ -73,7 +74,9 @@ Un seul écran, `/`, dans l'ordre de lecture :
    script, et l'historique ne le suit pas ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
-4. le formulaire : la question ; les **Réglages**, repliés ; le champ caché de l'historique ;
+4. le formulaire : la question ; les **Réglages**, repliés, pour un libraire ou
+   l'administrateur seulement (« Le conseiller selon le rôle ») ; le champ caché de
+   l'historique ;
 5. la réponse ou le refus ; la ligne discrète (profil, fournisseur, modèle, date de l'appel,
    reformulation, coût estimé, latence) ; une carte par série citée, ses métadonnées et ses
    seuls passages cités ; les détails techniques, repliés ;
@@ -82,7 +85,8 @@ Un seul écran, `/`, dans l'ordre de lecture :
 `/a-propos` : ce qui est transmis, tous les profils proposés et leur hébergement, ce qui
 n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API ; il
 porte `api`, `base` et `catalogue` (`ok`, `indisponible`, `non_configure` : un `GET /live`
-du catalogue, sans clé, délai court).
+du catalogue, sans clé, délai court), et `cles_api` (`une`, `deux` : la clé des comptes
+posée ou non, E4, lot 2b).
 `/metrics` : Prometheus, sur le bouclage, ou le réseau de collecte déclaré
 (`APPLICATION_METRIQUES_RESEAUX`). `application_requetes_total{route, statut}` : `route` est
 le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour le reste.
@@ -96,14 +100,90 @@ issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
 `application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
 chaque appel.
 
+### Le conseiller selon le rôle (E4, lot 2b)
+
+| Rôle | Réglages (profil, température, reformulation) | Case « mode démonstration » | Liste des modes | Mode envoyé |
+|---|---|---|---|---|
+| visiteur, client | **absents du HTML** | absente | absente | `strict`, le défaut du contrat |
+| libraire | présents, repliés | absente | si `/v1/info` déclare plus d'un mode ; `strict` choisi | celui de la liste ; hors liste, le défaut |
+| administrateur | présents | **présente** | même règle | idem |
+
+- **Un champ forgé est ignoré, pas refusé** : pour le public, `profil`, `temperature`,
+  `reformuler`, `mode` et `mode_demonstration` n'existent pas ; un `POST` qui les porte part
+  avec les défauts (profil par défaut, température par défaut, reformulation par défaut de
+  l'API, `strict`) — 200, jamais 422. Un libraire n'a pas le mode démonstration.
+- **Le complément du mode enrichi** n'est rendu que pour un rôle qui choisit le mode ; son
+  étiquette est `complement_etiquette` de l'API (contrat 1.4.0), le texte du 12 si elle
+  manque (`[textes] complement_etiquette`).
+- **Le public** lit, sous le titre, « Le conseiller répond à partir des critiques des
+  libraires du réseau » ; la mention IA reste sur chaque écran.
+- **Le pont, dans les deux sens** : la fiche d'une série porte « Demander au conseiller »
+  (`/?serie=<id>`), qui pré-remplit la question avec le **titre exact lu dans le 02**
+  (« Que pensent les libraires de *titre* ? », `[textes] question_pre_remplie`) — jamais un
+  texte de l'adresse ; un identifiant illisible, une série inconnue, un catalogue absent ou
+  en panne : la page sans pré-remplissage, sans erreur. Une réponse qui **refuse** ou ne
+  **cite aucune série** porte « Chercher ce titre dans le catalogue »
+  (`/catalogue?q=<question coupée à 100 caractères>`, absent sous 2 caractères).
+
+Tests : `tests/test_conseiller_roles.py` (un test par critère de V1, A7, L6, fin de V3) ;
+mutations `E4Q-01` (réglages servis au public), `E4Q-02` (case servie à un libraire),
+`E4Q-03` (`mode=enrichi` forgé par un visiteur accepté).
+
+### Les bornes du conseiller (E4, lot 2b)
+
+Le conseiller public appelle un modèle payant : quatre bornes le tiennent, toutes en
+configuration (`[conseiller.limites]`), vérifiées **avant** l'appel, dans cet ordre, et un
+refus n'appelle jamais l'API.
+
+Les chiffres des deux quotas sont ceux de la décision de Max du 2026-11-09 : **5 questions par
+jour pour un visiteur, 20 pour un client**. Ils remplacent 10 par heure et 10 par jour, qui
+donnaient à un visiteur plus de questions sur une journée qu'à un compte. Les deux se
+comptent par jour civil UTC et se remettent à zéro à minuit UTC.
+
+| Borne | Qui | Valeur, et son repère | Mécanisme | Dépassement |
+|---|---|---|---|---|
+| Quota par session | visiteurs | **5 questions / jour civil UTC** — de quoi essayer le conseiller | les horodatages des questions du jour dans le cookie signé (`quota`), purgés et **bornés** à 5 à chaque lecture (un cookie forgé ne fait rien enfler) ; compté après une réponse 200 seulement | 429, `Retry-After` jusqu'à minuit UTC, « Vous avez posé vos 5 questions du jour ; le conseiller vous revient demain à HH:MM (fuseau du serveur). Un compte gratuit en donne 20 par jour. » ; la question reste au formulaire |
+| Quota par compte client | clients connectés (ni libraires, ni administrateur) | **20 questions / jour civil UTC** — un compte donne plus de questions qu'aucun compte | `application.questions_jour` (migration `029`), relu avant, incrémenté après une réponse 200 ; il **suit le compte**, pas le cookie | 429, `Retry-After` jusqu'à minuit UTC, « … vos 20 questions du jour ; le conseiller vous revient demain à HH:MM » |
+| Plafond de débit | les appels partis avec la **clé publique** | **10 / minute**, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min | en mémoire du processus : **valable avec un processus** ; plusieurs demanderaient un compteur partagé | 429, `Retry-After`, « Le conseiller est très sollicité ; réessayez dans une minute » |
+| Plafond de coût du jour | tout le monde, strict et enrichi | **0,50 $ / jour** — environ 250 questions au coût mesuré | `application.couts_jour` (027) : la somme du jour, relue avant chaque appel ; après chaque réponse, le `cout_estime_usd` reçu (0 s'il manque, journalisé `cout_absent`) sous le profil et le mode **rendus par l'API** ; base indisponible : le plafond n'est **pas vérifiable**, le conseiller répond quand même (`plafond_non_verifiable`, état `inconnu`) | 503, `Retry-After` jusqu'à minuit UTC, « Le conseiller a atteint son budget du jour ; il reprend demain » |
+
+- **Les deux clés** (décision 5) : `APPLICATION_CLE_API` (publique, visiteurs) et
+  `APPLICATION_CLE_API_COMPTES` (facultative : client, libraire, administrateur), prises
+  **par appel** par le même client HTTP. Sans clé des comptes, la publique sert aux deux
+  (`cle_comptes_absente` au démarrage, `/sante` : `"cles_api": "une"`, sinon `"deux"`) :
+  les comptes passent alors sous le plafond de débit des visiteurs — la protection de D7
+  (une rafale de visiteurs ne bloque pas un libraire) suppose la seconde clé, posée au
+  trousseau de l'API au lot de livraison continue.
+- **L'inscription bornée** : 3 comptes par heure et par session (`inscriptions` dans le
+  cookie, même mécanisme, gardé à l'ouverture et à la fermeture d'une session) ; au-delà,
+  429, `Retry-After`, un encart au formulaire, aucune ligne en base.
+- **Limites assumées** : un cookie effacé remet à zéro le quota de session et le compteur
+  d'inscriptions (le quota d'un compte, lui, suit le compte) ; deux questions simultanées
+  peuvent passer ensemble le plafond de coût (relu, pas réservé) ; une réponse en erreur de
+  l'API (503) ne porte pas son coût : il n'est pas compté.
+- **Métriques** : `application_questions_total{mode, issue}` (`reponse`, `refus`, `quota`,
+  `debit`, `plafond_cout`, `api_erreur`, `api_indisponible`),
+  `application_quota_refus_total{motif}` (`session`, `client`, `debit`, `cout`,
+  `inscription`), `application_cout_jour_usd` (lu avant chaque question),
+  `application_plafond_cout_etat{etat}` (`ok`, `atteint`, `inconnu`) ; la latence du
+  conseiller est `application_latence_secondes{route="/question"}` (histogramme existant,
+  borné). Toutes déclarées à zéro dès le démarrage.
+
+Tests : `tests/test_bornes.py` (horloge injectée : la fenêtre glisse, minuit passe, sans
+attendre) ; mutations `E4Q-04` (quota de session jamais incrémenté), `E4Q-05` (plafond de
+débit retiré), `E4Q-06` (coût non relu avant l'appel), `E4Q-07` (clé des comptes retirée),
+`E4Q-08` (inscription sans borne), `E4Q-12` (quota du compte client jamais relu).
+
 ### Les réglages
+
+Pour un libraire ou l'administrateur (« Le conseiller selon le rôle »).
 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
 | Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
-| Mode démonstration | coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
+| Mode démonstration | administrateur seul ; coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
 | Mode | affiché seulement si l'API en déclare plus d'un | `strict` |
 
 Le reste (`longueur_max`, `nombre_series`, `passages_par_serie`, `catalogue_seul`) reste aux
@@ -111,8 +191,8 @@ défauts de l'API.
 
 ### Le mode démonstration
 
-Une case des réglages, **décochée par défaut** (`[reglages] mode_demonstration_defaut =
-false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
+Une case des réglages, **à l'administrateur seul** (E4, lot 2b, A7), **décochée par
+défaut** (`[reglages] mode_demonstration_defaut = false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
 « Nouvelle conversation » la remet au défaut. Ni variable d'environnement, ni cookie à
 elle (le seul cookie est celui de la session, « Sécurité et données »).
 
@@ -195,14 +275,14 @@ par minute du compte (2026-11-03).
 
 ### Le catalogue (E4, lot 2a)
 
-Deux pages publiques, servies par l'API data du module 02 (contrat 0.5.0), sous la clé
+Deux pages publiques, servies par l'API data du module 02 (contrat 0.6.0 depuis le lot 2b ; un 02 en 0.5.0 reste lu, sans suggestions ni source du résumé), sous la clé
 de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le menu porte
 « Catalogue » sur chaque page ; elles gardent le menu du compte connecté.
 
 | Page | Ce qu'elle fait |
 |---|---|
-| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé qui renvoie au conseiller, et dit que la recherche ne corrige pas encore les fautes |
-| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé, les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé ; quand le 02 rend des `suggestions` (contrat 0.6.0, la ressemblance de trigrammes au-dessus d'un seuil mesuré), **« Vouliez-vous dire… ? »** et un lien par fiche suggérée (non préchargée), puis le lien vers le conseiller ; sans suggestion, le renvoi au conseiller seul (E4, lot 2b) |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé servi par le 02 (contrat 0.6.0 : coupé avant les critiques de lecteurs que la source y avait recopiées) et sa source — un résumé Kitsu dit « Résumé fourni par Kitsu (en anglais) », `lang="en"` ; le français principal, le résumé Kitsu replié dessous dans un `<details>` (`lang="en"`) ; sans résumé, « Résumé indisponible » — ; « Demander au conseiller » (`zone-pont-conseiller`) ; les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
 
 **Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
 configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
@@ -437,7 +517,8 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
 | Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
-| Consommation de ressources (A04), authentification (A07) : l'inscription | **non couvert à ce lot** : un même poste peut créer des comptes à la chaîne ; couvert au lot du conseiller public avec le quota par session et le plafond global |
+| Consommation de ressources non bornée (A04) : le conseiller | **couvert** (E4, lot 2b) : quatre bornes vérifiées avant l'appel — quota par session, quota par compte client, débit de la clé publique, budget du jour persisté (« Les bornes du conseiller ») ; un refus n'appelle jamais l'API ; mutations E4Q-04 à 07, E4Q-12 |
+| Authentification (A07) : l'inscription | **couvert, par session** (E4, lot 2b) : 3 comptes par heure et par navigateur, aucune ligne au-delà ; limite assumée : un cookie effacé remet le compteur à zéro ; mutation E4Q-08 |
 
 ## Configuration
 
@@ -500,7 +581,7 @@ l'API, ajouter à la ligne `API_MODELE_CLES`, séparé par une virgule,
 `application:<secret>` : une seconde ligne remplacerait la première.
 
 **Le catalogue dans la pile** (E4, lot 2a) — le service `catalogue`, l'image
-`api-catalogue:0.5.0` du module 02 :
+`api-catalogue:0.6.0` du module 02 :
 
 - dans `02_api_manga/.env` : `API_KEYS=conseiller:<clé>` (le consommateur de
   l'application) et `DB_NAME` (`apimanga`, lu seulement) ; dans le `.env` de ce module,
@@ -549,6 +630,12 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 ```
 
 ## Limites déclarées
+
+- **Tolérance aux fautes du conseiller** : mesurée le 2026-11-08 (E4, lot 2b, D14 a) — douze
+  questions du jeu gelé, une faute mécanique chacune (auteur inversé, transposition, lettre
+  manquante, lettre doublée), posées en strict à l'API réelle depuis la préproduction :
+  **11 / 12** citent une série attendue ; résultat et méthode au rapport du lot 2b ; la
+  résolution des titres dans l'API (D14 c) reste une décision de Max.
 
 - **Une instance**, aucune mémoire partagée.
 - **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute

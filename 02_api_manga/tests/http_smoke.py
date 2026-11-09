@@ -278,7 +278,12 @@ def main() -> None:
     verifier_les_curseurs_illisibles()
 
     assert get_json("/live") == {"status": "ok", "db": "not_checked"}
-    assert get_json("/health") == {"status": "ok", "db": "ok"}
+    # Le harnais migre jusqu'au dernier fichier, donc avec la 028 : la fonction.
+    assert get_json("/health") == {
+        "status": "ok",
+        "db": "ok",
+        "normalisation": "fonction",
+    }
 
     # /kitsu/{id} lit manga.kitsu_series_core, peuplée d'une seule série.
     kitsu = get_json("/kitsu/38")
@@ -397,6 +402,23 @@ def verifier_le_catalogue() -> None:
     assert {champ: serie[champ] for champ in attendus} == attendus
     assert serie["members_rating"] == 8.69 and serie["members_votes"] == 6936
 
+    # Le résumé (contrat 0.6.0), dérivé de la fixture (section 2 ter) : coupé avant la
+    # critique recopiée, au point qui la précède ; la source ; le résumé Kitsu.
+    assert serie["synopsis_enriched"] == (
+        "Gol D. Roger, roi des pirates, a cache son tresor a Raftel. "
+        "Luffy part a sa recherche avec son equipage, d'ile en ile, sur Grand Line."
+    )
+    assert "abordage" not in serie["synopsis_enriched"]
+    assert "abordage" in serie["synopsis"], "le brut reste au contrat"
+    assert serie["synopsis_source"] == "manga_sanctuary"
+    assert serie["synopsis_kitsu"] == (
+        "Gol D. Roger, roi des pirates, a cache son tresor a Raftel."
+    )
+    # 8514 : ni résumé Manga Sanctuary ni lien au moyeu — rien.
+    sans = get_json("/series/8514")
+    assert (sans["synopsis_enriched"], sans["synopsis_source"]) == (None, None)
+    assert sans["synopsis_kitsu"] is None
+
     # Aucune colonne de travail du rapprochement ne doit sortir par HTTP.
     for interdit in ("ms_title_norm_x", "_other_titles_list", "match_score"):
         assert interdit not in serie
@@ -487,9 +509,41 @@ def verifier_la_recherche() -> None:
     assert auteur["items"][0]["correspondance"] == "auteur"
     assert auteur["items"][0]["auteurs"] == "Eiichiro ODA"
 
-    # « zz » : rien ne le contient — 200 et une liste vide, jamais 404.
+    # « zz » : rien ne le contient — 200 et une liste vide, jamais 404 ; et rien ne
+    # lui ressemble : aucune suggestion.
     vide = get_json("/series?q=zz")
     assert vide["total"] == 0 and vide["items"] == []
+    assert vide["suggestions"] == []
+
+    # Contrat 0.6.0 — cinq saisies sur la fixture, pour la mécanique (la mesure du
+    # seuil, elle, se joue sur le catalogue réel : README).
+    # « oda eiichiro » : l'auteur, ses mots dans l'autre ordre — correspondance directe.
+    inverse = get_json("/series?q=oda%20eiichiro")
+    assert [i["series_id"] for i in inverse["items"]] == [736]
+    assert inverse["items"][0]["correspondance"] == "auteur"
+    # « Wân Pisu » : une romanisation fautive, couverte par la normalisation.
+    roman = get_json("/series?q=W%C3%A2n%20Pisu")
+    assert [i["correspondance"] for i in roman["items"]] == ["autre_titre"]
+    assert roman["suggestions"] == []
+    # « one pice » (une lettre manquante) : rien ne la contient ; « One Piece » lui
+    # ressemble au-dessus du seuil — par son titre.
+    faute = get_json("/series?q=one%20pice")
+    assert faute["total"] == 0 and faute["items"] == []
+    assert faute["suggestions"][0]["series_id"] == 736
+    assert faute["suggestions"][0]["correspondance"] == "titre"
+    assert 0.3 <= faute["suggestions"][0]["score"] <= 1
+    # « eiichiro odda » (une lettre doublée dans l'auteur) : par l'auteur.
+    auteur_faute = get_json("/series?q=eiichiro%20odda")
+    assert auteur_faute["total"] == 0
+    assert [s["series_id"] for s in auteur_faute["suggestions"]] == [736]
+    assert auteur_faute["suggestions"][0]["correspondance"] == "auteur"
+    # « serie d » : « Serie B », « Serie C », « Serie sans critique » lui ressemblent ;
+    # cinq au plus, la plus ressemblante d'abord.
+    proches = get_json("/series?q=serie%20d")
+    assert proches["total"] == 0
+    scores = [s["score"] for s in proches["suggestions"]]
+    assert scores == sorted(scores, reverse=True) and 1 <= len(scores) <= 5
+    assert {s["series_id"] for s in proches["suggestions"]} <= {8514, 9999, 999}
 
     # « 100% » : le « % » de la saisie n'est pas un joker — rien ne contient « 100% ».
     assert get_json("/series?q=100%25")["total"] == 0

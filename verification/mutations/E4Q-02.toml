@@ -1,0 +1,7 @@
+id = "E4Q-02"
+origine = "E4, lot 2b, spec 01 (2026-11-08) — la case du mode démonstration servie à un libraire : elle est réservée à l'administrateur (A7)"
+fichier = "12_application/src/application/gabarits/composants/formulaire.html"
+avant = '''{% if peut_demontrer %}'''
+apres = '''{% if peut_regler %}'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_conseiller_roles.py", "-k", "libraire_a_les_reglages_et_la_liste_sans_la_case"]
