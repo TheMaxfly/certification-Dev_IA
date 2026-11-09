@@ -459,6 +459,14 @@ indisponibles** ; la requête du 2a rejouée sur le champ servi : **0** ; *Narut
 résumé français coupé, 850 caractères. Sur les 14 670 séries : 8 927 résumés Manga
 Sanctuary, 1 762 Kitsu, 3 981 sans résumé.
 
+**Marques de critique mesurées le 2026-11-09 : 128 résumés servis** (1,43 % des 8 927)
+portent au moins deux des cinq familles de marques (tomes lus, première personne, note
+chiffrée, adresse au lecteur, appréciation), 1 492 au moins une ; un tirage de 10 relus :
+10 vrais extraits de critiques ou de chroniques, **absents des tables de critiques** — la
+règle ci-dessus ne peut pas les voir (*Naruto* en garde un). **Décision : aucune coupe de
+plus dans ce lot** ; une seconde coupe à la première marque (120 résumés coupés en plus,
+2 passés à Kitsu, 6 indisponibles) est soumise ; le vrai remède est la collecte.
+
 **Le moyeu, pas l'ancien appariement.** Parmi les 5 671 séries sans résumé Manga
 Sanctuary, l'ancien champ `series_synopsis_enriched` portait un résumé Kitsu pour 1 871
 (l'appariement historique) ; le moyeu en donne 1 730 : 371 séries perdent un résumé
