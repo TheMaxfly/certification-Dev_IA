@@ -124,7 +124,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " catalogue_vouliez_vous_dire catalogue_trouve_par_auteur"
             " serie_metadonnees serie_type serie_annee serie_note_etiquette"
             " serie_sans_note serie_reseau_titre serie_reseau_vide"
-            " serie_listes_titre serie_listes serie_synopsis_titre"
+            " serie_listes_titre serie_synopsis_titre"
             " serie_sans_synopsis serie_genres_titre serie_lien_catalogue"
             " serie_retour_catalogue"
             # E4, lot 3 : les critiques signées.
@@ -174,6 +174,18 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " quota_titre debit_titre debit_public budget_titre budget_atteint"
             " inscription_bornee_titre apropos_quotas_titre"
             " serie_resume_kitsu_source serie_resume_kitsu_voir"
+            # E4, lot 4 : les listes du client.
+            " menu_listes liste_favori liste_a_lire liste_a_commander"
+            " liste_bouton_favori liste_bouton_a_lire liste_bouton_a_commander"
+            " liste_dans_favori liste_dans_a_lire liste_dans_a_commander"
+            " liste_section_favori liste_section_a_lire liste_section_a_commander"
+            " liste_vide_favori liste_vide_a_lire liste_vide_a_commander"
+            " liste_retirer liste_retirer_court liste_avis_retiree liste_avis_absente"
+            " liste_avis_indisponible liste_etat_inconnu_titre liste_etat_inconnu"
+            " liste_pleine_titre serie_listes_connexion serie_listes_inscription"
+            " serie_listes_aucune serie_listes_indisponible serie_listes_groupe"
+            " listes_titre listes_aide listes_catalogue_encart"
+            " listes_titre_indisponible apropos_listes_titre apropos_listes"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -239,6 +251,16 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "quota_client": frozenset({"n", "heure"}),
     "inscription_bornee": frozenset({"n", "heure"}),
     "apropos_quotas": frozenset({"visiteur", "client"}),
+    "liste_bouton_actuelle": frozenset({"libelle"}),
+    "liste_avis_ajoutee": frozenset({"liste"}),
+    "liste_avis_changee": frozenset({"liste"}),
+    "liste_avis_inchangee": frozenset({"liste"}),
+    "liste_avis_pleine": frozenset({"n"}),
+    "liste_retirer_etiquette": frozenset({"titre"}),
+    "liste_section_compte": frozenset({"titre", "n"}),
+    "liste_ajoutee_le": frozenset({"date"}),
+    "serie_listes_etat": frozenset({"liste"}),
+    "carte_listes_groupe": frozenset({"titre"}),
 }
 
 
@@ -292,6 +314,8 @@ class Comptes:
     nom_affiche_max: int
     delai_base_s: float
     par_page: int
+    #: La borne d'une liste du client (E4, lot 4) : un ajout au-delà est refusé.
+    listes_max_par_etat: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -632,6 +656,7 @@ def lire_comptes(lecteur: _Lecteur, donnees: Table) -> Comptes:
         nom_affiche_max=lecteur.entier(comptes, "nom_affiche_max", "comptes"),
         delai_base_s=lecteur.positif(comptes, "delai_base_s", "comptes"),
         par_page=lecteur.entier(comptes, "par_page", "comptes"),
+        listes_max_par_etat=lecteur.entier(comptes, "listes_max_par_etat", "comptes"),
     )
 
 

@@ -1,0 +1,9 @@
+id = "E4L-04"
+origine = "E4, lot 4, spec 02 (2026-11-09) — le formulaire de liste servi sur les cartes du conseiller à un visiteur (et à un libraire, un administrateur)"
+fichier = "12_application/src/application/pages_listes.py"
+avant = '''    if not peut_lister(compte):
+        return {}'''
+apres = '''    if False:
+        return {}'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_listes.py", "-k", "aucun_formulaire_de_liste_dans_les_cartes_hors_client"]

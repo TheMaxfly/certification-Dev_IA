@@ -18,6 +18,9 @@
 <li><a href="/">{{ t.menu_conseiller }}</a></li>
 <li><a href="/catalogue">{{ t.menu_catalogue }}</a></li>
 {% if compte %}
+{% if compte.role == "client" %}
+<li><a href="/compte/listes">{{ t.menu_listes }}</a></li>
+{% endif %}
 <li><a href="/compte/mot-de-passe">{{ t.menu_mon_compte }}</a></li>
 {% if compte.role == "libraire" %}
 <li><a href="/libraire/critiques">{{ t.menu_critiques }}</a></li>

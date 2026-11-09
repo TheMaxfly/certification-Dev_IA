@@ -44,6 +44,9 @@ MODES_QUESTION = ("strict", "enrichi")
 MOTIFS_REFUS = ("session", "client", "debit", "cout", "inscription")
 #: L'état du plafond de coût à sa dernière lecture.
 ETATS_PLAFOND = ("ok", "atteint", "inconnu")
+#: Les gestes sur les listes du client (E4, lot 4) qui écrivent : un ajout, un
+#: changement d'état, un retrait.
+ACTIONS_LISTES = ("ajout", "changement", "retrait")
 
 
 class Metriques:
@@ -138,6 +141,15 @@ class Metriques:
             ["etat"],
             registry=self.registre,
         )
+        self.listes = Counter(
+            "application_listes",
+            "Gestes écrits sur les listes du client (E4, lot 4), par action : ajout,"
+            " changement (d'état), retrait. Un geste sans effet n'est pas compté.",
+            ["action"],
+            registry=self.registre,
+        )
+        for action in ACTIONS_LISTES:
+            self.listes.labels(action=action)
         for motif in MOTIFS_REFUS:
             self.quota_refus.labels(motif=motif)
         for mode in MODES_QUESTION:

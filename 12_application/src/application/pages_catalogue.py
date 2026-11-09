@@ -25,7 +25,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from application import journal, pages_critiques, presentation, sessions
+from application import journal, pages_critiques, pages_listes, presentation, sessions
 from application.client_catalogue import (
     CatalogueIndisponible,
     ClientCatalogue,
@@ -226,15 +226,26 @@ def installer(
         request: Request, fiche: SerieCatalogue, compte: Compte | None
     ) -> Response:
         meta = fiche.metadonnees()
+        base = request.app.state.base
         reseau = await pages_critiques.reseau_de(
-            request.app.state.base, reglages, compte, fiche.series_id
+            base, reglages, compte, fiche.series_id
         )
-        publiee = request.query_params.get("etat") == "critique_publiee"
+        # E4, lot 4 : la zone des listes selon le rôle, et l'avis d'un geste (PRG).
+        zone = await pages_listes.zone_de_la_fiche(base, t, compte, fiche.series_id)
+        etat = request.query_params.get("etat", "")
+        avis = (
+            t["critiques_l5"]
+            if etat == "critique_publiee"
+            else pages_listes.avis_de_la_fiche(
+                t, etat, zone, reglages.comptes.listes_max_par_etat
+            )
+        )
         return rendre(
             request,
             "serie.html",
             reseau=reseau,
-            avis=t["critiques_l5"] if publiee else None,
+            zone_listes=zone,
+            avis=avis,
             titre=fiche.title or t["valeur_inconnue"],
             fiche=fiche,
             # Une adresse du catalogue, et rien d'autre (ni `javascript:`, ni relatif).

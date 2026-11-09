@@ -1,0 +1,11 @@
+id = "E4L-01"
+origine = "E4, lot 4, spec 02 (2026-11-09) — l'état d'une liste n'est pas écrit en base : le geste répond « ajoutée » et rien n'est gardé"
+fichier = "12_application/src/application/listes.py"
+avant = '''            "INSERT INTO application.listes (compte_id, series_id, etat)"
+            " VALUES (%s, %s, %s)"
+            " ON CONFLICT (compte_id, series_id) DO UPDATE"
+            " SET etat = EXCLUDED.etat, ajoute_le = now()"
+            " WHERE listes.etat IS DISTINCT FROM EXCLUDED.etat",'''
+apres = '''            "SELECT %s, %s, %s",'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_listes.py", "-k", "ajouter_changer_meme_etat_retirer"]

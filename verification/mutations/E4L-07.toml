@@ -1,0 +1,7 @@
+id = "E4L-07"
+origine = "E4, lot 4, spec 02 (2026-11-09) — la borne listes_max_par_etat retirée : une liste grandirait sans fin, la page « Mes listes » demanderait autant de titres au catalogue"
+fichier = "12_application/src/application/listes.py"
+avant = '''        if dans_la_liste >= maximum:'''
+apres = '''        if False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_listes.py", "-k", "la_borne"]

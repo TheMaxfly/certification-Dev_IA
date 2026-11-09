@@ -1,0 +1,7 @@
+id = "E4L-03"
+origine = "E4, lot 4, spec 02 (2026-11-09) — la garde de rôle du geste retirée : un libraire ou un administrateur écrirait une liste"
+fichier = "12_application/src/application/pages_listes.py"
+avant = '''            compte = await sessions.exiger_role("client")(request)'''
+apres = '''            compte = await sessions.exiger_connexion(request)'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_listes.py", "-k", "un_libraire_et_un_admin_n_ont_ni_zone_ni_geste"]

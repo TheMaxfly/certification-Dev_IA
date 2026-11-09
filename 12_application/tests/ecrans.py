@@ -152,6 +152,13 @@ ECRANS: tuple[Ecran, ...] = (
     Ecran("conseiller_debit_atteint", question=QUESTION, borne="debit"),
     Ecran("conseiller_budget_atteint", question=QUESTION, borne="budget"),
     Ecran("inscription_bornee", chemin="/inscription", borne="inscription"),
+    # E4, lot 4 : les listes du client — la zone de la fiche selon le rôle, le geste sur
+    # les cartes du conseiller. Les pages du compte (« Mes listes », la fiche avec un
+    # état, la suppression) sont des écrans des comptes (`test_audit_axe`), comme au
+    # lot 3 ; leur balisage est éprouvé par `test_listes` et `test_effacement`.
+    Ecran("serie_listes_visiteur", chemin="/series/101"),
+    Ecran("serie_listes_client", chemin="/series/102", role="client"),
+    Ecran("reponse_cartes_client", question=QUESTION, role="client"),
 )
 
 #: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le

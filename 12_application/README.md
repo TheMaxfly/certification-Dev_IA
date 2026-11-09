@@ -346,6 +346,41 @@ aux recommandations du conseiller à la prochaine mise à jour du corpus » — 
 publication et en tête de « Mes critiques ». Les critiques collectées (celles des lecteurs)
 ne sont toujours pas affichées : aucun appel à `/series/{id}/reviews`.
 
+### Les listes du client (E4, lot 4)
+
+Un compte **client** tient trois listes — **favori**, **à lire**, **à commander** —, un
+état par série, le dernier geste gagne. Sans JavaScript : un formulaire `POST`, des
+boutons ; `Cache-Control: no-store`.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/series/{series_id}`, zone « Vos listes » (`zone-listes`) | visiteur | « Connectez-vous pour tenir vos listes » (`/connexion?retour=/series/{id}`) et « Créer un compte » ; aucun bouton |
+| | client | « Dans votre liste : à lire » ou « Cette série n'est dans aucune de vos listes » ; **un** formulaire, trois boutons (`etat`), l'état courant `aria-pressed="true"` et dit « (actuelle) », et « Retirer de mes listes » quand un état existe ; après le geste, l'avis en tête de la fiche |
+| | libraire, administrateur | la zone **n'est pas rendue** (les listes sont celles des clients ; un libraire a ses critiques, l'administrateur ses outils) |
+| `POST /listes/{series_id}` | client | `jeton`, `etat` (`favori`, `a_lire`, `a_commander`, `retirer`), `retour` (chemin local seul ; défaut : la fiche) ; **303 vers `retour`**, `?etat=` : `ajoutee`, `changee`, `inchangee` (« Déjà dans vos favoris »), `retiree`, `absente`, `pleine`, `indisponible` ; libraire, administrateur : **403** ; visiteur : 303 vers la connexion, retour compris ; un état hors liste : 422 nommé ; un identifiant hors de 1 … 2 147 483 647 : 404 |
+| `/compte/listes` | client | « Mes listes » : trois sections (`zone-liste-favori`, `zone-liste-a_lire`, `zone-liste-a_commander`), « À lire (3) », la plus récente d'abord ; chaque entrée : le titre **lu dans le 02** (lien vers la fiche), la date d'ajout (`<time>`), « Retirer » ; état vide nommé par section ; base absente : 503 « comptes indisponibles » |
+| carte du conseiller (`zone-carte-listes`) | client | sous chaque carte citée, « Dans votre liste : favori » s'il y a lieu et les trois boutons ; `retour` = la fiche de la série ; pas de retrait (la fiche et la page le font) ; **aucun formulaire dans le HTML d'un visiteur, d'un libraire ou d'un administrateur** |
+
+- **La revalidation** : la série d'un **ajout** (ou d'un changement) est relue dans le 02
+  avant l'écriture — inconnue : 404, rien d'écrit ; catalogue injoignable ou non
+  configuré : rien d'écrit, l'avis « le catalogue ne répond pas ». Un **retrait** ne la
+  demande pas : une série que le 02 ne connaît plus doit pouvoir sortir d'une liste.
+- **La borne** : `[comptes] listes_max_par_etat` (**50**) ; une 51e série, ou un changement
+  vers une liste pleine, est refusé (`?etat=pleine`, avis nommé), vérifié dans la même
+  transaction que l'écriture, la ligne du compte tenue : deux gestes simultanés ne la
+  dépassent pas. Pas de pagination : la borne suffit.
+- **Les titres en parallèle** : la page demande au 02 les fiches de ses entrées ensemble
+  (`asyncio.gather`, 150 au plus) ; une série inconnue : « Titre indisponible », l'entrée
+  et son lien restent ; le catalogue muet : toutes en « Titre indisponible » et l'encart
+  « Le catalogue ne répond pas ; vos listes sont intactes ». Le titre n'est jamais gardé
+  en base (`application.listes` : compte, série, état, date).
+- **Rien n'est tracé au journal des actions** : une liste est la donnée du client, pas un
+  contenu publié ; retirer supprime la ligne. Métrique : `application_listes_total{action}`
+  (`ajout`, `changement`, `retrait` ; un geste sans effet n'est pas compté).
+- **Limite (CL4)** : le geste depuis une carte mène à la **fiche** de la série, où l'état et
+  l'avis se lisent : la réponse du conseiller n'est pas conservée par un `POST` sans
+  JavaScript (« rien n'est gardé des conversations »).
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -362,7 +397,7 @@ Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, ave
 
 **Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
 Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
-client — Conseiller, Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
+client — Conseiller, Mes listes (E4, lot 4), Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
 en plus, Mes critiques ; administrateur — en plus, Comptes et Critiques (la modération ;
 pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
 dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
@@ -513,6 +548,7 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
+| Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
 | Injection (A03) : le texte des critiques | requêtes paramétrées ; le texte rendu **échappé** par les gabarits, jamais marqué « sûr » (test avec `<script>`, `<b>`, `<img onerror>` : rendus littéralement, aucun élément créé ; mutation E4R-07) ; politique de sécurité du contenu sans script |
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
@@ -641,7 +677,8 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 - **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute
   (2026-11-03), est rendu à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
   quota par poste : épreuve E4.
-- **Aucune personnalisation** : pas de compte.
+- **Aucune personnalisation du conseiller** : il ne lit ni les listes ni l'historique du
+  compte.
 - **Un seul écran.**
 - **Un clic trop tôt après un refus** peut coûter une reformulation (« Les cas dégradés »).
 - **Au-delà de 75 s**, l'écran dit « délai dépassé » pendant que l'API peut continuer, et
@@ -681,7 +718,8 @@ la garde par rôle et d'environnement, les écrans des comptes et leurs trois r�
 libraire, administrateur), la commande du premier administrateur (ci-dessus). **Lot 2a
 (le catalogue)** : la recherche et la page de série, par l'API data du 02. **Lot 3 (les
 critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
-lecteurs (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
+lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
+la fiche, les cartes du conseiller et « Mes listes » (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
 et de l'état des services ; le serveur avec préproduction et production ; l'identité
 visuelle, sur `theme.css`.
