@@ -621,6 +621,8 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
     retard_s: ClassVar[float] = 0.0
     goutte_s: ClassVar[float] = 0.0
     statut_modeles: ClassVar[int] = 200
+    #: Un retard de la liste des modèles (E4, lot 5 : le test des clés trop lent).
+    retard_modeles_s: ClassVar[float] = 0.0
     modeles: ClassVar[list[str]] = []
     recus: ClassVar[list[dict[str, Any]]] = []
 
@@ -658,6 +660,8 @@ class DoublureFournisseur(BaseHTTPRequestHandler):
         if self.path != "/v1/models":
             self._envoyer(404, b"{}")
             return
+        if DoublureFournisseur.retard_modeles_s:
+            time.sleep(DoublureFournisseur.retard_modeles_s)
         corps = {"object": "list", "data": [{"id": m} for m in self.modeles]}
         self._envoyer(DoublureFournisseur.statut_modeles, json.dumps(corps).encode())
 
@@ -725,6 +729,7 @@ def doublures() -> Iterator[Doublures]:
     DoublureFournisseur.retard_s = 0.0
     DoublureFournisseur.goutte_s = 0.0
     DoublureFournisseur.statut_modeles = 200
+    DoublureFournisseur.retard_modeles_s = 0.0
     DoublureFournisseur.modeles = []
     DoublureFournisseur.recus = []
     serveurs = (

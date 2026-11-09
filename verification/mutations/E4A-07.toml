@@ -1,0 +1,7 @@
+id = "E4A-07"
+origine = "E4, lot 5, spec 02 (2026-11-09) — le test des clés rend la valeur de la variable d'environnement au lieu de son nom"
+fichier = "11_api_modele/src/api_modele/fournisseurs.py"
+avant = '''                    variable_cle=variable,'''
+apres = '''                    variable_cle=self._environ.get(variable, ""),'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_verification_cles.py", "-k", "aucune_valeur_de_cle"]

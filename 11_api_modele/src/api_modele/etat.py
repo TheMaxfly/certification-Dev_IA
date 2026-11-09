@@ -27,6 +27,8 @@ class EtatApi:
     classeur: Classeur
     limiteur: Limiteur
     metriques: Metriques
+    #: La borne du test des clés (E4, lot 5) : 1 appel par minute et par clé, à part.
+    limiteur_verification: Limiteur
     fournisseurs: Fournisseurs
     pseudonymes: Pseudonymes
 

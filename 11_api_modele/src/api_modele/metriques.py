@@ -118,6 +118,13 @@ class Metriques:
             buckets=SEUILS_LLM_S,
             registry=self.registre,
         )
+        self.verifications = Counter(
+            "api_modele_verifications",
+            "Tests des clés des fournisseurs (POST /v1/verification, E4, lot 5), par"
+            " issue : ok (tous les profils disponibles), partiel, aucune.",
+            ["issue"],
+            registry=self.registre,
+        )
         self.profil_actif = Gauge(
             "api_modele_profil_actif",
             "Le profil qui rédige (1), les autres profils déclarés (0).",

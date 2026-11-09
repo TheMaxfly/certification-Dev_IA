@@ -25,6 +25,11 @@ caractères (`estimes`). L'estimation avant appel (`estimer_jetons`, `estimer_co
 sert au banc, qui tient le plafond d'un run ; la couche ne bloque pas sur le plafond,
 elle rend l'estimation dans sa trace.
 
+Le test des clés (E4, lot 5, D10) : `controler_cles`, la route `POST /v1/verification`.
+Il rejoue `GET …/v1/models` (non facturé) pour **chaque profil déclaré**, une fois par
+couple (adresse, variable), en parallèle, et rend un rapport ; il **ne change rien** à
+la disponibilité des profils en service (le contrôle du démarrage, lui, en retire).
+
 Ce que la couche ne fait jamais : journaliser une clé, un message, un passage, une
 sortie du modèle ; appeler sans profil ; réessayer.
 """
@@ -61,6 +66,22 @@ NOM_SCHEMA = "sortie"
 #: Un code d'erreur de fournisseur recopié dans `details` : court, sans donnée.
 CODE_COURT = re.compile(r"^[a-z0-9_.-]{1,64}$")
 STATUT_DEBIT = 429
+
+
+@dataclass(frozen=True, slots=True)
+class Controle:
+    """Le test de la clé d'un profil : `configuree` — la variable est posée et non
+    vide ; `disponible` — la liste des modèles a répondu et contient le modèle ;
+    `statut` — `ok`, `injoignable`, le code HTTP du fournisseur, `corps_inattendu`, ou
+    `absente` (aucun appel). Le NOM de la variable, jamais sa valeur."""
+
+    nom: str
+    fournisseur: str
+    modele: str
+    variable_cle: str
+    configuree: bool
+    disponible: bool
+    statut: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,6 +377,59 @@ class Fournisseurs:
                 },
             )
         return {nom: p.disponible for nom, p in self.profils.items()}
+
+    async def controler_cles(self) -> list[Controle]:
+        """Le test des clés de l'administration : un rapport par profil déclaré, sans
+        effet sur `self.profils` — il informe, il ne coupe pas un profil en service.
+        Une clé non posée n'appelle rien (`absente`) ; les autres, `/v1/models` une
+        fois par couple (adresse, variable), en parallèle."""
+        configurees = {
+            nom: bool(self._environ.get(p.variable_cle, "").strip())
+            for nom, p in self.profils.items()
+        }
+        groupes: dict[tuple[str, str], list[str]] = {}
+        for nom, profil in self.profils.items():
+            if configurees[nom]:
+                cle = (adresse_modeles(profil.adresse), profil.variable_cle)
+                groupes.setdefault(cle, []).append(nom)
+        couples = list(groupes)
+        lus = dict(
+            zip(
+                couples,
+                await asyncio.gather(*(self._lister(a, v) for a, v in couples)),
+                strict=True,
+            )
+        )
+        for (adresse, variable), (_, statut) in lus.items():
+            journal.evenement(
+                "verification_cles",
+                {
+                    "adresse": adresse,
+                    "variable_cle": variable,
+                    "statut": statut,
+                    "profils": groupes[adresse, variable],
+                },
+            )
+        controles: list[Controle] = []
+        for nom, profil in self.profils.items():
+            variable = profil.variable_cle
+            if configurees[nom]:
+                identifiants, statut = lus[adresse_modeles(profil.adresse), variable]
+                disponible = profil.modele in identifiants
+            else:
+                disponible, statut = False, "absente"
+            controles.append(
+                Controle(
+                    nom=nom,
+                    fournisseur=profil.fournisseur,
+                    modele=profil.modele,
+                    variable_cle=variable,
+                    configuree=configurees[nom],
+                    disponible=disponible,
+                    statut=statut,
+                )
+            )
+        return controles
 
     async def _lister(self, adresse: str, variable: str) -> tuple[set[str], str]:
         cle = self._environ.get(variable, "")

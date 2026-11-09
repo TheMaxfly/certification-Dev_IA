@@ -239,6 +239,36 @@ class Info(BaseModel):
     modele_langage: ModeleLangage
 
 
+class ControleCle(BaseModel):
+    """Le test de la clé d'un profil (E4, lot 5) : le NOM de la variable, jamais sa
+    valeur, ni un préfixe, ni une longueur."""
+
+    nom: str
+    fournisseur: str
+    modele: str = Field(description="L'identifiant du modèle chez le fournisseur.")
+    variable_cle: str = Field(
+        description="Le NOM de la variable d'environnement de la clé, jamais sa valeur."
+    )
+    configuree: bool = Field(
+        description="La variable est posée dans l'environnement de l'API, non vide."
+    )
+    disponible: bool = Field(
+        description="La liste des modèles du fournisseur a répondu et contient le"
+        " modèle du profil."
+    )
+    statut: str = Field(
+        description="ok ; injoignable ; le code HTTP rendu par le fournisseur ;"
+        " corps_inattendu (liste illisible) ; absente (clé non posée : aucun appel)."
+    )
+
+
+class Verification(BaseModel):
+    """Le rapport du test des clés : un instant, un contrôle par profil déclaré."""
+
+    verifie_le: str = Field(description="L'instant du test, en UTC (ISO 8601, Z).")
+    profils: list[ControleCle]
+
+
 # --------------------------------------------------------------------------- #
 #  La route de réponse — `POST /v1/reponse` (E3, étape 3)
 # --------------------------------------------------------------------------- #

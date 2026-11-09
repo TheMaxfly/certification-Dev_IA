@@ -1,0 +1,7 @@
+id = "E4A-06"
+origine = "E4, lot 5, spec 02 (2026-11-09) — la route du test des clés sans sa borne : le fournisseur sondé autant de fois qu'on la demande"
+fichier = "11_api_modele/src/api_modele/application.py"
+avant = '''        attente = etat.limiteur_verification.admettre(cle)'''
+apres = '''        attente = None'''
+dossier = "11_api_modele"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_verification_cles.py", "-k", "bornee_a_un_appel"]
