@@ -310,6 +310,8 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
         # E4, lot 2a : le catalogue (l'API data du 02).
         "APPLICATION_CLE_CATALOGUE",
         "CATALOGUE_ADRESSE",
+        # E4, lot 2b : la clé des comptes connectés (facultative).
+        "APPLICATION_CLE_API_COMPTES",
     }
     assert all(valeur == "" for _, valeur in affectations)
 
