@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "composants/champ.html" as c %}
 {% import "composants/critique.html" as k %}
+{% import "composants/listes.html" as l %}
 {% block titre %}{{ titre }}{% endblock %}
 {% block contenu %}
 <h1>{{ titre }}</h1>
@@ -41,10 +42,22 @@
 {% endif %}
 {% endif %}
 </section>
+{# Les listes du client (E4, lot 4) : l'invitation pour un visiteur, l'état et le geste
+   pour un client ; ni titre ni texte pour un libraire ou un administrateur. #}
+{% if zone_listes %}
 <section class="zone-listes" aria-labelledby="listes-titre">
 <h2 id="listes-titre">{{ t.serie_listes_titre }}</h2>
-<p>{{ t.serie_listes }}</p>
+{% if zone_listes.visiteur %}
+<p><a href="{{ zone_listes.connexion }}">{{ t.serie_listes_connexion }}</a></p>
+<p><a href="{{ zone_listes.inscription }}">{{ t.serie_listes_inscription }}</a></p>
+{% elif zone_listes.indisponible %}
+<p>{{ t.serie_listes_indisponible }}</p>
+{% else %}
+<p>{{ zone_listes.phrase or t.serie_listes_aucune }}</p>
+{{ l.formulaire(zone_listes, t, jeton) }}
+{% endif %}
 </section>
+{% endif %}
 <section class="zone-synopsis" aria-labelledby="synopsis-titre">
 <h2 id="synopsis-titre">{{ t.serie_synopsis_titre }}</h2>
 {# Contrat 0.6.0 : le résumé servi et sa source ; le résumé Kitsu, en anglais, replié

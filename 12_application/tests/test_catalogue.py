@@ -346,7 +346,9 @@ def test_v3_les_zones_du_reseau_et_des_listes_sont_nommees(client):
     assert "Les critiques du réseau sont momentanément indisponibles." in (
         reseau.get_text()
     )
-    assert "Vos listes : bientôt disponible." in listes.get_text()
+    # E4, lot 4 : un visiteur y lit l'invitation à se connecter (CL2).
+    assert "Connectez-vous pour tenir vos listes" in listes.get_text()
+    assert listes.select_one("form") is None
     for zone in ("zone-titre", "zone-note", "zone-synopsis"):
         assert page.select_one(f"section.{zone}") is not None, zone
 

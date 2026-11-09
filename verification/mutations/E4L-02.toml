@@ -1,0 +1,9 @@
+id = "E4L-02"
+origine = "E4, lot 4, spec 02 (2026-11-09) — « retirer » ne supprime pas la ligne : l'avis dit « retirée », la série reste dans la liste"
+fichier = "12_application/src/application/listes.py"
+avant = '''            "DELETE FROM application.listes"
+            " WHERE compte_id = %s AND series_id = %s RETURNING series_id",'''
+apres = '''            "SELECT series_id FROM application.listes"
+            " WHERE compte_id = %s AND series_id = %s",'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_listes.py", "-k", "ajouter_changer_meme_etat_retirer or retirer_depuis_la_page"]

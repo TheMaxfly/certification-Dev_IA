@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.effacement_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.effacement_titre }}</h1>
+{# Le droit à l'effacement (E4, lot 4, CL5) : ce qui est supprimé, ce qui reste,
+   l'irréversible, puis le mot de passe exigé. #}
+<section class="zone-effacement" aria-labelledby="effacement-quoi">
+<h2 id="effacement-quoi">{{ t.apropos_effacement_titre }}</h2>
+<p>{{ t.effacement_supprime }}</p>
+<p>{{ t.effacement_reste }}</p>
+<p><strong>{{ t.effacement_irreversible }}</strong></p>
+</section>
+<form method="post" action="/compte/supprimer">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+{{ c.champ("mot_de_passe", t.champ_mot_de_passe, type="password", autocomplete="current-password", erreur=erreur, max=comptes.mot_de_passe_max, focus=erreur is not none) }}
+<button type="submit">{{ t.effacement_bouton }}</button>
+</form>
+<p><a href="/compte/listes">{{ t.effacement_annuler }}</a></p>
+{% endblock %}

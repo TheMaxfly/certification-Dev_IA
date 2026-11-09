@@ -18,6 +18,11 @@ dans le navigateur, par les formulaires eux-mêmes.
 E4, lot 2b : les écrans du conseiller d'un rôle connecté (`Ecran.role`) passent par
 l'application à base, chaque rôle dans son contexte.
 
+E4, lot 4 : les listes du client (« Mes listes » vide, garnie, sans catalogue ; la
+fiche avec un état ; la zone de la fiche d'un visiteur et d'un client ; les cartes d'un
+client) et la suppression du compte (confirmation, refus, interdite à un libraire,
+l'accueil après).
+
 E4, lot 3 : les écrans des critiques (« Mes critiques » pleine, vide, sans catalogue ;
 écrire, refus, modifier, retirer, accès refusé ; la fiche avec critiques ; la
 modération, sa liste vide, sa confirmation), sur la même base, où trois critiques
@@ -280,6 +285,13 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                     label is not None,
                 ),
             )
+        for serie, etat in LISTES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.listes (compte_id, series_id, etat) VALUES ("
+                " (SELECT id FROM application.comptes WHERE pseudo = 'listes_audit'),"
+                " %s, %s)",
+                (serie, etat),
+            )
 
     source = (ACCESSIBILITE / "axe.min.js").read_text(encoding="utf-8")
     doublure = Doublure()
@@ -468,7 +480,14 @@ COMPTES_AUDIT = (
     ("conseiller_client_audit", "client", False),
     ("conseiller_libraire_audit", "libraire", False),
     ("conseiller_admin_audit", "admin", False),
+    # E4, lot 4 : les listes du client (`LISTES_AUDIT`), une liste vide.
+    ("listes_audit", "client", False),
+    ("listes_vide_audit", "client", False),
+    # E4, lot 4 : la suppression du compte (la page et son refus ; rien n'est supprimé).
+    ("effacement_audit", "client", False),
 )
+#: Les listes de `listes_audit` : (series_id, état) — une série par liste.
+LISTES_AUDIT = ((101, "favori"), (102, "a_lire"), (103, "a_commander"))
 TEXTE_AUDIT = (
     "Texte factice d'une critique d'audit, assez long pour tenir dans les bornes.\n\n"
     "Un second paragraphe factice, avec <b>du balisage</b> rendu littéralement."
@@ -633,6 +652,56 @@ ECRANS_COMPTES: tuple[EcranCompte, ...] = (
         "admin_audit",
         "/admin/critiques/2/retirer",
         "Retirer une critique (modération)",
+    ),
+    # E4, lot 4 : les listes du client.
+    EcranCompte(
+        "serie_listes_client_etat",
+        "listes_audit",
+        "/series/101?etat=ajoutee",
+        "Série factice A",
+    ),
+    EcranCompte(
+        "mes_listes_vides", "listes_vide_audit", "/compte/listes", "Mes listes"
+    ),
+    EcranCompte(
+        "mes_listes_garnies",
+        "listes_audit",
+        "/compte/listes?etat=retiree",
+        "Mes listes",
+    ),
+    EcranCompte(
+        "mes_listes_catalogue_indisponible",
+        "listes_audit",
+        "/compte/listes",
+        "Mes listes",
+        catalogue="indisponible",
+    ),
+    # E4, lot 4 : la suppression du compte par son titulaire (CL5).
+    EcranCompte(
+        "compte_supprimer",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+    ),
+    EcranCompte(
+        "compte_supprimer_refuse",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+        {"#mot_de_passe": "faux faux faux"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "compte_supprimer_interdit",
+        "libraire_audit",
+        "/compte/supprimer",
+        "Suppression impossible",
+    ),
+    EcranCompte(
+        "accueil_apres_suppression",
+        None,
+        "/?etat=compte_supprime",
+        "Conseiller de lecture",
     ),
     EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
     EcranCompte(

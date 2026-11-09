@@ -1,5 +1,6 @@
 """Les écrans des comptes (E4, lot 1, spec 03) : inscription, connexion, déconnexion,
-changement de mot de passe, administration des comptes. Les critiques du libraire ont
+changement de mot de passe, administration des comptes ; la suppression du compte par
+son titulaire (E4, lot 4, CL5 : le droit à l'effacement). Les critiques du libraire ont
 leurs écrans à elles (`pages_critiques`, E4, lot 3).
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire `POST` porte le jeton
@@ -24,7 +25,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from application import comptes, journal, presentation, quotas, sessions
 from application.base import Base
-from application.comptes import Compte, PseudoPris, Refus
+from application.comptes import (
+    Compte,
+    CompteNonSupprimable,
+    DejaSupprime,
+    PseudoPris,
+    Refus,
+)
 from application.config import Reglages
 from application.motdepasse import Hacheur
 
@@ -345,6 +352,93 @@ def installer(app: FastAPI, reglages: Reglages, rendre: Rendre) -> None:
     @app.get("/compte/mot-de-passe", include_in_schema=False)
     async def mot_de_passe(request: Request, compte: Connecte) -> Response:
         return page_mot_de_passe(request, compte)
+
+    # ------------------------------------------------------------------ #
+    #  Supprimer son compte (E4, lot 4, CL5) : le client seul
+    # ------------------------------------------------------------------ #
+    def page_suppression(
+        request: Request, statut: int = 200, erreur: str | None = None
+    ) -> Response:
+        return rendre(
+            request,
+            "compte_supprimer.html",
+            statut,
+            erreur=erreur,
+            comptes=regles,
+        )
+
+    def du_reseau(request: Request) -> Response:
+        """Un libraire, un administrateur : 403 et la phrase — les comptes du réseau se
+        désactivent, ils ne se suppriment pas (leurs critiques restent attribuables)."""
+        route = getattr(request.scope.get("route"), "path", None)
+        journal.evenement_requete(request, "acces_refuse", {"route": route})
+        request.state.code_erreur = "acces_refuse"
+        return rendre(
+            request,
+            "erreur.html",
+            403,
+            titre=t["effacement_reseau_titre"],
+            texte=t["effacement_reseau"],
+            identifiant=presentation.dire(
+                t, "erreur_identifiant", identifiant=request.state.identifiant_requete
+            ),
+        )
+
+    @app.get("/compte/supprimer", include_in_schema=False)
+    async def suppression(request: Request, compte: Connecte) -> Response:
+        if compte.role != "client":
+            return du_reseau(request)
+        return page_suppression(request)
+
+    @app.post("/compte/supprimer", include_in_schema=False)
+    async def supprimer(request: Request) -> Response:
+        donnees = await formulaire(request)
+        compte = await sessions.exiger_connexion(request)
+        if compte.role != "client":
+            return du_reseau(request)
+        base = base_de(request)
+        pseudo = await comptes.pseudo_de(base, compte.id)
+        # Le mot de passe vérifié par le chemin même de la connexion : même coût, même
+        # compteur d'échecs, même verrou — une session ouverte ne permet pas de deviner.
+        verifie = await comptes.authentifier(
+            base,
+            hacheur_de(request),
+            pseudo=pseudo or "",
+            mot_de_passe=champ(donnees, "mot_de_passe"),
+            seuil=regles.echecs_avant_verrou,
+            duree_verrou_s=regles.duree_verrou_s,
+        )
+        if isinstance(verifie, Refus):
+            journal.evenement_requete(
+                request, "suppression_refusee", {"motif": verifie.motif}
+            )
+            if verifie.verrou_pose:
+                journal.evenement_requete(request, "verrou_pose")
+            request.state.code_erreur = "suppression_refusee"
+            return page_suppression(request, 422, t["effacement_refus"])
+        try:
+            await comptes.supprimer(base, compte.id)
+        except DejaSupprime:
+            pass  # supprimé par une autre session : même sortie, journal inchangé
+        except CompteNonSupprimable:
+            request.state.code_erreur = "suppression_impossible"
+            return rendre(
+                request,
+                "erreur.html",
+                409,
+                titre=t["effacement_impossible_titre"],
+                texte=t["effacement_impossible"],
+                identifiant=presentation.dire(
+                    t,
+                    "erreur_identifiant",
+                    identifiant=request.state.identifiant_requete,
+                ),
+            )
+        else:
+            request.app.state.metriques.comptes_supprimes.inc()
+            journal.evenement_requete(request, "compte_supprime")
+        sessions.fermer(request)
+        return RedirectResponse("/?etat=compte_supprime", status_code=303)
 
     @app.post("/compte/mot-de-passe", include_in_schema=False)
     async def changer_mot_de_passe(request: Request) -> Response:

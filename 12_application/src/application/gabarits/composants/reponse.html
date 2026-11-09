@@ -52,6 +52,15 @@
 {% else %}
 <p>{{ t.carte_sans_passage }}</p>
 {% endfor %}
+{# Les listes depuis une carte (E4, lot 4, CL4) : un client connecté seulement ; le
+   retour est la fiche de la série. #}
+{% if carte.serie_id in zones_cartes %}
+{% set zone = zones_cartes[carte.serie_id] %}
+<div class="zone-carte-listes">
+{% if zone.phrase %}<p><small>{{ zone.phrase }}</small></p>
+{% endif %}{{ l.formulaire(zone, t, jeton, false) }}
+</div>
+{% endif %}
 <p><small>{{ t.mention_carte }} {{ t.mention_dispo }}</small></p>
 </article>
 {% endfor %}

@@ -282,7 +282,7 @@ de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le m
 | Page | Ce qu'elle fait |
 |---|---|
 | `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé ; quand le 02 rend des `suggestions` (contrat 0.6.0, la ressemblance de trigrammes au-dessus d'un seuil mesuré), **« Vouliez-vous dire… ? »** et un lien par fiche suggérée (non préchargée), puis le lien vers le conseiller ; sans suggestion, le renvoi au conseiller seul (E4, lot 2b) |
-| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes : bientôt disponible » (lot 4) ; le résumé servi par le 02 (contrat 0.6.0 : coupé avant les critiques de lecteurs que la source y avait recopiées) et sa source — un résumé Kitsu dit « Résumé fourni par Kitsu (en anglais) », `lang="en"` ; le français principal, le résumé Kitsu replié dessous dans un `<details>` (`lang="en"`) ; sans résumé, « Résumé indisponible » — ; « Demander au conseiller » (`zone-pont-conseiller`) ; les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes » (lot 4, « Les listes du client ») ; le résumé servi par le 02 (contrat 0.6.0 : coupé avant les critiques de lecteurs que la source y avait recopiées) et sa source — un résumé Kitsu dit « Résumé fourni par Kitsu (en anglais) », `lang="en"` ; le français principal, le résumé Kitsu replié dessous dans un `<details>` (`lang="en"`) ; sans résumé, « Résumé indisponible » — ; « Demander au conseiller » (`zone-pont-conseiller`) ; les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
 
 **Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
 configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
@@ -346,6 +346,66 @@ aux recommandations du conseiller à la prochaine mise à jour du corpus » — 
 publication et en tête de « Mes critiques ». Les critiques collectées (celles des lecteurs)
 ne sont toujours pas affichées : aucun appel à `/series/{id}/reviews`.
 
+### Les listes du client (E4, lot 4)
+
+Un compte **client** tient trois listes — **favori**, **à lire**, **à commander** —, un
+état par série, le dernier geste gagne. Sans JavaScript : un formulaire `POST`, des
+boutons ; `Cache-Control: no-store`.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/series/{series_id}`, zone « Vos listes » (`zone-listes`) | visiteur | « Connectez-vous pour tenir vos listes » (`/connexion?retour=/series/{id}`) et « Créer un compte » ; aucun bouton |
+| | client | « Dans votre liste : à lire » ou « Cette série n'est dans aucune de vos listes » ; **un** formulaire, trois boutons (`etat`), l'état courant `aria-pressed="true"` et dit « (actuelle) », et « Retirer de mes listes » quand un état existe ; après le geste, l'avis en tête de la fiche |
+| | libraire, administrateur | la zone **n'est pas rendue** (les listes sont celles des clients ; un libraire a ses critiques, l'administrateur ses outils) |
+| `POST /listes/{series_id}` | client | `jeton`, `etat` (`favori`, `a_lire`, `a_commander`, `retirer`), `retour` (chemin local seul ; défaut : la fiche) ; **303 vers `retour`**, `?etat=` : `ajoutee`, `changee`, `inchangee` (« Déjà dans vos favoris »), `retiree`, `absente`, `pleine`, `indisponible` ; libraire, administrateur : **403** ; visiteur : 303 vers la connexion, retour compris ; un état hors liste : 422 nommé ; un identifiant hors de 1 … 2 147 483 647 : 404 |
+| `/compte/listes` | client | « Mes listes » : trois sections (`zone-liste-favori`, `zone-liste-a_lire`, `zone-liste-a_commander`), « À lire (3) », la plus récente d'abord ; chaque entrée : le titre **lu dans le 02** (lien vers la fiche), la date d'ajout (`<time>`), « Retirer » ; état vide nommé par section ; base absente : 503 « comptes indisponibles » |
+| carte du conseiller (`zone-carte-listes`) | client | sous chaque carte citée, « Dans votre liste : favori » s'il y a lieu et les trois boutons ; `retour` = la fiche de la série ; pas de retrait (la fiche et la page le font) ; **aucun formulaire dans le HTML d'un visiteur, d'un libraire ou d'un administrateur** |
+
+- **La revalidation** : la série d'un **ajout** (ou d'un changement) est relue dans le 02
+  avant l'écriture — inconnue : 404, rien d'écrit ; catalogue injoignable ou non
+  configuré : rien d'écrit, l'avis « le catalogue ne répond pas ». Un **retrait** ne la
+  demande pas : une série que le 02 ne connaît plus doit pouvoir sortir d'une liste.
+- **La borne** : `[comptes] listes_max_par_etat` (**50**) ; une 51e série, ou un changement
+  vers une liste pleine, est refusé (`?etat=pleine`, avis nommé), vérifié dans la même
+  transaction que l'écriture, la ligne du compte tenue : deux gestes simultanés ne la
+  dépassent pas. Pas de pagination : la borne suffit.
+- **Les titres en parallèle** : la page demande au 02 les fiches de ses entrées ensemble
+  (`asyncio.gather`, 150 au plus) ; une série inconnue : « Titre indisponible », l'entrée
+  et son lien restent ; le catalogue muet : toutes en « Titre indisponible » et l'encart
+  « Le catalogue ne répond pas ; vos listes sont intactes ». Le titre n'est jamais gardé
+  en base (`application.listes` : compte, série, état, date).
+- **Rien n'est tracé au journal des actions** : une liste est la donnée du client, pas un
+  contenu publié ; retirer supprime la ligne. Métrique : `application_listes_total{action}`
+  (`ajout`, `changement`, `retrait` ; un geste sans effet n'est pas compté).
+- **Limite (CL4)** : le geste depuis une carte mène à la **fiche** de la série, où l'état et
+  l'avis se lisent : la réponse du conseiller n'est pas conservée par un `POST` sans
+  JavaScript (« rien n'est gardé des conversations »).
+
+### L'effacement du compte (E4, lot 4)
+
+**Le droit à l'effacement** : un client supprime son compte lui-même, à tout moment,
+physiquement et immédiatement.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/compte/mot-de-passe`, en bas (`zone-effacement`) | client | le lien « Supprimer mon compte » — pas dans le menu : un geste irréversible n'est pas à un clic du menu |
+| `/compte/supprimer` | client | la page de confirmation : ce qui sera supprimé (le compte, le pseudo, l'empreinte du mot de passe, les listes, les compteurs de questions), ce qui reste (une ligne de journal sans identité), « irréversible » ; le mot de passe (`autocomplete="current-password"`), « Supprimer définitivement mon compte », « Annuler » |
+| `POST /compte/supprimer` | client | le mot de passe vérifié par **`comptes.authentifier`**, le chemin même de la connexion — même coût, même compteur d'échecs, même verrou : un mauvais mot de passe compte comme un échec de connexion ; refus : la page, 422, « Mot de passe incorrect. », rien d'écrit ; succès : **303 vers l'accueil**, l'avis « Votre compte a été supprimé », la session fermée |
+| `/compte/supprimer` | libraire, administrateur | **403** et la phrase : « Les comptes du réseau sont désactivés par l'administrateur ; ils ne se suppriment pas, leurs critiques signées doivent rester attribuables » (l'asymétrie est voulue) |
+
+- **Une transaction** : la ligne du compte tenue (`FOR UPDATE`), la ligne `compte_supprime`
+  au journal des actions (par le compte, sur le compte), puis `DELETE FROM
+  application.comptes` — la cascade emporte `listes` et `questions_jour` ; la contrainte
+  met `par_compte_id` à `NULL` : il reste « un compte n° n a été supprimé, par lui-même », et
+  ce numéro ne nomme plus personne. Supprimé entre-temps par une autre session : même
+  sortie, rien au journal. Un compte qui a des critiques signées (un libraire, jamais un
+  client) : la base refuse (`ON DELETE RESTRICT`), la page « Ce compte ne peut pas être
+  supprimé » (409).
+- **Après** : un cookie copié avant ne vaut plus rien (le compte n'existe plus) ; **le
+  pseudo redevient libre** ; le compteur des inscriptions de la session, lui, survit (un
+  compte supprimé n'est pas une inscription de plus). Métrique :
+  `application_comptes_supprimes_total`.
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -362,7 +422,7 @@ Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, ave
 
 **Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
 Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
-client — Conseiller, Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
+client — Conseiller, Mes listes (E4, lot 4), Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
 en plus, Mes critiques ; administrateur — en plus, Comptes et Critiques (la modération ;
 pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
 dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
@@ -487,7 +547,9 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 - **Ce qui est transmis, et par qui** : l'API envoie au fournisseur du profil utilisé la
   question, l'historique et les passages. L'application ne parle jamais à un fournisseur.
 - **Ce qui est conservé par l'application** : rien des conversations. Les comptes, en
-  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel).
+  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel),
+  et les listes d'un client — jusqu'à ce qu'il supprime son compte (« Registre des
+  traitements » ci-dessous).
   Son journal, une ligne JSON par requête et par événement, porte route, statut, durée,
   identifiants (de la requête, du compte), code d'erreur, nombre de tours et taille de
   l'historique ; **jamais** la question, l'historique, la réponse, la clé, un mot de passe,
@@ -496,7 +558,20 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   `acces_refuse` (gabarit de la route), `base_indisponible`, `cle_session_ephemere` ; des
   écrans de compte (E4, lot 1, spec 03) : `inscription`, `connexion_reussie`,
   `connexion_refusee` (motif borné), `verrou_pose`, `deconnexion`, `mot_de_passe_change`,
-  `mot_de_passe_refuse` (motif borné).
+  `mot_de_passe_refuse` (motif borné) ; de l'effacement (E4, lot 4) : `compte_supprime`,
+  `suppression_refusee` (motif borné).
+
+### Registre des traitements : les données du client
+
+| Données | Finalité | Durée | Suppression | Ce qui subsiste |
+|---|---|---|---|---|
+| pseudo, nom affiché (le pseudo), empreinte Argon2id du mot de passe, rôle, dates, compteur d'échecs et verrou | se connecter, tenir ses listes | jusqu'à la suppression par l'intéressé | **immédiate**, par lui-même (`/compte/supprimer`), sans délai de rétention | une ligne `compte_supprime` du journal des actions, sans identité (`par_compte_id` nul, le numéro de l'ancien compte, la date) |
+| listes (identifiant de série, état, date d'ajout) | favori, à lire, à commander | jusqu'au retrait de la série ou à la suppression du compte | le retrait supprime la ligne ; la suppression du compte, toutes (cascade) | rien |
+| compteurs de questions du jour (`questions_jour`, un nombre, aucun texte) | le quota d'un client | jusqu'à la suppression du compte | cascade | rien |
+| coûts du jour (`couts_jour`) | le budget du conseiller | — | — | des agrégats par jour, profil et mode, **sans compte** |
+
+Les comptes du réseau (libraires, administrateurs) ne se suppriment pas : ils se
+désactivent (leurs critiques signées restent attribuables).
 
 ### OWASP Top 10, mis en regard
 
@@ -513,6 +588,8 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
+| Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
+| Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
 | Injection (A03) : le texte des critiques | requêtes paramétrées ; le texte rendu **échappé** par les gabarits, jamais marqué « sûr » (test avec `<script>`, `<b>`, `<img onerror>` : rendus littéralement, aucun élément créé ; mutation E4R-07) ; politique de sécurité du contenu sans script |
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
@@ -641,7 +718,8 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 - **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute
   (2026-11-03), est rendu à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
   quota par poste : épreuve E4.
-- **Aucune personnalisation** : pas de compte.
+- **Aucune personnalisation du conseiller** : il ne lit ni les listes ni l'historique du
+  compte.
 - **Un seul écran.**
 - **Un clic trop tôt après un refus** peut coûter une reformulation (« Les cas dégradés »).
 - **Au-delà de 75 s**, l'écran dit « délai dépassé » pendant que l'API peut continuer, et
@@ -681,7 +759,9 @@ la garde par rôle et d'environnement, les écrans des comptes et leurs trois r�
 libraire, administrateur), la commande du premier administrateur (ci-dessus). **Lot 2a
 (le catalogue)** : la recherche et la page de série, par l'API data du 02. **Lot 3 (les
 critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
-lecteurs (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
+lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
+la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compte par son
+titulaire, le droit à l'effacement (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
 et de l'état des services ; le serveur avec préproduction et production ; l'identité
 visuelle, sur `theme.css`.

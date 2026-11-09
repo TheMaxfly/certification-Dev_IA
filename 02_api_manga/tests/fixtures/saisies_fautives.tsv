@@ -14,6 +14,13 @@
 #                   l'ordre inverse (« Naoki URASAWA » → « URASAWA Naoki ») ; correspondance
 #                   directe attendue. Un auteur d'un seul mot (CLAMP, xxxHoLic, 28e) n'a pas
 #                   d'ordre : la série suivante du classement (31e) le remplace.
+#
+# Complément (E4, lot 4, spec 01, § 2), écrit AVANT la seconde mesure du seuil ; la règle
+# ci-dessus n'est pas modifiée. 10 saisies « espace retirée » (famille `espace_retiree`) :
+# parmi les 30 séries ci-dessous, dans leur ordre (le même classement des votes), les 10
+# premières dont le titre contient une espace ; le titre normalisé (`manga.normaliser`,
+# lu en lecture seule sur la préproduction le 2026-11-09) privé de sa PREMIÈRE espace
+# (« one piece » → « onepiece »). Une seule faute par saisie.
 # Colonnes : saisie, series_id_attendu, famille (titre de la série pour le lecteur).
 saisie	series_id_attendu	famille	titre
 death noet	2027	transposition	Death Note
@@ -46,3 +53,13 @@ AKAMATSU Ken	1710	auteur_inverse	Negima !
 HINO Matsuri	5221	auteur_inverse	Vampire Knight
 YAZAWA Ai	899	auteur_inverse	Nana
 KISHIMOTO Seishi	1679	auteur_inverse	Satan 666
+deathnote	2027	espace_retiree	Death Note
+onepiece	736	espace_retiree	One Piece
+fullmetalalchemist	1629	espace_retiree	Fullmetal Alchemist
+fairytail	3056	espace_retiree	Fairy Tail
+dragonball	726	espace_retiree	Dragon Ball
+lovehina	565	espace_retiree	Love Hina
+fruitsbasket	548	espace_retiree	Fruits Basket
+samuraideeper kyo	559	espace_retiree	Samurai Deeper Kyo
+hunterx hunter	534	espace_retiree	Hunter X Hunter
+tsubasareservoir chronicle	1083	espace_retiree	Tsubasa Reservoir Chronicle

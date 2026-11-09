@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.listes_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.listes_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
+<p>{{ t.listes_aide }}</p>
+{% if indisponible %}
+<article>
+<h2>{{ t.catalogue_encart_titre }}</h2>
+<p>{{ t.listes_catalogue_encart }}</p>
+</article>
+{% endif %}
+{% for section in sections %}
+<section class="zone-liste-{{ section.etat }}" aria-labelledby="liste-{{ section.etat }}">
+<h2 id="liste-{{ section.etat }}">{{ section.titre }}</h2>
+{% if section.lignes %}
+<ul>
+{% for ligne in section.lignes %}
+<li>
+<a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a>
+<small><time datetime="{{ ligne.datetime }}">{{ ligne.date }}</time></small>
+<form method="post" action="/listes/{{ ligne.series_id }}">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<input type="hidden" name="retour" value="/compte/listes">
+<button type="submit" name="etat" value="retirer" aria-label="{{ ligne.etiquette_retirer }}">{{ t.liste_retirer_court }}</button>
+</form>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>{{ section.vide }}</p>
+{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

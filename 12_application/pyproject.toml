@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "application-conseiller"
-version = "0.5.0"
+version = "0.6.0"
 description = "L'application du libraire : une page, une question, la réponse de l'API du modèle, ses sources et ses cas dégradés"
 readme = "README.md"
 requires-python = ">=3.12"

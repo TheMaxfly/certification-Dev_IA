@@ -39,6 +39,7 @@ from application import (
     pages_catalogue,
     pages_comptes,
     pages_critiques,
+    pages_listes,
     presentation,
     quotas,
     sessions,
@@ -360,6 +361,8 @@ def creer_application(
         affichage: presentation.Affichage | None = None,
         encart: presentation.Encart | None = None,
         cloture: str | None = None,
+        avis: str | None = None,
+        zones_cartes: Mapping[int, pages_listes.Zone] | None = None,
     ) -> Response:
         info = vue.info
         limites = vue.limites()
@@ -413,6 +416,8 @@ def creer_application(
                 affichage=affichage,
                 encart=encart,
                 cloture=cloture,
+                avis=avis,
+                zones_cartes=zones_cartes or {},
             ),
             status_code=statut,
         )
@@ -445,7 +450,13 @@ def creer_application(
         await sessions.page(request)
         await vue.rafraichir()
         question = await question_pre_remplie(request)
-        return page_principale(request, formulaire=Formulaire(question=question))
+        # E4, lot 4 : après la suppression du compte, l'avis à l'accueil (PRG).
+        supprime = request.query_params.get("etat") == "compte_supprime"
+        return page_principale(
+            request,
+            formulaire=Formulaire(question=question),
+            avis=t["effacement_avis"] if supprime else None,
+        )
 
     def lire_formulaire(
         donnees: FormData, compte: Compte | None
@@ -736,18 +747,27 @@ def creer_application(
             question="",
             historique="" if cloture else historique.ecrire(suivants),
         )
+        affichage = presentation.affichage_de(
+            lu.question,
+            corps,
+            reglages,
+            demonstration=bool(lu.mode_demonstration),
+            complement=droits_de(compte).choisir_mode,
+        )
+        # E4, lot 4 (CL4) : le geste sur les listes, sur chaque carte, pour un client.
+        zones = await pages_listes.zones_des_cartes(
+            request.app.state.base,
+            t,
+            compte,
+            ((carte.serie_id, carte.titre) for carte in affichage.cartes),
+        )
         return page_principale(
             request,
             formulaire=f,
             tours=tours,
-            affichage=presentation.affichage_de(
-                lu.question,
-                corps,
-                reglages,
-                demonstration=bool(lu.mode_demonstration),
-                complement=droits_de(compte).choisir_mode,
-            ),
+            affichage=affichage,
             cloture=cloture,
+            zones_cartes=zones,
         )
 
     @app.get("/a-propos", response_class=HTMLResponse, include_in_schema=False)
@@ -808,6 +828,7 @@ def creer_application(
     pages_comptes.installer(app, reglages, rendre)
     pages_catalogue.installer(app, reglages, rendre, catalogue)
     pages_critiques.installer(app, reglages, rendre, catalogue, metriques)
+    pages_listes.installer(app, reglages, rendre, catalogue, metriques)
 
     app.state.vue = vue
     app.state.metriques = metriques

@@ -62,7 +62,7 @@ services:
       context: ..
       dockerfile: 12_application/Dockerfile
       target: application
-    image: application-conseiller:0.5.0
+    image: application-conseiller:0.6.0
     depends_on:
       api:
         condition: service_healthy
