@@ -177,6 +177,9 @@ ECRANS: tuple[Ecran, ...] = (
         info="erreur_interne",
         role="admin",
     ),
+    # E4, lot 5, spec 02 : l'état des clés, avant tout test ; les états après un test
+    # sont des écrans des comptes (`test_audit_axe`), le formulaire envoyé.
+    Ecran("admin_cles", chemin="/admin/cles", info="administration", role="admin"),
 )
 #: Le réglage posé dans la base des écrans d'un rôle (E4, lot 5) : le profil actif de
 #: l'application, égal au défaut de l'API — aucun autre écran n'en change.

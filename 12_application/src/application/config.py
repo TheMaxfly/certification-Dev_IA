@@ -136,6 +136,17 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " admin_reglages_api_absente_titre admin_reglages_api_absente"
             " admin_reglages_actuel_aucun admin_reglages_erreur"
             " profil_actif_indisponible_titre profil_actif_indisponible_lien"
+            " admin_cles_titre admin_cles_intro admin_cles_api_absente"
+            " admin_cles_tableau"
+            " admin_cles_colonne_profil admin_cles_colonne_fournisseur"
+            " admin_cles_colonne_modele admin_cles_colonne_variable"
+            " admin_cles_colonne_demarrage admin_cles_colonne_test"
+            " admin_cles_configuree admin_cles_absente admin_cles_non_teste"
+            " admin_cles_valide admin_cles_modele admin_cles_test_absente"
+            " admin_cles_injoignable admin_cles_illisible admin_cles_test_titre"
+            " admin_cles_test_aucun admin_cles_test_aide admin_cles_bouton"
+            " admin_cles_avis_teste admin_cles_trop_tot_sans admin_cles_indisponible"
+            " admin_cles_procedure_avant admin_cles_procedure"
             # E4, lot 3 : les critiques signées.
             " critiques_l5 critiques_vide critiques_vers_catalogue"
             " critiques_colonne_serie critiques_colonne_tome critiques_colonne_note"
@@ -286,6 +297,10 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "admin_reglages_avis_applique": frozenset({"profil"}),
     "admin_reglages_avis_inchange": frozenset({"profil"}),
     "profil_actif_indisponible": frozenset({"profil", "defaut"}),
+    "admin_cles_refusee": frozenset({"code"}),
+    "admin_cles_teste_le": frozenset({"date"}),
+    "admin_cles_repli": frozenset({"version"}),
+    "admin_cles_trop_tot": frozenset({"n"}),
 }
 
 
@@ -305,6 +320,8 @@ class Delais:
     reponse_s: float
     info_s: float
     sante_s: float
+    #: Le test des clés (E4, lot 5) : l'API interroge chaque fournisseur, en parallèle.
+    verification_s: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,6 +421,14 @@ class Bornes:
 
 
 @dataclass(frozen=True, slots=True)
+class Administration:
+    """Les pages de l'administration (`[administration]`, E4, lot 5) : le lien vers la
+    procédure de pose et de rotation des clés (un document du dépôt)."""
+
+    procedure_cles: str
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -439,6 +464,7 @@ class Reglages:
     catalogue: Catalogue
     critiques: Critiques
     bornes: Bornes
+    administration: Administration
 
 
 class _Lecteur:
@@ -752,6 +778,19 @@ def lire_bornes(lecteur: _Lecteur, donnees: Table) -> Bornes:
     )
 
 
+def lire_administration(
+    lecteur: _Lecteur, donnees: Table, ecarts: list[str]
+) -> Administration:
+    """Le lien de la procédure des clés : une adresse `https://`, un document public."""
+    table = lecteur.table(donnees, "administration")
+    procedure = lecteur.texte(table, "procedure_cles", "administration")
+    if not procedure.startswith("https://"):
+        ecarts.append(
+            "reglages.toml : [administration] procedure_cles : https:// attendu"
+        )
+    return Administration(procedure_cles=procedure)
+
+
 def lire_cle_comptes(environ: Mapping[str, str], ecarts: list[str]) -> str | None:
     cle = environ.get(VARIABLE_CLE_COMPTES, "").strip() or None
     if cle is not None and not cle.isascii():
@@ -868,6 +907,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
             reponse_s=lecteur.positif(delais, "reponse_s", "api.delais"),
             info_s=lecteur.positif(delais, "info_s", "api.delais"),
             sante_s=lecteur.positif(delais, "sante_s", "api.delais"),
+            verification_s=lecteur.positif(delais, "verification_s", "api.delais"),
         ),
         attente_debit_defaut_s=lecteur.entier(
             attentes, "debit_defaut_s", "api.attentes"
@@ -913,6 +953,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         catalogue=lire_catalogue(lecteur, donnees, environ, environnement, ecarts),
         critiques=lire_critiques(lecteur, donnees, ecarts),
         bornes=lire_bornes(lecteur, donnees),
+        administration=lire_administration(lecteur, donnees, ecarts),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

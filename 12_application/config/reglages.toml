@@ -14,7 +14,8 @@ connexion_s = 5.0
 reponse_s = 75.0
 info_s = 5.0
 sante_s = 5.0
-motif = "La réponse : 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s sur les profils proposés, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) ; attendre davantage devant une page ne sert personne. Au-delà, l'écran le dit, et l'appel peut continuer côté API. L'état du service : 5 s, sans attendre."
+verification_s = 15.0
+motif = "Le test des clés (E4, lot 5) : 15 s — l'API interroge chaque fournisseur en parallèle, chacun borné à 5 s par son module. La réponse : 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s sur les profils proposés, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) ; attendre davantage devant une page ne sert personne. Au-delà, l'écran le dit, et l'appel peut continuer côté API. L'état du service : 5 s, sans attendre."
 
 [api.attentes]
 debit_defaut_s = 60
@@ -114,6 +115,10 @@ cout_jour_max_usd = 0.50
 inscriptions_session_max = 3
 inscriptions_fenetre_min = 60
 motif = "Les bornes du conseiller public (E4, lot 2b ; chiffres des quotas décidés par Max le 2026-11-09). Un visiteur : 5 questions par jour civil UTC, compteur dans le cookie de la session — de quoi essayer le conseiller. Un compte client : 20 par jour civil UTC, persisté par compte — un compte doit donner plus de questions qu'aucun compte ; libraires et administrateur n'ont pas de quota. La clé publique : 10 appels par minute, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min. Le coût : 0,50 $ par jour, environ 250 questions au coût mesuré, persisté par jour, profil et mode, relu avant chaque appel. L'inscription : 3 comptes par heure et par session. Un cookie effacé remet à zéro les compteurs de session, pas celui d'un compte."
+
+[administration]
+procedure_cles = "https://github.com/TheMaxfly/certification-Dev_IA/blob/main/11_api_modele/README.md#poser-ou-changer-une-cl%C3%A9"
+motif = "La procédure de pose et de rotation des clés des fournisseurs (E4, lot 5, décision Q4) : un document public du dépôt, pas une procédure dans l'écran. Sur main, à jour à la livraison du lot."
 
 [fournisseurs.mistral]
 nom = "Mistral"
@@ -621,3 +626,35 @@ admin_reglages_erreur = "Ce profil n'est pas proposé : rien n'a été enregistr
 profil_actif_indisponible_titre = "Profil actif indisponible"
 profil_actif_indisponible = "Le profil actif choisi par l'administration, {profil}, est indisponible : les questions partent avec le défaut de l'API ({defaut}). Le réglage est gardé ; il s'appliquera de nouveau quand le profil reviendra."
 profil_actif_indisponible_lien = "Voir les réglages"
+# E4, lot 5 : l'état des clés et leur test (A3)
+admin_cles_titre = "Clés des fournisseurs"
+admin_cles_intro = "Par profil, le nom de la variable de sa clé et son état. Une valeur de clé n'est jamais affichée : ni ici, ni au journal."
+admin_cles_api_absente = "L'API du modèle ne répond pas : l'état des clés ne peut pas être lu."
+admin_cles_tableau = "Les profils de l'API du modèle et leur clé"
+admin_cles_colonne_profil = "Profil"
+admin_cles_colonne_fournisseur = "Fournisseur"
+admin_cles_colonne_modele = "Modèle"
+admin_cles_colonne_variable = "Variable de la clé"
+admin_cles_colonne_demarrage = "Au démarrage de l'API"
+admin_cles_colonne_test = "Dernier test"
+admin_cles_configuree = "configurée (clé posée au démarrage de l'API)"
+admin_cles_absente = "absente ou écartée au démarrage de l'API"
+admin_cles_non_teste = "pas encore testée"
+admin_cles_valide = "valide : le fournisseur liste le modèle"
+admin_cles_modele = "acceptée, mais le modèle n'est pas dans la liste du fournisseur"
+admin_cles_test_absente = "clé absente : aucun appel"
+admin_cles_injoignable = "fournisseur injoignable"
+admin_cles_refusee = "refusée par le fournisseur (code {code})"
+admin_cles_illisible = "réponse du fournisseur illisible"
+admin_cles_test_titre = "Tester les clés"
+admin_cles_test_aucun = "Aucun test dans cette session."
+admin_cles_teste_le = "Dernier test : {date}."
+admin_cles_test_aide = "Le test demande à chaque fournisseur la liste de ses modèles : un appel non facturé, un test par minute au plus. Il informe ; il ne coupe aucun profil en service."
+admin_cles_bouton = "Tester les clés maintenant"
+admin_cles_avis_teste = "Clés testées : le résultat est dans le tableau."
+admin_cles_repli = "Le test n'existe pas sur cette version de l'API ({version}) ; l'état affiché est celui du démarrage."
+admin_cles_trop_tot = "Un test par minute au plus : réessayez dans {n} s."
+admin_cles_trop_tot_sans = "Un test par minute au plus : réessayez dans une minute."
+admin_cles_indisponible = "L'API du modèle n'a pas répondu au test ; l'état affiché est celui du démarrage."
+admin_cles_procedure_avant = "Poser ou changer une clé :"
+admin_cles_procedure = "la procédure du module de l'API du modèle"

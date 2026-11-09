@@ -737,6 +737,66 @@ SCENARIOS_INFO: dict[str, Callable[[], Rendu]] = {
     "delai": lambda: Rendu(200, info(), attente_s=5.0),
 }
 
+
+def controle(
+    nom: str, fournisseur: str = "mistral", statut: str = "ok", disponible: bool = True
+) -> dict[str, Any]:
+    return {
+        "nom": nom,
+        "fournisseur": fournisseur,
+        "modele": f"modele-de-{nom}",
+        "variable_cle": f"{fournisseur.upper()}_CLE_FACTICE",
+        "configuree": statut != "absente",
+        "disponible": disponible,
+        "statut": statut,
+    }
+
+
+#: Le test des clés (contrat 1.5.0, E4, lot 5). `route_absente` : l'API 1.4.0 de la
+#: pile, qui ne connaît pas la route — un 404 que le contrat 1.5.0 ne déclare pas pour
+#: elle, rendu brut.
+SCENARIOS_VERIFICATION: dict[str, Callable[[], Rendu]] = {
+    "nominale": lambda: Rendu(
+        200,
+        {
+            "verifie_le": "2026-11-10T09:00:00Z",
+            "profils": [
+                controle("mistral-large-2512"),
+                controle("mistral-large-4"),
+                controle("gpt-6-luna", "openai", "401", False),
+                controle("gpt-6-sol", "openai", "absente", False),
+            ],
+        },
+    ),
+    "injoignable": lambda: Rendu(
+        200,
+        {
+            "verifie_le": "2026-11-10T09:00:00Z",
+            "profils": [
+                controle("mistral-large-2512", statut="injoignable", disponible=False),
+                controle("mistral-large-4", disponible=False),
+                controle("gpt-6-luna", "openai", "corps_inattendu", False),
+            ],
+        },
+    ),
+    "route_absente": lambda: Rendu(
+        404,
+        brut=json.dumps(erreur("route_inconnue")).encode(),
+        entetes={"Content-Type": "application/json"},
+    ),
+    "trop_tot": lambda: Rendu(
+        429,
+        erreur("debit_depasse", {"limite_par_minute": 1, "reessayer_dans_s": 42}),
+        {"Retry-After": "42"},
+    ),
+    "trop_tot_sans_entete": lambda: Rendu(
+        429, erreur("debit_depasse", {"limite_par_minute": 1, "reessayer_dans_s": 1})
+    ),
+    "erreur_interne": lambda: Rendu(500, erreur("erreur_interne")),
+    "hors_contrat": lambda: Rendu(200, brut=b'{"profils": "aucun"}'),
+    "delai": lambda: Rendu(200, {"verifie_le": "x", "profils": []}, attente_s=5.0),
+}
+
 SANTE_OK = {
     "statut": "ok",
     "base": "ok",
@@ -1059,6 +1119,9 @@ class Doublure:
         self.scenario_sante = "ok"
         self.scenario_reponse = "nominale"
         self.scenario_catalogue = "nominal"
+        self.scenario_verification = "nominale"
+        #: Les tests des clés reçus (E4, lot 5) : leur nombre, et la clé de chacun.
+        self.verifications: list[str | None] = []
         self.cles_catalogue: list[str | None] = []
         self.appels_catalogue: dict[str, int] = {}
         #: Les recherches reçues : (q, limit, offset).
@@ -1078,7 +1141,10 @@ class Doublure:
         sante: str | None = None,
         reponse: str | None = None,
         catalogue: str | None = None,
+        verification: str | None = None,
     ) -> None:
+        if verification is not None:
+            self.scenario_verification = connu(verification, SCENARIOS_VERIFICATION)
         if catalogue is not None:
             if catalogue not in SCENARIOS_CATALOGUE:
                 raise KeyError(catalogue)
@@ -1134,6 +1200,7 @@ class Doublure:
                 sante=demande.get("sante"),
                 reponse=demande.get("reponse"),
                 catalogue=demande.get("catalogue"),
+                verification=demande.get("verification"),
             )
             return {
                 "info": self.scenario_info,
@@ -1171,6 +1238,13 @@ class Doublure:
             nom = self.scenario_reponse
             rendu = SCENARIOS_REPONSE[nom]()
             return await self._rendre("/v1/reponse", "post", nom, rendu)
+
+        @app.post("/v1/verification")
+        async def route_verification(request: Request) -> Response:
+            self.verifications.append(request.headers.get("X-API-Key"))
+            nom = self.scenario_verification
+            rendu = SCENARIOS_VERIFICATION[nom]()
+            return await self._rendre("/v1/verification", "post", nom, rendu)
 
         self._creer_catalogue(app)
         return app

@@ -47,6 +47,8 @@ ETATS_PLAFOND = ("ok", "atteint", "inconnu")
 #: Les gestes sur les listes du client (E4, lot 4) qui écrivent : un ajout, un
 #: changement d'état, un retrait.
 ACTIONS_LISTES = ("ajout", "changement", "retrait")
+#: L'issue d'un test des clés demandé par l'administration (E4, lot 5).
+ISSUES_VERIFICATION = ("teste", "route_absente", "trop_tot", "indisponible")
 
 
 class Metriques:
@@ -169,6 +171,16 @@ class Metriques:
             ["profil"],
             registry=self.registre,
         )
+        self.verifications_cles = Counter(
+            "application_verifications_cles",
+            "Tests des clés demandés par l'administration (E4, lot 5), par issue :"
+            " teste, route_absente (API antérieure à 1.5.0), trop_tot (la borne d'un"
+            " test par minute), indisponible.",
+            ["issue"],
+            registry=self.registre,
+        )
+        for issue in ISSUES_VERIFICATION:
+            self.verifications_cles.labels(issue=issue)
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",

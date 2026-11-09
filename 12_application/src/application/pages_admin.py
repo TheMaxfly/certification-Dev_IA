@@ -1,5 +1,5 @@
-"""Les écrans de l'administration (E4, lot 5) : le profil IA actif (A2) et la barre
-d'onglets commune à toutes les pages `/admin/*`.
+"""Les écrans de l'administration (E4, lot 5) : le profil IA actif (A2), l'état des clés
+et leur test (A3), et la barre d'onglets commune à toutes les pages `/admin/*`.
 
 **Contrôle d'accès** (OWASP A01) : chaque route exige le rôle `admin`
 (`sessions.exiger_role`) ; un autre rôle reçoit 403, un visiteur la connexion. Chaque
@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
@@ -28,7 +28,14 @@ from starlette.routing import BaseRoute
 
 from application import journal, presentation, reglages_app, sessions
 from application.base import Base
-from application.client_api import Info, ProfilDecrit, VueApi
+from application.client_api import (
+    Info,
+    ProfilDecrit,
+    RouteAbsente,
+    TropTot,
+    Verification,
+    VueApi,
+)
 from application.comptes import Compte
 from application.config import Reglages
 from application.metriques import Metriques
@@ -46,6 +53,10 @@ ONGLETS = (
     ("/admin/couts", "onglet_couts"),
     ("/admin/services", "onglet_services"),
 )
+#: Le dernier test des clés, gardé dans la session (le cookie signé) : un geste de
+#: l'instant, jamais en base ; et l'attente annoncée par un refus de la borne.
+SESSION_TEST = "verification_cles"
+SESSION_ATTENTE = "verification_attente"
 #: Les avis de la page des réglages, après un `POST` (motif PRG : `?etat=`).
 AVIS_REGLAGES = {
     "applique": "admin_reglages_avis_applique",
@@ -91,6 +102,18 @@ class LigneProfil:
     nom: str
     etiquette: str
     coche: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LigneCle:
+    """Un profil sur la page des clés : des noms et des états, jamais une valeur."""
+
+    nom: str
+    fournisseur: str
+    modele: str
+    variable: str
+    demarrage: str
+    test: str
 
 
 def etiquette_profil(profil: ProfilDecrit, reglages: Reglages) -> str:
@@ -251,3 +274,128 @@ def installer(
             journal.evenement_requete(request, "profil_actif_change")
         etat = "applique" if issue == "fait" else "inchange"
         return RedirectResponse(f"/admin/reglages?etat={etat}", status_code=303)
+
+    # ------------------------------------------------------------------ #
+    #  L'état des clés et leur test (A3)
+    # ------------------------------------------------------------------ #
+    def texte_du_test(controle: object) -> str:
+        """Le dernier test d'un profil, en mots : des états, jamais une valeur."""
+        if not isinstance(controle, dict):
+            return t["admin_cles_non_teste"]
+        lu = cast(dict[str, object], controle)
+        statut = str(lu.get("statut", ""))
+        if statut == "ok":
+            return t[
+                "admin_cles_valide" if lu.get("disponible") else "admin_cles_modele"
+            ]
+        if statut == "absente":
+            return t["admin_cles_test_absente"]
+        if statut == "injoignable":
+            return t["admin_cles_injoignable"]
+        if statut.isdigit():
+            return presentation.dire(t, "admin_cles_refusee", code=statut)
+        return t["admin_cles_illisible"]
+
+    def dernier_test(request: Request) -> dict[str, object] | None:
+        """Le dernier test de la session (le cookie signé) : un geste de l'instant,
+        jamais gardé en base."""
+        brut = request.session.get(SESSION_TEST)
+        return cast(dict[str, object], brut) if isinstance(brut, dict) else None
+
+    @app.get("/admin/cles", include_in_schema=False)
+    async def admin_cles(request: Request, admin: Admin) -> Response:
+        await vue.rafraichir()
+        info = vue.info if vue.etat == "ok" else None
+        test = dernier_test(request)
+        resultats = (
+            cast(dict[str, object], test.get("profils", {})) if test is not None else {}
+        )
+        etat = request.query_params.get("etat", "")
+        avis: str | None = None
+        repli: str | None = None
+        if etat == "teste" and test is not None:
+            avis = t["admin_cles_avis_teste"]
+        elif etat == "route_absente":
+            repli = presentation.dire(
+                t,
+                "admin_cles_repli",
+                version=info.version_api if info is not None else t["valeur_inconnue"],
+            )
+        elif etat == "trop_tot":
+            attente = request.session.pop(SESSION_ATTENTE, None)
+            avis = (
+                presentation.dire(t, "admin_cles_trop_tot", n=attente)
+                if isinstance(attente, int)
+                else t["admin_cles_trop_tot_sans"]
+            )
+        elif etat == "indisponible":
+            avis = t["admin_cles_indisponible"]
+        lignes = (
+            []
+            if info is None
+            else [
+                LigneCle(
+                    nom=p.nom,
+                    fournisseur=presentation.fournisseur_de(
+                        reglages, p.fournisseur
+                    ).nom,
+                    modele=p.modele,
+                    variable=p.variable_cle,
+                    demarrage=t[
+                        "admin_cles_configuree"
+                        if p.disponible
+                        else "admin_cles_absente"
+                    ],
+                    test=texte_du_test(resultats.get(p.nom)),
+                )
+                for p in info.modele_langage.profils
+            ]
+        )
+        return rendre(
+            request,
+            "admin_cles.html",
+            200 if info is not None else 503,
+            api_absente=info is None,
+            lignes=lignes,
+            avis=avis,
+            repli=repli,
+            test=(
+                None
+                if test is None
+                else {
+                    "verifie_le": str(test.get("verifie_le", "")),
+                    "date": presentation.dire(
+                        t,
+                        "admin_cles_teste_le",
+                        date=presentation.date_lisible(str(test.get("verifie_le", ""))),
+                    ),
+                }
+            ),
+            lien_procedure=reglages.administration.procedure_cles,
+        )
+
+    @app.post("/admin/cles/tester", include_in_schema=False)
+    async def admin_tester_cles(request: Request) -> Response:
+        await formulaire(request)
+        await sessions.exiger_role("admin")(request)
+        resultat = await vue.client.verification()
+        if isinstance(resultat, Verification):
+            request.session[SESSION_TEST] = {
+                "verifie_le": resultat.verifie_le,
+                "profils": {
+                    c.nom: {"disponible": c.disponible, "statut": c.statut}
+                    for c in resultat.profils
+                },
+            }
+            issue = "teste"
+        elif isinstance(resultat, RouteAbsente):
+            issue = "route_absente"
+        elif isinstance(resultat, TropTot):
+            if resultat.retry_after is not None:
+                request.session[SESSION_ATTENTE] = resultat.retry_after
+            issue = "trop_tot"
+        else:
+            issue = "indisponible"
+        metriques.verifications_cles.labels(issue=issue).inc()
+        journal.evenement_requete(request, "verification_cles", {"issue": issue})
+        return RedirectResponse(f"/admin/cles?etat={issue}", status_code=303)

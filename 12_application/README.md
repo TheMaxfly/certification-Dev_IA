@@ -447,6 +447,35 @@ principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
 - **la métrique** : `application_profil_actif_info{profil}`, 1 sur le profil actif, 0 sur les
   autres profils de `/v1/info`, rafraîchie à chaque lecture.
 
+**L'état des clés et leur test** (`/admin/cles`, story A3, décision D10) :
+
+- **le tableau** : par profil de `/v1/info`, le fournisseur, le modèle, le **nom** de la
+  variable de sa clé (`variable_cle` — un nom, jamais une valeur) et son état **au démarrage
+  de l'API** : `disponible` dans `/v1/info` veut dire « clé posée au démarrage » (et, si le
+  contrôle d'exploitation a tourné, « modèle présent ») — dit tel quel ;
+- **« Tester les clés maintenant »** (`POST /admin/cles/tester`, jeton, administrateur) :
+  l'application appelle `POST /v1/verification` de l'API du modèle (contrat 1.5.0), qui
+  demande à chaque fournisseur la liste de ses modèles — **non facturée**, **un test par
+  minute et par clé** (429 : « réessayez dans n s ») ; le résultat, daté, par profil (valide,
+  modèle absent de la liste, refusée avec son code, fournisseur injoignable, clé absente),
+  est gardé **dans la session** (le cookie signé) : il survit au rechargement de la page, pas
+  à une autre session, et n'est jamais écrit en base — un test est un geste de l'instant ;
+- **le repli** : l'API en 1.4.0 ne connaît pas la route (404) — l'écran dit « le test n'existe
+  pas sur cette version de l'API (1.4.0) ; l'état affiché est celui du démarrage ». C'est le
+  comportement réel tant que l'image 1.5.0 n'est pas déployée ; l'API injoignable : un encart ;
+- **le lien** vers la procédure de pose et de rotation des clés (`[administration]
+  procedure_cles` : le README du module 11, « Poser ou changer une clé ») ; aucune procédure
+  dans l'écran ;
+- métrique `application_verifications_cles_total{issue}` (`teste`, `route_absente`,
+  `trop_tot`, `indisponible`), événement `verification_cles` au journal (l'issue seule).
+
+**Jamais une valeur de secret** à l'écran, au journal, aux métriques : un test pose des
+valeurs factices reconnaissables pour les quatre secrets de l'application
+(`APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`, `APPLICATION_CLE_CATALOGUE`,
+`APPLICATION_CLE_SESSION`) et les cherche — entières et par morceau — dans le HTML de
+**toutes** les pages de l'administration (chaque onglet présent, les états après un test),
+dans `/sante` et dans `/metrics` (`tests/test_admin_secrets.py`, mutation E4A-04).
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -624,6 +653,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
+| Secrets (A02, A05) : l'administration | **jamais une valeur de clé** dans une page `/admin/*`, `/sante`, `/metrics` : le nom des variables seul ; prouvé par des valeurs factices reconnaissables, cherchées entières et par morceau ; mutation **E4A-04** |
 | Clé du catalogue | dans l'environnement, jamais en page ni au journal (prouvé par test, sur le journal complet) ; gardée dans le seul client HTTP ; un refus (401) journalisé sans elle |
 | Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
@@ -649,13 +679,14 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 |---|---|---|
 | `[api] adresse` | `http://127.0.0.1:8010` | l'API du modèle sur le poste |
 | `[api] identite` | `libraire-demo` | fixe tant qu'il n'y a pas de comptes |
-| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
+| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s, test des clés 15 s (E4, lot 5) | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
 | `[api.attentes]` | 60 s, 2 s | l'attente annoncée sans `Retry-After` lisible |
 | `[reglages]` | température 0, reformulation cochée, mode démonstration éteint, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
 | `[conversation]` | 500 caractères par question, 5 échanges, 10 tours, 4 000 caractères, 2 000 par tour | les bornes de l'API ; celles que `/v1/info` publie l'emportent, un écart est journalisé ; la longueur d'un tour est comparée au contrat par un test |
 | `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
+| `[administration]` | le lien de la procédure des clés (README du 11, sur `main`) | E4, lot 5 : un document du dépôt, pas une procédure dans l'écran |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
 | `[catalogue]` | `http://127.0.0.1:8000` ; 20 par page (50 au plus) ; saisie de 2 à 100 ; connexion 3 s, réponse 5 s | l'API data du 02 sur le poste ; ses bornes, recopiées et comparées au contrat par un test ; la recherche répond en 116 ms de médiane (2026-11-08) |
 | `[comptes]` | session 8 h après la dernière page ; verrou après 5 échecs, 15 min ; pseudo 3 à 30, nom affiché 60 au plus (les bornes de la migration `027`, comparées par un test) ; mot de passe 12 à 128 (décision 7) ; base 3 s ; 25 comptes par page | voir « Sécurité et données » |

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.admin_cles_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1>{{ t.admin_cles_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
+<section class="zone-cles">
+<p>{{ t.admin_cles_intro }}</p>
+{% if api_absente %}
+<article>
+<div role="alert">
+<h2>{{ t.admin_reglages_api_absente_titre }}</h2>
+<p>{{ t.admin_cles_api_absente }}</p>
+</div>
+</article>
+{% else %}
+<table>
+<caption>{{ t.admin_cles_tableau }}</caption>
+<thead>
+<tr><th scope="col">{{ t.admin_cles_colonne_profil }}</th><th scope="col">{{ t.admin_cles_colonne_fournisseur }}</th><th scope="col">{{ t.admin_cles_colonne_modele }}</th><th scope="col">{{ t.admin_cles_colonne_variable }}</th><th scope="col">{{ t.admin_cles_colonne_demarrage }}</th><th scope="col">{{ t.admin_cles_colonne_test }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr>
+<th scope="row">{{ ligne.nom }}</th>
+<td>{{ ligne.fournisseur }}</td>
+<td>{{ ligne.modele }}</td>
+<td><code>{{ ligne.variable }}</code></td>
+<td>{{ ligne.demarrage }}</td>
+<td>{{ ligne.test }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+<p>{{ t.admin_cles_procedure_avant }} <a href="{{ lien_procedure }}">{{ t.admin_cles_procedure }}</a></p>
+</section>
+<section class="zone-cles-test">
+<h2>{{ t.admin_cles_test_titre }}</h2>
+{% if test %}
+<p><time datetime="{{ test.verifie_le }}">{{ test.date }}</time></p>
+{% else %}
+<p>{{ t.admin_cles_test_aucun }}</p>
+{% endif %}
+{% if repli %}
+<p>{{ repli }}</p>
+{% endif %}
+<p>{{ t.admin_cles_test_aide }}</p>
+<form method="post" action="/admin/cles/tester">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<button type="submit">{{ t.admin_cles_bouton }}</button>
+</form>
+</section>
+{% endblock %}
