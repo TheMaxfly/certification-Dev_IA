@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% import "composants/texte.html" as texte %}
+{% import "composants/champ.html" as c %}
 {% import "composants/listes.html" as l %}
 {% block contenu %}
 <h1>{{ t.titre_application }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
 {% if not peut_regler %}
 <p>{{ t.conseiller_aide_public }}</p>
 {% endif %}

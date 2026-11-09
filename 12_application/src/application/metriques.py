@@ -148,6 +148,12 @@ class Metriques:
             ["action"],
             registry=self.registre,
         )
+        self.comptes_supprimes = Counter(
+            "application_comptes_supprimes",
+            "Comptes clients supprimés par leur titulaire (E4, lot 4, droit à"
+            " l'effacement).",
+            registry=self.registre,
+        )
         for action in ACTIONS_LISTES:
             self.listes.labels(action=action)
         for motif in MOTIFS_REFUS:

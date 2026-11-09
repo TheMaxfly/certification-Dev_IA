@@ -32,7 +32,11 @@ type Role = Literal["client", "libraire", "admin"]
 #: Le motif d'un refus de connexion, borné (journal `connexion_refusee`).
 type Motif = Literal["mot_de_passe", "verrou", "inactif"]
 type Action = Literal[
-    "compte_cree", "compte_desactive", "compte_reactive", "mot_de_passe_change"
+    "compte_cree",
+    "compte_desactive",
+    "compte_reactive",
+    "mot_de_passe_change",
+    "compte_supprime",
 ]
 
 
@@ -59,6 +63,16 @@ class Refus:
 
 class PseudoPris(Exception):
     """Le pseudo existe déjà."""
+
+
+class CompteNonSupprimable(Exception):
+    """La base refuse la suppression : le compte a des critiques signées (contrainte
+    `ON DELETE RESTRICT` de la 027). Un client n'en a pas ; la base le tient."""
+
+
+class DejaSupprime(Exception):
+    """Le compte n'existait plus au moment de la suppression (une autre session l'a
+    supprimé) : la transaction est annulée, le journal n'a rien reçu."""
 
 
 class CompteInvalide(Exception):
@@ -377,3 +391,41 @@ async def lister(
             for ligne in await curseur.fetchall()
         ]
     return lignes, total, page
+
+
+# --------------------------------------------------------------------------- #
+#  L'effacement du compte par son titulaire (E4, lot 4, CL5)
+# --------------------------------------------------------------------------- #
+async def pseudo_de(base: Base, ident: int) -> str | None:
+    """Le pseudo d'un compte, pour vérifier son mot de passe par le chemin même de la
+    connexion (`authentifier`) ; il ne sort pas de l'application."""
+    async with base.transaction() as cx:
+        curseur = await cx.execute(
+            "SELECT pseudo FROM application.comptes WHERE id = %s", (ident,)
+        )
+        ligne = await curseur.fetchone()
+    return None if ligne is None else str(ligne[0])
+
+
+async def supprimer(base: Base, ident: int) -> None:
+    """Le compte supprimé physiquement, en une transaction : d'abord la ligne
+    `compte_supprime` du journal (par le compte lui-même, sur lui-même), puis le
+    `DELETE` — la cascade emporte ses listes et ses compteurs de questions, la
+    contrainte met `par_compte_id` à NULL : il reste « un compte n° n a été supprimé »,
+    et ce numéro ne nomme plus personne. La ligne du compte est tenue d'abord ; absente
+    (une autre session l'a supprimée) : `DejaSupprime`, la transaction annulée, rien au
+    journal ; des critiques signées : `CompteNonSupprimable`, rien non plus."""
+    try:
+        async with base.transaction() as cx:
+            # La ligne tenue d'abord : supprimée entre-temps par une autre session, la
+            # ligne de journal n'aurait plus de compte à citer.
+            curseur = await cx.execute(
+                "SELECT 1 FROM application.comptes WHERE id = %s FOR UPDATE", (ident,)
+            )
+            if await curseur.fetchone() is None:
+                raise DejaSupprime
+            await journaliser(cx, ident, "compte_supprime", ident)
+            # La ligne est tenue : le `DELETE` la trouve.
+            await cx.execute("DELETE FROM application.comptes WHERE id = %s", (ident,))
+    except errors.ForeignKeyViolation:
+        raise CompteNonSupprimable from None

@@ -1,0 +1,7 @@
+id = "E4L-05"
+origine = "E4, lot 4, spec 03 (2026-11-09) — la suppression du compte sans vérification du mot de passe : une session laissée ouverte suffirait à effacer le compte"
+fichier = "12_application/src/application/pages_comptes.py"
+avant = '''        if isinstance(verifie, Refus):'''
+apres = '''        if False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_effacement.py", "-k", "un_mot_de_passe_faux"]

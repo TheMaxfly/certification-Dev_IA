@@ -17,4 +17,7 @@
 <button type="submit">{{ t.mdp_bouton }}</button>
 </form>
 {% endif %}
+{% if compte and compte.role == "client" %}
+<p class="zone-effacement"><a href="/compte/supprimer">{{ t.effacement_lien }}</a></p>
+{% endif %}
 {% endblock %}

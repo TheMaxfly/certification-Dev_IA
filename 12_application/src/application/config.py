@@ -174,7 +174,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " quota_titre debit_titre debit_public budget_titre budget_atteint"
             " inscription_bornee_titre apropos_quotas_titre"
             " serie_resume_kitsu_source serie_resume_kitsu_voir"
-            # E4, lot 4 : les listes du client.
+            # E4, lot 4 : les listes du client, l'effacement du compte.
             " menu_listes liste_favori liste_a_lire liste_a_commander"
             " liste_bouton_favori liste_bouton_a_lire liste_bouton_a_commander"
             " liste_dans_favori liste_dans_a_lire liste_dans_a_commander"
@@ -186,6 +186,11 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " serie_listes_aucune serie_listes_indisponible serie_listes_groupe"
             " listes_titre listes_aide listes_catalogue_encart"
             " listes_titre_indisponible apropos_listes_titre apropos_listes"
+            " effacement_lien effacement_titre effacement_supprime effacement_reste"
+            " effacement_irreversible effacement_bouton effacement_annuler"
+            " effacement_refus effacement_reseau_titre effacement_reseau"
+            " effacement_avis effacement_impossible_titre effacement_impossible"
+            " apropos_effacement_titre apropos_effacement"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),

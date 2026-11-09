@@ -361,6 +361,7 @@ def creer_application(
         affichage: presentation.Affichage | None = None,
         encart: presentation.Encart | None = None,
         cloture: str | None = None,
+        avis: str | None = None,
         zones_cartes: Mapping[int, pages_listes.Zone] | None = None,
     ) -> Response:
         info = vue.info
@@ -415,6 +416,7 @@ def creer_application(
                 affichage=affichage,
                 encart=encart,
                 cloture=cloture,
+                avis=avis,
                 zones_cartes=zones_cartes or {},
             ),
             status_code=statut,
@@ -448,7 +450,13 @@ def creer_application(
         await sessions.page(request)
         await vue.rafraichir()
         question = await question_pre_remplie(request)
-        return page_principale(request, formulaire=Formulaire(question=question))
+        # E4, lot 4 : après la suppression du compte, l'avis à l'accueil (PRG).
+        supprime = request.query_params.get("etat") == "compte_supprime"
+        return page_principale(
+            request,
+            formulaire=Formulaire(question=question),
+            avis=t["effacement_avis"] if supprime else None,
+        )
 
     def lire_formulaire(
         donnees: FormData, compte: Compte | None

@@ -417,6 +417,7 @@ def test_cl2_les_metriques_comptent_ajout_changement_retrait(client, base):
 
     zero = client.get("/metrics").text
     assert [valeur(zero, a) for a in ("ajout", "changement", "retrait")] == [0, 0, 0]
+    assert "application_comptes_supprimes_total 0.0" in zero
     entrer(client, base, "client_un")
     for etat in ("favori", "favori", "a_lire", "retirer", "retirer"):
         geste(client, 101, etat)

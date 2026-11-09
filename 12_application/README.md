@@ -381,6 +381,31 @@ boutons ; `Cache-Control: no-store`.
   l'avis se lisent : la réponse du conseiller n'est pas conservée par un `POST` sans
   JavaScript (« rien n'est gardé des conversations »).
 
+### L'effacement du compte (E4, lot 4)
+
+**Le droit à l'effacement** : un client supprime son compte lui-même, à tout moment,
+physiquement et immédiatement.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/compte/mot-de-passe`, en bas (`zone-effacement`) | client | le lien « Supprimer mon compte » — pas dans le menu : un geste irréversible n'est pas à un clic du menu |
+| `/compte/supprimer` | client | la page de confirmation : ce qui sera supprimé (le compte, le pseudo, l'empreinte du mot de passe, les listes, les compteurs de questions), ce qui reste (une ligne de journal sans identité), « irréversible » ; le mot de passe (`autocomplete="current-password"`), « Supprimer définitivement mon compte », « Annuler » |
+| `POST /compte/supprimer` | client | le mot de passe vérifié par **`comptes.authentifier`**, le chemin même de la connexion — même coût, même compteur d'échecs, même verrou : un mauvais mot de passe compte comme un échec de connexion ; refus : la page, 422, « Mot de passe incorrect. », rien d'écrit ; succès : **303 vers l'accueil**, l'avis « Votre compte a été supprimé », la session fermée |
+| `/compte/supprimer` | libraire, administrateur | **403** et la phrase : « Les comptes du réseau sont désactivés par l'administrateur ; ils ne se suppriment pas, leurs critiques signées doivent rester attribuables » (l'asymétrie est voulue) |
+
+- **Une transaction** : la ligne du compte tenue (`FOR UPDATE`), la ligne `compte_supprime`
+  au journal des actions (par le compte, sur le compte), puis `DELETE FROM
+  application.comptes` — la cascade emporte `listes` et `questions_jour` ; la contrainte
+  met `par_compte_id` à `NULL` : il reste « un compte n° n a été supprimé, par lui-même », et
+  ce numéro ne nomme plus personne. Supprimé entre-temps par une autre session : même
+  sortie, rien au journal. Un compte qui a des critiques signées (un libraire, jamais un
+  client) : la base refuse (`ON DELETE RESTRICT`), la page « Ce compte ne peut pas être
+  supprimé » (409).
+- **Après** : un cookie copié avant ne vaut plus rien (le compte n'existe plus) ; **le
+  pseudo redevient libre** ; le compteur des inscriptions de la session, lui, survit (un
+  compte supprimé n'est pas une inscription de plus). Métrique :
+  `application_comptes_supprimes_total`.
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -522,7 +547,9 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 - **Ce qui est transmis, et par qui** : l'API envoie au fournisseur du profil utilisé la
   question, l'historique et les passages. L'application ne parle jamais à un fournisseur.
 - **Ce qui est conservé par l'application** : rien des conversations. Les comptes, en
-  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel).
+  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel),
+  et les listes d'un client — jusqu'à ce qu'il supprime son compte (« Registre des
+  traitements » ci-dessous).
   Son journal, une ligne JSON par requête et par événement, porte route, statut, durée,
   identifiants (de la requête, du compte), code d'erreur, nombre de tours et taille de
   l'historique ; **jamais** la question, l'historique, la réponse, la clé, un mot de passe,
@@ -531,7 +558,20 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   `acces_refuse` (gabarit de la route), `base_indisponible`, `cle_session_ephemere` ; des
   écrans de compte (E4, lot 1, spec 03) : `inscription`, `connexion_reussie`,
   `connexion_refusee` (motif borné), `verrou_pose`, `deconnexion`, `mot_de_passe_change`,
-  `mot_de_passe_refuse` (motif borné).
+  `mot_de_passe_refuse` (motif borné) ; de l'effacement (E4, lot 4) : `compte_supprime`,
+  `suppression_refusee` (motif borné).
+
+### Registre des traitements : les données du client
+
+| Données | Finalité | Durée | Suppression | Ce qui subsiste |
+|---|---|---|---|---|
+| pseudo, nom affiché (le pseudo), empreinte Argon2id du mot de passe, rôle, dates, compteur d'échecs et verrou | se connecter, tenir ses listes | jusqu'à la suppression par l'intéressé | **immédiate**, par lui-même (`/compte/supprimer`), sans délai de rétention | une ligne `compte_supprime` du journal des actions, sans identité (`par_compte_id` nul, le numéro de l'ancien compte, la date) |
+| listes (identifiant de série, état, date d'ajout) | favori, à lire, à commander | jusqu'au retrait de la série ou à la suppression du compte | le retrait supprime la ligne ; la suppression du compte, toutes (cascade) | rien |
+| compteurs de questions du jour (`questions_jour`, un nombre, aucun texte) | le quota d'un client | jusqu'à la suppression du compte | cascade | rien |
+| coûts du jour (`couts_jour`) | le budget du conseiller | — | — | des agrégats par jour, profil et mode, **sans compte** |
+
+Les comptes du réseau (libraires, administrateurs) ne se suppriment pas : ils se
+désactivent (leurs critiques signées restent attribuables).
 
 ### OWASP Top 10, mis en regard
 
@@ -548,6 +588,7 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
+| Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
 | Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
 | Injection (A03) : le texte des critiques | requêtes paramétrées ; le texte rendu **échappé** par les gabarits, jamais marqué « sûr » (test avec `<script>`, `<b>`, `<img onerror>` : rendus littéralement, aucun élément créé ; mutation E4R-07) ; politique de sécurité du contenu sans script |
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
@@ -719,7 +760,8 @@ libraire, administrateur), la commande du premier administrateur (ci-dessus). **
 (le catalogue)** : la recherche et la page de série, par l'API data du 02. **Lot 3 (les
 critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
 lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
-la fiche, les cartes du conseiller et « Mes listes » (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
+la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compte par son
+titulaire, le droit à l'effacement (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
 et de l'état des services ; le serveur avec préproduction et production ; l'identité
 visuelle, sur `theme.css`.

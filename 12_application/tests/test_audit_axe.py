@@ -483,6 +483,8 @@ COMPTES_AUDIT = (
     # E4, lot 4 : les listes du client (`LISTES_AUDIT`), une liste vide.
     ("listes_audit", "client", False),
     ("listes_vide_audit", "client", False),
+    # E4, lot 4 : la suppression du compte (la page et son refus ; rien n'est supprimé).
+    ("effacement_audit", "client", False),
 )
 #: Les listes de `listes_audit` : (series_id, état) — une série par liste.
 LISTES_AUDIT = ((101, "favori"), (102, "a_lire"), (103, "a_commander"))
@@ -673,6 +675,33 @@ ECRANS_COMPTES: tuple[EcranCompte, ...] = (
         "/compte/listes",
         "Mes listes",
         catalogue="indisponible",
+    ),
+    # E4, lot 4 : la suppression du compte par son titulaire (CL5).
+    EcranCompte(
+        "compte_supprimer",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+    ),
+    EcranCompte(
+        "compte_supprimer_refuse",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+        {"#mot_de_passe": "faux faux faux"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "compte_supprimer_interdit",
+        "libraire_audit",
+        "/compte/supprimer",
+        "Suppression impossible",
+    ),
+    EcranCompte(
+        "accueil_apres_suppression",
+        None,
+        "/?etat=compte_supprime",
+        "Conseiller de lecture",
     ),
     EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
     EcranCompte(

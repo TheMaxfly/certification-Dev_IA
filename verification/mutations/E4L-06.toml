@@ -1,0 +1,7 @@
+id = "E4L-06"
+origine = "E4, lot 4, spec 03 (2026-11-09) — la suppression du compte sans sa ligne de journal : l'effacement ne laisserait aucune trace, même sans identité"
+fichier = "12_application/src/application/comptes.py"
+avant = '''            await journaliser(cx, ident, "compte_supprime", ident)'''
+apres = '''            pass'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_effacement.py", "-k", "emporte_compte_listes_et_compteurs"]
