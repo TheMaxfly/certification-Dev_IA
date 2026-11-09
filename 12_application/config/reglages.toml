@@ -106,14 +106,13 @@ labels = [
 motif = "Une critique de libraire : de 50 à 2 000 caractères (la migration 027 admet de 1 à 10 000 ; les bornes métier, plus serrées, sont tenues par l'application et comparées à la 027 par un test). Note entière de 0 à 10, obligatoire ; un label au plus, facultatif, pris dans cette liste fixe — modifiable ici sans code, chaque code de la forme ^[a-z_]{1,40}$ (celle de la 027) et unique. 25 critiques par page de liste (« Mes critiques », modération)."
 
 [conseiller.limites]
-quota_session_questions = 10
-quota_session_fenetre_min = 60
-quota_client_questions_jour = 10
+quota_visiteur_questions_jour = 5
+quota_client_questions_jour = 20
 debit_public_par_minute = 10
 cout_jour_max_usd = 0.50
 inscriptions_session_max = 3
 inscriptions_fenetre_min = 60
-motif = "Les bornes du conseiller public (E4, lot 2b). Un visiteur : 10 questions par heure et par session — un visiteur en boutique, le temps d'un choix. Un compte client : 10 par jour civil UTC, persisté par compte — la borne classique d'un service gratuit sans abonnement ; libraires et administrateur n'ont pas de quota. La clé publique : 10 appels par minute, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min. Le coût : 0,50 $ par jour, environ 250 questions au coût mesuré, persisté par jour, profil et mode, relu avant chaque appel. L'inscription : 3 comptes par heure et par session. Un cookie effacé remet à zéro les compteurs de session, pas celui d'un compte."
+motif = "Les bornes du conseiller public (E4, lot 2b ; chiffres des quotas décidés par Max le 2026-11-09). Un visiteur : 5 questions par jour civil UTC, compteur dans le cookie de la session — de quoi essayer le conseiller. Un compte client : 20 par jour civil UTC, persisté par compte — un compte doit donner plus de questions qu'aucun compte ; libraires et administrateur n'ont pas de quota. La clé publique : 10 appels par minute, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min. Le coût : 0,50 $ par jour, environ 250 questions au coût mesuré, persisté par jour, profil et mode, relu avant chaque appel. L'inscription : 3 comptes par heure et par session. Un cookie effacé remet à zéro les compteurs de session, pas celui d'un compte."
 
 [fournisseurs.mistral]
 nom = "Mistral"
@@ -148,7 +147,7 @@ question_pre_remplie = "Que pensent les libraires de {titre} ?"
 pont_vers_catalogue = "Chercher ce titre dans le catalogue"
 pont_vers_conseiller = "Demander au conseiller"
 quota_titre = "Quota de questions atteint"
-quota_session = "Vous avez posé {n} questions cette heure-ci ; revenez à {heure}."
+quota_visiteur = "Vous avez posé vos {n} questions du jour ; le conseiller vous revient demain à {heure}. Un compte gratuit en donne {client} par jour."
 quota_client = "Vous avez posé vos {n} questions du jour ; le conseiller vous revient demain à {heure}."
 debit_titre = "Conseiller très sollicité"
 debit_public = "Le conseiller est très sollicité ; réessayez dans une minute."
@@ -157,7 +156,7 @@ budget_atteint = "Le conseiller a atteint son budget du jour ; il reprend demain
 inscription_bornee_titre = "Trop de comptes créés"
 inscription_bornee = "Ce navigateur a créé {n} comptes dans l'heure, le maximum ; réessayez à {heure}."
 apropos_quotas_titre = "Les quotas du conseiller"
-apropos_quotas = "Le conseiller répond à {visiteur} questions par heure pour un visiteur, et à {client} par jour pour un client inscrit ; les libraires du réseau n'ont pas de quota. Le premier compteur vit dans le cookie de la session (strictement nécessaire, rien d'autre) ; le second est un nombre de questions par compte et par jour, sans aucun texte, supprimé avec le compte."
+apropos_quotas = "Le conseiller répond à {visiteur} questions par jour pour un visiteur, et à {client} par jour pour un client inscrit ; les libraires du réseau n'ont pas de quota. Le premier compteur vit dans le cookie de la session (strictement nécessaire, rien d'autre) ; le second est un nombre de questions par compte et par jour, sans aucun texte, supprimé avec le compte."
 bouton = "Demander"
 nouvelle_conversation = "Nouvelle conversation"
 reglages_titre = "Réglages"

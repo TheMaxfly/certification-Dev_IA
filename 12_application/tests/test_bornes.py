@@ -172,54 +172,62 @@ def heure(instant: float) -> str:
 
 
 # --------------------------------------------------------------------------- #
-#  V1 : le quota par session des visiteurs
+#  V1 : le quota journalier des visiteurs (par session) — décision de Max du
+#  2026-11-09 : 5 questions par jour pour un visiteur, 20 pour un client
 # --------------------------------------------------------------------------- #
-def test_v1_dix_questions_passent_la_onzieme_est_refusee(lancer, doublure, horloge):
+MINUIT = datetime(2026, 11, 9, tzinfo=UTC).timestamp()
+
+
+def test_v1_un_visiteur_cinq_questions_par_jour_la_sixieme_jusqu_a_minuit(
+    lancer, doublure, horloge
+):
     app = lancer(debit_public_par_minute=1000)
     client = visiteur(app)
 
     statuts = []
-    for _ in range(10):
+    for _ in range(5):
         statuts.append(poser(client).status_code)
-        horloge.avancer(60)
-    r = poser(client, "La onzième question ?")
+        horloge.avancer(600)
+    r = poser(client, "La sixième question ?")
 
-    assert statuts == [200] * 10
+    assert statuts == [200] * 5
     assert r.status_code == 429
-    assert r.headers["Retry-After"] == str(3600 - 600)
-    attendu = f"revenez à {heure(DEBUT + 3600)}"
-    assert "Vous avez posé 10 questions cette heure-ci" in encart(r)
-    assert attendu in encart(r)
+    assert r.headers["Retry-After"] == str(int(MINUIT - horloge()))
+    assert "Vous avez posé vos 5 questions du jour" in encart(r)
+    assert f"demain à {heure(MINUIT)}" in encart(r)
+    assert "Un compte gratuit en donne 20 par jour." in encart(r)
     assert (
         soupe(r).select_one("[role=alert] h2").get_text()
         == "Quota de questions atteint"
     )
     assert (
-        soupe(r).select_one("textarea#question").get_text() == "La onzième question ?"
+        soupe(r).select_one("textarea#question").get_text() == "La sixième question ?"
     )
-    assert len(doublure.corps_recus) == 10, "un refus n'appelle jamais l'API"
+    assert len(doublure.corps_recus) == 5, "un refus n'appelle jamais l'API"
 
 
-def test_v1_la_fenetre_glisse(lancer, horloge):
+def test_v1_le_lendemain_le_quota_du_visiteur_repart(lancer, horloge):
     client = visiteur(lancer(debit_public_par_minute=1000))
-    for _ in range(10):
+    for _ in range(5):
         poser(client)
-
     assert poser(client).status_code == 429
-    horloge.avancer(3600)
+
+    horloge.avancer(3 * 3600)  # 23:00 : le même jour
+    assert poser(client).status_code == 429
+    horloge.instant = MINUIT  # 00:00:00 UTC le 9
     assert poser(client).status_code == 200
 
 
 def test_v1_ni_un_refus_ni_une_erreur_de_l_api_n_incrementent(lancer, doublure):
     client = visiteur(lancer(debit_public_par_minute=1000))
     doublure.choisir(reponse="fournisseur_injoignable")
-    for _ in range(12):
+    for _ in range(7):
         assert poser(client).status_code == 503
     doublure.choisir(reponse="nominale")
 
-    assert [poser(client).status_code for _ in range(11)] == [200] * 10 + [429]
+    assert [poser(client).status_code for _ in range(6)] == [200] * 5 + [429]
     assert [poser(client).status_code for _ in range(3)] == [429] * 3, "refus"
-    assert len(doublure.corps_recus) == 22
+    assert len(doublure.corps_recus) == 12
 
 
 def cookie_signe(contenu: dict[str, object]) -> str:
@@ -247,14 +255,22 @@ def test_v1_un_cookie_a_dix_mille_horodatages_est_borne(lancer, doublure):
 
     assert r.status_code == 429
     assert doublure.corps_recus == []
-    assert contenu["quota"] == [int(DEBUT)] * 10
+    assert contenu["quota"] == [int(DEBUT)] * 5
     assert len(renvoye) < 600
 
 
-def test_v1_des_horodatages_illisibles_sont_ecartes(lancer):
+def test_v1_des_horodatages_illisibles_ou_d_un_autre_jour_sont_ecartes(lancer):
     client = visiteur(lancer(debit_public_par_minute=1000))
     jeton = "jeton-de-l-essai"
-    illisibles = ["x", None, True, 1.5, int(DEBUT) + 999, int(DEBUT) - 7200]
+    illisibles = [
+        "x",
+        None,
+        True,
+        1.5,
+        int(DEBUT) + 999,  # à venir
+        int(DEBUT) - 86_400,  # la veille
+        int(DEBUT) - 7200,  # le même jour, 18:00 : compte
+    ]
     client.cookies.set(
         NOM_COOKIE,
         cookie_signe({"csrf": jeton, "quota": illisibles}),
@@ -267,44 +283,50 @@ def test_v1_des_horodatages_illisibles_sont_ecartes(lancer):
 
     assert r.status_code == 200
     contenu = json.loads(base64.b64decode(client.cookies[NOM_COOKIE].split(".")[0]))
-    assert contenu["quota"] == [int(DEBUT)]
+    assert contenu["quota"] == [int(DEBUT) - 7200, int(DEBUT)]
 
 
 # --------------------------------------------------------------------------- #
 #  V1 : le quota journalier des comptes clients (029)
 # --------------------------------------------------------------------------- #
-def test_v1_un_client_dix_questions_par_jour_la_onzieme_jusqu_a_minuit(
+def test_v1_un_client_vingt_questions_par_jour_la_vingt_et_unieme_jusqu_a_minuit(
     lancer, doublure, base_app, horloge
 ):
     app = lancer(base_app=base_app, debit_public_par_minute=1000)
     client = connecte(app, base_app, "client")
 
-    statuts = [poser(client).status_code for _ in range(10)]
+    statuts = [poser(client).status_code for _ in range(20)]
     horloge.avancer(3600)
     r = poser(client)
 
-    assert statuts == [200] * 10
+    assert statuts == [200] * 20
     assert r.status_code == 429
-    minuit = datetime(2026, 11, 9, tzinfo=UTC).timestamp()
-    assert r.headers["Retry-After"] == str(int(minuit - horloge()))
-    assert "Vous avez posé vos 10 questions du jour" in encart(r)
-    assert f"demain à {heure(minuit)}" in encart(r)
-    assert len(doublure.corps_recus) == 10
-    assert questions_du_jour(base_app) == [("2026-11-08", 10)]
+    assert r.headers["Retry-After"] == str(int(MINUIT - horloge()))
+    assert "Vous avez posé vos 20 questions du jour" in encart(r)
+    assert f"demain à {heure(MINUIT)}" in encart(r)
+    assert len(doublure.corps_recus) == 20
+    assert questions_du_jour(base_app) == [("2026-11-08", 20)]
+
+
+def test_v1_un_compte_client_a_plus_de_questions_qu_un_visiteur():
+    """La décision du 2026-11-09 : un compte donne plus de questions qu'aucun compte."""
+    bornes = charger(ENVIRONNEMENT).bornes
+
+    assert bornes.quota_client_questions_jour > bornes.quota_visiteur_questions_jour
 
 
 def test_v1_le_lendemain_le_compteur_du_client_repart(lancer, base_app, horloge):
     client = connecte(
         lancer(base_app=base_app, debit_public_par_minute=1000), base_app, "client"
     )
-    for _ in range(10):
+    for _ in range(20):
         poser(client)
     assert poser(client).status_code == 429
 
     horloge.avancer(4 * 3600)  # 00:00:00 UTC le 9
 
     assert poser(client).status_code == 200
-    assert questions_du_jour(base_app) == [("2026-11-08", 10), ("2026-11-09", 1)]
+    assert questions_du_jour(base_app) == [("2026-11-08", 20), ("2026-11-09", 1)]
 
 
 def test_v1_un_refus_de_l_api_n_incremente_pas_le_compte(lancer, doublure, base_app):
@@ -318,7 +340,7 @@ def test_v1_un_refus_de_l_api_n_incremente_pas_le_compte(lancer, doublure, base_
 def test_v1_le_quota_suit_le_compte_pas_le_cookie(lancer, base_app):
     app = lancer(base_app=base_app, debit_public_par_minute=1000)
     premier = connecte(app, base_app, "client", "client_suivi")
-    for _ in range(10):
+    for _ in range(20):
         poser(premier)
 
     autre = reconnecte(app, "client_suivi")  # un autre navigateur, un autre cookie
@@ -332,22 +354,22 @@ def test_v1_libraires_et_admin_n_ont_pas_de_quota(lancer, base_app, role):
         lancer(base_app=base_app, debit_public_par_minute=1000), base_app, role
     )
 
-    assert [poser(client).status_code for _ in range(12)] == [200] * 12
+    assert [poser(client).status_code for _ in range(22)] == [200] * 22
     assert questions_du_jour(base_app) == []
 
 
 def test_v1_deconnecte_le_client_redevient_visiteur_sans_fuite(lancer, base_app):
     app = lancer(base_app=base_app, debit_public_par_minute=1000)
     client = connecte(app, base_app, "client", "client_deconnecte")
-    for _ in range(10):
+    for _ in range(20):
         poser(client)
     assert poser(client).status_code == 429
 
     client.post("/deconnexion", data={})
 
-    assert [poser(client).status_code for _ in range(11)] == [200] * 10 + [429]
-    assert "cette heure-ci" in encart(poser(client)), "le quota de la session"
-    assert questions_du_jour(base_app) == [("2026-11-08", 10)], "pas de fuite"
+    assert [poser(client).status_code for _ in range(6)] == [200] * 5 + [429]
+    assert "vos 5 questions du jour" in encart(poser(client)), "le quota du visiteur"
+    assert questions_du_jour(base_app) == [("2026-11-08", 20)], "pas de fuite"
 
 
 def test_v1_sans_base_un_client_redevient_visiteur(lancer, base_app, port_ferme):
@@ -363,10 +385,10 @@ def test_v1_sans_base_un_client_redevient_visiteur(lancer, base_app, port_ferme)
     perdu = visiteur(sans_base)
     perdu.cookies = client.cookies
 
-    statuts = [poser(perdu).status_code for _ in range(11)]
+    statuts = [poser(perdu).status_code for _ in range(6)]
 
-    assert statuts == [200] * 10 + [429]
-    assert "cette heure-ci" in encart(poser(perdu))
+    assert statuts == [200] * 5 + [429]
+    assert "vos 5 questions du jour" in encart(poser(perdu))
 
 
 # --------------------------------------------------------------------------- #
@@ -376,12 +398,13 @@ def test_v1_dix_appels_publics_par_minute_le_onzieme_attend(
     lancer, doublure, base_app, horloge
 ):
     app = lancer(base_app=base_app, cle_comptes=CLE_COMPTES)
-    premier, second = visiteur(app), visiteur(app)
-    for _ in range(10):
-        assert poser(premier).status_code == 200
-        horloge.avancer(1)
+    premier, deuxieme, troisieme = visiteur(app), visiteur(app), visiteur(app)
+    for client in (premier, deuxieme):  # deux visiteurs, cinq questions chacun
+        for _ in range(5):
+            assert poser(client).status_code == 200
+            horloge.avancer(1)
 
-    r = poser(second)
+    r = poser(troisieme)
 
     assert r.status_code == 429
     assert r.headers["Retry-After"] == "50"
@@ -390,7 +413,7 @@ def test_v1_dix_appels_publics_par_minute_le_onzieme_attend(
     libraire = connecte(app, base_app, "libraire")
     assert poser(libraire).status_code == 200, "la clé des comptes n'y est pas soumise"
     horloge.avancer(50)
-    assert poser(second).status_code == 200
+    assert poser(troisieme).status_code == 200
 
 
 def test_v1_sans_cle_des_comptes_le_libraire_compte_sous_le_plafond_public(
@@ -399,9 +422,9 @@ def test_v1_sans_cle_des_comptes_le_libraire_compte_sous_le_plafond_public(
     """Le repli : la clé publique sert aux deux, le libraire passe donc sous le même
     plafond que les visiteurs (README)."""
     app = lancer(base_app=base_app)
-    premier = visiteur(app)
-    for _ in range(10):
-        poser(premier)
+    for client in (visiteur(app), visiteur(app)):
+        for _ in range(5):
+            poser(client)
 
     assert poser(connecte(app, base_app, "libraire")).status_code == 429
 

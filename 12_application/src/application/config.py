@@ -235,7 +235,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "critique_lien_retirer": frozenset({"serie"}),
     "critique_lien_moderer": frozenset({"nom"}),
     "question_pre_remplie": frozenset({"titre"}),
-    "quota_session": frozenset({"n", "heure"}),
+    "quota_visiteur": frozenset({"n", "heure", "client"}),
     "quota_client": frozenset({"n", "heure"}),
     "inscription_bornee": frozenset({"n", "heure"}),
     "apropos_quotas": frozenset({"visiteur", "client"}),
@@ -342,12 +342,11 @@ class Critiques:
 
 @dataclass(frozen=True, slots=True)
 class Bornes:
-    """Les bornes du conseiller (`[conseiller.limites]`, E4, lot 2b) : quota par session
-    des visiteurs, quota journalier des comptes clients, plafond de débit de la clé
-    publique, plafond de coût du jour, inscriptions par session."""
+    """Les bornes du conseiller (`[conseiller.limites]`, E4, lot 2b) : quota journalier
+    des visiteurs (par session) et des comptes clients (par compte), plafond de débit de
+    la clé publique, plafond de coût du jour, inscriptions par session."""
 
-    quota_session_questions: int
-    quota_session_fenetre_min: int
+    quota_visiteur_questions_jour: int
     quota_client_questions_jour: int
     debit_public_par_minute: int
     cout_jour_max_usd: float
@@ -684,11 +683,8 @@ def lire_bornes(lecteur: _Lecteur, donnees: Table) -> Bornes:
     )
     chemin = "conseiller.limites"
     return Bornes(
-        quota_session_questions=lecteur.entier(
-            table, "quota_session_questions", chemin
-        ),
-        quota_session_fenetre_min=lecteur.entier(
-            table, "quota_session_fenetre_min", chemin
+        quota_visiteur_questions_jour=lecteur.entier(
+            table, "quota_visiteur_questions_jour", chemin
         ),
         quota_client_questions_jour=lecteur.entier(
             table, "quota_client_questions_jour", chemin

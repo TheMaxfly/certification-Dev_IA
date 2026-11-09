@@ -58,14 +58,13 @@ def test_la_cle_des_comptes_est_facultative_et_jamais_montree():
 def test_les_bornes_du_conseiller_sont_celles_decidees():
     bornes = charger(ENV).bornes
     assert (
-        bornes.quota_session_questions,
-        bornes.quota_session_fenetre_min,
+        bornes.quota_visiteur_questions_jour,
         bornes.quota_client_questions_jour,
         bornes.debit_public_par_minute,
         bornes.cout_jour_max_usd,
         bornes.inscriptions_session_max,
         bornes.inscriptions_fenetre_min,
-    ) == (10, 60, 10, 10, 0.50, 3, 60)
+    ) == (5, 20, 10, 0.50, 3, 60)
 
 
 def test_le_lancement_sans_cle_nomme_la_variable_et_rend_2(monkeypatch, capsys):
@@ -215,12 +214,12 @@ def fichier_modifie(tmp_path: Path, avant: str, apres: str) -> Path:
         ('bouton = "Demander"', 'bouton = "{"', "accolades invalides"),
         # E4, lot 2b : les bornes du conseiller, positives.
         (
-            "quota_session_questions = 10",
-            "quota_session_questions = 0",
-            "conseiller.limites.quota_session_questions",
+            "quota_visiteur_questions_jour = 5",
+            "quota_visiteur_questions_jour = 0",
+            "conseiller.limites.quota_visiteur_questions_jour",
         ),
         (
-            "quota_client_questions_jour = 10",
+            "quota_client_questions_jour = 20",
             "quota_client_questions_jour = 2.5",
             "conseiller.limites.quota_client_questions_jour",
         ),

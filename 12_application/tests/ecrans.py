@@ -157,7 +157,7 @@ ECRANS: tuple[Ecran, ...] = (
 #: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le
 #: premier passage la dépasse.
 BORNES_SERREES: dict[str, dict[str, float]] = {
-    "session": {"quota_session_questions": 1},
+    "session": {"quota_visiteur_questions_jour": 1},
     "client": {"quota_client_questions_jour": 1},
     "debit": {"debit_public_par_minute": 1},
     "budget": {"cout_jour_max_usd": 0.0001},

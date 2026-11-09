@@ -17,7 +17,6 @@ import time
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -524,19 +523,24 @@ def creer_application(
         base: Base = request.app.state.base
         jour = quotas.jour_utc(instant)
         if compte is None:
-            fenetre = bornes.quota_session_fenetre_min * 60
-            plafond = bornes.quota_session_questions
-            gardes = quotas.horodatages(
-                request.session, quotas.CLE_QUOTA, instant, fenetre, plafond
+            plafond = bornes.quota_visiteur_questions_jour
+            gardes = quotas.horodatages_du_jour(
+                request.session, quotas.CLE_QUOTA, instant, plafond
             )
-            attente = quotas.attente(gardes, instant, fenetre, plafond)
-            if attente is not None:
-                retour = datetime.fromtimestamp(instant + attente, UTC)
+            if len(gardes) >= plafond:
+                minuit = quotas.minuit_suivant(instant)
                 texte = presentation.dire(
-                    t, "quota_session", n=plafond, heure=quotas.heure_locale(retour)
+                    t,
+                    "quota_visiteur",
+                    n=plafond,
+                    heure=quotas.heure_locale(minuit),
+                    client=bornes.quota_client_questions_jour,
                 )
                 encart = presentation.Encart(
-                    texte, 429, attente, titre=t["quota_titre"]
+                    texte,
+                    429,
+                    quotas.secondes_jusqu_a(minuit, instant),
+                    titre=t["quota_titre"],
                 )
                 return borne("session", encart), "quota"
         elif compte.role == "client":
@@ -596,9 +600,8 @@ def creer_application(
         base: Base = request.app.state.base
         jour = quotas.jour_utc(instant)
         if compte is None:
-            fenetre = bornes.quota_session_fenetre_min * 60
-            plafond = bornes.quota_session_questions
-            quotas.noter(request.session, quotas.CLE_QUOTA, instant, fenetre, plafond)
+            plafond = bornes.quota_visiteur_questions_jour
+            quotas.noter_du_jour(request.session, quotas.CLE_QUOTA, instant, plafond)
         elif compte.role == "client":
             try:
                 await quotas.compter_question(base, compte.id, jour)
@@ -767,7 +770,7 @@ def creer_application(
                 apropos_quotas=presentation.dire(
                     t,
                     "apropos_quotas",
-                    visiteur=bornes.quota_session_questions,
+                    visiteur=bornes.quota_visiteur_questions_jour,
                     client=bornes.quota_client_questions_jour,
                 ),
             ),

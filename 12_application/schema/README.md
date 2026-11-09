@@ -121,7 +121,7 @@ sont ceux que l'API rend.
 | `jour` | `date` | le jour civil UTC, celui de `couts_jour` |
 | `questions` | `integer` | 0 par défaut, ≥ 0 : les questions posées au conseiller ce jour-là |
 
-Clé primaire `(compte_id, jour)`. Le quota des comptes clients (10 par jour) ; aucun texte,
+Clé primaire `(compte_id, jour)`. Le quota des comptes clients (20 par jour depuis la décision du 2026-11-09) ; aucun texte,
 un compteur. `app_rw` : `SELECT`, `INSERT`, `UPDATE`, pas de `DELETE`.
 
 ### `reglages`

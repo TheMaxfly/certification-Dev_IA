@@ -4,4 +4,4 @@ fichier = "12_application/src/application/app.py"
 avant = '''            posees = await quotas.questions_posees(base, compte.id, jour)'''
 apres = '''            posees = 0'''
 dossier = "12_application"
-commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "un_client_dix_questions_par_jour"]
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "un_client_vingt_questions_par_jour"]

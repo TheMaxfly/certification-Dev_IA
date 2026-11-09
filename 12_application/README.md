@@ -135,10 +135,15 @@ Le conseiller public appelle un modèle payant : quatre bornes le tiennent, tout
 configuration (`[conseiller.limites]`), vérifiées **avant** l'appel, dans cet ordre, et un
 refus n'appelle jamais l'API.
 
+Les chiffres des deux quotas sont ceux de la décision de Max du 2026-11-09 : **5 questions par
+jour pour un visiteur, 20 pour un client**. Ils remplacent 10 par heure et 10 par jour, qui
+donnaient à un visiteur plus de questions sur une journée qu'à un compte. Les deux se
+comptent par jour civil UTC et se remettent à zéro à minuit UTC.
+
 | Borne | Qui | Valeur, et son repère | Mécanisme | Dépassement |
 |---|---|---|---|---|
-| Quota par session | visiteurs | **10 questions / heure** — un visiteur en boutique, le temps d'un choix | les horodatages des questions de l'heure dans le cookie signé (`quota`), purgés et **bornés** à 10 à chaque lecture (un cookie forgé ne fait rien enfler) ; compté après une réponse 200 seulement | 429, `Retry-After`, « Vous avez posé 10 questions cette heure-ci ; revenez à HH:MM (fuseau du serveur) » ; la question reste au formulaire |
-| Quota par compte client | clients connectés (ni libraires, ni administrateur) | **10 questions / jour civil UTC** — la borne classique d'un service gratuit sans abonnement | `application.questions_jour` (migration `029`), relu avant, incrémenté après une réponse 200 ; il **suit le compte**, pas le cookie | 429, `Retry-After` jusqu'à minuit UTC, « … vos 10 questions du jour ; le conseiller vous revient demain à HH:MM » |
+| Quota par session | visiteurs | **5 questions / jour civil UTC** — de quoi essayer le conseiller | les horodatages des questions du jour dans le cookie signé (`quota`), purgés et **bornés** à 5 à chaque lecture (un cookie forgé ne fait rien enfler) ; compté après une réponse 200 seulement | 429, `Retry-After` jusqu'à minuit UTC, « Vous avez posé vos 5 questions du jour ; le conseiller vous revient demain à HH:MM (fuseau du serveur). Un compte gratuit en donne 20 par jour. » ; la question reste au formulaire |
+| Quota par compte client | clients connectés (ni libraires, ni administrateur) | **20 questions / jour civil UTC** — un compte donne plus de questions qu'aucun compte | `application.questions_jour` (migration `029`), relu avant, incrémenté après une réponse 200 ; il **suit le compte**, pas le cookie | 429, `Retry-After` jusqu'à minuit UTC, « … vos 20 questions du jour ; le conseiller vous revient demain à HH:MM » |
 | Plafond de débit | les appels partis avec la **clé publique** | **10 / minute**, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min | en mémoire du processus : **valable avec un processus** ; plusieurs demanderaient un compteur partagé | 429, `Retry-After`, « Le conseiller est très sollicité ; réessayez dans une minute » |
 | Plafond de coût du jour | tout le monde, strict et enrichi | **0,50 $ / jour** — environ 250 questions au coût mesuré | `application.couts_jour` (027) : la somme du jour, relue avant chaque appel ; après chaque réponse, le `cout_estime_usd` reçu (0 s'il manque, journalisé `cout_absent`) sous le profil et le mode **rendus par l'API** ; base indisponible : le plafond n'est **pas vérifiable**, le conseiller répond quand même (`plafond_non_verifiable`, état `inconnu`) | 503, `Retry-After` jusqu'à minuit UTC, « Le conseiller a atteint son budget du jour ; il reprend demain » |
 

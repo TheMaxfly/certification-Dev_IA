@@ -85,7 +85,7 @@ def bornes_larges(reglages: Reglages) -> Reglages:
     (`test_bornes.py`) reprennent les valeurs de la configuration."""
     larges = replace(
         reglages.bornes,
-        quota_session_questions=10_000,
+        quota_visiteur_questions_jour=10_000,
         quota_client_questions_jour=10_000,
         debit_public_par_minute=10_000,
         inscriptions_session_max=10_000,
