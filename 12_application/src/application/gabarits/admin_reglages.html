@@ -35,8 +35,7 @@
 <fieldset{% if erreur %} aria-describedby="profil-erreur"{% endif %}>
 <legend>{{ t.admin_reglages_legende }}</legend>
 {% for profil in profils %}
-<input id="profil-{{ loop.index }}" type="radio" name="profil" value="{{ profil.nom }}"{% if profil.coche %} checked{% endif %}{% if erreur and loop.first %} autofocus{% endif %}>
-<label for="profil-{{ loop.index }}">{{ profil.etiquette }}{% if profil.coche and aucun_reglage %} {{ t.admin_reglages_defaut }}{% endif %}</label>
+<label for="profil-{{ loop.index }}"><input id="profil-{{ loop.index }}" type="radio" name="profil" value="{{ profil.nom }}"{% if profil.coche %} checked{% endif %}{% if erreur and loop.first %} autofocus{% endif %}> {{ profil.etiquette }}{% if profil.coche and aucun_reglage %} {{ t.admin_reglages_defaut }}{% endif %}</label>
 {% endfor %}
 </fieldset>
 {% if erreur %}<p id="profil-erreur">{{ erreur }}</p>

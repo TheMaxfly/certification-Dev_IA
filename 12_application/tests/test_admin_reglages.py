@@ -546,3 +546,20 @@ def test_a1_une_seule_entree_administration_pour_l_admin(appli, base, role, entr
     if entrees:
         lien = soupe(client.get("/")).select_one("header nav a[href='/admin/comptes']")
         assert lien.get_text(strip=True) == "Administration"
+
+
+def test_a2_chaque_bouton_est_dans_son_etiquette(appli, base):
+    """Relevé en recette : un bouton radio hors de son étiquette s'affichait au bout de
+    la ligne du profil précédent — le choix devenait ambigu. Chaque bouton est dans
+    l'étiquette de son profil, qui commence par son nom."""
+    _, client = appli
+    entrer(client, base, "admin_un")
+
+    page = soupe(client.get("/admin/reglages"))
+    boutons = page.select(".zone-profil-actif input[type=radio]")
+
+    assert boutons
+    for bouton in boutons:
+        etiquette = bouton.find_parent("label")
+        assert etiquette is not None and etiquette["for"] == bouton["id"]
+        assert etiquette.get_text(strip=True).startswith(bouton["value"])
