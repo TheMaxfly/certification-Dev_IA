@@ -365,12 +365,11 @@ def creer_application(
 
     async def profil_regle(request: Request) -> str | None:
         """Le profil actif réglé par l'administrateur (E4, lot 5, D12), relu en base à
-        chaque requête — une fois par requête, aucun cache au-delà. None : aucun
-        réglage, ou la base ne répond pas (la question part avec le défaut de l'API :
-        décision 11 du lot 1). Un réglage qui n'est plus proposé se journalise ; la
-        jauge du profil actif suit ce qui part."""
-        if hasattr(request.state, "profil_regle"):
-            return request.state.profil_regle
+        chaque requête — une fois par requête (la page qui suit le reprend de
+        `request.state`), aucun cache au-delà. None : aucun réglage, ou la base ne
+        répond pas (la question part avec le défaut de l'API : décision 11 du lot 1).
+        Un réglage qui n'est plus proposé se journalise ; la jauge du profil actif suit
+        ce qui part."""
         regle: str | None = None
         base: Base = request.app.state.base
         if base.configuree:
@@ -906,7 +905,7 @@ def creer_application(
     pages_catalogue.installer(app, reglages, rendre, catalogue)
     pages_critiques.installer(app, reglages, rendre, catalogue, metriques)
     pages_listes.installer(app, reglages, rendre, catalogue, metriques)
-    pages_admin.installer(app, reglages, rendre, vue, metriques)
+    pages_admin.installer(app, reglages, rendre, vue, metriques, catalogue)
 
     app.state.vue = vue
     app.state.metriques = metriques

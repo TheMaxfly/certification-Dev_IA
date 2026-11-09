@@ -1,5 +1,6 @@
 """Les écrans de l'administration (E4, lot 5) : le profil IA actif (A2), l'état des clés
-et leur test (A3), et la barre d'onglets commune à toutes les pages `/admin/*`.
+et leur test (A3), les coûts et la jauge du budget (A4), l'état des services (A6), et la
+barre d'onglets commune à toutes les pages `/admin/*`.
 
 **Contrôle d'accès** (OWASP A01) : chaque route exige le rôle `admin`
 (`sessions.exiger_role`) ; un autre rôle reçoit 403, un visiteur la connexion. Chaque
@@ -13,9 +14,12 @@ n'apparaît que si sa page existe dans l'application (`onglets`).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+import asyncio
+import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, Request
@@ -26,8 +30,8 @@ from starlette.datastructures import FormData
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.routing import BaseRoute
 
-from application import journal, presentation, reglages_app, sessions
-from application.base import Base
+from application import couts, journal, presentation, quotas, reglages_app, sessions
+from application.base import Base, BaseIndisponible
 from application.client_api import (
     Info,
     ProfilDecrit,
@@ -36,6 +40,7 @@ from application.client_api import (
     Verification,
     VueApi,
 )
+from application.client_catalogue import ClientCatalogue, EtatCatalogue
 from application.comptes import Compte
 from application.config import Reglages
 from application.metriques import Metriques
@@ -116,6 +121,25 @@ class LigneCle:
     test: str
 
 
+#: Le délai de chaque lecture de la page des services : celui de `/sante`.
+DELAI_SERVICE_S = 5.0
+#: L'état d'un service → son icône textuelle (le mot suit toujours : jamais l'icône ni
+#: la couleur seules).
+ICONES = {"joignable": "✓", "injoignable": "✗", "non_configure": "–"}
+
+
+@dataclass(frozen=True, slots=True)
+class LigneService:
+    """Un service de la page des services : un mot, une icône, un délai, des détails."""
+
+    cle: str
+    nom: str
+    icone: str
+    etat: str
+    delai: str
+    details: list[str]
+
+
 def etiquette_profil(profil: ProfilDecrit, reglages: Reglages) -> str:
     t = reglages.textes
     fournisseur = presentation.fournisseur_de(reglages, profil.fournisseur)
@@ -137,6 +161,7 @@ def installer(
     rendre: Rendre,
     vue: VueApi,
     metriques: Metriques,
+    catalogue: ClientCatalogue | None,
 ) -> None:
     t = reglages.textes
 
@@ -399,3 +424,321 @@ def installer(
         metriques.verifications_cles.labels(issue=issue).inc()
         journal.evenement_requete(request, "verification_cles", {"issue": issue})
         return RedirectResponse(f"/admin/cles?etat={issue}", status_code=303)
+
+    # ------------------------------------------------------------------ #
+    #  Les coûts et la jauge du budget (A4)
+    # ------------------------------------------------------------------ #
+    regles_couts = reglages.couts
+
+    def dollars(valeur: Decimal | float, n: int = 4) -> str:
+        return f"{Decimal(str(valeur)):.{n}f}".replace(".", ",")
+
+    def pourcentage(valeur: Decimal, maximum: Decimal) -> str:
+        part = Decimal(0) if maximum <= 0 else valeur * 100 / maximum
+        return f"{part:.1f}".replace(".", ",") + " %"
+
+    @app.get("/admin/couts", include_in_schema=False)
+    async def admin_couts(request: Request, admin: Admin) -> Response:
+        base = base_de(request)
+        jour = quotas.jour_utc(request.app.state.horloge())
+        cumul = await couts.cumul_du_jour(base, jour)
+        lignes = await couts.historique(base, jour, regles_couts.historique_jours)
+        tous = await couts.totaux(base)
+        plafond = Decimal(str(reglages.bornes.cout_jour_max_usd))
+        atteint = cumul >= plafond
+        budget = Decimal(str(regles_couts.budget_projet_usd))
+        anterieur = Decimal(str(regles_couts.cout_anterieur_usd))
+        projet = tous.total_table + anterieur
+        jours: list[dict[str, object]] = []
+        for le_jour in sorted({ligne.jour for ligne in lignes}, reverse=True):
+            du_jour = [ligne for ligne in lignes if ligne.jour == le_jour]
+            jours.append(
+                {
+                    "iso": le_jour.isoformat(),
+                    "date": presentation.date_en_lettres(
+                        datetime(le_jour.year, le_jour.month, le_jour.day, tzinfo=UTC)
+                    ),
+                    "lignes": [
+                        {
+                            "profil": ligne.profil,
+                            "mode": ligne.mode,
+                            "appels": ligne.appels,
+                            "cout": presentation.dire(
+                                t, "admin_couts_dollars", cout=dollars(ligne.cout_usd)
+                            ),
+                        }
+                        for ligne in du_jour
+                    ],
+                    "appels": sum(ligne.appels for ligne in du_jour),
+                    "cout": presentation.dire(
+                        t,
+                        "admin_couts_dollars",
+                        cout=dollars(
+                            sum((ligne.cout_usd for ligne in du_jour), Decimal(0))
+                        ),
+                    ),
+                }
+            )
+        premier = (
+            None
+            if tous.premier_jour is None
+            else presentation.date_en_lettres(
+                datetime(
+                    tous.premier_jour.year,
+                    tous.premier_jour.month,
+                    tous.premier_jour.day,
+                    tzinfo=UTC,
+                )
+            )
+        )
+
+        def agregats(par: dict[str, couts.Agregat]) -> list[str]:
+            return [
+                presentation.dire(
+                    t,
+                    "admin_couts_repartition",
+                    nom=nom,
+                    appels=agregat.appels,
+                    cout=dollars(agregat.cout_usd),
+                )
+                for nom, agregat in sorted(par.items())
+            ]
+
+        metriques.cout_jour.set(float(cumul))
+        return rendre(
+            request,
+            "admin_couts.html",
+            jour={
+                "atteint": atteint,
+                "texte": presentation.dire(
+                    t,
+                    "admin_couts_jour",
+                    cout=dollars(cumul),
+                    plafond=dollars(plafond, 2),
+                    etat=t["admin_couts_atteint" if atteint else "admin_couts_ok"],
+                ),
+                "max": f"{plafond}",
+                "valeur": f"{min(cumul, plafond)}",
+                "pourcentage": pourcentage(cumul, plafond),
+            },
+            projet={
+                "texte": presentation.dire(
+                    t,
+                    "admin_couts_projet",
+                    total=dollars(projet),
+                    budget=dollars(budget, 0),
+                ),
+                "termes": presentation.dire(
+                    t,
+                    "admin_couts_termes",
+                    anterieur=dollars(anterieur),
+                    table=dollars(tous.total_table),
+                    appels=tous.appels,
+                    avant=(
+                        presentation.dire(t, "admin_couts_avant_le", date=premier)
+                        if premier is not None
+                        else t["admin_couts_sans_table"]
+                    ),
+                ),
+                "max": f"{budget}",
+                "valeur": f"{min(projet, budget)}",
+                "pourcentage": pourcentage(projet, budget),
+                "premier_jour": (
+                    t["admin_couts_table_vide"]
+                    if premier is None
+                    else presentation.dire(t, "admin_couts_premier_jour", date=premier)
+                ),
+            },
+            historique={
+                "titre": presentation.dire(
+                    t, "admin_couts_historique_titre", n=regles_couts.historique_jours
+                ),
+                "jours": jours,
+            },
+            repartition={
+                "profils": agregats(tous.par_profil),
+                "modes": agregats(tous.par_mode),
+            },
+        )
+
+    # ------------------------------------------------------------------ #
+    #  L'état des services (A6) : lu à la demande de la page, rien de stocké
+    # ------------------------------------------------------------------ #
+    async def mesurer[T](appel: Awaitable[T]) -> tuple[T | None, float]:
+        """Un appel, borné au délai de `/sante` ; sa durée, en millisecondes."""
+        debut = time.perf_counter()
+        try:
+            async with asyncio.timeout(DELAI_SERVICE_S):
+                resultat: T | None = await appel
+        except TimeoutError:
+            resultat = None
+        return resultat, (time.perf_counter() - debut) * 1000
+
+    def ligne_service(
+        cle: str, etat: str, delai_ms: float | None, details: list[str]
+    ) -> LigneService:
+        return LigneService(
+            cle=cle,
+            nom=t[f"admin_services_{cle}"],
+            icone=ICONES[etat],
+            etat=t[f"admin_services_etat_{etat}"],
+            delai=(
+                t["admin_services_sans_delai"]
+                if delai_ms is None
+                else presentation.dire(t, "admin_services_delai", ms=round(delai_ms))
+            ),
+            details=details,
+        )
+
+    @app.get("/admin/services", include_in_schema=False)
+    async def admin_services(request: Request) -> Response:
+        base = base_de(request)
+        # Une page d'état s'affiche sans base (spec 03, § 6) : c'est elle qui dit que
+        # la base manque. Avec la base, l'administration seule (403 sinon).
+        sondee = await base.sonder() if base.configuree else base.etat
+        if sondee == "ok":
+            await sessions.exiger_role("admin")(request)
+        else:
+            journal.evenement_requete(request, "services_sans_base")
+
+        async def base_lue() -> str:
+            return await base.sonder() if base.configuree else "non_configuree"
+
+        async def catalogue_lu() -> EtatCatalogue | None:
+            return None if catalogue is None else await catalogue.etat()
+
+        (
+            (sante, d_sante),
+            (_, d_info),
+            (lu_catalogue, d_catalogue),
+            (lu_base, d_base),
+        ) = await asyncio.gather(
+            mesurer(vue.client.sante()),
+            mesurer(vue.rafraichir()),
+            mesurer(catalogue_lu()),
+            mesurer(base_lue()),
+        )
+        info = vue.info if vue.etat == "ok" else None
+        lignes: list[LigneService] = []
+        # L'API du modèle.
+        api_ok = bool(sante) and info is not None
+        details_api: list[str] = []
+        if info is not None:
+            regle = None
+            if lu_base == "ok":
+                try:
+                    lu = await reglages_app.lire(base, "profil_actif")
+                except BaseIndisponible:
+                    lu = None
+                regle = None if lu is None else lu.valeur
+            actif = presentation.profil_par_defaut(info, reglages, regle)
+            details_api = [
+                presentation.dire(
+                    t, "admin_services_version", version=info.version_api
+                ),
+                presentation.dire(
+                    t,
+                    "admin_services_corpus",
+                    corpus=info.corpus_id,
+                    encodage=info.encodage_id,
+                    modele=info.modele,
+                ),
+                presentation.dire(
+                    t,
+                    "admin_services_modele_langage",
+                    profil=info.modele_langage.profil_actif,
+                ),
+                presentation.dire(
+                    t,
+                    "admin_services_profil_actif",
+                    profil=actif or t["valeur_inconnue"],
+                    etat=t[
+                        "admin_services_profil_indisponible"
+                        if presentation.regle_indisponible(info, reglages, regle)
+                        else (
+                            "admin_services_profil_regle"
+                            if regle is not None
+                            else "admin_services_profil_defaut"
+                        )
+                    ],
+                ),
+            ]
+        lignes.append(
+            ligne_service(
+                "api",
+                "joignable" if api_ok else "injoignable",
+                max(d_sante, d_info),
+                details_api,
+            )
+        )
+        # Le catalogue (l'API data du 02).
+        if catalogue is None:
+            lignes.append(ligne_service("catalogue", "non_configure", None, []))
+        else:
+            details_catalogue = (
+                []
+                if lu_catalogue is None or lu_catalogue.normalisation is None
+                else [
+                    presentation.dire(
+                        t,
+                        "admin_services_normalisation",
+                        normalisation=lu_catalogue.normalisation,
+                    )
+                ]
+            )
+            joignable = lu_catalogue is not None and lu_catalogue.ok
+            if lu_catalogue is not None and not lu_catalogue.ok:
+                details_catalogue.append(t["admin_services_catalogue_degrade"])
+            lignes.append(
+                ligne_service(
+                    "catalogue",
+                    "joignable" if joignable else "injoignable",
+                    d_catalogue,
+                    details_catalogue,
+                )
+            )
+        # La base de l'application.
+        etat_base = {
+            "ok": "joignable",
+            "non_configuree": "non_configure",
+        }.get(lu_base or "indisponible", "injoignable")
+        lignes.append(
+            ligne_service(
+                "base", etat_base, None if etat_base == "non_configure" else d_base, []
+            )
+        )
+        # Les clés d'API de l'application : un état de configuration, sans appel.
+        deux = reglages.cle_api_comptes is not None
+        lignes.append(
+            LigneService(
+                cle="cles",
+                nom=t["admin_services_cles"],
+                icone=ICONES["joignable" if deux else "non_configure"],
+                etat=t[
+                    "admin_services_cles_deux" if deux else "admin_services_cles_une"
+                ],
+                delai=t["admin_services_sans_delai"],
+                details=[] if deux else [t["admin_services_cles_repli"]],
+            )
+        )
+        manquants = [
+            ligne.nom for ligne in lignes if ligne.icone == ICONES["injoignable"]
+        ]
+        maintenant = datetime.fromtimestamp(request.app.state.horloge(), UTC)
+        return rendre(
+            request,
+            "admin_services.html",
+            lignes=lignes,
+            manquants=(
+                presentation.dire(
+                    t, "admin_services_encart", services=", ".join(manquants)
+                )
+                if manquants
+                else None
+            ),
+            lu_iso=maintenant.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            lu_a=presentation.dire(
+                t, "admin_services_heure", heure=maintenant.strftime("%H:%M:%S")
+            ),
+            grafana=reglages.monitorage.adresse_grafana,
+        )

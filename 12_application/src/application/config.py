@@ -147,6 +147,26 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " admin_cles_test_aucun admin_cles_test_aide admin_cles_bouton"
             " admin_cles_avis_teste admin_cles_trop_tot_sans admin_cles_indisponible"
             " admin_cles_procedure_avant admin_cles_procedure"
+            " admin_couts_titre admin_couts_intro admin_couts_jour_titre"
+            " admin_couts_jauge_jour admin_couts_projet_titre admin_couts_jauge_projet"
+            " admin_couts_tableau admin_couts_colonne_jour admin_couts_colonne_profil"
+            " admin_couts_colonne_mode admin_couts_colonne_appels"
+            " admin_couts_colonne_cout admin_couts_total_jour admin_couts_vide"
+            " admin_couts_sans_texte admin_couts_repartition_titre"
+            " admin_couts_par_profil admin_couts_par_mode admin_couts_atteint"
+            " admin_couts_ok admin_couts_sans_table admin_couts_table_vide"
+            " admin_services_titre admin_services_encart_titre admin_services_intro"
+            " admin_services_lu_a admin_services_relire admin_services_tableau"
+            " admin_services_colonne_service admin_services_colonne_etat"
+            " admin_services_colonne_delai admin_services_colonne_details"
+            " admin_services_grafana admin_services_grafana_lien admin_services_api"
+            " admin_services_catalogue admin_services_base admin_services_cles"
+            " admin_services_etat_joignable admin_services_etat_injoignable"
+            " admin_services_etat_non_configure admin_services_sans_delai"
+            " admin_services_profil_indisponible admin_services_profil_regle"
+            " admin_services_profil_defaut admin_services_catalogue_degrade"
+            " admin_services_cles_deux admin_services_cles_une"
+            " admin_services_cles_repli"
             # E4, lot 3 : les critiques signées.
             " critiques_l5 critiques_vide critiques_vers_catalogue"
             " critiques_colonne_serie critiques_colonne_tome critiques_colonne_note"
@@ -301,6 +321,22 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "admin_cles_teste_le": frozenset({"date"}),
     "admin_cles_repli": frozenset({"version"}),
     "admin_cles_trop_tot": frozenset({"n"}),
+    "admin_couts_dollars": frozenset({"cout"}),
+    "admin_couts_repartition": frozenset({"nom", "appels", "cout"}),
+    "admin_couts_jour": frozenset({"cout", "plafond", "etat"}),
+    "admin_couts_projet": frozenset({"total", "budget"}),
+    "admin_couts_termes": frozenset({"anterieur", "table", "appels", "avant"}),
+    "admin_couts_avant_le": frozenset({"date"}),
+    "admin_couts_premier_jour": frozenset({"date"}),
+    "admin_couts_historique_titre": frozenset({"n"}),
+    "admin_services_encart": frozenset({"services"}),
+    "admin_services_heure": frozenset({"heure"}),
+    "admin_services_delai": frozenset({"ms"}),
+    "admin_services_version": frozenset({"version"}),
+    "admin_services_corpus": frozenset({"corpus", "encodage", "modele"}),
+    "admin_services_modele_langage": frozenset({"profil"}),
+    "admin_services_profil_actif": frozenset({"profil", "etat"}),
+    "admin_services_normalisation": frozenset({"normalisation"}),
 }
 
 
@@ -421,6 +457,24 @@ class Bornes:
 
 
 @dataclass(frozen=True, slots=True)
+class Couts:
+    """Le budget du projet (`[couts]`, E4, lot 5) : le budget en dollars, la dépense
+    antérieure à la table `couts_jour` (E3), la profondeur de l'historique affiché."""
+
+    budget_projet_usd: float
+    cout_anterieur_usd: float
+    historique_jours: int
+
+
+@dataclass(frozen=True, slots=True)
+class Monitorage:
+    """`[monitorage]` (E4, lot 5) : l'adresse du tableau de bord Grafana, facultative —
+    vide, la page des services n'en fait pas de lien."""
+
+    adresse_grafana: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class Administration:
     """Les pages de l'administration (`[administration]`, E4, lot 5) : le lien vers la
     procédure de pose et de rotation des clés (un document du dépôt)."""
@@ -465,6 +519,8 @@ class Reglages:
     critiques: Critiques
     bornes: Bornes
     administration: Administration
+    couts: Couts
+    monitorage: Monitorage
 
 
 class _Lecteur:
@@ -508,6 +564,14 @@ class _Lecteur:
         valeur = source.get(cle)
         if not isinstance(valeur, str) or not valeur.strip():
             self._ecart(f"{chemin}.{cle}", "texte attendu")
+            return ""
+        return valeur
+
+    def texte_facultatif(self, source: Table, cle: str, chemin: str) -> str:
+        """Un texte qui peut être vide ; présent, et un texte."""
+        valeur = source.get(cle)
+        if not isinstance(valeur, str):
+            self._ecart(f"{chemin}.{cle}", "texte attendu (vide admis)")
             return ""
         return valeur
 
@@ -791,6 +855,34 @@ def lire_administration(
     return Administration(procedure_cles=procedure)
 
 
+def lire_couts(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Couts:
+    """Le budget et l'historique positifs ; la dépense antérieure peut valoir 0."""
+    table = lecteur.table(donnees, "couts")
+    anterieur = lecteur.nombre(table, "cout_anterieur_usd", "couts")
+    if anterieur < 0:
+        ecarts.append(
+            "reglages.toml : [couts] cout_anterieur_usd : positif ou nul attendu"
+        )
+    return Couts(
+        budget_projet_usd=lecteur.positif(table, "budget_projet_usd", "couts"),
+        cout_anterieur_usd=anterieur,
+        historique_jours=lecteur.entier(table, "historique_jours", "couts"),
+    )
+
+
+def lire_monitorage(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Monitorage:
+    """L'adresse de Grafana : vide, aucune ; sinon `http(s)://hôte[:port]`."""
+    table = lecteur.table(donnees, "monitorage")
+    adresse = lecteur.texte_facultatif(table, "adresse_grafana", "monitorage").strip()
+    if adresse:
+        decoupee = urlsplit(adresse)
+        if decoupee.scheme not in ("http", "https") or not decoupee.hostname:
+            ecarts.append(
+                "reglages.toml : [monitorage] adresse_grafana : http(s)://hôte attendu"
+            )
+    return Monitorage(adresse_grafana=adresse or None)
+
+
 def lire_cle_comptes(environ: Mapping[str, str], ecarts: list[str]) -> str | None:
     cle = environ.get(VARIABLE_CLE_COMPTES, "").strip() or None
     if cle is not None and not cle.isascii():
@@ -954,6 +1046,8 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         critiques=lire_critiques(lecteur, donnees, ecarts),
         bornes=lire_bornes(lecteur, donnees),
         administration=lire_administration(lecteur, donnees, ecarts),
+        couts=lire_couts(lecteur, donnees, ecarts),
+        monitorage=lire_monitorage(lecteur, donnees, ecarts),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

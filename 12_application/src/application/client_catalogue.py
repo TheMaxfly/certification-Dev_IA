@@ -19,6 +19,7 @@ route et issue, l'état du catalogue posé à chaque appel.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
@@ -33,6 +34,8 @@ from application.metriques import Metriques
 ENTETE_CLE = "X-API-Key"
 ROUTE_RECHERCHE = "/series"
 ROUTE_LIVE = "/live"
+#: L'état du catalogue et de sa base, sans clé (E4, lot 5 : la page des services).
+ROUTE_HEALTH = "/health"
 #: La plus grande page de `GET /series/{id}/volumes` (contrat 0.5.0 du 02).
 VOLUMES_PAR_APPEL = 200
 #: La borne de sécurité : au-delà, la liste est tronquée et le journal le dit.
@@ -167,6 +170,24 @@ def libelles_de(volumes: list[Volume]) -> dict[str, str]:
         )
         for v in volumes
     }
+
+
+class SanteCatalogue(BaseModel):
+    """`/health` du 02 (contrat 0.6.0) : son état, celui de sa base, et comment la
+    recherche normalise le texte (`fonction` : la 028 ; `repli`)."""
+
+    status: str
+    db: str
+    normalisation: Literal["fonction", "repli"] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EtatCatalogue:
+    """Ce que la page des services dit du catalogue : il répond et sa base aussi
+    (`ok`), et sa normalisation s'il la dit."""
+
+    ok: bool
+    normalisation: str | None
 
 
 class CatalogueIndisponible(Exception):
@@ -310,6 +331,25 @@ class ClientCatalogue:
                 return lus[:VOLUMES_MAX]
             if not page.items or len(lus) >= page.total:
                 return lus
+
+    async def etat(self) -> EtatCatalogue | None:
+        """`GET /health`, sans clé, délai court : 200, le catalogue et sa base
+        répondent ; 503, sa base ne répond pas ; None : injoignable, trop lent, ou hors
+        contrat."""
+        try:
+            async with asyncio.timeout(self._delais.connexion_s):
+                reponse = await self._http.get(
+                    ROUTE_HEALTH, timeout=self._delais.connexion_s
+                )
+        except (httpx.HTTPError, TimeoutError):
+            return None
+        if reponse.status_code not in (200, 503):
+            return None
+        try:
+            lu = SanteCatalogue.model_validate_json(reponse.content)
+        except ValidationError:
+            return None
+        return EtatCatalogue(reponse.status_code == 200, lu.normalisation)
 
     async def sante(self) -> bool:
         """`GET /live`, sans clé, délai court : le catalogue vit-il ?"""

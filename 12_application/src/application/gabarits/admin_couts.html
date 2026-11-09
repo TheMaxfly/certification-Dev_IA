@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titre %}{{ t.admin_couts_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1>{{ t.admin_couts_titre }}</h1>
+<p>{{ t.admin_couts_intro }}</p>
+<section class="zone-cout-jour">
+<h2>{{ t.admin_couts_jour_titre }}</h2>
+{% if jour.atteint %}
+<article>
+<div role="status">
+<h3>{{ t.budget_titre }}</h3>
+<p>{{ t.budget_atteint }}</p>
+</div>
+</article>
+{% endif %}
+<p>{{ jour.texte }}</p>
+<p><label for="jauge-jour">{{ t.admin_couts_jauge_jour }}</label>
+<progress id="jauge-jour" max="{{ jour.max }}" value="{{ jour.valeur }}">{{ jour.pourcentage }}</progress>
+<span>{{ jour.pourcentage }}</span></p>
+</section>
+<section class="zone-cout-projet">
+<h2>{{ t.admin_couts_projet_titre }}</h2>
+<p>{{ projet.texte }}</p>
+<p>{{ projet.termes }}</p>
+<p><label for="jauge-projet">{{ t.admin_couts_jauge_projet }}</label>
+<progress id="jauge-projet" max="{{ projet.max }}" value="{{ projet.valeur }}">{{ projet.pourcentage }}</progress>
+<span>{{ projet.pourcentage }}</span></p>
+<p>{{ projet.premier_jour }}</p>
+</section>
+<section class="zone-cout-historique">
+<h2>{{ historique.titre }}</h2>
+{% if historique.jours %}
+<table>
+<caption>{{ t.admin_couts_tableau }}</caption>
+<thead>
+<tr><th scope="col">{{ t.admin_couts_colonne_jour }}</th><th scope="col">{{ t.admin_couts_colonne_profil }}</th><th scope="col">{{ t.admin_couts_colonne_mode }}</th><th scope="col">{{ t.admin_couts_colonne_appels }}</th><th scope="col">{{ t.admin_couts_colonne_cout }}</th></tr>
+</thead>
+{% for jour_h in historique.jours %}
+<tbody>
+{% for ligne in jour_h.lignes %}
+<tr>{% if loop.first %}<th scope="rowgroup" rowspan="{{ jour_h.lignes | length + 1 }}"><time datetime="{{ jour_h.iso }}">{{ jour_h.date }}</time></th>{% endif %}<td>{{ ligne.profil }}</td><td>{{ ligne.mode }}</td><td>{{ ligne.appels }}</td><td>{{ ligne.cout }}</td></tr>
+{% endfor %}
+<tr class="total-jour"><td colspan="2">{{ t.admin_couts_total_jour }}</td><td>{{ jour_h.appels }}</td><td>{{ jour_h.cout }}</td></tr>
+</tbody>
+{% endfor %}
+</table>
+{% else %}
+<p>{{ t.admin_couts_vide }}</p>
+{% endif %}
+<p>{{ t.admin_couts_sans_texte }}</p>
+</section>
+<section class="zone-cout-repartition">
+<h2>{{ t.admin_couts_repartition_titre }}</h2>
+<h3>{{ t.admin_couts_par_profil }}</h3>
+{% if repartition.profils %}
+<ul>
+{% for ligne in repartition.profils %}<li>{{ ligne }}</li>
+{% endfor %}
+</ul>
+{% else %}<p>{{ t.admin_couts_vide }}</p>{% endif %}
+<h3>{{ t.admin_couts_par_mode }}</h3>
+{% if repartition.modes %}
+<ul>
+{% for ligne in repartition.modes %}<li>{{ ligne }}</li>
+{% endfor %}
+</ul>
+{% else %}<p>{{ t.admin_couts_vide }}</p>{% endif %}
+</section>
+{% endblock %}

@@ -30,7 +30,14 @@ from conftest import (
     harnais,
 )
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, REGLAGE_ECRANS, Ecran
+from ecrans import (
+    BORNES_SERREES,
+    COUTS_ECRANS,
+    ECRANS,
+    MDP_INSCRIPTION,
+    REGLAGE_ECRANS,
+    Ecran,
+)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -106,6 +113,11 @@ def base_balisage(conteneur, gabarit, fichier_pgpass) -> Iterator[str]:
             cx.execute(
                 "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)",
                 REGLAGE_ECRANS,
+            )
+            cx.execute(
+                "INSERT INTO application.couts_jour (jour, profil, mode, appels,"
+                " cout_usd) VALUES ((now() AT TIME ZONE 'UTC')::date, %s, %s, %s, %s)",
+                COUTS_ECRANS,
             )
         yield dsn_du_role(dsn)
 
@@ -544,3 +556,26 @@ def test_le_groupe_de_recherche_ne_porte_que_le_champ_et_le_bouton(pages, nom):
     erreur = formulaire.select_one("#q-erreur")
     if erreur is not None:
         assert erreur.find_parent(role="search") is None
+
+
+def test_les_ecrans_de_l_administration_rendent_l_etat_voulu(pages):
+    """E4, lot 5 : chaque écran d'administration est bien celui qu'on croit."""
+    vues = {p.ecran.nom: p for p in pages}
+    assert vues["admin_reglages"].statut == 200
+    assert vues["admin_reglages_indisponible"].soupe.select_one(
+        ".zone-profil-actif-indisponible"
+    )
+    assert vues["admin_reglages_api_absente"].statut == 503
+    assert vues["admin_cles"].soupe.select(".zone-cles tbody tr")
+    jour = vues["admin_couts"].soupe.select_one(".zone-cout-jour").get_text()
+    assert "plafond : ok" in jour
+    atteint = vues["admin_couts_plafond_atteint"].soupe.select_one(".zone-cout-jour")
+    assert "plafond : atteint" in atteint.get_text()
+    assert vues["admin_couts"].soupe.select("progress") != []
+    assert vues["admin_services"].soupe.select(".zone-services-encart") == []
+    degrade = vues["admin_services_degrades"].soupe
+    assert "Catalogue" in degrade.select_one(".zone-services-encart").get_text()
+    for nom in ("admin_couts", "admin_services"):
+        for tableau in vues[nom].soupe.select("main table"):
+            assert tableau.select_one("caption").get_text(strip=True), nom
+            assert all(th["scope"] == "col" for th in tableau.select("thead th")), nom

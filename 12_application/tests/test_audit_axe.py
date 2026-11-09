@@ -46,7 +46,14 @@ import psycopg
 import pytest
 from conftest import HACHEUR_RAPIDE, ServeurLocal
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, REGLAGE_ECRANS, Ecran
+from ecrans import (
+    BORNES_SERREES,
+    COUTS_ECRANS,
+    ECRANS,
+    MDP_INSCRIPTION,
+    REGLAGE_ECRANS,
+    Ecran,
+)
 
 from application.app import creer_application
 
@@ -288,6 +295,11 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
         cx.execute(
             "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)",
             REGLAGE_ECRANS,
+        )
+        cx.execute(
+            "INSERT INTO application.couts_jour (jour, profil, mode, appels, cout_usd)"
+            " VALUES ((now() AT TIME ZONE 'UTC')::date, %s, %s, %s, %s)",
+            COUTS_ECRANS,
         )
         for serie, etat in LISTES_AUDIT:
             cx.execute(

@@ -1285,6 +1285,20 @@ class Doublure:
             self.appels_catalogue["/live"] = self.appels_catalogue.get("/live", 0) + 1
             return JSONResponse({"status": "ok", "db": "not_checked"})
 
+        @app.get("/health")
+        async def route_health() -> Response:
+            # E4, lot 5 : la page des services. Le catalogue « indisponible » : sa
+            # base ne répond pas (503) ; sinon, la normalisation de la 028.
+            self.appels_catalogue["/health"] = (
+                self.appels_catalogue.get("/health", 0) + 1
+            )
+            if self.scenario_catalogue == "indisponible":
+                rendu = Rendu(503, {"status": "degraded", "db": "error"})
+            else:
+                corps = {"status": "ok", "db": "ok", "normalisation": "fonction"}
+                rendu = Rendu(200, corps)
+            return await self._rendre_catalogue("/health", "", rendu)
+
         @app.get("/series")
         async def route_series(request: Request) -> Response:
             nom = self.scenario_catalogue

@@ -180,10 +180,31 @@ ECRANS: tuple[Ecran, ...] = (
     # E4, lot 5, spec 02 : l'état des clés, avant tout test ; les états après un test
     # sont des écrans des comptes (`test_audit_axe`), le formulaire envoyé.
     Ecran("admin_cles", chemin="/admin/cles", info="administration", role="admin"),
+    # E4, lot 5, spec 03 : les coûts (la base des écrans porte une ligne du jour,
+    # `COUTS_ECRANS`, sous le plafond ; serré à une unité, il est atteint) et les
+    # services (le catalogue dont la base ne répond pas : l'encart).
+    Ecran("admin_couts", chemin="/admin/couts", role="admin"),
+    Ecran(
+        "admin_couts_plafond_atteint",
+        chemin="/admin/couts",
+        role="admin",
+        borne="budget",
+    ),
+    Ecran("admin_services", chemin="/admin/services", role="admin"),
+    Ecran(
+        "admin_services_degrades",
+        chemin="/admin/services",
+        role="admin",
+        catalogue="indisponible",
+    ),
 )
 #: Le réglage posé dans la base des écrans d'un rôle (E4, lot 5) : le profil actif de
 #: l'application, égal au défaut de l'API — aucun autre écran n'en change.
 REGLAGE_ECRANS = ("profil_actif", "mistral-large-2512")
+#: La ligne de coût du jour (UTC) de cette même base (E4, lot 5) : (profil, mode,
+#: appels, coût) — sous le plafond du jour de la configuration ; la borne « budget »,
+#: serrée, le dépasse.
+COUTS_ECRANS = ("mistral-large-2512", "strict", 12, "0.0223")
 
 #: La borne → ce que son application serre (`Bornes`) : une unité, la page qui suit le
 #: premier passage la dépasse.

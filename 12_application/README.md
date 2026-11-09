@@ -469,6 +469,40 @@ principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
 - métrique `application_verifications_cles_total{issue}` (`teste`, `route_absente`,
   `trop_tot`, `indisponible`), événement `verification_cles` au journal (l'issue seule).
 
+**Les coûts** (`/admin/couts`, story A4) :
+
+- **la source unique** : la table `application.couts_jour` (027), garnie après chaque réponse
+  depuis le lot 2b (le coût estimé par l'API, sous le profil et le mode qu'elle a appliqués)
+  — jamais le texte d'une question : la table n'a que jour, profil, mode, appels et coût
+  (la garantie C20, éprouvée par un test sur la forme des lignes lues) ;
+- **le jour** (UTC) : « Aujourd'hui : x $ sur 0,50 $ — plafond : ok / atteint », le plafond
+  du conseiller (`[conseiller.limites] cout_jour_max_usd`, atteint dès qu'il est égalé), une
+  jauge `<progress>` et son **pourcentage en texte à côté** ; atteint : l'encart que le
+  conseiller affiche aussi ;
+- **le projet** : le total = la table **+ `[couts] cout_anterieur_usd`** — la dépense d'E3,
+  avant la table, **0,709557 $** (somme des clôtures des étapes 3 à 6 d'E3, relevée dans
+  l'inspection du point 0 d'E4, arrêtée par Max le 2026-11-09 ; avant E3 : non établie) —,
+  **les deux termes affichés**, contre `[couts] budget_projet_usd` (20 $) ; jauge et
+  pourcentage ; le premier jour de la table ;
+- **l'historique** : jour × profil × mode (appels, coût) sur `[couts] historique_jours`
+  (30) jours civils UTC, un total par jour ; un état vide nommé ; la répartition par profil et
+  par mode sur toute la table (l'argument « le mode enrichi coûte davantage » s'y lit) ;
+- sans base : 503 « comptes indisponibles », comme toute page d'administration.
+
+**L'état des services** (`/admin/services`, story A6) : l'API du modèle (`/v1/sante` et
+`/v1/info` : version du contrat, corpus et encodage, profil actif de l'API, **profil actif de
+l'application** et sa disponibilité), le catalogue (`/health` du 02 : sa base, sa
+`normalisation`), la base de l'application (`SELECT 1`), les clés d'API du 12 (`deux` /
+`une`). Chacun **joignable / injoignable / non configuré** — un mot, et une icône
+décorative —, avec le délai mesuré ; un encart nommé si un service manque ; « lu à HH:MM:SS
+UTC » et un lien « Relire ». **Lu à la demande de la page** (les quatre lectures en
+parallèle, 5 s chacune) : aucune sonde de fond, aucun stockage — **Grafana reste l'outil de
+fond** (E5) ; un lien vers lui si `[monitorage] adresse_grafana` est posée (vide par défaut).
+**Écart assumé** avec les autres pages d'administration : **sans base, la page répond 200**
+(c'est elle qui dit que la base manque) et, faute de base, elle ne peut pas vérifier le rôle —
+elle montre alors ce que `/sante` dit déjà à tous, et rien de plus ; la base répond : le
+rôle admin est exigé (403 sinon).
+
 **Jamais une valeur de secret** à l'écran, au journal, aux métriques : un test pose des
 valeurs factices reconnaissables pour les quatre secrets de l'application
 (`APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`, `APPLICATION_CLE_CATALOGUE`,
@@ -686,6 +720,8 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 | `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
+| `[couts]` | budget 20 $ ; antérieur 0,709557 $ (E3) ; 30 jours | E4, lot 5 : le total du projet = la table + l'antérieur |
+| `[monitorage]` | `adresse_grafana` vide | le lien vers Grafana, s'il est posé |
 | `[administration]` | le lien de la procédure des clés (README du 11, sur `main`) | E4, lot 5 : un document du dépôt, pas une procédure dans l'écran |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
 | `[catalogue]` | `http://127.0.0.1:8000` ; 20 par page (50 au plus) ; saisie de 2 à 100 ; connexion 3 s, réponse 5 s | l'API data du 02 sur le poste ; ses bornes, recopiées et comparées au contrat par un test ; la recherche répond en 116 ms de médiane (2026-11-08) |
