@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/statique/senpai.css">
 <script src="/statique/attente.js" defer></script>
 </head>
-<body class="esp-{% block espace %}ciel{% endblock %}">
+<body class="{{ classes_body(self.espace()) }}">
 <a href="#contenu">{{ t.evitement }}</a>
 <header>
 <p>{{ t.nom_librairie }}</p>

@@ -9,7 +9,7 @@ l'API se lit sur la cible de Prometheus, pas ici.
 from __future__ import annotations
 
 import ipaddress
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -181,6 +181,14 @@ class Metriques:
         )
         for issue in ISSUES_VERIFICATION:
             self.verifications_cles.labels(issue=issue)
+        self.apparence_info = Gauge(
+            "application_apparence_info",
+            "L'apparence de l'application (E4, lot 7) : 1 sur la couleur réglée de"
+            " chaque espace (par son nom d'origine), 0 sur les cinq autres ;"
+            " rafraîchie à chaque lecture du réglage.",
+            ["espace", "couleur"],
+            registry=self.registre,
+        )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
             "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
@@ -205,6 +213,15 @@ class Metriques:
         """1 sur le profil actif, 0 sur les autres profils connus de `/v1/info`."""
         for nom in profils:
             self.profil_actif_info.labels(profil=nom).set(1 if nom == actif else 0)
+
+    def apparence(self, couleurs: Mapping[str, str], palette: Iterable[str]) -> None:
+        """1 sur la couleur réglée de chaque espace, 0 sur les autres de la palette."""
+        connues = tuple(palette)
+        for espace, reglee in couleurs.items():
+            for couleur in connues:
+                self.apparence_info.labels(espace=espace, couleur=couleur).set(
+                    1 if couleur == reglee else 0
+                )
 
     def exposer(self) -> tuple[bytes, str]:
         return generate_latest(self.registre), CONTENT_TYPE_LATEST

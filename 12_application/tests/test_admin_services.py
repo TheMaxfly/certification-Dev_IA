@@ -298,7 +298,7 @@ def test_a6_un_visiteur_est_renvoye_vers_la_connexion(appli):
     assert r.headers["location"] == "/connexion?retour=/admin/services"
 
 
-def test_a6_l_onglet_services_apparait_et_les_six_onglets_sont_la(appli, base):
+def test_a6_l_onglet_services_apparait_et_les_sept_onglets_sont_la(appli, base):
     _, client = appli
     entrer(client, base, "admin_un")
 
@@ -311,5 +311,6 @@ def test_a6_l_onglet_services_apparait_et_les_six_onglets_sont_la(appli, base):
         "Clés",
         "Coûts",
         "Services",
+        "Apparence",
     ]
     assert nav.select_one("a[aria-current=page]")["href"] == "/admin/services"

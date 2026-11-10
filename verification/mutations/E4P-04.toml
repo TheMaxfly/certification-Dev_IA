@@ -1,0 +1,9 @@
+id = "E4P-04"
+origine = "E4, lot 7, spec 01 (2026-11-10) — la base injoignable lève une erreur au lieu de donner les défauts : le conseiller d'un visiteur dépendrait de la base"
+fichier = "12_application/src/application/app.py"
+avant = '''            except BaseIndisponible:
+                lignes = {}'''
+apres = '''            except BaseIndisponible:
+                raise'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_apparence.py", "-k", "injoignable"]

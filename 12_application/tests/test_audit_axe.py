@@ -54,6 +54,7 @@ from ecrans import (
     MDP_INSCRIPTION,
     REGLAGE_ECRANS,
     Ecran,
+    poser_apparence,
 )
 
 from application.app import creer_application
@@ -106,6 +107,16 @@ PREPARER = """(valeurs) => {
   if (valeurs.demonstration) {
     document.querySelector("#mode_demonstration").checked = true;
   }
+}"""
+#: E4, lot 7 (écart 1) : Kōhai suit la page, plus la couleur — le titre du conseiller
+#: reste une boîte flexible dans toute couleur, une autre page n'a pas de Kōhai.
+KOHAI_SUIT_LA_PAGE = """() => {
+  const titre = document.querySelector("main > h1");
+  return {
+    apres: getComputedStyle(titre, "::after").content,
+    affichage: getComputedStyle(titre).display,
+    principal: titre.querySelector(".kohai-principal") !== null,
+  };
 }"""
 OUVRIR = "() => document.querySelectorAll('details').forEach((d) => { d.open = true; })"
 LANCER = """(etiquettes) => axe.run(document, {
@@ -343,6 +354,8 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     sans_focus: list[str] = []
     #: La case cochée dans le navigateur doit produire la section, et elle seule.
     ecarts_de_trace: list[str] = []
+    #: Les écrans d'une apparence réglée (E4, lot 7) : Kōhai suit la page.
+    ecarts_apparence: list[str] = []
 
     def adresse_de(reglee: str, **delais: float) -> Any:
         reduits = replace(reglages.delais, **delais)
@@ -447,10 +460,22 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 base = adresse_neuve
             elif ecran.delai_court:
                 base = adresse_pressee
+            if ecran.apparence:
+                poser_apparence(base_app, ecran.apparence)
             if ecran.borne is not None:
                 ouvrir_borne(page, base, ecran)
             else:
                 ouvrir_ecran(page, base, ecran)
+            if ecran.apparence:
+                poser_apparence(base_app, ())
+                titre = page.evaluate(KOHAI_SUIT_LA_PAGE)
+                tenu = (
+                    titre["affichage"] == "flex"
+                    if titre["principal"]
+                    else titre["apres"] == "none"
+                )
+                if not tenu:
+                    ecarts_apparence.append(f"{ecran.nom} : {titre}")
             if focus_tenu(page) is False:
                 sans_focus.append(ecran.nom)
             if (page.query_selector("#trace") is not None) != ecran.demonstration:
@@ -490,6 +515,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     assert not console, console
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
+    assert not ecarts_apparence, ecarts_apparence
     assert not ecarts_kohai, ecarts_kohai
     assert not ecarts_etroits, ecarts_etroits
     # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).

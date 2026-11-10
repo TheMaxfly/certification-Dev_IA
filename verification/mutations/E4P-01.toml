@@ -1,0 +1,7 @@
+id = "E4P-01"
+origine = "E4, lot 7, spec 01 (2026-11-10) — une couleur hors liste acceptée : la liste blanche ne vérifie plus que le type, une valeur forgée serait écrite"
+fichier = "12_application/src/application/apparence.py"
+avant = '''    return valeur if isinstance(valeur, str) and valeur in admises else None'''
+apres = '''    return valeur if isinstance(valeur, str) else None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_apparence.py", "-k", "hors_liste or valider"]

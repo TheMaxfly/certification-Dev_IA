@@ -19,10 +19,11 @@ from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -34,10 +35,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from application import (
     __version__,
+    apparence,
     couts,
     historique,
     journal,
     pages_admin,
+    pages_apparence,
     pages_catalogue,
     pages_comptes,
     pages_critiques,
@@ -84,6 +87,8 @@ STATIQUE = ICI / "statique"
 #: de table des types (`/etc/mime.types`) ; sans eux, la police et les lavis partiraient
 #: en `application/octet-stream`.
 TYPES_STATIQUES = {".woff2": "font/woff2", ".webp": "image/webp"}
+#: Les routes qui ne rendent aucune page : l'apparence n'y est pas lue (E4, lot 7).
+SANS_APPARENCE = frozenset({"/sante", "/metrics"})
 #: Le statut d'une page d'erreur → ses textes.
 PAGES_ERREUR = {
     400: ("erreur_400_titre", "erreur_400_texte"),
@@ -243,7 +248,14 @@ def creer_application(
         (le menu par rôle) et le jeton de la session (le bouton de déconnexion). Une
         page d'erreur de l'enveloppe (413, 500) n'a pas de requête : le menu anonyme."""
         compte = getattr(request.state, "compte", None) if request else None
+        # L'apparence réglée (E4, lot 7), lue une fois par requête par la dépendance de
+        # l'application ; une page d'erreur de l'enveloppe, sans requête : le défaut.
+        lue = getattr(request.state, "apparence", None) if request else None
+        reglee = lue if isinstance(lue, apparence.Apparence) else apparence.DEFAUT
         return {
+            # `base.html` : les classes de `<body>`, d'après le bloc `espace` du
+            # gabarit.
+            "classes_body": partial(apparence.classes_body, reglee),
             "suffixe_menu": suffixe_menu(request, valeurs.get("retour")),
             "t": t,
             "pied": presentation.pied_de_page(vue.etat, vue.info, reglages),
@@ -296,10 +308,45 @@ def creer_application(
         )
         return HTMLResponse(contenu, status_code=statut)
 
+    async def apparence_reglee(request: Request) -> apparence.Apparence:
+        """L'apparence réglée par l'administrateur (E4, lot 7), comme `profil_regle` :
+        les huit clés en une requête, une fois par requête (`request.state`), aucun
+        cache au-delà. Base non configurée ou injoignable : le défaut, sans erreur ni
+        événement — l'apparence n'est pas un événement, et le conseiller d'un visiteur
+        ne dépend jamais de la base pour s'afficher."""
+        deja = getattr(request.state, "apparence", None)
+        if isinstance(deja, apparence.Apparence):
+            return deja
+        lue = apparence.DEFAUT
+        lignes: dict[str, reglages_app.Valeur] = {}
+        base: Base = request.app.state.base
+        if base.configuree:
+            try:
+                lignes = await reglages_app.lire_plusieurs(base, apparence.CLES)
+            except BaseIndisponible:
+                lignes = {}
+            else:
+                lue = apparence.depuis_reglages(
+                    {cle: valeur.valeur for cle, valeur in lignes.items()}
+                )
+        request.state.apparence = lue
+        request.state.reglages_apparence = lignes
+        metriques.apparence(lue.couleurs, apparence.COULEURS)
+        return lue
+
+    async def preparer_page(request: Request) -> None:
+        """La dépendance de l'application (E4, lot 7) : après la garde de session (le
+        compte relu, une session refusée vidée), l'apparence de la page."""
+        if request.url.path in SANS_APPARENCE:
+            return
+        await sessions.compte_courant(request)
+        await apparence_reglee(request)
+
     app = FastAPI(
         title=t["titre_application"],
         version=__version__,
         lifespan=cycle,
+        dependencies=[Depends(preparer_page)],
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -316,7 +363,8 @@ def creer_application(
 
     async def erreur_http(request: Request, exc: Exception) -> Response:
         statut = exc.status_code if isinstance(exc, StarletteHTTPException) else 500
-        await sessions.compte_courant(request)  # le menu du compte connecté
+        # Une route inconnue n'a pas eu la dépendance de l'application.
+        await preparer_page(request)  # le menu du compte connecté, l'apparence
         reponse = page_erreur(
             statut, str(request.state.identifiant_requete), request=request
         )
@@ -918,6 +966,7 @@ def creer_application(
     pages_critiques.installer(app, reglages, rendre, catalogue, metriques)
     pages_listes.installer(app, reglages, rendre, catalogue, metriques)
     pages_admin.installer(app, reglages, rendre, vue, metriques, catalogue)
+    pages_apparence.installer(app, reglages, rendre)
 
     app.state.vue = vue
     app.state.metriques = metriques

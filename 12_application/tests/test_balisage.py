@@ -37,6 +37,7 @@ from ecrans import (
     MDP_INSCRIPTION,
     REGLAGE_ECRANS,
     Ecran,
+    poser_apparence,
 )
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -190,7 +191,11 @@ def pages(base_balisage: str) -> Iterator[list[Page]]:
                 )
                 r = rendre_borne(application, ecran, base_balisage)
             elif ecran.role is not None:
+                if ecran.apparence:
+                    poser_apparence(base_balisage, ecran.apparence)
                 r = rendre(par_role[ecran.role], ecran)
+                if ecran.apparence:
+                    poser_apparence(base_balisage, ())
             else:
                 r = rendre(client_sans_api if ecran.api_fermee else client, ecran)
             rendues.append(
@@ -614,6 +619,8 @@ def test_chaque_ecran_porte_un_seul_espace_celui_de_sa_page(pages):
             "Série introuvable",
         }:
             continue
+        if page.ecran.apparence:
+            continue  # E4, lot 7 : la couleur réglée (test_apparence_des_ecrans_regles)
         attendu = next(e for p, e in ESPACE_DU_CHEMIN if chemin.startswith(p))
         if page.statut == 200:
             assert espaces == [f"esp-{attendu}"], page.ecran.nom
@@ -659,3 +666,158 @@ def test_les_profils_indisponibles_portent_l_etiquette_de_statut(pages):
     if zone is not None:
         for ligne in zone.select("li"):
             assert ligne["class"] == ["badge", "statut", "ouvert"]
+
+
+#: Les classes de `<body>` de chaque écran au lot 6 (relevées le 2026-11-10 sur
+#: `d87f7bc`, avant le lot 7) : sans réglage, l'apparence ne change aucune d'elles.
+CLASSES_DU_LOT_6: dict[str, tuple[str, ...]] = {
+    "esp-brume": (
+        "admin_cles",
+        "admin_couts",
+        "admin_couts_plafond_atteint",
+        "admin_reglages",
+        "admin_reglages_api_absente",
+        "admin_reglages_indisponible",
+        "admin_services",
+        "admin_services_degrades",
+    ),
+    "esp-ciel": (
+        "a_propos",
+        "a_propos_sans_api",
+        "catalogue",
+        "catalogue_erreur_saisie",
+        "catalogue_indisponible",
+        "catalogue_resultats",
+        "catalogue_suggestions",
+        "catalogue_vide",
+        "inscription_bornee",
+        "page_404",
+        "serie_introuvable",
+    ),
+    "esp-menthe": (
+        "api_indisponible",
+        "aucun_profil",
+        "cle_refusee",
+        "conseiller_admin",
+        "conseiller_budget_atteint",
+        "conseiller_client",
+        "conseiller_debit_atteint",
+        "conseiller_libraire",
+        "conseiller_prerempli",
+        "conseiller_public",
+        "conseiller_quota_atteint",
+        "conseiller_quota_client_atteint",
+        "conversation_3_tours",
+        "conversation_5_tours",
+        "conversation_close",
+        "conversation_invalide",
+        "conversation_pleine",
+        "conversation_trop_longue",
+        "degrade_api_injoignable",
+        "degrade_base_indisponible",
+        "degrade_cle_invalide",
+        "degrade_corps_hors_contrat",
+        "degrade_corps_trop_volumineux",
+        "degrade_debit_depasse",
+        "degrade_debit_sans_entete",
+        "degrade_delai",
+        "degrade_encodage_en_service_change",
+        "degrade_entree_invalide",
+        "degrade_erreur_interne",
+        "degrade_fournisseur_corps_inattendu",
+        "degrade_fournisseur_delai",
+        "degrade_fournisseur_injoignable",
+        "degrade_fournisseur_longueur",
+        "degrade_fournisseur_refus_429",
+        "degrade_fournisseur_refus_429_sans_entete",
+        "degrade_fournisseur_refus_500",
+        "degrade_historique_invalide",
+        "degrade_profil_inconnu",
+        "degrade_profil_indisponible",
+        "degrade_question_trop_longue",
+        "degrade_reglage_non_expose",
+        "degrade_reponse_hors_contrat",
+        "degrade_service_embedding_incoherent",
+        "degrade_service_embedding_indisponible",
+        "degrade_sortie_demographie",
+        "degrade_sortie_disponibilite",
+        "degrade_sortie_fragment_inconnu",
+        "degrade_sortie_pseudonyme",
+        "degrade_sortie_refus_incoherent",
+        "degrade_sortie_schema",
+        "degrade_sortie_serie_inconnue",
+        "deux_modes",
+        "erreur_profil",
+        "erreur_question_longue",
+        "erreur_question_vide",
+        "erreur_temperature",
+        "page_vide",
+        "refus_aucun_passage",
+        "refus_demonstration",
+        "refus_hors_catalogue",
+        "refus_inconnu",
+        "reponse",
+        "reponse_cartes_client",
+        "reponse_complement",
+        "reponse_demonstration",
+        "reponse_metadonnees_nulles",
+        "reponse_reformulee",
+        "reponse_refus_avec_pont",
+        "reponse_refus_debit",
+        "reponse_sans_carte_avec_pont",
+        "reponse_sans_passage",
+        "reponse_titres",
+    ),
+    "esp-sakura": (
+        "serie",
+        "serie_critiques_indisponibles",
+        "serie_deux_resumes",
+        "serie_listes_client",
+        "serie_listes_visiteur",
+        "serie_resume_kitsu",
+        "serie_sans_note",
+        "serie_sans_resume",
+    ),
+}
+
+
+def test_sans_reglage_les_classes_du_corps_sont_celles_du_lot_6(pages):
+    """E4, lot 7 (décision 3) : sans réglage, le rendu du lot 6 à l'identique — la
+    même classe de `<body>`, et rien d'autre, sur chaque écran du catalogue."""
+    attendues = {nom: c for c, noms in CLASSES_DU_LOT_6.items() for nom in noms}
+    rendues = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in attendues
+    }
+    assert rendues == attendues
+    nouveaux = {p.ecran.nom for p in pages} - set(attendues)
+    assert all(n.startswith(("admin_apparence", "apparence_")) for n in nouveaux)
+
+
+#: Les classes attendues des écrans réglés par `APPARENCE_ECRANS` : la couleur du
+#: suivant, 60 %, l'aplat.
+REGLEES = {
+    "admin_apparence_reglee": "esp-menthe intensite-60 matiere-aplat",
+    "apparence_conseiller": "esp-ciel intensite-60 matiere-aplat",
+    "apparence_catalogue": "esp-sakura intensite-60 matiere-aplat",
+    "apparence_fiche": "esp-yuzu intensite-60 matiere-aplat",
+    "apparence_listes": "esp-glycine intensite-60 matiere-aplat",
+    "apparence_libraire": "esp-brume intensite-60 matiere-aplat",
+    "apparence_administration": "esp-menthe intensite-60 matiere-aplat",
+    "admin_apparence": "esp-brume",
+    "admin_apparence_partage": "esp-brume",
+}
+
+
+def test_apparence_des_ecrans_regles(pages):
+    """E4, lot 7 : chaque espace rend la couleur réglée pour lui ; l'intensité et la
+    matière, sur toutes les pages."""
+    rendues = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in REGLEES
+    }
+    assert rendues == REGLEES
+    statuts = {p.ecran.nom: p.statut for p in pages if p.ecran.nom in REGLEES}
+    assert set(statuts.values()) == {200}, statuts
