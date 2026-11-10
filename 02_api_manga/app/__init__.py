@@ -5,4 +5,4 @@ référence : `Settings.app_version` en hérite, les métadonnées OpenAPI aussi
 `tests/test_version.py` vérifie qu'elle n'a pas divergé de `pyproject.toml`.
 """
 
-API_VERSION = "0.6.0"
+API_VERSION = "0.7.0"

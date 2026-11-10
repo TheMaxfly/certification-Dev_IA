@@ -1,5 +1,6 @@
-"""Le résumé servi d'une série (E4, lot 2b, contrat 0.6.0) : le résumé Manga Sanctuary
-**coupé avant le premier extrait de critique**, sinon le résumé Kitsu, sinon rien.
+"""Le résumé servi d'une série (E4, lot 2b, contrat 0.6.0 ; seconde coupe : lot 6,
+0.7.0) : le résumé Manga Sanctuary **coupé avant le premier extrait de critique**, sinon
+le résumé Kitsu, sinon rien.
 
 Pourquoi : la collecte du référentiel a laissé, dans 1 844 résumés Manga Sanctuary
 (mesure du 2026-11-08), des critiques de lecteurs recopiées à la suite du résumé ; la
@@ -21,13 +22,24 @@ La règle (décision de Max du 8 novembre 2026) :
    principal (`manga_sanctuary`) ; sinon le résumé **Kitsu** de la série (par le moyeu
    d'identité) s'il existe (`kitsu`) ; sinon aucun.
 
-Un résumé sans extrait reste tel quel, quelle que soit sa longueur (le plancher juge ce
-qu'une coupe laisse) ; un résumé Manga Sanctuary absent passe à Kitsu.
+Un résumé sans extrait reste tel quel, quelle que soit sa longueur (le plancher juge
+ce qu'une coupe laisse) ; un résumé Manga Sanctuary absent passe à Kitsu.
+
+**La seconde coupe** (E4, lot 6, contrat 0.7.0 ; décision de Max du 9 novembre 2026, sur
+la mesure du lot 4) : des extraits de critiques ou de chroniques **absents des tables de
+critiques** restent après la première coupe. Après elle, et avant le plancher, le
+résumé est cherché, normalisé comme ci-dessus (apostrophe typographique ramenée à
+« ' »), par les cinq familles de marques de critique (`MARQUES_CRITIQUE`) ; s'il en
+porte **au moins deux familles**, il est coupé à la **première marque**, toutes
+familles confondues, ramenée à la fin de la phrase précédente ; puis le plancher,
+Kitsu, rien. Une seule famille ne coupe rien : la première personne seule apparaît dans
+des résumés d'éditeur.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -38,6 +50,50 @@ type Source = Literal["manga_sanctuary", "kitsu"]
 DEBUT_CARACTERES = 60
 #: Ce qui finit une phrase, pour ramener la coupe.
 FINS_DE_PHRASE = ".!?\n"
+#: Les cinq familles de marques de critique (E4, lot 4, spec 01 : les motifs de la
+#: mesure du 2026-11-09, tels qu'écrits) ; cherchées dans le texte normalisé, motifs
+#: normalisés de la même façon.
+MARQUES_CRITIQUE: Mapping[str, str] = {
+    "tomes_lus": r"\btomes? \d+ (à|a|-|au) \d+\b",
+    "premiere_personne": (
+        r"\b(j'ai|je |j'|mon avis|à mon (sens|goût)|je (recommande|conseille))"
+    ),
+    "note_chiffree": r"\b\d{1,2} ?/ ?(10|20)\b",
+    "adresse_au_lecteur": (
+        r"\b(vous (allez|devez|pouvez)|lisez|foncez|à lire absolument)\b"
+    ),
+    "appreciation": (
+        r"\b(quel plaisir|coup de c(œ|oe)ur|chef[- ]d'(œ|oe)uvre|déçu|décevant"
+        r"|excellent|incontournable)\b"
+    ),
+}
+#: Le nombre de familles à partir duquel la seconde coupe tombe.
+FAMILLES_MIN = 2
+
+
+def forme_des_marques(texte: str) -> str:
+    """Le texte comme les marques le lisent : la table du repli, à longueur égale, et
+    l'apostrophe typographique ramenée (un caractère pour un)."""
+    return normaliser_a_longueur_egale(texte).replace("\u2019", "'")
+
+
+MOTIFS = {
+    famille: re.compile(forme_des_marques(motif), re.IGNORECASE)
+    for famille, motif in MARQUES_CRITIQUE.items()
+}
+
+
+def familles_touchees(texte: str) -> set[str]:
+    """Les familles de marques présentes dans le texte."""
+    forme = forme_des_marques(texte)
+    return {famille for famille, motif in MOTIFS.items() if motif.search(forme)}
+
+
+def position_premiere_marque(texte: str) -> int | None:
+    """La position de la première marque, toutes familles confondues ; None : aucune."""
+    forme = forme_des_marques(texte)
+    trouvees = [m.start() for motif in MOTIFS.values() if (m := motif.search(forme))]
+    return min(trouvees) if trouvees else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,11 +131,19 @@ def resume_servi(
     """Le résumé et sa source, selon la règle du module."""
     if manga_sanctuary and manga_sanctuary.strip():
         position = coupure(manga_sanctuary, debuts)
-        if position is None:
-            # Sans extrait, le résumé reste tel quel, court ou non : le plancher juge
-            # ce qu'une coupe laisse, pas un résumé que rien n'a touché.
+        texte = manga_sanctuary
+        coupe = position is not None
+        if position is not None:
+            texte = couper(manga_sanctuary, position)
+        # La seconde coupe (E4, lot 6) : après la première, avant le plancher.
+        marque = position_premiere_marque(texte)
+        if marque is not None and len(familles_touchees(texte)) >= FAMILLES_MIN:
+            texte = couper(texte, marque)
+            coupe = True
+        if not coupe:
+            # Sans extrait ni marques, le résumé reste tel quel, court ou non : le
+            # plancher juge ce qu'une coupe laisse, pas un résumé que rien n'a touché.
             return Resume(manga_sanctuary, "manga_sanctuary")
-        texte = couper(manga_sanctuary, position)
         if len(texte) >= plancher:
             return Resume(texte, "manga_sanctuary")
     if kitsu and kitsu.strip():

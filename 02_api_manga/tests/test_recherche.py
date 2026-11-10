@@ -257,7 +257,7 @@ def test_le_compose_du_module_publie_sur_le_bouclage_seulement() -> None:
     ]
 
     assert publications == ["127.0.0.1:8000:8000"]
-    assert "APP_VERSION: ${APP_VERSION:-0.6.0}" in texte
+    assert "APP_VERSION: ${APP_VERSION:-0.7.0}" in texte
 
 
 # --------------------------------------------------------------------------- #

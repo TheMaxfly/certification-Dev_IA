@@ -1969,7 +1969,7 @@
   "info": {
     "description": "\nRead-only HTTP API over the manga corpus stored in PostgreSQL (schema `manga`).\n\n**Authorisation.** Data endpoints require an `X-API-Key` header. The\ndocumentation (`/docs`, `/redoc`, `/openapi.json`) and the probes (`/live`,\n`/health`) are open by design: *the documentation is open, the data is closed.*\n",
     "title": "API Manga",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "openapi": "3.1.0",
   "paths": {

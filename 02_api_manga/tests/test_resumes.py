@@ -139,3 +139,90 @@ def test_la_fiche_sans_aucun_resume_dit_null_et_null() -> None:
 
     assert (reponse.synopsis_enriched, reponse.synopsis_source) == (None, None)
     assert reponse.synopsis_kitsu is None
+
+
+# --------------------------------------------------------------------------- #
+#  La seconde coupe aux marques de critique (E4, lot 6, contrat 0.7.0)
+# --------------------------------------------------------------------------- #
+#: Un résumé d'éditeur factice, sans marque : il fait plus de 100 caractères.
+EDITEUR = (
+    "Dans une cité portuaire, une apprentie cartographe découvre une carte qui change "
+    "chaque nuit. Avec un vieux marin, elle part chercher l'île qu'elle dessine."
+)
+
+
+@pytest.mark.parametrize(
+    ("famille", "positif", "negatif"),
+    [
+        ("tomes_lus", "Lu les tomes 1 à 12 d'une traite.", "Une série en 12 tomes."),
+        ("premiere_personne", "J'ai refermé le livre ému.", "Elle referme le livre."),
+        ("note_chiffree", "Une note de 17/20 pour finir.", "Le 17 mai, tout bascule."),
+        ("adresse_au_lecteur", "Foncez, sans hésiter !", "Ils foncent vers le port."),
+        ("appreciation", "Un vrai coup de cœur.", "Un vrai coup de vent."),
+    ],
+)
+def test_chaque_famille_a_son_motif(famille, positif, negatif) -> None:
+    assert resumes.familles_touchees(positif) == {famille}
+    assert famille not in resumes.familles_touchees(negatif)
+
+
+def test_l_apostrophe_typographique_et_les_accents_sont_ramenes() -> None:
+    assert resumes.familles_touchees("J’ai adoré, CHEF-D’ŒUVRE.") == {
+        "premiere_personne",
+        "appreciation",
+    }
+
+
+def test_une_seule_famille_ne_coupe_rien() -> None:
+    texte = EDITEUR + " Je ne vous en dis pas plus."
+
+    servi = resumes.resume_servi(texte, KITSU, [], plancher=100)
+
+    assert (servi.texte, servi.source) == (texte, "manga_sanctuary")
+
+
+def test_deux_familles_coupent_a_la_premiere_marque_en_fin_de_phrase() -> None:
+    texte = EDITEUR + " Lu les tomes 1 à 12 : excellent, je le recommande."
+
+    servi = resumes.resume_servi(texte, KITSU, [], plancher=100)
+
+    assert resumes.position_premiere_marque(texte) == texte.index("tomes 1")
+    assert (servi.texte, servi.source) == (EDITEUR, "manga_sanctuary")
+
+
+def test_sous_le_plancher_la_seconde_coupe_passe_a_kitsu_sinon_a_rien() -> None:
+    texte = "Une carte change chaque nuit. Foncez : un excellent récit d'aventure."
+
+    assert resumes.resume_servi(texte, KITSU, [], plancher=100) == resumes.Resume(
+        KITSU, "kitsu"
+    )
+    assert resumes.resume_servi(texte, None, [], plancher=100) == resumes.Resume(
+        None, None
+    )
+
+
+def test_la_premiere_coupe_puis_la_seconde() -> None:
+    critique = (
+        "Franchement, ce manga est le meilleur que j'aie lu cette année, foncez donc."
+    )
+    texte = EDITEUR + " Foncez, c'est excellent.\n" + critique
+
+    servi = resumes.resume_servi(texte, KITSU, [critique[:60]], plancher=100)
+
+    assert resumes.coupure(texte, [critique[:60]]) == texte.index("Franchement")
+    assert (servi.texte, servi.source) == (EDITEUR, "manga_sanctuary")
+
+
+def test_la_fiche_sert_le_resume_coupe_aux_marques() -> None:
+    texte = EDITEUR + " Lu les tomes 1 à 12 : excellent, je le recommande."
+    ligne = (
+        LIGNE_SERIE[:14] + (texte, "Synopsis retenu") + LIGNE_SERIE[16:38] + (KITSU, [])
+    )
+
+    reponse = get_series(FakePool([ligne]), 8514)
+
+    assert reponse.synopsis == texte, "le brut reste au contrat"
+    assert (reponse.synopsis_enriched, reponse.synopsis_source) == (
+        EDITEUR,
+        "manga_sanctuary",
+    )

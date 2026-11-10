@@ -33,7 +33,7 @@ services:
   catalogue:
     build:
       context: ../02_api_manga
-    image: api-catalogue:0.6.0
+    image: api-catalogue:0.7.0
     environment:
       APP_ENV: ${CATALOGUE_APP_ENV:-production}
       # Vide : le 02 refuse de démarrer (le refus lui appartient, en un seul endroit).
