@@ -141,10 +141,12 @@ hebergement = "hors Union européenne par défaut"
 [textes]
 # Généraux
 titre_application = "Conseiller de lecture"
-nom_librairie = "Librairie de démonstration"
+# Nom de travail, modifiable (E4, lot 6) : le logo de l'habillage le porte ; si le nom
+# change, les scripts `outils/` du paquet d'habillage régénèrent le logo (README).
+nom_librairie = "Senpai"
 evitement = "Aller au contenu"
 mention_courte = "Vous parlez à une IA."
-mention_complete = "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à partir de critiques et de résumés du catalogue ; elles peuvent être incomplètes."
+mention_complete = "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à partir de critiques et de résumés du catalogue ; elles peuvent être incomplètes. Senpai est un réseau fictif de librairies : projet de certification Développeur en intelligence artificielle (formation Simplon)."
 etat_ok = "Service disponible — profil actif : {profil} (modèle {modele})."
 etat_ko = "Le service de recommandation ne répond pas."
 etat_cle = "Le service de recommandation refuse l'accès de l'application : l'exploitant doit vérifier sa clé."
@@ -323,7 +325,9 @@ apropos_conserve = "La conversation n'est pas conservée : elle vit dans la page
 apropos_registre_titre = "Registre des traitements"
 apropos_registre = "Ce traitement sera inscrit au registre des traitements du projet avant toute mise en service."
 apropos_licences_titre = "Licences"
-apropos_licences = "Feuille de style : Pico CSS (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
+apropos_identite_titre = "L'identité Senpai"
+apropos_identite = "Senpai est le nom de travail d'un réseau fictif de librairies, imaginé pour un projet de certification. Kōhai, la mascotte, illustre le conseiller : elle est décorative, et le texte dit toujours l'état de la page. Les polices Mochiy Pop One, Zen Maru Gothic et Yusei Magic sont servies par l'application, sous licence SIL Open Font License 1.1. Les icônes viennent de Phosphor Icons, sous licence MIT."
+apropos_licences = "Feuille de style : Pico CSS (MIT). Polices : SIL Open Font License 1.1. Icônes : Phosphor Icons (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
 # Pages d'erreur
 erreur_400_titre = "Demande illisible"
 erreur_400_texte = "Le formulaire reçu n'a pas pu être lu."

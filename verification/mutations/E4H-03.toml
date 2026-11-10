@@ -1,0 +1,7 @@
+id = "E4H-03"
+origine = "E4, lot 6, spec 01 (2026-11-10) — le corps des pages sans classe d'espace : aucune page ne prendrait sa couleur"
+fichier = "12_application/src/application/gabarits/base.html"
+avant = '''<body class="esp-{% block espace %}ciel{% endblock %}">'''
+apres = '''<body>'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_habillage.py", "-k", "chaque_page_rendue_porte_son_espace or erreur_de_l_enveloppe_porte_un_espace"]

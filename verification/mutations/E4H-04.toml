@@ -1,0 +1,7 @@
+id = "E4H-04"
+origine = "E4, lot 6, spec 01 (2026-11-10) — une empreinte fausse dans statique/EMPREINTES : un fichier vendu changé passerait sans être vu"
+fichier = "12_application/src/application/statique/EMPREINTES"
+avant = '''59f3ba57f5a4b7e4d9c2b69943ce9ddd908549019dcd446a995e23b2c5328c8d  images/logo-senpai.svg'''
+apres = '''59f3ba57f5a4b7e4d9c2b69943ce9ddd908549019dcd446a995e23b2c5328c8e  images/logo-senpai.svg'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_habillage.py", "-k", "empreinte_exacte"]

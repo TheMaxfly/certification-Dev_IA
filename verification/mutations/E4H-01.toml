@@ -1,0 +1,7 @@
+id = "E4H-01"
+origine = "E4, lot 6, spec 01 (2026-11-10) — la politique sans font-src : default-src 'none' bloquerait les polices vendues de l'habillage"
+fichier = "12_application/src/application/enveloppe.py"
+avant = '''    "font-src 'self'; script-src 'self'; "'''
+apres = '''    "script-src 'self'; "'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_habillage.py", "-k", "politique_est_exactement or en_tete_porte_la_politique"]

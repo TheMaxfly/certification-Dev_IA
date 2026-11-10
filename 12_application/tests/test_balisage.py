@@ -43,6 +43,7 @@ from fastapi.testclient import TestClient
 
 from application.app import GABARITS, STATIQUE, creer_application
 from application.config import charger
+from application.presentation import entree_du_menu
 
 ACCESSIBILITE = Path(__file__).resolve().parents[1] / "accessibilite"
 TITRES = ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -579,3 +580,47 @@ def test_les_ecrans_de_l_administration_rendent_l_etat_voulu(pages):
         for tableau in vues[nom].soupe.select("main table"):
             assert tableau.select_one("caption").get_text(strip=True), nom
             assert all(th["scope"] == "col" for th in tableau.select("thead th")), nom
+
+
+#: L'espace attendu d'une page rendue, selon son chemin (E4, lot 6) ; les pages
+#: d'erreur sont `ciel`, quel que soit leur chemin.
+ESPACE_DU_CHEMIN = (
+    ("/admin/", "brume"),
+    ("/series/", "sakura"),
+    ("/catalogue", "ciel"),
+    ("/a-propos", "ciel"),
+    ("/inscription", "ciel"),
+    ("/", "menthe"),
+)
+
+
+def test_chaque_ecran_porte_un_seul_espace_celui_de_sa_page(pages):
+    """E4, lot 6 : la classe d'espace sur `<body>`, posée par chaque gabarit."""
+    for page in pages:
+        espaces = [c for c in page.soupe.body.get("class", []) if c.startswith("esp-")]
+        assert len(espaces) == 1, page.ecran.nom
+        chemin = page.ecran.chemin.split("?")[0]
+        if page.soupe.select_one("main h1").get_text() in {
+            "Page introuvable",
+            "Série introuvable",
+        }:
+            continue
+        attendu = next(e for p, e in ESPACE_DU_CHEMIN if chemin.startswith(p))
+        if page.statut == 200:
+            assert espaces == [f"esp-{attendu}"], page.ecran.nom
+
+
+def test_le_menu_marque_la_page_courante_sur_chaque_ecran(pages):
+    """E4, lot 6 : `aria-current="page"` sur le lien du menu de la page, et lui seul ;
+    toute l'administration sous « Administration »."""
+    vus = set()
+    for page in pages:
+        chemin = "/question" if page.ecran.question else page.ecran.chemin.split("?")[0]
+        entree = entree_du_menu(chemin)
+        hrefs = [a["href"] for a in page.soupe.select("header nav a")]
+        marques = page.soupe.select("header nav a[aria-current]")
+        attendu = [entree] if entree in hrefs else []
+        assert [a["href"] for a in marques] == attendu, page.ecran.nom
+        assert all(a["aria-current"] == "page" for a in marques), page.ecran.nom
+        vus.update(attendu)
+    assert {"/", "/catalogue", "/admin/comptes"} <= vus

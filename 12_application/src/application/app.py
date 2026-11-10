@@ -243,6 +243,10 @@ def creer_application(
             "t": t,
             "pied": presentation.pied_de_page(vue.etat, vue.info, reglages),
             "compte": compte,
+            # Le lien du menu de la page courante (E4, lot 6) : `aria-current`.
+            "menu_courant": (
+                presentation.entree_du_menu(request.url.path) if request else None
+            ),
             # La barre de l'administration (E4, lot 5) : ses pages seulement.
             "onglets": (
                 pages_admin.onglets(request.app, request.url.path, t)

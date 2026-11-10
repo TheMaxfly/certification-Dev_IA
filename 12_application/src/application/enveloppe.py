@@ -27,11 +27,14 @@ ROUTE_INCONNUE = "inconnue"
 #: Les feuilles de style : un `Mount`, qui ne pose pas de route dans le scope.
 ROUTE_STATIQUE = "statique"
 PREFIXE_STATIQUE = "/statique/"
-#: Aucun script, aucune ressource externe : les deux choses que la politique protège.
-#: `data:` pour les images seules : Pico dessine ses coches et ses chevrons ainsi (14
-#: occurrences, toutes `image/svg+xml`), et une image n'exécute rien.
+#: Aucune ressource externe, rien en ligne : ce que la politique protège. `data:` pour
+#: les images seules : Pico dessine ses coches et ses chevrons ainsi (14 occurrences,
+#: toutes `image/svg+xml`), et une image n'exécute rien. E4, lot 6 : `font-src 'self'`
+#: pour les polices vendues de l'habillage ; `script-src 'self'` pour le seul script
+#: vendu (`statique/attente.js`, la pose d'attente de la mascotte) — jamais en ligne.
 POLITIQUE = (
     "default-src 'none'; style-src 'self'; img-src 'self' data:; "
+    "font-src 'self'; script-src 'self'; "
     "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 )
 ENTETES_SECURITE = {

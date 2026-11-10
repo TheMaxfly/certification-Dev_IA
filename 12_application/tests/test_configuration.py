@@ -134,7 +134,7 @@ def test_les_valeurs_par_defaut_sont_celles_decidees():
     assert r.temperature_defaut == 0.0 and r.reformuler_defaut is True
     assert r.delais.reponse_s == 75.0 and r.delais.connexion_s == 5.0
     assert r.limites.echanges == 5 and r.corps_octets_max == 16384
-    assert r.textes["nom_librairie"] == "Librairie de démonstration"
+    assert r.textes["nom_librairie"] == "Senpai"
     assert r.fournisseurs["mistral"].hebergement == "Union européenne"
 
 
@@ -268,10 +268,12 @@ def test_la_mention_ia_est_le_texte_decide():
     textes = charger(ENV).textes
 
     assert textes["mention_courte"] == "Vous parlez à une IA."
+    # E4, lot 6 : la mention décidée, inchangée, puis le crédit du réseau fictif.
     assert textes["mention_complete"] == (
         "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à"
         " partir de critiques et de résumés du catalogue ; elles peuvent être"
-        " incomplètes."
+        " incomplètes. Senpai est un réseau fictif de librairies : projet de"
+        " certification Développeur en intelligence artificielle (formation Simplon)."
     )
 
 

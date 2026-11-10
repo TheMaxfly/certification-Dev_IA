@@ -546,6 +546,66 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   make app-admin-creer
 ```
 
+## L'identité Senpai (E4, lot 6)
+
+**Senpai** est le nom de travail du réseau fictif (`nom_librairie`, `config/reglages.toml`,
+modifiable) ; le pied de page le dit, après la mention de l'IA : « Senpai est un réseau
+fictif de librairies : projet de certification Développeur en intelligence artificielle
+(formation Simplon). » Le logo est une image qui porte le nom : si le nom change, les
+scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédit du pied de page
+(`mention_complete`) se réécrit à la main.
+
+- **Le paquet** : remis par la session design du 9 novembre 2026, versé **tel quel** dans
+  `src/application/statique/` — `theme.css` (remplacé), `senpai.css` (nouveau), `polices/`,
+  `lavis/`, `touches/`, `images/`, `icones/`, leurs licences ; ses empreintes ajoutées à
+  `statique/EMPREINTES`, commentaires de provenance compris. Ses pages d'aperçu et ses
+  scripts de génération restent hors dépôt. Tout écart au paquet est relevé au rapport du lot.
+- **`base.html`, trois retouches** : `senpai.css` après `theme.css` ; la classe d'espace
+  sur `<body>` (`esp-{% block espace %}ciel{% endblock %}`), chaque gabarit déclarant la
+  sienne ; `aria-current="page"` sur le lien du menu de la page courante (toute
+  l'administration sous « Administration » ; la page du conseiller aussi après une
+  question). Le logo est une image de fond du premier paragraphe de l'en-tête : aucune
+  balise ajoutée.
+- **Les espaces** (une page, une couleur) :
+
+| Espace | Gabarits |
+|---|---|
+| `menthe` | `index.html` (le conseiller) |
+| `ciel` (défaut) | `catalogue.html`, `connexion.html`, `inscription.html`, `a_propos.html`, `erreur.html` (et la page d'erreur de l'enveloppe, 413 et 500) |
+| `sakura` | `serie.html` |
+| `yuzu` | `mot_de_passe.html`, `listes.html`, `compte_supprimer.html` |
+| `glycine` | `critiques.html`, `critique_formulaire.html`, `critique_retirer.html` |
+| `brume` | les sept pages `admin_*.html` |
+
+  Un test lit le dossier des gabarits et compare chaque déclaration à cette table ; un
+  gabarit neuf sans déclaration hérite de `ciel`, c'est voulu.
+- **Les règles du design** : une page, une couleur (lavis, survol, onglets, étiquettes,
+  jauge) ; un seul bouton, blanc, trait d'encre et ombre décalée ; le bleu nuit pour ce qui
+  est choisi ou la page courante, la framboise pour les erreurs et les liens posés sur le
+  papier ; sur le lavis, l'encre seule. Le sens n'est jamais porté par la couleur seule.
+  Cibles de 44 px, focus visible de 3 px.
+- **Ressources vendues et licences** : polices Mochiy Pop One, Zen Maru Gothic (500, 700),
+  Yusei Magic, sous-ensembles latins en woff2, **SIL Open Font License 1.1**
+  (`polices/LICENCE-OFL`) ; 33 icônes **Phosphor Icons**, **MIT** (`icones/LICENCE-phosphor`) ;
+  lavis, touches, logo et poses de la mascotte créés pour le projet. Rien n'est chargé
+  d'ailleurs : toutes les `url()` de `senpai.css` visent `/statique/` (test).
+- **Politique de sécurité du contenu** : `font-src 'self'` ajouté pour les polices vendues,
+  et `script-src 'self'` pour le seul script vendu (la pose d'attente de la mascotte) ;
+  `default-src 'none'`, `style-src 'self'`, `img-src 'self' data:` inchangés ; aucun style
+  ni script en ligne, nulle part (test sur chaque écran).
+- **Pas de mode sombre** : `base.html` force `data-theme="light"`, et le thème n'a pas de
+  variante sombre.
+- **Le poids** : `statique/` passe de 73 477 à 349 896 octets (≈ 72 à 342 Ko) : polices
+  58 880, lavis 112 828, touches 9 084, images 28 845, icônes 15 346, `senpai.css` 29 857 ;
+  l'image Docker grossit d'autant.
+
+### Ressources
+
+`statique/EMPREINTES` liste chaque fichier vendu et son empreinte SHA-256 : Pico, puis les
+59 fichiers du paquet Senpai. Un test exige que **chaque** fichier de `statique/` qui n'est
+pas écrit pour l'application (`theme.css`, `senpai.css`) ou une licence y figure, avec
+l'empreinte exacte.
+
 ## Accessibilité
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
@@ -587,9 +647,10 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   module (`APPLICATION_CLE_API`, le secret seul). Jamais dans un fichier suivi, une page, un
   journal : un test le vérifie, et les hooks la refusent par valeur et par aspect. Pour la
   révoquer : la retirer du trousseau, redémarrer l'API.
-- **En-têtes** : politique de sécurité du contenu stricte (aucun script, aucune ressource
-  externe ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14 occurrences,
-  toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
+- **En-têtes** : politique de sécurité du contenu stricte (aucune ressource externe, rien
+  en ligne ; `font-src 'self'` et `script-src 'self'` pour les polices et le seul script
+  vendus, E4, lot 6 ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14
+  occurrences, toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
   `Referrer-Policy`, `Cache-Control: no-store` sur les pages de conversation.
 - **Formulaire** : en `POST`, corps borné, gabarits échappés, aucun marquage « sûr » d'un
   texte venu de l'API ; **un jeton CSRF** dans chaque formulaire `POST` (celui du conseiller

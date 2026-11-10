@@ -7,26 +7,27 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="/statique/pico.classless.min.css">
 <link rel="stylesheet" href="/statique/theme.css">
+<link rel="stylesheet" href="/statique/senpai.css">
 </head>
-<body>
+<body class="esp-{% block espace %}ciel{% endblock %}">
 <a href="#contenu">{{ t.evitement }}</a>
 <header>
 <p>{{ t.nom_librairie }}</p>
 <p>{{ t.mention_courte }}</p>
 <nav aria-label="{{ t.menu_etiquette }}">
 <ul>
-<li><a href="/">{{ t.menu_conseiller }}</a></li>
-<li><a href="/catalogue">{{ t.menu_catalogue }}</a></li>
+<li><a href="/"{% if menu_courant == "/" %} aria-current="page"{% endif %}>{{ t.menu_conseiller }}</a></li>
+<li><a href="/catalogue"{% if menu_courant == "/catalogue" %} aria-current="page"{% endif %}>{{ t.menu_catalogue }}</a></li>
 {% if compte %}
 {% if compte.role == "client" %}
-<li><a href="/compte/listes">{{ t.menu_listes }}</a></li>
+<li><a href="/compte/listes"{% if menu_courant == "/compte/listes" %} aria-current="page"{% endif %}>{{ t.menu_listes }}</a></li>
 {% endif %}
-<li><a href="/compte/mot-de-passe">{{ t.menu_mon_compte }}</a></li>
+<li><a href="/compte/mot-de-passe"{% if menu_courant == "/compte/mot-de-passe" %} aria-current="page"{% endif %}>{{ t.menu_mon_compte }}</a></li>
 {% if compte.role == "libraire" %}
-<li><a href="/libraire/critiques">{{ t.menu_critiques }}</a></li>
+<li><a href="/libraire/critiques"{% if menu_courant == "/libraire/critiques" %} aria-current="page"{% endif %}>{{ t.menu_critiques }}</a></li>
 {% endif %}
 {% if compte.role == "admin" %}
-<li><a href="/admin/comptes">{{ t.menu_administration }}</a></li>
+<li><a href="/admin/comptes"{% if menu_courant == "/admin/comptes" %} aria-current="page"{% endif %}>{{ t.menu_administration }}</a></li>
 {% endif %}
 <li>{{ connecte }}</li>
 <li><form method="post" action="/deconnexion"><input type="hidden" name="jeton" value="{{ jeton }}"><button>{{ t.menu_deconnexion }}</button></form></li>

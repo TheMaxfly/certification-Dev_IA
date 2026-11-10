@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}ciel{% endblock %}
 {% block titre %}{{ t.apropos_titre }}{% endblock %}
 {% block contenu %}
 <h1>{{ t.apropos_titre }}</h1>
@@ -52,6 +53,10 @@
 <section>
 <h2>{{ t.apropos_registre_titre }}</h2>
 <p>{{ t.apropos_registre }}</p>
+</section>
+<section id="identite">
+<h2>{{ t.apropos_identite_titre }}</h2>
+<p>{{ t.apropos_identite }}</p>
 </section>
 <section>
 <h2>{{ t.apropos_licences_titre }}</h2>

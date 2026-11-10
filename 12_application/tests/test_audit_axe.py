@@ -64,15 +64,27 @@ GRAVES = ("serious", "critical")
 INSCRITS: dict[str, str] = {}
 #: Ce qu'axe ne sait pas juger, avec ce qui le règle : écrit au rapport.
 A_REVOIR = {
-    "color-contrast": "le chevron d'une liste déroulante ou l'icône d'un champ invalide"
-    " est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces"
-    " champs est fixé par `theme.css`, et son contraste calculé par un test"
-    " (`test_wcag_1_4_3_…`). À relire à l'œil.",
+    "color-contrast": "le texte est posé sur une image de fond — le lavis d'aquarelle"
+    " de la page, la touche d'aquarelle d'une surface pâle (habillage Senpai, E4, lot"
+    " 6), le chevron d'une liste déroulante ou l'icône d'un champ invalide : axe ne"
+    " déduit pas la couleur du fond. Les couples du thème sont calculés par un test"
+    " (`test_wcag_1_4_3_…`) ; l'encre sur les lavis et les touches est mesurée au pire"
+    " pixel par les scripts du paquet d'habillage (au moins 7:1 sur le lavis à 100 %,"
+    " 10,1:1 sur les touches). À relire à l'œil, sur les captures de la recette.",
 }
 #: L'élément qui devrait avoir le focus l'a-t-il, une fois la page chargée ?
 FOCUS = """() => {
   const attendu = document.querySelector("[autofocus]");
   return attendu === null ? null : attendu === document.activeElement;
+}"""
+#: E4, lot 6 : avec la transition de vue entre pages (`@view-transition` de
+#: l'habillage), le navigateur pose le focus d'`autofocus` à la fin de la transition,
+#: après `load` ; sans elle (mouvement réduit), aussitôt. Le contrôle attend donc le
+#: focus, deux secondes au plus, puis le lit : un focus qui n'arrive jamais reste un
+#: échec.
+FOCUS_POSE = """() => {
+  const attendu = document.querySelector("[autofocus]");
+  return attendu === null || attendu === document.activeElement;
 }"""
 PREPARER = """(valeurs) => {
   const form = document.querySelector("main form");
@@ -99,6 +111,17 @@ LANCER = """(etiquettes) => axe.run(document, {
   runOnly: {type: "tag", values: etiquettes},
   resultTypes: ["violations", "incomplete"],
 })"""
+
+
+def focus_tenu(page: Any) -> bool | None:
+    """Le focus est-il sur l'élément `autofocus`, la transition de vue finie ?"""
+    from playwright.sync_api import TimeoutError as DelaiDepasse
+
+    try:
+        page.wait_for_function(FOCUS_POSE, timeout=2000)
+    except DelaiDepasse:
+        pass
+    return page.evaluate(FOCUS)
 
 
 def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
@@ -427,7 +450,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 ouvrir_borne(page, base, ecran)
             else:
                 ouvrir_ecran(page, base, ecran)
-            if page.evaluate(FOCUS) is False:
+            if focus_tenu(page) is False:
                 sans_focus.append(ecran.nom)
             if (page.query_selector("#trace") is not None) != ecran.demonstration:
                 ecarts_de_trace.append(ecran.nom)
@@ -812,7 +835,7 @@ def auditer_les_comptes(
                 page.click(ecran.bouton)
         titre = page.inner_text("main h1")
         assert titre == ecran.titre, (nom, titre)
-        if page.evaluate(FOCUS) is False:
+        if focus_tenu(page) is False:
             sans_focus.append(nom)
         pages[nom] = auditer(page, source, adresse)
         page.close()

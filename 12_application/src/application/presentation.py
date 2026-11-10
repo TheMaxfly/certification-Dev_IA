@@ -35,6 +35,27 @@ def dire(textes: Mapping[str, str], cle: str, **valeurs: object) -> str:
     return textes[cle].format(**valeurs)
 
 
+#: Les entrées du menu (E4, lot 6) : leur cible, et les chemins qui sont leur page. La
+#: page du conseiller se rend aussi après l'envoi d'une question (`POST /question`).
+ENTREES_DU_MENU: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("/", ("/", "/question")),
+    ("/catalogue", ("/catalogue",)),
+    ("/compte/listes", ("/compte/listes",)),
+    ("/compte/mot-de-passe", ("/compte/mot-de-passe",)),
+    ("/libraire/critiques", ("/libraire/critiques",)),
+)
+#: L'administration : toutes ses pages sont sous un préfixe, une seule entrée du menu.
+PREFIXE_ADMINISTRATION = "/admin/"
+
+
+def entree_du_menu(chemin: str) -> str | None:
+    """La cible du lien du menu qui porte `aria-current="page"` sur ce chemin ; None :
+    aucune (une fiche, une page d'erreur, la connexion…)."""
+    if chemin.startswith(PREFIXE_ADMINISTRATION):
+        return "/admin/comptes"
+    return next((cible for cible, pages in ENTREES_DU_MENU if chemin in pages), None)
+
+
 def fournisseur_de(reglages: Reglages, nom: str) -> Fournisseur:
     """Le nom et l'hébergement d'un fournisseur, s'ils sont connus de la configuration :
     `/v1/info` ne dit pas l'hébergement."""

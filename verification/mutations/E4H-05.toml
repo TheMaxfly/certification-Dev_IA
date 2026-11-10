@@ -1,0 +1,7 @@
+id = "E4H-05"
+origine = "E4, lot 6, spec 01 (2026-11-10) — une url() externe dans la feuille de l'habillage : une ressource chargée hors de l'application"
+fichier = "12_application/src/application/statique/senpai.css"
+avant = '''url(/statique/images/logo-senpai.svg)'''
+apres = '''url(https://exemple.invalid/logo-senpai.svg)'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_habillage.py", "-k", "ne_charge_rien_d_externe"]
