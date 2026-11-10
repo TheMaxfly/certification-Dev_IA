@@ -33,6 +33,13 @@ DOUBLURE = os.environ["DOUBLURE_URL"]
 #: Le cookie de session, gardé d'une requête à l'autre (`nom=valeur`), comme un
 #: navigateur.
 COOKIE: dict[str, str] = {}
+#: Le type de chaque sorte de ressource vendue (E4, lot 6).
+TYPES_ATTENDUS = (
+    ("/statique/polices/zen-maru-gothic-500.woff2", "font/woff2"),
+    ("/statique/lavis/lavis-menthe.webp", "image/webp"),
+    ("/statique/attente.js", "text/javascript"),
+    ("/statique/senpai.css", "text/css"),
+)
 
 
 def appeler(
@@ -126,6 +133,12 @@ def principal() -> None:
 
     statut, _, corps = appeler(f"{BASE}/a-propos")
     verifier(statut == 200 and "Union européenne" in corps, "/a-propos : l'hébergement")
+
+    # E4, lot 6 : les ressources de l'habillage, servies avec leur type, dans l'image.
+    for chemin, attendu in TYPES_ATTENDUS:
+        with urllib.request.urlopen(f"{BASE}{chemin}", timeout=10) as r:  # noqa: S310
+            type_ = r.headers.get_content_type()
+        verifier(type_ == attendu, f"{chemin} : {attendu}")
 
     statut, _, corps = appeler(f"{BASE}/metrics")
     verifier(

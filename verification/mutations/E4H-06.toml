@@ -4,4 +4,4 @@ fichier = "02_api_manga/app/resumes.py"
 avant = '''        if marque is not None and len(familles_touchees(texte)) >= FAMILLES_MIN:'''
 apres = '''        if False:'''
 dossier = "02_api_manga"
-commande = ["uv", "run", "--locked", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_resumes.py", "-k", "deux_familles or seconde or aux_marques"]
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_resumes.py", "-k", "deux_familles or seconde or aux_marques"]

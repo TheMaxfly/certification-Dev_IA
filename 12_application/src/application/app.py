@@ -13,6 +13,7 @@ jeton CSRF sur chaque formulaire `POST` — celui du conseiller compris.
 from __future__ import annotations
 
 import logging
+import mimetypes
 import time
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
@@ -79,6 +80,10 @@ ICI = Path(__file__).resolve().parent
 CHIFFRES_SERIE = 18
 GABARITS = ICI / "gabarits"
 STATIQUE = ICI / "statique"
+#: Les types des ressources vendues de l'habillage (E4, lot 6) : l'image de base n'a pas
+#: de table des types (`/etc/mime.types`) ; sans eux, la police et les lavis partiraient
+#: en `application/octet-stream`.
+TYPES_STATIQUES = {".woff2": "font/woff2", ".webp": "image/webp"}
 #: Le statut d'une page d'erreur → ses textes.
 PAGES_ERREUR = {
     400: ("erreur_400_titre", "erreur_400_texte"),
@@ -365,6 +370,8 @@ def creer_application(
     app.add_exception_handler(ComptesIndisponibles, comptes_indisponibles)
     # Une base perdue en cours de route, qu'une page n'a pas attrapée : 503, jamais 500.
     app.add_exception_handler(BaseIndisponible, comptes_indisponibles)
+    for extension, type_ in TYPES_STATIQUES.items():
+        mimetypes.add_type(type_, extension)
     app.mount("/statique", StaticFiles(directory=STATIQUE), name="statique")
 
     async def profil_regle(request: Request) -> str | None:

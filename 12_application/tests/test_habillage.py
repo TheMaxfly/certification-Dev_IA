@@ -13,7 +13,7 @@ import re
 import pytest
 from bs4 import BeautifulSoup
 
-from application.app import GABARITS, STATIQUE
+from application.app import GABARITS, STATIQUE, TYPES_STATIQUES
 from application.enveloppe import POLITIQUE
 from application.presentation import entree_du_menu
 
@@ -296,3 +296,18 @@ def contraste(a: str, b: str) -> float:
 
     clair, sombre = sorted((luminance(a), luminance(b)), reverse=True)
     return (clair + 0.05) / (sombre + 0.05)
+
+
+@pytest.mark.parametrize(
+    ("ressource", "attendu"),
+    [
+        ("/statique/polices/zen-maru-gothic-500.woff2", "font/woff2"),
+        ("/statique/lavis/lavis-menthe.webp", "image/webp"),
+        ("/statique/touches/touche-menthe.webp", "image/webp"),
+    ],
+)
+def test_les_ressources_vendues_partent_avec_leur_type(navigateur, ressource, attendu):
+    """L'image de base n'a pas de table des types : l'application les déclare (l'essai
+    d'intégration le vérifie dans le conteneur)."""
+    assert TYPES_STATIQUES == {".woff2": "font/woff2", ".webp": "image/webp"}
+    assert navigateur.get(ressource).headers["content-type"] == attendu
