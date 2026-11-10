@@ -9,8 +9,14 @@ __pycache__/
 coverage.xml
 htmlcov/
 
-# Secrets et adresses : seul `.env.example` est versionné.
+# Secrets et adresses : seul `.env.example` est versionné. `.env.staging` (E4, lot 8) :
+# la clé de session de la cible staging.
 .env
+.env.*
+!.env.example
+
+# Le pgpass monté dans le conteneur de l'application (Compose, E4, lot 8) : un secret.
+.pgpass.conteneur
 
 # La sortie brute de l'audit d'accessibilité : régénérée par `make verify-poste`, gardée
 # sur le poste pour ne réécrire le rapport que si le résultat change. Seul

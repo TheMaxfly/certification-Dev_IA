@@ -109,11 +109,48 @@ def test_le_mode_demonstration_ne_porte_aucune_cle():
 
 
 def test_l_application_ne_joint_que_l_api():
+    application = bloc_du_service("application")
+
     assert "API_MODELE_ADRESSE: http://api:8010" in FUSION
-    assert "networks: [applicatif, publication]" in FUSION
+    attaches = application.split("    networks:\n")[1]
+    reseaux = re.findall(r"^      (\w+):", attaches, re.M)
+    assert reseaux == ["applicatif", "publication", "application_sortie"]
     assert "networks: [interne, sortie, applicatif]" in FUSION
-    bloc = FUSION.split("networks:\n")[-1]
+    bloc = FUSION.split("\nnetworks:\n")[-1]
     assert "applicatif:\n    internal: true" in bloc
+
+
+def test_l_application_lit_la_base_par_un_pgpass_monte_et_un_sous_reseau_fixe():
+    """E4, lot 8 : les comptes servis par la pile. Le DSN vient d'une variable du
+    conteneur, sans mot de passe ; le pgpass est monté ; la route par défaut sort par
+    172.30.12.0/24, le sous-réseau que pg_hba.conf admet."""
+    application = bloc_du_service("application")
+    reseaux = FUSION.split("\nnetworks:\n")[-1]
+
+    for ligne in (
+        "APPLICATION_ENVIRONNEMENT: ${APPLICATION_ENVIRONNEMENT:-}",
+        "APPLICATION_BASE_DSN: ${APPLICATION_BASE_DSN_CONTENEUR:-}",
+        "APPLICATION_CLE_SESSION: ${APPLICATION_CLE_SESSION:-}",
+        "APPLICATION_CLE_API_COMPTES: ${APPLICATION_CLE_API_COMPTES:-}",
+        "PGPASSFILE: /run/secrets/pgpass_application",
+        "secrets: [pgpass_application]",
+        'user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"',
+        '- "host.docker.internal:host-gateway"',
+        "application_sortie:\n        gw_priority: 1",
+    ):
+        assert ligne in application, ligne
+    sous_reseau = "ipam:\n      config:\n        - subnet: 172.30.12.0/24"
+    assert f"application_sortie:\n    {sous_reseau}" in reseaux
+    assert "file: ${APPLICATION_PGPASS:-../12_application/.pgpass.conteneur}" in FUSION
+    # Aucune valeur : ni DSN écrit, ni mot de passe.
+    assert "postgresql://" not in application
+    assert "image: application-conseiller:0.9.1" in application
+
+
+def test_le_pgpass_et_les_fichiers_d_environnement_du_module_sont_ignores():
+    ignore = (RACINE / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    assert {".env", ".env.*", "!.env.example", ".pgpass.conteneur"} <= set(ignore)
 
 
 def test_l_essai_tourne_sans_sortie_et_sans_port_publie():

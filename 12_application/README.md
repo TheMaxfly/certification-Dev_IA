@@ -973,6 +973,46 @@ l'API, ajouter à la ligne `API_MODELE_CLES`, séparé par une virgule,
   `catalogue_sortie` (`172.30.2.0/24`, fixe) ; il n'entre pas dans le monitorage (pas de
   métriques).
 
+**Les comptes dans la pile** (E4, lot 8, 0.9.1) — jusqu'à la 0.9.0, le conteneur de
+l'application ne recevait ni la base ni les clés des comptes : il servait le conseiller
+seul, et les comptes ne tournaient que sur l'hôte. Le service `application` reçoit
+maintenant, toutes vides par défaut (`${…:-}`) :
+
+| Variable du conteneur | Lue depuis | Posée par |
+|---|---|---|
+| `APPLICATION_ENVIRONNEMENT` | `APPLICATION_ENVIRONNEMENT` | le fichier de cible (`15_livraison/cibles/`) |
+| `APPLICATION_BASE_DSN` | `APPLICATION_BASE_DSN_CONTENEUR` — `postgresql://app_conseiller@host.docker.internal:5432/<base>`, **sans mot de passe** | le fichier de cible |
+| `APPLICATION_CLE_SESSION` | `APPLICATION_CLE_SESSION` | `12_application/.env` (production) ; `12_application/.env.staging` (staging) — une clé par environnement |
+| `APPLICATION_CLE_API_COMPTES` | `APPLICATION_CLE_API_COMPTES` | `12_application/.env` (la même valeur dans `API_MODELE_CLES` du 11) |
+| `PGPASSFILE` | `/run/secrets/pgpass_application` | le Compose |
+
+- **Sans ces variables**, rien ne change : `developpement`, `base: non_configuree`, le
+  conseiller seul (le défaut du DSN est vide : en développement, la base de production est
+  refusée) ;
+- le mot de passe de `app_conseiller` : dans `12_application/.pgpass.conteneur` (secret
+  `pgpass_application`, chemin surchargeable par `APPLICATION_PGPASS`), hors dépôt, ignoré
+  par git, mode 600, une ligne par base :
+  `host.docker.internal:5432:<base>:app_conseiller:<mot de passe>` ; le service tourne sous
+  l'utilisateur de l'hôte (`HOTE_UID`, `HOTE_GID`), seul lecteur du fichier ;
+- le serveur PostgreSQL admet `app_conseiller` depuis le seul sous-réseau de l'application,
+  une ligne de `pg_hba.conf` par base, puis un rechargement du serveur :
+  `host  <base>  app_conseiller  172.30.12.0/24  scram-sha-256` ;
+- l'application sort vers la base par `application_sortie` (`172.30.12.0/24`, fixe), sa
+  **route par défaut** (`gw_priority: 1` : elle est aussi sur `publication`, l'autre
+  réseau non interne) ; `host.docker.internal` désigne l'hôte (`host-gateway`) ;
+- l'ordre des fichiers d'environnement : ceux des modules (11, 12, 02, et 13 s'il existe),
+  puis `12_application/.env.<cible>` s'il existe, puis le fichier de cible — le dernier
+  l'emporte. C'est l'ordre de `make livrer` (`15_livraison/`) ; `make app-compose` et
+  `make monitorage` ne lisent que ceux des modules.
+
+Les variables de l'application, telles que `src/application/config.py` les lit — la liste
+contre laquelle relire `.env.example` : `APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`,
+`APPLICATION_ENVIRONNEMENT`, `APPLICATION_BASE_DSN`, `APPLICATION_CLE_SESSION`,
+`APPLICATION_CLE_CATALOGUE`, `CATALOGUE_ADRESSE`, `API_MODELE_ADRESSE`,
+`APPLICATION_ECOUTE`, `APPLICATION_METRIQUES_RESEAUX` ; le Compose lit en plus
+`APPLICATION_PORT_PUBLIE`, `CATALOGUE_PORT_PUBLIE`, `APPLICATION_BASE_DSN_CONTENEUR`,
+`APPLICATION_PGPASS`, `CATALOGUE_PGPASS`.
+
 Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **L'API
 n'est pas publiée** : on l'atteint par l'application ; l'application et le catalogue le
 sont, sur l'adresse locale seule. Il ajoute trois réseaux : `applicatif`, l'application,
@@ -1062,6 +1102,8 @@ actif, l'état et le test des clés, les coûts et la jauge du budget, l'état d
 (ci-dessus). **Lot 6 (l'habillage, 0.8.0)** : l'identité Senpai, Kōhai animé, le seul
 script, les tableaux défilants (ci-dessus). **Lot 7 (l'apparence, 0.9.0)** : la couleur des
 six espaces, l'intensité et la matière réglées par l'administrateur ; l'en-tête en deux
-navigations (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
+navigations (ci-dessus). **Lot 8 (la livraison, 0.9.1)** : les comptes servis par la pile
+Compose — la base, la clé de session, la clé des comptes, un pgpass monté, un sous-réseau
+fixe vers la base (« Par Compose », ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
 production.

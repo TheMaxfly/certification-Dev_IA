@@ -12,16 +12,20 @@
 # `.env` sont nommés, sinon ceux du 12 et du 02 n'arriveraient pas aux services.
 #
 # Quatre services : le service d'embedding, l'API, l'application, et le catalogue — l'API
-# data du module 02 (E4, lot 2a). Trois réseaux de plus :
+# data du module 02 (E4, lot 2a). Quatre réseaux de plus :
 #   - `applicatif` : l'application, l'API et le catalogue, rien d'autre. L'application
 #     n'est ni sur le réseau du service d'embedding (`interne`, ouvert à l'API et à la
-#     collecte) ni sur ceux de la base (`sortie`, `catalogue_sortie`) ;
+#     collecte) ni sur ceux de la base de l'API et du catalogue (`sortie`,
+#     `catalogue_sortie`) ;
 #   - `publication` : le port publié, sur l'adresse locale seule. Docker ne publie pas sur
 #     un réseau `internal` : celui-ci a donc une route vers l'extérieur, que l'application
 #     n'emploie pas (elle n'appelle que l'API et le catalogue, par son code) ;
 #   - `catalogue_sortie` : le catalogue vers la base de l'hôte, à sous-réseau fixe — le
 #     serveur PostgreSQL admet `manga_api` depuis lui, et lui seul (une ligne de
-#     pg_hba.conf). Le mot de passe est dans un pgpass monté, jamais ici.
+#     pg_hba.conf). Le mot de passe est dans un pgpass monté, jamais ici ;
+#   - `application_sortie` (E4, lot 8) : l'application vers la base des comptes, à
+#     sous-réseau fixe (172.30.12.0/24), sa route par défaut — même règle, pour
+#     `app_conseiller`, avec son propre pgpass monté.
 
 services:
   api:
@@ -62,7 +66,7 @@ services:
       context: ..
       dockerfile: 12_application/Dockerfile
       target: application
-    image: application-conseiller:0.9.0
+    image: application-conseiller:0.9.1
     depends_on:
       api:
         condition: service_healthy
@@ -78,7 +82,27 @@ services:
       APPLICATION_CLE_CATALOGUE: ${APPLICATION_CLE_CATALOGUE:-}
       CATALOGUE_ADRESSE: http://catalogue:8000
       APPLICATION_METRIQUES_RESEAUX: ${APPLICATION_METRIQUES_RESEAUX:-}
-    networks: [applicatif, publication]
+      # Les comptes (E4, lot 8). Vides : `developpement`, sans base — le conseiller seul,
+      # comme avant. La cible de déploiement (15_livraison/cibles/) pose l'environnement
+      # et le DSN du conteneur, SANS mot de passe (il est dans le pgpass monté) ; la clé
+      # de session et la clé des comptes viennent des fichiers d'environnement, hors dépôt.
+      APPLICATION_ENVIRONNEMENT: ${APPLICATION_ENVIRONNEMENT:-}
+      APPLICATION_BASE_DSN: ${APPLICATION_BASE_DSN_CONTENEUR:-}
+      APPLICATION_CLE_SESSION: ${APPLICATION_CLE_SESSION:-}
+      APPLICATION_CLE_API_COMPTES: ${APPLICATION_CLE_API_COMPTES:-}
+      PGPASSFILE: /run/secrets/pgpass_application
+    secrets: [pgpass_application]
+    # Non root : l'utilisateur de l'hôte, seul lecteur du pgpass (mode 600), comme l'API.
+    user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      applicatif: {}
+      publication: {}
+      # La route par défaut : la base voit l'application depuis 172.30.12.0/24, le seul
+      # sous-réseau que pg_hba.conf admet pour le rôle de l'application.
+      application_sortie:
+        gw_priority: 1
     ports:
       - "127.0.0.1:${APPLICATION_PORT_PUBLIE:-8020}:8020"
     restart: "no"
@@ -91,8 +115,16 @@ networks:
     ipam:
       config:
         - subnet: 172.30.2.0/24
+  # L'application vers la base de l'hôte (E4, lot 8), à sous-réseau fixe comme celles de
+  # l'API et du catalogue.
+  application_sortie:
+    ipam:
+      config:
+        - subnet: 172.30.12.0/24
 
 secrets:
-  # Relatif au dossier du premier fichier Compose (11_api_modele/) ; hors dépôt.
+  # Relatifs au dossier du premier fichier Compose (11_api_modele/) ; hors dépôt.
   pgpass_catalogue:
     file: ${CATALOGUE_PGPASS:-../02_api_manga/.pgpass.conteneur}
+  pgpass_application:
+    file: ${APPLICATION_PGPASS:-../12_application/.pgpass.conteneur}
