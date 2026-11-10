@@ -239,42 +239,44 @@ def test_a6_catalogue_injoignable_et_non_configure(doublure, reglages, base_app,
     }
 
 
-def test_a6_sans_base_la_page_reste_a_200_et_le_dit(doublure, reglages):
+def test_a6_sans_base_la_page_est_un_503_comme_toute_page_d_administration(
+    doublure, reglages
+):
+    """Décision de Max du 2026-11-10 (écart 17 du lot 5) : le contrôle de rôle ne
+    souffre aucune exception sous `/admin/` ; sans base, aucune session ne se relit."""
     app = demarrer(doublure, configure(reglages, None))
 
-    page = lire(app)  # aucune session : la base manque, c'est elle qu'on lit
-    vues = lignes(page)
+    with Navigateur(app, client=CLIENT, raise_server_exceptions=False) as client:
+        r = client.get("/admin/services")
 
-    assert vues["base"]["etat"] == "– non configuré"
-    assert vues["api"]["etat"] == "✓ joignable"
-    assert (
-        "profil actif de l'application : mistral-large-2512" in vues["api"]["details"]
-    )
+    assert r.status_code == 503
+    assert "Les comptes sont momentanément indisponibles" in r.text
+    assert "zone-services" not in r.text
 
 
-def test_a6_base_injoignable_la_page_reste_a_200(doublure, reglages):
+def test_a6_base_injoignable_la_page_est_un_503(doublure, reglages):
     fermee = adresse_fermee().replace("http://", "")
     dsn = f"postgresql://personne@{fermee}/apimanga_essai"
     app = demarrer(doublure, configure(reglages, dsn))
 
-    vues = lignes(lire(app))
+    with Navigateur(app, client=CLIENT, raise_server_exceptions=False) as client:
+        assert client.get("/admin/services").status_code == 503
 
-    assert vues["base"]["etat"] == "✗ injoignable"
 
+def test_a6_api_et_catalogue_injoignables_la_page_repond_quand_meme(
+    doublure, reglages, base_app, base
+):
+    app = demarrer(
+        doublure, configure(reglages, base_app), api=False, catalogue_ferme=True
+    )
 
-def test_a6_tout_injoignable_la_page_repond_quand_meme(doublure, reglages):
-    fermee = adresse_fermee().replace("http://", "")
-    dsn = f"postgresql://personne@{fermee}/apimanga_essai"
-    app = demarrer(doublure, configure(reglages, dsn), api=False, catalogue_ferme=True)
-
-    page = lire(app)
+    page = lire(app, base)
     vues = lignes(page)
 
-    assert [vues[c]["etat"] for c in ("api", "catalogue", "base")] == [
-        "✗ injoignable"
-    ] * 3
+    assert [vues[c]["etat"] for c in ("api", "catalogue")] == ["✗ injoignable"] * 2
+    assert vues["base"]["etat"] == "✓ joignable"
     encart = page.select_one(".zone-services-encart").get_text()
-    assert "API du modèle, Catalogue, Base de l'application" in encart
+    assert "API du modèle, Catalogue" in encart
 
 
 # --------------------------------------------------------------------------- #

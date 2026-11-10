@@ -591,15 +591,10 @@ def installer(
         )
 
     @app.get("/admin/services", include_in_schema=False)
-    async def admin_services(request: Request) -> Response:
+    async def admin_services(request: Request, admin: Admin) -> Response:
+        # Le rôle admin, comme toute page d'administration : sans base, 503 « comptes
+        # indisponibles » (décision de Max du 2026-11-10, écart 17 du lot 5).
         base = base_de(request)
-        # Une page d'état s'affiche sans base (spec 03, § 6) : c'est elle qui dit que
-        # la base manque. Avec la base, l'administration seule (403 sinon).
-        sondee = await base.sonder() if base.configuree else base.etat
-        if sondee == "ok":
-            await sessions.exiger_role("admin")(request)
-        else:
-            journal.evenement_requete(request, "services_sans_base")
 
         async def base_lue() -> str:
             return await base.sonder() if base.configuree else "non_configuree"

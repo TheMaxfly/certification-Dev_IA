@@ -498,10 +498,9 @@ décorative —, avec le délai mesuré ; un encart nommé si un service manque 
 UTC » et un lien « Relire ». **Lu à la demande de la page** (les quatre lectures en
 parallèle, 5 s chacune) : aucune sonde de fond, aucun stockage — **Grafana reste l'outil de
 fond** (E5) ; un lien vers lui si `[monitorage] adresse_grafana` est posée (vide par défaut).
-**Écart assumé** avec les autres pages d'administration : **sans base, la page répond 200**
-(c'est elle qui dit que la base manque) et, faute de base, elle ne peut pas vérifier le rôle —
-elle montre alors ce que `/sante` dit déjà à tous, et rien de plus ; la base répond : le
-rôle admin est exigé (403 sinon).
+Comme toute page d'administration, elle exige le rôle admin : **sans base, 503 « comptes
+indisponibles »** — le contrôle de rôle ne souffre aucune exception sous `/admin/` (l'état de
+la base, sans session, se lit à `/sante`).
 
 **Jamais une valeur de secret** à l'écran, au journal, aux métriques : un test pose des
 valeurs factices reconnaissables pour les quatre secrets de l'application
