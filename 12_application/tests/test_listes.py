@@ -677,7 +677,7 @@ def test_balisage_titres_evitement_langue_mention_et_un_seul_focus(
         assert page.select_one('a[href="#contenu"]') is not None, nom
         assert page.select_one("html")["lang"] == "fr", nom
         assert "Vous parlez à une IA." in page.get_text(), nom
-        assert page.select_one("script") is None, nom
+        assert page.select_one("script:not([src='/statique/attente.js'])") is None, nom
         assert len(page.select("[autofocus]")) <= 1, nom
 
 

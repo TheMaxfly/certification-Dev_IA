@@ -599,10 +599,50 @@ scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédi
   58 880, lavis 112 828, touches 9 084, images 28 845, icônes 15 346, `senpai.css` 29 857 ;
   l'image Docker grossit d'autant.
 
+### Kōhai, la mascotte
+
+- **Phase 1** (le paquet, sans gabarit) : Kōhai en image, choisi par la feuille selon ce
+  que la page affiche (`:has()`) ; sur la fiche, le petit Kōhai du bouton « Demander au
+  conseiller ».
+- **Phase 2** (SVG en ligne) : `composants/kohai.html` inclut un des cinq dessins de
+  `gabarits/kohai/` (tels que remis) dans un cadre `aria-hidden` qui choisit l'animation
+  (`k-anim-*`). Sur le conseiller, dans le titre, la pose vient du serveur : **arrivée** à
+  chaque chargement de l'accueil (comme la phase 1 : rien n'est gardé dans la session, le
+  cookie ne porte que le strict nécessaire), **trouvé** quand la réponse cite au moins une
+  série, **perdu** sur un refus ou un encart. Kōhai est décoratif : le texte de la page dit
+  toujours l'état.
+- **Transitions entre pages** : `@view-transition` (Chrome et Edge 126+, Safari 18.2+ ;
+  Firefox change de page normalement) ; Kōhai passe du conseiller à la fiche (nom de
+  transition `kohai`). `:has()` : Chrome 105, Safari 15.4, Firefox 121 ; sans lui, la pose
+  « bonjour » reste.
+- **Mouvement réduit** : sous `prefers-reduced-motion: reduce`, aucune animation ni
+  transition (test sur le texte de la feuille ; écran de l'audit émulé).
+- **Compléments de la feuille** : une section 16 ajoutée à la fin de `senpai.css`, une
+  règle par manque relevé (l'image de la phase 1 retirée quand le SVG est là, un refus en
+  pose « perdu », le Kōhai principal caché pendant l'attente, le nom de transition sur le
+  Kōhai de la fiche) ; aucune règle du paquet modifiée (un test garde l'empreinte de ce qui
+  précède).
+
+### Le seul script
+
+- **Ce qu'il fait** : `statique/attente.js`, neuf lignes, sans dépendance, en mode strict :
+  à l'envoi du formulaire de question, il pose la classe `en-attente` sur `<body>` ; la
+  feuille montre alors Kōhai qui lit et la phrase « Kōhai lit les critiques… » (zone
+  `aria-live`), déjà dans la page et cachée.
+- **Ce qu'il ne fait pas** : il ne lit aucune donnée, n'envoie rien, ne touche ni cookie ni
+  stockage ; hors du conseiller, il ne trouve pas le formulaire et s'arrête.
+- **Pourquoi une exception** : la page suivante arrive avec la réponse ; la pose d'attente ne
+  peut donc pas venir du serveur.
+- **La politique** : `script-src 'self'`, une seule balise, dans `<head>`, `defer`, le fichier
+  empreinté dans `EMPREINTES` ; jamais en ligne.
+- **L'application est identique sans lui** : les tests rendent les pages sans exécuter de
+  script ; l'audit vérifie dans Chromium, JavaScript actif, que l'envoi pose la classe et
+  montre la phrase, et, JavaScript coupé, que la page ne change pas et que la question part.
+
 ### Ressources
 
 `statique/EMPREINTES` liste chaque fichier vendu et son empreinte SHA-256 : Pico, puis les
-59 fichiers du paquet Senpai. Un test exige que **chaque** fichier de `statique/` qui n'est
+59 fichiers du paquet Senpai, puis le seul script (`attente.js`). Un test exige que **chaque** fichier de `statique/` qui n'est
 pas écrit pour l'application (`theme.css`, `senpai.css`) ou une licence y figure, avec
 l'empreinte exacte.
 
@@ -746,7 +786,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Risque | Ici |
 |---|---|
 | Injection | requêtes paramétrées seules, sur le schéma `application` ; le rôle n'a rien ailleurs (refus `42501` éprouvés) ; l'API par son contrat |
-| XSS | échappement des gabarits, politique de sécurité du contenu sans script |
+| XSS (A03), mauvaise configuration (A05) : la politique | échappement des gabarits ; politique de sécurité du contenu sans rien en ligne : `script-src 'self'` pour **le seul script vendu**, empreinté (`attente.js`, E4, lot 6), aucun `<script>` en ligne ni attribut `on*` (test sur chaque écran ; mutations **E4H-02**, **E4H-07**) ; `font-src 'self'` (**E4H-01**) |
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |

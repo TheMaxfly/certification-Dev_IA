@@ -66,3 +66,5 @@ af8daaaaaccf70b52485d7f5c507055765561b89808081d41ec6f5bea31b3d59  polices/yusei-
 988063c1a63bf477764711875bb772976092fe389e87799fb784a96e5778c58c  touches/touche-menthe.webp
 aa7a5cf86f5200e0934ce626d8c9ea3f21a743033964a1bee2840b5755c030c9  touches/touche-sakura.webp
 e1e0b3bcc4cfed4501cccce00486ce2bd911f28ca0e9b37de83ebc2a6eb4f8d9  touches/touche-yuzu.webp
+# Le seul script, écrit pour l'application (E4, lot 6) : la pose d'attente de la mascotte ; licence du dépôt.
+b9035170e07a4c87ef581592d71d9b4bf8f1cdf01f01bc1088f016a82ad0cb49  attente.js

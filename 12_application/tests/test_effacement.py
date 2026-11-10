@@ -475,7 +475,7 @@ def test_balisage_titres_evitement_langue_mention_et_focus(appli, base):
         assert page.select_one('a[href="#contenu"]') is not None, nom
         assert page.select_one("html")["lang"] == "fr", nom
         assert "Vous parlez à une IA." in page.get_text(), nom
-        assert page.select_one("script") is None, nom
+        assert page.select_one("script:not([src='/statique/attente.js'])") is None, nom
         assert len(page.select("[autofocus]")) <= 1, nom
         for formulaire in page.select("main form[method=post]"):
             assert formulaire.select_one("input[name=jeton]") is not None, nom

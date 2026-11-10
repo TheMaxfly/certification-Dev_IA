@@ -515,7 +515,10 @@ def test_les_pages_de_conversation_ne_vont_pas_en_cache(navigateur):
 def test_aucune_ressource_externe_ni_script_dans_le_html(navigateur, chemin):
     page = soupe(navigateur.get(chemin))
 
-    assert not page.select("script")
+    # E4, lot 6 : le seul script, vendu, servi par l'application — jamais en ligne.
+    assert [s_.attrs for s_ in page.select("script")] == [
+        {"src": "/statique/attente.js", "defer": ""}
+    ]
     for balise, attribut in (("link", "href"), ("img", "src"), ("a", "href")):
         for element in page.select(balise):
             valeur = element.get(attribut, "")

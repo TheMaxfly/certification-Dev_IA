@@ -56,6 +56,22 @@ def entree_du_menu(chemin: str) -> str | None:
     return next((cible for cible, pages in ENTREES_DU_MENU if chemin in pages), None)
 
 
+type PoseKohai = Literal["arrivee", "trouve", "perdu"]
+
+
+def pose_de_kohai(affichage: Affichage | None, encart: Encart | None) -> PoseKohai:
+    """La pose de Kōhai sur la page du conseiller (E4, lot 6) : « perdu » sur un encart
+    ou un refus, « trouvé » quand la réponse cite au moins une série, l'arrivée sinon —
+    à chaque chargement de l'accueil, comme la phase 1 : rien n'est gardé dans la
+    session. La réflexion n'est jamais choisie ici : le script de l'attente la montre,
+    à l'envoi de la question."""
+    if encart is not None or (affichage is not None and affichage.refus):
+        return "perdu"
+    if affichage is not None and affichage.cartes:
+        return "trouve"
+    return "arrivee"
+
+
 def fournisseur_de(reglages: Reglages, nom: str) -> Fournisseur:
     """Le nom et l'hébergement d'un fournisseur, s'ils sont connus de la configuration :
     `/v1/info` ne dit pas l'hébergement."""

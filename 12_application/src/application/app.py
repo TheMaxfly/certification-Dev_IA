@@ -426,6 +426,7 @@ def creer_application(
             "index.html",
             contexte(
                 request,
+                pose_kohai=presentation.pose_de_kohai(affichage, encart),
                 peut_regler=droits.regler,
                 peut_demontrer=droits.demontrer,
                 peut_choisir_mode=droits.choisir_mode,

@@ -3,8 +3,9 @@
 {% import "composants/texte.html" as texte %}
 {% import "composants/champ.html" as c %}
 {% import "composants/listes.html" as l %}
+{% import "composants/kohai.html" as k %}
 {% block contenu %}
-<h1>{{ t.titre_application }}</h1>
+<h1>{{ t.titre_application }}{{ k.kohai(pose_kohai, true) }}</h1>
 {% if profil_actif_indisponible %}
 <article class="zone-profil-actif-indisponible">
 <div role="status">
@@ -31,6 +32,9 @@
 </section>
 {% endif %}
 {% include "composants/formulaire.html" %}
+{# La pose d'attente (E4, lot 6) : cachée par la feuille ; le seul script la montre à
+   l'envoi de la question. Sans script, elle n'apparaît jamais. #}
+<div class="kohai-attente" aria-live="polite">{{ k.kohai("reflexion") }}<p>{{ t.kohai_attente }}</p></div>
 <section aria-live="polite">
 {% if encart %}
 <article>

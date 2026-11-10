@@ -460,6 +460,10 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
             pages[ecran.nom] = resume(page.evaluate(LANCER, ETIQUETTES), base)
             page.close()
             pile.close()
+        des_kohai, ecarts_kohai = auditer_kohai(
+            navigateur, source, adresse, adresse_sans_api, adresse_doublure, console
+        )
+        pages |= des_kohai
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()
@@ -482,7 +486,9 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     assert not console, console
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
-    assert len(pages) == len(ECRANS) + len(ECRANS_COMPTES) + 1
+    assert not ecarts_kohai, ecarts_kohai
+    # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).
+    assert len(pages) == len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI)
 
 
 @dataclass(frozen=True)
@@ -775,6 +781,165 @@ REMPLIR = """([saisies, action]) => {
   }
   document.querySelectorAll("form").forEach((f) => { f.noValidate = true; });
 }"""
+
+
+#: Ce que la page montre de Kōhai : la pose du principal, sa visibilité, la phrase de
+#: l'attente, la classe du corps, les animations en cours.
+ETAT_KOHAI = """() => {
+  const p = document.querySelector(".kohai-principal");
+  const a = document.querySelector(".kohai-attente");
+  const h = document.querySelector("main > h1");
+  return {
+    pose: p ? [...p.classList].find((c) => c.startsWith("k-anim-")) : null,
+    principal_visible: p ? p.getBoundingClientRect().width > 0 : false,
+    attente_visible: a ? getComputedStyle(a).display !== "none" : false,
+    image_phase_1: h ? getComputedStyle(h, "::after").content : null,
+    corps: document.body.className,
+    animations: document.getAnimations().length,
+  };
+}"""
+
+
+#: Les écrans de Kōhai audités par `auditer_kohai` (E4, lot 6).
+ECRANS_KOHAI = (
+    "conseiller_accueil_kohai",
+    "conseiller_reponse_kohai",
+    "conseiller_attente",
+    "conseiller_perdu_kohai",
+    "conseiller_mouvement_reduit",
+)
+SANS_TRANSITION = """() => !document.getAnimations().some(
+  (a) => (a.effect?.pseudoElement || "").startsWith("::view-transition"))"""
+GARDER_LA_PAGE = """() => document.querySelector("form[action='/question']")
+  .addEventListener("submit", (evenement) => evenement.preventDefault())"""
+
+
+def kohai_de(page: Any) -> dict[str, Any]:
+    return page.evaluate(ETAT_KOHAI)
+
+
+def envoyer_question(page: Any) -> None:
+    page.fill("#question", "Un manga factice pour débuter ?")
+    page.click("main form button[type=submit]")
+
+
+def auditer_kohai(
+    navigateur: Any,
+    source: str,
+    adresse: str,
+    adresse_sans_api: str,
+    adresse_doublure: str,
+    console: list[str],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Kōhai dans Chromium (E4, lot 6) : chaque pose, l'attente montrée par le seul
+    script, le mouvement réduit ; et, JavaScript coupé, la page sans changement et la
+    question qui part. Chaque écran est audité ; les captures, si `CAPTURES_KOHAI` nomme
+    un dossier (hors dépôt), y sont écrites."""
+    pages: dict[str, dict[str, Any]] = {}
+    ecarts: list[str] = []
+    captures = os.environ.get("CAPTURES_KOHAI")
+
+    def scenario(reponse: str) -> None:
+        httpx.post(
+            f"{adresse_doublure}/_essai/scenario",
+            json={"info": "nominale", "reponse": reponse, "catalogue": "nominal"},
+        ).raise_for_status()
+
+    def attendre(nom: str, etat: dict[str, Any], **attendu: object) -> None:
+        for cle, valeur in attendu.items():
+            if etat[cle] != valeur:
+                ecarts.append(f"{nom} : {cle} = {etat[cle]!r}, attendu {valeur!r}")
+
+    def noter(nom: str, page: Any, base: str) -> None:
+        # La transition de vue entre pages finie : la capture montre la page arrivée.
+        page.wait_for_function(SANS_TRANSITION, timeout=5000)
+        if captures:
+            page.screenshot(path=f"{captures}/{nom}.png", full_page=True)
+        pages[nom] = auditer(page, source, base)
+
+    def ecouter(page: Any, nom: str) -> None:
+        page.on(
+            "console",
+            lambda m: (
+                console.append(f"{nom} : {m.text}")
+                if "Content Security Policy" in m.text
+                else None
+            ),
+        )
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_accueil_kohai")
+    page.goto(adresse + "/")
+    attendre(
+        "arrivée",
+        kohai_de(page),
+        pose="k-anim-arrivee",
+        principal_visible=True,
+        image_phase_1="none",
+    )
+    page.goto(adresse + "/")
+    # Écart 16 : l'arrivée à chaque chargement de l'accueil, rien dans la session.
+    attendre("accueil", kohai_de(page), pose="k-anim-arrivee", attente_visible=False)
+    noter("conseiller_accueil_kohai", page, adresse)
+    scenario("nominale")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("réponse", kohai_de(page), pose="k-anim-trouve", image_phase_1="none")
+    noter("conseiller_reponse_kohai", page, adresse)
+    # L'attente : pendant une navigation, la page d'avant ne se lit plus. Un écouteur
+    # ajouté après celui du script (chargé avant `load`) arrête la seule navigation : le
+    # script a réagi au vrai envoi, la page reste à lire. Que la question parte, avec ou
+    # sans script, est vérifié ailleurs.
+    page.goto(adresse + "/")
+    page.evaluate(GARDER_LA_PAGE)
+    envoyer_question(page)
+    page.wait_for_selector("body.en-attente", state="attached", timeout=3000)
+    attendre(
+        "attente",
+        kohai_de(page),
+        attente_visible=True,
+        principal_visible=False,
+        corps="esp-menthe en-attente",
+    )
+    noter("conseiller_attente", page, adresse)
+    page.close()
+    contexte.close()
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_perdu_kohai")
+    page.goto(adresse_sans_api + "/")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("perdu", kohai_de(page), pose="k-anim-perdu", image_phase_1="none")
+    noter("conseiller_perdu_kohai", page, adresse_sans_api)
+    contexte.close()
+
+    contexte = navigateur.new_context(reduced_motion="reduce")
+    page = contexte.new_page()
+    ecouter(page, "conseiller_mouvement_reduit")
+    page.goto(adresse + "/")
+    attendre("mouvement réduit", kohai_de(page), pose="k-anim-arrivee", animations=0)
+    noter("conseiller_mouvement_reduit", page, adresse)
+    contexte.close()
+
+    # JavaScript coupé : rien ne change, la question part, pas de pose d'attente.
+    contexte = navigateur.new_context(java_script_enabled=False)
+    page = contexte.new_page()
+    page.goto(adresse + "/")
+    brut = page.request.get(adresse + "/").text()
+    if 'class="esp-menthe"' not in brut or "en-attente" in page.content():
+        ecarts.append("sans JavaScript : la page diffère de celle du serveur")
+    with page.expect_navigation():
+        envoyer_question(page)
+    if page.inner_text("section[aria-live] h2") != "Réponse":
+        ecarts.append("sans JavaScript : la question n'est pas partie")
+    if "en-attente" in (page.get_attribute("body", "class") or ""):
+        ecarts.append("sans JavaScript : la pose d'attente est apparue")
+    contexte.close()
+    assert sorted(pages) == sorted(ECRANS_KOHAI)
+    return pages, ecarts
 
 
 def auditer(page: Any, source: str, base: str) -> dict[str, Any]:

@@ -748,7 +748,7 @@ def test_un_extrait_ou_un_titre_non_cite_pieges_sont_echappes(navigateur, doublu
     r = poser(navigateur, coche=True)
     page = soupe(r)
 
-    assert not page.select("script")
+    assert not page.select("script:not([src='/statique/attente.js'])")
     assert not page.select("#trace ~ details b, #trace ~ table b")
     assert "&lt;script&gt;alert(2)&lt;/script&gt; Extrait piégé." in r.text
     assert "&lt;b&gt;Titre piégé&lt;/b&gt;" in r.text

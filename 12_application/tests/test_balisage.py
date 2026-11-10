@@ -329,8 +329,14 @@ def test_wcag_1_1_1_toute_image_a_un_texte_de_remplacement(pages):
 
 
 def test_wcag_1_3_1_ni_style_en_ligne_ni_script(pages):
+    """E4, lot 6 : une seule balise `<script>`, celle du script vendu, vide et
+    différée ; rien d'autre, nulle part."""
     for page in pages:
-        assert not page.soupe.select("script, [style]"), page.ecran.nom
+        assert not page.soupe.select("style, [style]"), page.ecran.nom
+        scripts = page.soupe.select("script")
+        assert len(scripts) == 1, page.ecran.nom
+        assert scripts[0].attrs == {"src": "/statique/attente.js", "defer": ""}
+        assert not scripts[0].get_text(strip=True), page.ecran.nom
         for element in page.soupe.find_all(True):
             assert not [a for a in element.attrs if a.startswith("on")], page.ecran.nom
         assert "default-src 'none'" in page.entetes["Content-Security-Policy"]
@@ -390,7 +396,10 @@ def test_wcag_1_4_4_aucune_largeur_fixe_sur_les_conteneurs_de_texte():
     theme = (STATIQUE / "theme.css").read_text(encoding="utf-8")
 
     assert not re.search(r"\bwidth\s*:\s*\d+px", theme)
-    for fichier in GABARITS.rglob("*.html"):
+    # Les gabarits, et les SVG de la mascotte inclus en ligne (E4, lot 6).
+    fichiers = [*GABARITS.rglob("*.html"), *GABARITS.rglob("*.svg")]
+    assert len([f for f in fichiers if f.suffix == ".svg"]) == 5
+    for fichier in fichiers:
         texte = fichier.read_text(encoding="utf-8")
         assert not re.search(r"\s(width|height)=", texte), fichier.name
 

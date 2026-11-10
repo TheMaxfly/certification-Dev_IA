@@ -335,3 +335,16 @@ body .note-pastilles input:focus-visible+span{outline:3px solid var(--sp-encre);
   body::before{display:none}
   body :is(button,[type=submit],[role=button]),body article{border:2px solid CanvasText;box-shadow:none}
 }
+
+/* ---------- 16. Compléments du lot 6 (orchestration, 10 novembre) ----------
+   Ajoutés à l'exécution, une règle par manque relevé ; aucune règle des sections 1 à 15
+   n'est modifiée. Le numéro est celui de l'écart au rapport du lot 6, remis à la session
+   design. */
+/* écart 4 : le SVG en ligne présent (phase 2), l'image de la phase 1 se retire */
+body.esp-menthe main>h1:has(.kohai)::after{content:none}
+/* écart 3 : un refus — une réponse sans aucune série citée — donne la pose « perdu » */
+body.esp-menthe:not(.en-attente) main:has(>section[aria-live]>h2):not(:has(>section[aria-live] article>h3))>h1::after{background-image:url(/statique/images/kohai-perdu.svg)}
+/* écart 10 : pendant l'attente, le Kōhai qui lit remplace le Kōhai principal */
+body.en-attente .kohai-principal{display:none}
+/* écart 11 : le petit Kōhai de la fiche est une image (::before) : il porte le nom de transition */
+body .zone-pont-conseiller a::before{view-transition-name:kohai}
