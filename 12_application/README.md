@@ -620,8 +620,11 @@ l'empreinte exacte.
   modération, sa liste vide, sa confirmation), sur une base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
   reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
-- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
-  sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
+- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md),
+  versionné, réécrit par le test si le résultat change. Sa sortie brute,
+  `rapport_axe.json`, reste sur le poste (ignorée par git, régénérée à chaque audit) :
+  avec l'habillage, chaque texte posé sur une image de fond y figure avec son nœud (plus
+  de 4 Mo).
   **Défauts inscrits : aucun.** Une règle reste à relire à l'œil, dite au rapport.
 - **Sans navigateur, sur le poste et sur GitHub** : des tests de balisage par critère
   (`-k wcag`) : langue, titres, étiquettes, lien d'évitement, focus, zone annoncée, contraste

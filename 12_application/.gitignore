@@ -11,3 +11,8 @@ htmlcov/
 
 # Secrets et adresses : seul `.env.example` est versionné.
 .env
+
+# La sortie brute de l'audit d'accessibilité : régénérée par `make verify-poste`, gardée
+# sur le poste pour ne réécrire le rapport que si le résultat change. Seul
+# `accessibilite/rapport_axe.md` est versionné (E4, lot 6).
+accessibilite/rapport_axe.json

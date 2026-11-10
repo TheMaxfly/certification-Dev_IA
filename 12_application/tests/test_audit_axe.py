@@ -7,8 +7,9 @@ navigateur, toute violation lue en console est un échec. Les `<details>` sont o
 sinon leur contenu n'est pas audité ; le formulaire est soumis, sinon une page issue
 d'un `POST` n'existe pas.
 
-Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.json`
-et `rapport_axe.md` ; un diff après un passage signale un changement à commiter.
+Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.md`
+(versionné ; un diff après un passage signale un changement à commiter) et
+`rapport_axe.json`, sa sortie brute, ignorée par git et gardée sur le poste (E4, lot 6).
 
 E4, lot 1 : les écrans des comptes (inscription, connexion, mot de passe,
 administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de rôle,
