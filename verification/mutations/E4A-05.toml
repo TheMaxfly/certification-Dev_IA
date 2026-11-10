@@ -1,0 +1,7 @@
+id = "E4A-05"
+origine = "E4, lot 5, spec 03 (2026-11-09) — le total du projet sans la dépense antérieure à la table (cout_anterieur_usd) : la jauge du budget sous-estime"
+fichier = "12_application/src/application/pages_admin.py"
+avant = '''        projet = tous.total_table + anterieur'''
+apres = '''        projet = tous.total_table'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_admin_couts.py", "-k", "table_plus_l_anterieur"]

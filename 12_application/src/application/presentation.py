@@ -53,13 +53,30 @@ def profils_proposes(info: Info, reglages: Reglages) -> list[ProfilDecrit]:
     ]
 
 
-def profil_par_defaut(info: Info, reglages: Reglages) -> str | None:
-    """Le profil actif s'il est proposé, sinon le premier proposé, sinon aucun."""
+def profil_par_defaut(
+    info: Info, reglages: Reglages, regle: str | None = None
+) -> str | None:
+    """Le profil qui part quand personne n'en choisit (E4, lot 5, D12) : celui que
+    l'administrateur a réglé (`regle`), s'il est proposé ; sinon le défaut de l'API —
+    son profil actif s'il est proposé, sinon le premier proposé ; sinon aucun."""
     proposes = [p.nom for p in profils_proposes(info, reglages)]
+    if regle is not None and regle in proposes:
+        return regle
     actif = info.modele_langage.profil_actif
     if actif in proposes:
         return actif
     return proposes[0] if proposes else None
+
+
+def regle_indisponible(
+    info: Info | None, reglages: Reglages, regle: str | None
+) -> bool:
+    """Le profil réglé n'est plus proposé (indisponible, retiré ou exclu) : la question
+    part avec le défaut de l'API, l'administrateur en est averti. Sans `/v1/info`, rien
+    ne se dit."""
+    if regle is None or info is None:
+        return False
+    return regle not in [p.nom for p in profils_proposes(info, reglages)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,13 +87,15 @@ class OptionProfil:
 
 
 def options_profils(
-    info: Info, reglages: Reglages, choisi: str | None
+    info: Info, reglages: Reglages, choisi: str | None, regle: str | None = None
 ) -> list[OptionProfil]:
     """Chaque option dit son fournisseur et son hébergement : ils se lisent au moment du
-    choix."""
+    choix. Le profil actif de l'application (`regle` s'il est proposé, E4, lot 5) est
+    présélectionné et dit « actif »."""
     proposes = profils_proposes(info, reglages)
     noms = [p.nom for p in proposes]
-    retenu = choisi if choisi in noms else profil_par_defaut(info, reglages)
+    actif = profil_par_defaut(info, reglages, regle)
+    retenu = choisi if choisi in noms else actif
     t = reglages.textes
     options: list[OptionProfil] = []
     for profil in proposes:
@@ -88,7 +107,7 @@ def options_profils(
             fournisseur=fournisseur.nom,
             hebergement=fournisseur.hebergement,
         )
-        if profil.nom == info.modele_langage.profil_actif:
+        if profil.nom == actif:
             etiquette += f" {t['suffixe_actif']}"
         if profil.statut == "apercu":
             etiquette += f" {t['suffixe_apercu']}"
@@ -120,13 +139,16 @@ def reformuler_par_defaut(info: Info | None, reglages: Reglages) -> bool:
     return info.modele_langage.reglages_reponse.reformuler.defaut
 
 
-def etat_du_service(etat: EtatApi, info: Info | None, reglages: Reglages) -> str:
+def etat_du_service(
+    etat: EtatApi, info: Info | None, reglages: Reglages, regle: str | None = None
+) -> str:
+    """L'état, et le profil qui sert : l'actif de l'application (E4, lot 5)."""
     t = reglages.textes
     if etat == "cle":
         return t["etat_cle"]
     if etat == "ko" or info is None:
         return t["etat_ko"]
-    actif = info.modele_langage.profil_actif
+    actif = profil_par_defaut(info, reglages, regle) or info.modele_langage.profil_actif
     modele = next(
         (p.modele for p in info.modele_langage.profils if p.nom == actif),
         t["valeur_inconnue"],
@@ -151,11 +173,14 @@ class LigneProfil:
     actif: bool
 
 
-def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
+def lignes_a_propos(
+    info: Info | None, reglages: Reglages, regle: str | None = None
+) -> list[LigneProfil]:
     """Tous les profils du sélecteur, avec leur hébergement : la page ne dit pas
     seulement celui du profil actif, qui mentirait dès qu'on en choisit un autre."""
     if info is None:
         return []
+    actif = profil_par_defaut(info, reglages, regle)
     lignes: list[LigneProfil] = []
     for profil in profils_proposes(info, reglages):
         fournisseur = fournisseur_de(reglages, profil.fournisseur)
@@ -164,7 +189,7 @@ def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
                 nom=profil.nom,
                 fournisseur=fournisseur.nom,
                 hebergement=fournisseur.hebergement,
-                actif=profil.nom == info.modele_langage.profil_actif,
+                actif=profil.nom == actif,
             )
         )
     return lignes

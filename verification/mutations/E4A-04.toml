@@ -1,0 +1,7 @@
+id = "E4A-04"
+origine = "E4, lot 5, spec 02 (2026-11-09) — une valeur de clé rendue à l'écran : la page des clés affiche la clé de l'API à la place du nom de la variable"
+fichier = "12_application/src/application/pages_admin.py"
+avant = '''                    variable=p.variable_cle,'''
+apres = '''                    variable=reglages.cle_api,'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_admin_secrets.py"]

@@ -1,0 +1,7 @@
+id = "E4A-03"
+origine = "E4, lot 5, spec 01 (2026-11-09) — la garde de rôle retirée d'une page d'administration (/admin/reglages) : un client ou un libraire la lit (OWASP A01)"
+fichier = "12_application/src/application/pages_admin.py"
+avant = '''    async def admin_reglages(request: Request, admin: Admin) -> Response:'''
+apres = '''    async def admin_reglages(request: Request) -> Response:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_admin_reglages.py", "-k", "autre_role_recoit_403"]

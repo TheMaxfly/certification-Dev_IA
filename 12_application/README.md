@@ -180,7 +180,7 @@ Pour un libraire ou l'administrateur (« Le conseiller selon le rôle »).
 
 | Réglage | Valeurs | Défaut |
 |---|---|---|
-| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
+| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le **profil actif de l'application**, choisi par l'administration (E4, lot 5) ; sans réglage, ou réglé sur un profil qui n'est plus proposé : le profil actif de l'API ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
 | Mode démonstration | administrateur seul ; coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
@@ -406,6 +406,110 @@ physiquement et immédiatement.
   compte supprimé n'est pas une inscription de plus). Métrique :
   `application_comptes_supprimes_total`.
 
+### L'administration (E4, lot 5)
+
+Toutes les pages `/admin/*` exigent le rôle **administrateur** : un autre rôle reçoit 403,
+un visiteur la page de connexion (`GET`) ou 401 (`POST`) ; chaque `POST` porte son jeton.
+Elles partagent une **barre d'onglets** (`nav.onglets`, `aria-label` « Administration »),
+dans cet ordre : Comptes · Modération · Réglages · Clés · Coûts · Services. La barre est
+construite à partir des **routes enregistrées** (`pages_admin.ONGLETS`, filtrée) : un onglet
+n'apparaît que si sa page existe ; la page courante porte `aria-current="page"`. Le menu
+principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
+
+**Le profil IA actif** (`/admin/reglages`, story A2, décision D12) :
+
+- **où il est gardé** : la clé `profil_actif` de la table `application.reglages` (027), une
+  ligne, sa valeur, son auteur (`modifie_par`) et sa date. Un réglage se **remplace**, il ne
+  s'efface pas (`app_rw` n'a pas `DELETE`) ; les clés écrites forment une liste fermée dans
+  le code (`reglages_app.CLES`), jamais une clé venue d'un formulaire ;
+- **ce que la page propose** : les profils de `/v1/info` **disponibles et non exclus**
+  (fournisseur, hébergement, modèle, statut `stable` / `aperçu`), un bouton radio chacun ;
+  l'actif coché — sans réglage, le défaut, dit « défaut de l'application » ; qui l'a choisi
+  (nom affiché) et quand ; les indisponibles **à part, sans bouton** ; les exclus **comptés,
+  jamais nommés** (l'exclusion est une décision du dépôt, `[reglages] profils_exclus`).
+  Le choix est **validé contre cette liste** avant toute écriture (hors liste : 422, rien
+  d'écrit) ; l'API injoignable : un encart et la valeur enregistrée, sans formulaire ;
+- **quand il est lu** : **à chaque question** (une lecture par requête, aucun cache au-delà),
+  et à chaque page du conseiller ; il part avec **toute** question — celle du public, qui n'a
+  pas de réglages, et, présélectionné, celle d'un libraire ou de l'administration, qui
+  **gardent leur liste** : le choix par question reste un geste de démonstration (lot 2b) et
+  ne modifie jamais le réglage. L'état du service, la page « à propos » et `/sante`
+  (`profil_actif: <nom> | defaut`) nomment le profil actif de l'application ;
+- **s'il devient indisponible** (l'API le dit à `/v1/info`) : la question part avec le
+  **défaut de l'API** ; un encart nommé paraît sur `/admin/reglages` et sur la page du
+  conseiller **d'une session administrateur seulement** ; l'événement
+  `profil_actif_indisponible` entre au journal applicatif ; le réglage **n'est pas effacé** :
+  il s'applique de nouveau quand le profil revient. Base injoignable pendant une question :
+  le défaut, l'événement `profil_actif_non_lu`, et le conseiller répond (décision 11) ;
+- **le journal** : chaque changement écrit, dans la même transaction, une ligne
+  `profil_actif_change` (`objet_type = 'reglage'`, `details = {"profil": "<nom>"}` — un nom
+  de profil, ni texte libre ni secret) ; la même valeur qu'avant n'écrit rien ;
+- **la métrique** : `application_profil_actif_info{profil}`, 1 sur le profil actif, 0 sur les
+  autres profils de `/v1/info`, rafraîchie à chaque lecture.
+
+**L'état des clés et leur test** (`/admin/cles`, story A3, décision D10) :
+
+- **le tableau** : par profil de `/v1/info`, le fournisseur, le modèle, le **nom** de la
+  variable de sa clé (`variable_cle` — un nom, jamais une valeur) et son état **au démarrage
+  de l'API** : `disponible` dans `/v1/info` veut dire « clé posée au démarrage » (et, si le
+  contrôle d'exploitation a tourné, « modèle présent ») — dit tel quel ;
+- **« Tester les clés maintenant »** (`POST /admin/cles/tester`, jeton, administrateur) :
+  l'application appelle `POST /v1/verification` de l'API du modèle (contrat 1.5.0), qui
+  demande à chaque fournisseur la liste de ses modèles — **non facturée**, **un test par
+  minute et par clé** (429 : « réessayez dans n s ») ; le résultat, daté, par profil (valide,
+  modèle absent de la liste, refusée avec son code, fournisseur injoignable, clé absente),
+  est gardé **dans la session** (le cookie signé) : il survit au rechargement de la page, pas
+  à une autre session, et n'est jamais écrit en base — un test est un geste de l'instant ;
+- **le repli** : l'API en 1.4.0 ne connaît pas la route (404) — l'écran dit « le test n'existe
+  pas sur cette version de l'API (1.4.0) ; l'état affiché est celui du démarrage ». C'est le
+  comportement réel tant que l'image 1.5.0 n'est pas déployée ; l'API injoignable : un encart ;
+- **le lien** vers la procédure de pose et de rotation des clés (`[administration]
+  procedure_cles` : le README du module 11, « Poser ou changer une clé ») ; aucune procédure
+  dans l'écran ;
+- métrique `application_verifications_cles_total{issue}` (`teste`, `route_absente`,
+  `trop_tot`, `indisponible`), événement `verification_cles` au journal (l'issue seule).
+
+**Les coûts** (`/admin/couts`, story A4) :
+
+- **la source unique** : la table `application.couts_jour` (027), garnie après chaque réponse
+  depuis le lot 2b (le coût estimé par l'API, sous le profil et le mode qu'elle a appliqués)
+  — jamais le texte d'une question : la table n'a que jour, profil, mode, appels et coût
+  (la garantie C20, éprouvée par un test sur la forme des lignes lues) ;
+- **le jour** (UTC) : « Aujourd'hui : x $ sur 0,50 $ — plafond : ok / atteint », le plafond
+  du conseiller (`[conseiller.limites] cout_jour_max_usd`, atteint dès qu'il est égalé), une
+  jauge `<progress>` et son **pourcentage en texte à côté** ; atteint : l'encart que le
+  conseiller affiche aussi ;
+- **le projet** : le total = la table **+ `[couts] cout_anterieur_usd`** — la dépense d'E3,
+  avant la table, **0,709557 $** (somme des clôtures des étapes 3 à 6 d'E3, relevée dans
+  l'inspection du point 0 d'E4, arrêtée par Max le 2026-11-09 ; avant E3 : non établie) —,
+  **les deux termes affichés**, contre `[couts] budget_projet_usd` (20 $) ; jauge et
+  pourcentage ; le premier jour de la table ;
+- **l'historique** : jour × profil × mode (appels, coût) sur `[couts] historique_jours`
+  (30) jours civils UTC, un total par jour ; un état vide nommé ; la répartition par profil et
+  par mode sur toute la table (l'argument « le mode enrichi coûte davantage » s'y lit) ;
+- sans base : 503 « comptes indisponibles », comme toute page d'administration.
+
+**L'état des services** (`/admin/services`, story A6) : l'API du modèle (`/v1/sante` et
+`/v1/info` : version du contrat, corpus et encodage, profil actif de l'API, **profil actif de
+l'application** et sa disponibilité), le catalogue (`/health` du 02 : sa base, sa
+`normalisation`), la base de l'application (`SELECT 1`), les clés d'API du 12 (`deux` /
+`une`). Chacun **joignable / injoignable / non configuré** — un mot, et une icône
+décorative —, avec le délai mesuré ; un encart nommé si un service manque ; « lu à HH:MM:SS
+UTC » et un lien « Relire ». **Lu à la demande de la page** (les quatre lectures en
+parallèle, 5 s chacune) : aucune sonde de fond, aucun stockage — **Grafana reste l'outil de
+fond** (E5) ; un lien vers lui si `[monitorage] adresse_grafana` est posée (vide par défaut).
+**Écart assumé** avec les autres pages d'administration : **sans base, la page répond 200**
+(c'est elle qui dit que la base manque) et, faute de base, elle ne peut pas vérifier le rôle —
+elle montre alors ce que `/sante` dit déjà à tous, et rien de plus ; la base répond : le
+rôle admin est exigé (403 sinon).
+
+**Jamais une valeur de secret** à l'écran, au journal, aux métriques : un test pose des
+valeurs factices reconnaissables pour les quatre secrets de l'application
+(`APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`, `APPLICATION_CLE_CATALOGUE`,
+`APPLICATION_CLE_SESSION`) et les cherche — entières et par morceau — dans le HTML de
+**toutes** les pages de l'administration (chaque onglet présent, les états après un test),
+dans `/sante` et dans `/metrics` (`tests/test_admin_secrets.py`, mutation E4A-04).
+
 ### Les comptes (E4, lot 1)
 
 Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
@@ -423,8 +527,9 @@ Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, ave
 **Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
 Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
 client — Conseiller, Mes listes (E4, lot 4), Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
-en plus, Mes critiques ; administrateur — en plus, Comptes et Critiques (la modération ;
-pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
+en plus, Mes critiques ; administrateur — en plus, **une seule entrée « Administration »**
+(`/admin/comptes`, E4, lot 5 : elle remplace « Comptes » et « Critiques » ; les pages de
+l'administration ont leur barre d'onglets ; pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
 dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
 
 **Le premier administrateur**, par une commande : `make app-admin-creer`, avec
@@ -582,11 +687,13 @@ désactivent (leurs critiques signées restent attribuables).
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
+| Secrets (A02, A05) : l'administration | **jamais une valeur de clé** dans une page `/admin/*`, `/sante`, `/metrics` : le nom des variables seul ; prouvé par des valeurs factices reconnaissables, cherchées entières et par morceau ; mutation **E4A-04** |
 | Clé du catalogue | dans l'environnement, jamais en page ni au journal (prouvé par test, sur le journal complet) ; gardée dans le seul client HTTP ; un refus (401) journalisé sans elle |
 | Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
 | Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
+| Contrôle d'accès (A01) : l'administration | **toute page `/admin/*` exige le rôle admin** (`sessions.exiger_role("admin")`, en `GET` comme en `POST`) : un client, un libraire reçoivent 403, un visiteur la connexion ; le profil choisi est validé contre la liste de `/v1/info` avant d'être écrit ; mutations E4A-02 (profil hors liste), **E4A-03** (garde de rôle retirée) |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
 | Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
 | Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
@@ -606,13 +713,16 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 |---|---|---|
 | `[api] adresse` | `http://127.0.0.1:8010` | l'API du modèle sur le poste |
 | `[api] identite` | `libraire-demo` | fixe tant qu'il n'y a pas de comptes |
-| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
+| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s, test des clés 15 s (E4, lot 5) | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
 | `[api.attentes]` | 60 s, 2 s | l'attente annoncée sans `Retry-After` lisible |
 | `[reglages]` | température 0, reformulation cochée, mode démonstration éteint, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
 | `[conversation]` | 500 caractères par question, 5 échanges, 10 tours, 4 000 caractères, 2 000 par tour | les bornes de l'API ; celles que `/v1/info` publie l'emportent, un écart est journalisé ; la longueur d'un tour est comparée au contrat par un test |
 | `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
+| `[couts]` | budget 20 $ ; antérieur 0,709557 $ (E3) ; 30 jours | E4, lot 5 : le total du projet = la table + l'antérieur |
+| `[monitorage]` | `adresse_grafana` vide | le lien vers Grafana, s'il est posé |
+| `[administration]` | le lien de la procédure des clés (README du 11, sur `main`) | E4, lot 5 : un document du dépôt, pas une procédure dans l'écran |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
 | `[catalogue]` | `http://127.0.0.1:8000` ; 20 par page (50 au plus) ; saisie de 2 à 100 ; connexion 3 s, réponse 5 s | l'API data du 02 sur le poste ; ses bornes, recopiées et comparées au contrat par un test ; la recherche répond en 116 ms de médiane (2026-11-08) |
 | `[comptes]` | session 8 h après la dernière page ; verrou après 5 échecs, 15 min ; pseudo 3 à 30, nom affiché 60 au plus (les bornes de la migration `027`, comparées par un test) ; mot de passe 12 à 128 (décision 7) ; base 3 s ; 25 comptes par page | voir « Sécurité et données » |

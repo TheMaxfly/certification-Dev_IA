@@ -5,7 +5,8 @@ le classement du banc chargé (rattachement et vecteurs de l'encodage en service
 puis la liste des pseudonymes est lue (`manga.v_pseudonymes`, gardée en mémoire) et
 la couche des fournisseurs du modèle de langage est posée (son contrôle
 d'exploitation, s'il est demandé : `/v1/models`) ; un écart, et l'API ne démarre pas.
-Routes : `/v1/recherche` et `/v1/info` (avec clé), `/v1/sante` (sans clé), `/metrics`
+Routes : `/v1/recherche`, `/v1/reponse`, `/v1/info` et `/v1/verification` (avec clé),
+`/v1/sante` (sans clé), `/metrics`
 (réseau interne), `/v1/openapi.json` (le contrat) et, sur réglage, `/v1/docs`
 (Swagger UI).
 """
@@ -16,6 +17,7 @@ import os
 import time
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -49,6 +51,7 @@ from api_modele.modeles import (
     BorneBooleenne,
     BorneEntiere,
     BorneReelle,
+    ControleCle,
     DemandeReponse,
     HistoriqueDecrit,
     Info,
@@ -62,6 +65,7 @@ from api_modele.modeles import (
     Reponse,
     Resultat,
     Sante,
+    Verification,
 )
 from api_modele.securite import exiger_cle
 from api_modele.service import ErreurService, Instance, ServiceNonConforme
@@ -82,6 +86,11 @@ Depuis 1.4.0, le mode « enrichi » : la même réponse, plus un complément tir
 connaissances du modèle et des titres qu'il nomme, étiquetés « non vérifié » et
 contrôlés pour ne pas contredire le catalogue. En mode « strict » (le défaut), rien ne
 change.
+
+Depuis 1.5.0, `POST /v1/verification` : le test des clés des fournisseurs, pour
+l'administration de l'application — par profil, la variable posée ou non (son nom,
+jamais sa valeur) et la réponse de la liste des modèles du fournisseur (non facturée).
+Un rapport, sans effet sur les profils en service ; un appel par minute et par clé.
 """
 
 REPONSES_CLE: dict[int | str, dict[str, object]] = {
@@ -133,6 +142,17 @@ REPONSES_REPONSE: dict[int | str, dict[str, object]] = {
                 "schema": {"type": "integer", "minimum": 1},
             }
         },
+    },
+}
+#: La borne du test des clés : un appel par minute et par clé (E4, lot 5, D10) — un
+#: fournisseur n'est pas un service à sonder en boucle.
+VERIFICATIONS_PAR_MINUTE = 1
+REPONSES_VERIFICATION: dict[int | str, dict[str, object]] = {
+    401: {"model": Erreur, "description": "Clé d'accès absente ou invalide."},
+    429: {
+        "model": Erreur,
+        "description": "Débit dépassé pour cette clé : celui des routes, ou la borne du"
+        " test des clés (un par minute).",
     },
 }
 #: L'exemple exact du 503 de `/v1/sante` (dette de l'étape 2, soldée à l'étape 3).
@@ -235,6 +255,7 @@ def creer_application(
             classeur=classeur,
             limiteur=Limiteur(reglages.debit_par_minute, horloge),
             metriques=metriques,
+            limiteur_verification=Limiteur(VERIFICATIONS_PAR_MINUTE, horloge),
             fournisseurs=fournisseurs,
             pseudonymes=noms,
         )
@@ -381,6 +402,55 @@ def creer_application(
     )
     def info(request: Request, _cle: CleExigee) -> Info:
         return decrire(etat_de(request))
+
+    @app.post(
+        f"{prefixe}/verification",
+        response_model=Verification,
+        responses=REPONSES_VERIFICATION,
+        tags=["exploitation"],
+        summary="Le test des clés des fournisseurs, non facturé, borné",
+    )
+    async def verifier(request: Request, cle: CleExigee) -> Verification:
+        """Par profil déclaré : sa variable posée ou non, la liste des modèles de son
+        fournisseur (`GET …/v1/models`, non facturée). Un rapport : la route ne coupe
+        aucun profil et ne rend jamais une valeur de clé. Un appel par minute et par
+        clé, au-delà 429."""
+        etat = etat_de(request)
+        attente = etat.limiteur_verification.admettre(cle)
+        if attente is not None:
+            etat.metriques.debit_refuse.labels(cle=cle).inc()
+            raise ErreurApi(
+                429,
+                "debit_depasse",
+                "Un test des clés par minute et par clé.",
+                {
+                    "limite_par_minute": VERIFICATIONS_PAR_MINUTE,
+                    "reessayer_dans_s": attente,
+                },
+                {"Retry-After": str(attente)},
+            )
+        controles = await etat.fournisseurs.controler_cles()
+        disponibles = sum(1 for c in controles if c.disponible)
+        if controles and disponibles == len(controles):
+            issue = "ok"
+        else:
+            issue = "partiel" if disponibles else "aucune"
+        etat.metriques.verifications.labels(issue=issue).inc()
+        return Verification(
+            verifie_le=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            profils=[
+                ControleCle(
+                    nom=c.nom,
+                    fournisseur=c.fournisseur,
+                    modele=c.modele,
+                    variable_cle=c.variable_cle,
+                    configuree=c.configuree,
+                    disponible=c.disponible,
+                    statut=c.statut,
+                )
+                for c in controles
+            ],
+        )
 
     if reglages.documentation:
 

@@ -46,7 +46,14 @@ import psycopg
 import pytest
 from conftest import HACHEUR_RAPIDE, ServeurLocal
 from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
-from ecrans import BORNES_SERREES, ECRANS, MDP_INSCRIPTION, Ecran
+from ecrans import (
+    BORNES_SERREES,
+    COUTS_ECRANS,
+    ECRANS,
+    MDP_INSCRIPTION,
+    REGLAGE_ECRANS,
+    Ecran,
+)
 
 from application.app import creer_application
 
@@ -285,6 +292,15 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                     label is not None,
                 ),
             )
+        cx.execute(
+            "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)",
+            REGLAGE_ECRANS,
+        )
+        cx.execute(
+            "INSERT INTO application.couts_jour (jour, profil, mode, appels, cout_usd)"
+            " VALUES ((now() AT TIME ZONE 'UTC')::date, %s, %s, %s, %s)",
+            COUTS_ECRANS,
+        )
         for serie, etat in LISTES_AUDIT:
             cx.execute(
                 "INSERT INTO application.listes (compte_id, series_id, etat) VALUES ("
@@ -461,6 +477,8 @@ class EcranCompte:
     bouton: str | None = None
     action: str | None = None
     catalogue: str = "nominal"
+    #: Le scénario du test des clés dans la doublure (E4, lot 5).
+    verification: str = "nominale"
 
 
 MDP = "mot de passe factice de l'audit"
@@ -703,6 +721,22 @@ ECRANS_COMPTES: tuple[EcranCompte, ...] = (
         "/?etat=compte_supprime",
         "Conseiller de lecture",
     ),
+    # E4, lot 5 : le test des clés envoyé — son résultat, puis le repli (API 1.4.0).
+    EcranCompte(
+        "admin_cles_testees",
+        "admin_audit",
+        "/admin/cles",
+        "Clés des fournisseurs",
+        bouton='form[action="/admin/cles/tester"] button[type=submit]',
+    ),
+    EcranCompte(
+        "admin_cles_route_absente",
+        "admin_audit",
+        "/admin/cles",
+        "Clés des fournisseurs",
+        bouton='form[action="/admin/cles/tester"] button[type=submit]',
+        verification="route_absente",
+    ),
     EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
     EcranCompte(
         "introuvable_connecte", "client_audit", "/nimporte", "Page introuvable"
@@ -755,7 +789,8 @@ def auditer_les_comptes(
     for ecran in ECRANS_COMPTES:
         nom, compte = ecran.nom, ecran.compte
         httpx.post(
-            f"{adresse_doublure}/_essai/scenario", json={"catalogue": ecran.catalogue}
+            f"{adresse_doublure}/_essai/scenario",
+            json={"catalogue": ecran.catalogue, "verification": ecran.verification},
         ).raise_for_status()
         if compte not in contextes:
             contextes[compte] = navigateur.new_context()

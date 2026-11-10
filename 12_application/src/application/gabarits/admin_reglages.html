@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.admin_reglages_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1>{{ t.admin_reglages_titre }}</h1>
+{% if profil_actif_indisponible %}
+<article class="zone-profil-actif-indisponible">
+<div role="status">
+<h2>{{ t.profil_actif_indisponible_titre }}</h2>
+<p>{{ profil_actif_indisponible }}</p>
+</div>
+</article>
+{% endif %}
+{% if avis %}
+{{ c.avis(avis, not erreur) }}
+{% endif %}
+<section class="zone-profil-actif">
+<p>{{ t.admin_reglages_intro }}</p>
+{% if api_absente %}
+<article>
+<div role="alert">
+<h2>{{ t.admin_reglages_api_absente_titre }}</h2>
+<p>{{ t.admin_reglages_api_absente }}</p>
+</div>
+</article>
+<p>{{ actuel }}</p>
+{% if choisi_par %}<p>{{ choisi_par }}</p>{% endif %}
+{% else %}
+{% if aucun_reglage %}<p>{{ aucun_reglage }}</p>{% endif %}
+{% if choisi_par %}<p>{{ choisi_par }}</p>{% endif %}
+{% if profils %}
+<form method="post" action="/admin/reglages">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<fieldset{% if erreur %} aria-describedby="profil-erreur"{% endif %}>
+<legend>{{ t.admin_reglages_legende }}</legend>
+{% for profil in profils %}
+<label for="profil-{{ loop.index }}"><input id="profil-{{ loop.index }}" type="radio" name="profil" value="{{ profil.nom }}"{% if profil.coche %} checked{% endif %}{% if erreur and loop.first %} autofocus{% endif %}> {{ profil.etiquette }}{% if profil.coche and aucun_reglage %} {{ t.admin_reglages_defaut }}{% endif %}</label>
+{% endfor %}
+</fieldset>
+{% if erreur %}<p id="profil-erreur">{{ erreur }}</p>
+{% endif %}
+<button type="submit">{{ t.admin_reglages_bouton }}</button>
+</form>
+{% else %}
+<p>{{ t.aucun_profil }}</p>
+{% endif %}
+{% if indisponibles %}
+<section class="zone-profils-indisponibles">
+<h2>{{ t.admin_reglages_indisponibles_titre }}</h2>
+<p>{{ t.admin_reglages_indisponibles_aide }}</p>
+<ul>
+{% for ligne in indisponibles %}
+<li>{{ ligne }}</li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
+{% if exclus %}<p>{{ exclus }}</p>{% endif %}
+{% endif %}
+</section>
+{% endblock %}

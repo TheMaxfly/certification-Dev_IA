@@ -318,6 +318,55 @@
         "title": "ContexteReponse",
         "type": "object"
       },
+      "ControleCle": {
+        "description": "Le test de la clé d'un profil (E4, lot 5) : le NOM de la variable, jamais sa\nvaleur, ni un préfixe, ni une longueur.",
+        "properties": {
+          "configuree": {
+            "description": "La variable est posée dans l'environnement de l'API, non vide.",
+            "title": "Configuree",
+            "type": "boolean"
+          },
+          "disponible": {
+            "description": "La liste des modèles du fournisseur a répondu et contient le modèle du profil.",
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "fournisseur": {
+            "title": "Fournisseur",
+            "type": "string"
+          },
+          "modele": {
+            "description": "L'identifiant du modèle chez le fournisseur.",
+            "title": "Modele",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "statut": {
+            "description": "ok ; injoignable ; le code HTTP rendu par le fournisseur ; corps_inattendu (liste illisible) ; absente (clé non posée : aucun appel).",
+            "title": "Statut",
+            "type": "string"
+          },
+          "variable_cle": {
+            "description": "Le NOM de la variable d'environnement de la clé, jamais sa valeur.",
+            "title": "Variable Cle",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "fournisseur",
+          "modele",
+          "variable_cle",
+          "configuree",
+          "disponible",
+          "statut"
+        ],
+        "title": "ControleCle",
+        "type": "object"
+      },
       "DemandeReponse": {
         "additionalProperties": false,
         "description": "Une question, l'historique de la conversation et les réglages de la réponse ;\nun champ inconnu est refusé.",
@@ -1343,6 +1392,29 @@
         ],
         "title": "Tour",
         "type": "object"
+      },
+      "Verification": {
+        "description": "Le rapport du test des clés : un instant, un contrôle par profil déclaré.",
+        "properties": {
+          "profils": {
+            "items": {
+              "$ref": "#/components/schemas/ControleCle"
+            },
+            "title": "Profils",
+            "type": "array"
+          },
+          "verifie_le": {
+            "description": "L'instant du test, en UTC (ISO 8601, Z).",
+            "title": "Verifie Le",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verifie_le",
+          "profils"
+        ],
+        "title": "Verification",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1355,9 +1427,9 @@
     }
   },
   "info": {
-    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n\nDepuis 1.4.0, le mode « enrichi » : la même réponse, plus un complément tiré des\nconnaissances du modèle et des titres qu'il nomme, étiquetés « non vérifié » et\ncontrôlés pour ne pas contredire le catalogue. En mode « strict » (le défaut), rien ne\nchange.\n",
+    "description": "L'API du modèle d'embedding en service : une question entre, les séries du\ncatalogue classées par le modèle sortent, avec les passages qui les justifient.\nLe classement est celui que le banc de mesure a mesuré.\n\nToutes les routes métier sont sous `/v1/` et demandent une clé (`X-API-Key`).\n`/v1/` ne reçoit que des ajouts compatibles ; une rupture ouvre `/v2/`.\n\nDepuis 1.1.0, `/v1/reponse` : un modèle de langage, choisi par profil, rédige en\nfrançais une réponse tirée des seuls passages de la recherche, ou refuse ; la réponse\nporte ses sources, le profil, les réglages, les jetons, le coût et les latences.\n\nDepuis 1.4.0, le mode « enrichi » : la même réponse, plus un complément tiré des\nconnaissances du modèle et des titres qu'il nomme, étiquetés « non vérifié » et\ncontrôlés pour ne pas contredire le catalogue. En mode « strict » (le défaut), rien ne\nchange.\n\nDepuis 1.5.0, `POST /v1/verification` : le test des clés des fournisseurs, pour\nl'administration de l'application — par profil, la variable posée ou non (son nom,\njamais sa valeur) et la réponse de la liste des modèles du fournisseur (non facturée).\nUn rapport, sans effet sur les profils en service ; un appel par minute et par clé.\n",
     "title": "API du modèle",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1620,6 +1692,53 @@
           }
         },
         "summary": "Vivant ; base, service et encodage en service cohérents",
+        "tags": [
+          "exploitation"
+        ]
+      }
+    },
+    "/v1/verification": {
+      "post": {
+        "description": "Par profil déclaré : sa variable posée ou non, la liste des modèles de son\nfournisseur (`GET …/v1/models`, non facturée). Un rapport : la route ne coupe\naucun profil et ne rend jamais une valeur de clé. Un appel par minute et par\nclé, au-delà 429.",
+        "operationId": "verifier_v1_verification_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Clé d'accès absente ou invalide."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            },
+            "description": "Débit dépassé pour cette clé : celui des routes, ou la borne du test des clés (un par minute)."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Le test des clés des fournisseurs, non facturé, borné",
         "tags": [
           "exploitation"
         ]

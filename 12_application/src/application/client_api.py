@@ -1,6 +1,8 @@
 """Le seul code qui parle à l'API du modèle, par HTTP et par son contrat.
 
-Trois appels : `info()`, `sante()`, `reponse(demande)`. Les erreurs sont typées d'après
+Quatre appels : `info()`, `sante()`, `reponse(demande)` et, pour l'administration
+(E4, lot 5), `verification()` — le test des clés, route du contrat 1.5.0, absente des
+versions antérieures (`RouteAbsente`, le repli). Les erreurs sont typées d'après
 le modèle d'erreur de l'API : `ErreurApi`, `ApiInjoignable`, `ApiDelai`. Un corps qui ne
 tient pas le contrat devient `ErreurApi(statut, "corps_inattendu")`. Les formes
 ci-dessous ne retiennent que ce que l'application emploie : un champ de plus de l'API
@@ -32,6 +34,7 @@ ENTETE_IDENTIFIANT = "X-Identifiant-Requete"
 ROUTE_INFO = "/v1/info"
 ROUTE_SANTE = "/v1/sante"
 ROUTE_REPONSE = "/v1/reponse"
+ROUTE_VERIFICATION = "/v1/verification"
 
 
 class ProfilDecrit(BaseModel):
@@ -41,6 +44,8 @@ class ProfilDecrit(BaseModel):
     statut: Literal["stable", "apercu"]
     disponible: bool
     reglages_absents: list[str]
+    #: Le NOM de la variable de la clé, jamais sa valeur (contrat 1.4.0 : obligatoire).
+    variable_cle: str
 
 
 class BorneReelle(BaseModel):
@@ -84,6 +89,44 @@ class Info(BaseModel):
     version_api: str
     question: Question
     modele_langage: ModeleLangage
+    #: Le corpus et l'encodage en service (E4, lot 5 : la page des services).
+    corpus_id: str
+    encodage_id: int
+    modele: str
+
+
+class ControleCle(BaseModel):
+    """Le test de la clé d'un profil (contrat 1.5.0) : des noms et des états."""
+
+    nom: str
+    fournisseur: str
+    modele: str
+    variable_cle: str
+    configuree: bool
+    disponible: bool
+    statut: str
+
+
+class Verification(BaseModel):
+    verifie_le: str
+    profils: list[ControleCle]
+
+
+@dataclass(frozen=True, slots=True)
+class RouteAbsente:
+    """L'API ne connaît pas la route (404) : une version antérieure à 1.5.0."""
+
+
+@dataclass(frozen=True, slots=True)
+class TropTot:
+    """La borne du test (un par minute et par clé) : l'attente, si l'API la dit."""
+
+    retry_after: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class Indisponible:
+    """L'API ne répond pas, trop lentement, ou hors contrat."""
 
 
 class SerieCitee(BaseModel):
@@ -409,6 +452,31 @@ class ClientApi:
         except ValidationError:
             raise self._inattendu(reponse) from None
         return Resultat(corps, identifiant)
+
+    async def verification(
+        self, cle: str | None = None
+    ) -> Verification | RouteAbsente | TropTot | Indisponible:
+        """`POST /v1/verification` (contrat 1.5.0), le test des clés : 404, l'API est
+        d'une version antérieure (le repli) ; 429, la borne d'un test par minute ; une
+        panne, un délai, une réponse hors contrat : indisponible."""
+        try:
+            reponse = await self._appeler(
+                "POST", ROUTE_VERIFICATION, self._delais.verification_s, cle=cle
+            )
+        except (ApiInjoignable, ApiDelai):
+            return Indisponible()
+        if reponse.status_code == 404:
+            return RouteAbsente()
+        if reponse.status_code == 429:
+            return TropTot(lire_retry_after(reponse.headers.get("Retry-After")))
+        if reponse.status_code != 200:
+            self._erreur(reponse)
+            return Indisponible()
+        try:
+            return Verification.model_validate_json(reponse.content)
+        except ValidationError:
+            self._inattendu(reponse)
+            return Indisponible()
 
 
 #: L'état de l'API vu d'ici : elle répond, elle ne répond pas, elle refuse la clé.

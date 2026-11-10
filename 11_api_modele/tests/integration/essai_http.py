@@ -124,8 +124,8 @@ def principal() -> None:
         contexte["profil"] == "essai-local"
         and [a["role"] for a in contexte["appels"]] == ["reponse"]
         and contexte["cout_estime_usd"] > 0
-        and contexte["version_api"] == "1.4.0",
-        "/v1/reponse : contexte (profil, un appel, coût, version 1.4.0)",
+        and contexte["version_api"] == "1.5.0",
+        "/v1/reponse : contexte (profil, un appel, coût, version 1.5.0)",
     )
     verifier(entetes.get("Cache-Control") == "no-store", "Cache-Control: no-store")
 

@@ -133,6 +133,13 @@ un compteur. `app_rw` : `SELECT`, `INSERT`, `UPDATE`, pas de `DELETE`.
 | `modifie_par` | `bigint` | → `comptes`, `ON DELETE SET NULL` |
 | `modifie_le` | `timestamptz` | `now()` par défaut |
 
+Les clés écrites forment une liste fermée dans le code (`reglages_app.CLES`). E4, lot 5 :
+**`profil_actif`**, le nom du profil IA qui part avec chaque question — choisi par
+l'administrateur (`/admin/reglages`), validé contre `/v1/info` avant d'être écrit, relu à
+chaque question et appliqué s'il est disponible et non exclu ; chaque changement écrit
+`profil_actif_change` au journal (`objet_type = 'reglage'`, `details = {"profil": …}`). Un
+réglage se remplace ; il ne s'efface pas (pas de `DELETE`).
+
 ## Les droits de `app_rw`
 
 | Objet | Droits |

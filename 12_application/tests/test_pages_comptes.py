@@ -789,7 +789,7 @@ def test_a1_un_non_admin_n_accede_a_aucune_page_d_administration(appli, base, ro
     assert creer_par_admin(client, "nouveau_essai", "admin").status_code == 403
     assert client.post(f"/admin/comptes/{cible}/desactiver", data={}).status_code == 403
     assert client.post(f"/admin/comptes/{cible}/reactiver", data={}).status_code == 403
-    assert "Comptes" not in menu(client.get("/"))
+    assert "Administration" not in menu(client.get("/"))
     assert etat_des_comptes(base) == avant
 
 
@@ -1147,9 +1147,11 @@ def test_un_mot_de_passe_initial_est_annonce_a_changer(appli, base):
     ("role", "attendus", "absents"),
     [
         (None, {"Conseiller", "Connexion", "Créer un compte"}, {"Mon compte"}),
-        ("client", {"Mon compte", "Déconnexion"}, {"Mes critiques", "Comptes"}),
-        ("libraire", {"Mon compte", "Mes critiques"}, {"Comptes", "Connexion"}),
-        ("admin", {"Mon compte", "Comptes", "Critiques"}, {"Mes critiques"}),
+        ("client", {"Mon compte", "Déconnexion"}, {"Mes critiques", "Administration"}),
+        ("libraire", {"Mon compte", "Mes critiques"}, {"Administration", "Connexion"}),
+        # E4, lot 5 : une seule entrée « Administration » remplace « Comptes » et
+        # « Critiques » ; les pages de l'administration ont leurs onglets.
+        ("admin", {"Mon compte", "Administration"}, {"Mes critiques", "Comptes"}),
     ],
     ids=["anonyme", "client", "libraire", "admin"],
 )

@@ -11,7 +11,7 @@ from openapi_spec_validator import OpenAPIV31SpecValidator
 import api_modele
 from api_modele.contrat import DESTINATION, contrat, exporter, serialiser
 
-ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche", "/v1/reponse"}
+ROUTES_PROTEGEES = {"/v1/info", "/v1/recherche", "/v1/reponse", "/v1/verification"}
 #: Le contrat publié à la livraison 1.0.0 (étiquette `api-modele`), figé à côté du
 #: contrat courant.
 REFERENCE_1_0_0 = DESTINATION.parent / "openapi_v1.0.0.json"
@@ -37,7 +37,13 @@ def test_le_contrat_est_un_openapi_3_1_valide():
 def test_les_routes_du_contrat_sont_sous_v1():
     chemins = set(contrat()["paths"])
 
-    assert chemins == {"/v1/sante", "/v1/info", "/v1/recherche", "/v1/reponse"}
+    assert chemins == {
+        "/v1/sante",
+        "/v1/info",
+        "/v1/recherche",
+        "/v1/reponse",
+        "/v1/verification",
+    }
     assert all(c.startswith("/v1/") for c in chemins)
 
 
@@ -64,6 +70,7 @@ def test_les_erreurs_des_routes_protegees_sont_declarees():
         ("/v1/info", "get"): ("401", "429"),
         ("/v1/recherche", "post"): ("401", "413", "422", "429", "503"),
         ("/v1/reponse", "post"): ("401", "413", "422", "429", "503"),
+        ("/v1/verification", "post"): ("401", "429"),
     }
     for (chemin, methode), statuts in attendus.items():
         reponses = chemins[chemin][methode]["responses"]
@@ -149,11 +156,11 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
     """Chaque route, schéma et champ du contrat 1.0.0 est inchangé ; seuls `Info`
     (`modele_langage`) et `Serie` (`metadonnees`) gagnent un champ ; la route de
     réponse, ses schémas, `Metadonnees` et l'exemple du 503 de `/v1/sante` s'ajoutent ;
-    la version passe à 1.4.0."""
+    la version est la courante (1.5.0 : la route de vérification des clés s'ajoute)."""
     avant = json.loads(REFERENCE_1_0_0.read_text(encoding="utf-8"))
     apres = contrat()
 
-    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.4.0")
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.0.0", "1.5.0")
     assert apres["info"]["title"] == avant["info"]["title"]
     assert apres["info"]["description"].startswith(avant["info"]["description"])
     assert (
@@ -166,7 +173,10 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
             contenu = actuelles["get"]["responses"]["503"]["content"]
             assert contenu["application/json"].pop("example")["statut"] == "degrade"
         assert actuelles == operations, chemin
-    assert set(apres["paths"]) - set(avant["paths"]) == {"/v1/reponse"}
+    assert set(apres["paths"]) - set(avant["paths"]) == {
+        "/v1/reponse",
+        "/v1/verification",
+    }
     schemas = apres["components"]["schemas"]
     gagnants = {"Info": "modele_langage", "Serie": "metadonnees"}
     for nom, schema in avant["components"]["schemas"].items():
@@ -184,6 +194,9 @@ def test_depuis_la_1_0_0_le_contrat_ne_recoit_que_des_ajouts():
         }
     nouveaux = set(schemas) - set(avant["components"]["schemas"])
     assert nouveaux == {
+        # 1.5.0 : le test des clés.
+        "ControleCle",
+        "Verification",
         "AppelModele",
         "BorneReelle",
         "ContexteReponse",
@@ -257,6 +270,8 @@ def test_compatibilite_avec_le_contrat_1_0_0():
 
 
 REFERENCE_1_3_1 = DESTINATION.parent / "openapi_v1.3.1.json"
+#: Le contrat de `develop` à 6b38ba7 (E4, lot 4 fusionné), figé avant la 1.5.0.
+REFERENCE_1_4_0 = DESTINATION.parent / "openapi_v1.4.0.json"
 EMPREINTE_1_3_1 = "eaaecd704051c7a6"  # le contrat de develop à eae9f43
 
 
@@ -264,9 +279,10 @@ def test_depuis_la_1_3_1_le_mode_enrichi_n_ajoute_que_des_champs():
     """1.4.0 sur 1.3.1 (figé, `openapi_v1.3.1.json`) : chaque route et chaque schéma
     inchangés, sauf `DemandeReponse.mode` (énumération élargie à `enrichi`, défaut
     `strict`) et `Reponse`, qui gagne trois champs facultatifs ; la description de
-    l'API gagne son paragraphe ; la version passe à 1.4.0."""
+    l'API gagne son paragraphe. Lu sur le contrat 1.4.0 figé : la 1.5.0 n'ajoute que sa
+    route et ses deux schémas (test suivant)."""
     avant = json.loads(REFERENCE_1_3_1.read_text(encoding="utf-8"))
-    apres = contrat()
+    apres = json.loads(REFERENCE_1_4_0.read_text(encoding="utf-8"))
 
     assert (avant["info"]["version"], apres["info"]["version"]) == ("1.3.1", "1.4.0")
     assert apres["info"]["description"].startswith(avant["info"]["description"])
@@ -305,3 +321,46 @@ def test_la_reference_1_3_1_est_le_contrat_livre():
 
     empreinte = hashlib.sha256(REFERENCE_1_3_1.read_bytes()).hexdigest()
     assert empreinte.startswith(EMPREINTE_1_3_1)
+
+
+def test_depuis_la_1_4_0_la_verification_n_ajoute_qu_une_route_et_deux_schemas():
+    """1.5.0 sur 1.4.0 (figé, `openapi_v1.4.0.json`) : chaque route et chaque schéma
+    inchangés ; `POST /v1/verification` s'ajoute, avec `Verification` et `ControleCle` ;
+    la description gagne son paragraphe ; la version passe à 1.5.0."""
+    avant = json.loads(REFERENCE_1_4_0.read_text(encoding="utf-8"))
+    apres = contrat()
+
+    assert (avant["info"]["version"], apres["info"]["version"]) == ("1.4.0", "1.5.0")
+    assert apres["info"]["description"].startswith(avant["info"]["description"])
+    assert set(apres["paths"]) - set(avant["paths"]) == {"/v1/verification"}
+    for chemin, operations in avant["paths"].items():
+        assert apres["paths"][chemin] == operations, chemin
+    schemas, schemas_avant = (
+        apres["components"]["schemas"],
+        avant["components"]["schemas"],
+    )
+    assert set(schemas) - set(schemas_avant) == {"Verification", "ControleCle"}
+    for nom, schema in schemas_avant.items():
+        assert schemas[nom] == schema, nom
+    operation = apres["paths"]["/v1/verification"]["post"]
+    assert "requestBody" not in operation
+    assert set(operation["responses"]) == {"200", "401", "429"}
+    assert operation["security"] == [{"APIKeyHeader": []}]
+
+
+def test_le_controle_d_une_cle_ne_porte_que_des_noms_et_des_etats():
+    """Aucun champ de `ControleCle` ne peut porter une valeur de clé : un nom de
+    variable, des booléens, un statut."""
+    schema = contrat()["components"]["schemas"]["ControleCle"]
+
+    assert set(schema["properties"]) == {
+        "nom",
+        "fournisseur",
+        "modele",
+        "variable_cle",
+        "configuree",
+        "disponible",
+        "statut",
+    }
+    assert schema["properties"]["configuree"]["type"] == "boolean"
+    assert schema["properties"]["disponible"]["type"] == "boolean"

@@ -983,7 +983,7 @@ def test_a5_la_moderation_se_pagine(doublure, reglages, base_app, base):
 
     assert "Série factice B" in une.select_one("tbody").get_text()
     assert "Série factice A" in deux.select_one("tbody").get_text()
-    assert "Page 1 sur 2" in une.select_one("main nav").get_text()
+    assert "Page 1 sur 2" in une.select_one("main nav:not(.onglets)").get_text()
 
 
 def test_a5_confirmation_en_entier_puis_retrait_au_nom_de_l_admin(appli, base):
@@ -1091,9 +1091,10 @@ def test_a5_l_admin_ne_modifie_aucune_critique(appli, base):
 @pytest.mark.parametrize(
     ("role", "attendus", "absents"),
     [
-        ("libraire", {"Mes critiques"}, {"Critiques", "Comptes"}),
-        ("admin", {"Critiques", "Comptes"}, {"Mes critiques"}),
-        ("client", set(), {"Mes critiques", "Critiques", "Comptes"}),
+        ("libraire", {"Mes critiques"}, {"Administration"}),
+        # E4, lot 5 : la modération est un onglet de « Administration ».
+        ("admin", {"Administration"}, {"Mes critiques", "Critiques"}),
+        ("client", set(), {"Mes critiques", "Administration"}),
     ],
 )
 def test_a5_le_menu_par_role(client, base, role, attendus, absents):

@@ -4,7 +4,9 @@ Une API REST qui expose le modèle d'embedding en service et, depuis la version
 **1.1.0**, un modèle de langage choisi par profil ; depuis la **1.2.0**, chaque série
 porte ses métadonnées, et depuis la **1.3.0** ses auteurs ; la **1.3.1** rend l'attente
 d'un 429 du fournisseur (`Retry-After`) ; la **1.4.0** ajoute le **mode enrichi** de la
-réponse (un complément « non vérifié », plus bas). Deux routes métier, sous `/v1/` :
+réponse (un complément « non vérifié », plus bas) ; la **1.5.0**, le **test des clés** des
+fournisseurs pour l'administration de l'application (`POST /v1/verification`, non
+facturé, borné). Deux routes métier, sous `/v1/` :
 
 - `POST /v1/recherche` : une question entre, une liste de séries classées sort, avec
   les passages qui les justifient ;
@@ -360,6 +362,7 @@ fixés.
 | `POST /v1/recherche` | oui | une question → les séries classées, leurs passages, le contexte | 200, 401, 413, 422, 429, 503 |
 | `POST /v1/reponse` | oui | une question, l'historique → une réponse rédigée des seuls passages, ou un refus ; ses sources, son contexte | 200, 401, 413, 422, 429, 503 |
 | `GET /v1/info` | oui | le modèle, la révision, l'encodage et le corpus servis ; les réglages et leurs bornes ; le modèle de langage, ses profils et leur disponibilité | 200, 401, 429 |
+| `POST /v1/verification` | oui | **1.5.0** : par profil, la clé posée ou non (le nom de la variable, jamais sa valeur) et la réponse de la liste des modèles du fournisseur (non facturée) ; un rapport, sans effet sur les profils en service ; **un appel par minute et par clé** | 200, 401, 429 |
 | `GET /v1/sante` | non | base, service, encodage en service : `ok`, ou `degrade` (503). Des états seulement, ni version ni modèle | 200, 503 |
 | `GET /v1/openapi.json` | non | le contrat, égal à `contrat/openapi_v1.json` (versionné) | 200 |
 | `GET /v1/docs` | non (les routes protégées y demandent la clé, saisie dans « Authorize ») | Swagger UI, **sur réglage** (`API_MODELE_DOCUMENTATION=vrai`) ; sinon 404 | 200 |
@@ -663,7 +666,7 @@ série sous `modele_api`, qui ne lit pas ces tables.
 `GET /v1/info` (avec la clé) — le modèle d'embedding servi, et le modèle de langage :
 
 ```json
-{"version_api": "1.4.0", "modele": "google/embeddinggemma-300m",
+{"version_api": "1.5.0", "modele": "google/embeddinggemma-300m",
  "revision": "57c266a740f537b4dc058e1b0cda161fd15afa75", "precision": "float32", "dimension": 768,
  "outil": "text-embeddings-inference", "outil_version": "1.9.4",
  "corpus_id": "v2", "encodage_id": 3, "nb_fragments": 77006,
@@ -695,6 +698,50 @@ série sous `modele_api`, qui ne lit pas ces tables.
 `{"statut": "ok", "base": "ok", "service_embedding": "ok", "encodage": "ok"}`. En 503,
 l'exemple du contrat est exact : `{"statut": "degrade", "base": "injoignable",
 "service_embedding": "ok", "encodage": "inconnu"}` (la base ne répond pas).
+
+### `POST /v1/verification` (1.5.0) : le test des clés
+
+Pour l'administration de l'application (E4, lot 5, story A3) : **par profil déclaré**, la
+variable de sa clé est-elle posée, et la liste des modèles de son fournisseur la reçoit-elle ?
+
+- **Ce qu'elle fait** : pour chaque profil, `configuree` — la variable nommée par
+  `variable_cle` est posée et non vide dans l'environnement de l'API ; si elle l'est,
+  `GET …/v1/models` chez le fournisseur (**non facturé**), **une fois par couple** (adresse,
+  variable), les couples en parallèle ; `disponible` — la liste a répondu et contient le
+  modèle ; `statut` — `ok`, `injoignable` (connexion refusée ou délai de
+  `[modele_langage.delais] connexion_s` dépassé), le code HTTP rendu par le fournisseur,
+  `corps_inattendu` (liste illisible), ou `absente` (clé non posée : **aucun appel**).
+  Corps vide ; réponse 200 `{"verifie_le": "<UTC>", "profils": [{nom, fournisseur, modele,
+  variable_cle, configuree, disponible, statut}]}`. Un fournisseur injoignable n'empêche pas
+  la réponse : c'est un rapport, pas une sonde de santé. Journal `verification_cles` (adresse,
+  nom de la variable, statut, profils) ; métrique `api_modele_verifications_total{issue}`
+  (`ok` : tous les profils disponibles, `partiel`, `aucune`).
+- **Sa borne** : la clé d'accès comme les autres routes (401 sans elle), **et un appel par
+  minute et par clé** (un `Limiteur` à part du débit des routes) : au-delà, 429
+  `debit_depasse`, `Retry-After` — le fournisseur n'est pas un service à sonder en boucle.
+  `POST` et non `GET` : elle a un coût réseau et une borne.
+- **Ce qu'elle ne fait pas** : elle **ne coupe rien** — la disponibilité des profils en
+  service (`/v1/info`) ne change pas, même si un fournisseur refuse la clé (seul le contrôle
+  d'exploitation du démarrage, `API_MODELE_VERIFIER_MODELES=1`, en retire) ; elle **n'affiche
+  rien** d'une clé — ni valeur, ni préfixe, ni longueur (prouvé par test : des valeurs
+  factices reconnaissables, absentes de la réponse, du journal et des métriques).
+
+## Poser ou changer une clé
+
+Une clé de fournisseur (ou une clé d'accès d'application) ne vit que dans le `.env` du
+module, hors dépôt, jamais dans un fichier suivi :
+
+1. **la variable** : celle que nomme `variable_cle` du profil (`MISTRAL_API_KEY`,
+   `OPENAI_API_KEY`), ou `API_MODELE_CLES` pour les clés d'accès (`nom:clé,…`) ;
+2. **la poser** dans `11_api_modele/.env`, sans l'afficher (ni `cat`, ni capture) ; une
+   rotation remplace la valeur, l'ancienne est révoquée chez le fournisseur ensuite ;
+3. **les hooks** du dépôt refusent une clé de fournisseur dans un commit et un push (sa forme,
+   et la valeur du poste) : le `.env` reste ignoré par git ;
+4. **redémarrer** l'API (la pile, ou le service seul) : les clés et la disponibilité des
+   profils sont lues au démarrage ;
+5. **vérifier** : `/v1/info` (le profil est-il `disponible` ?), puis `POST /v1/verification`
+   (la liste du fournisseur reçoit-elle la clé ? `statut: "ok"`) — l'écran « Clés » de
+   l'administration de l'application l'appelle.
 
 ## Les erreurs
 
@@ -781,7 +828,8 @@ n'y changera rien ; `details.code_fournisseur` le distingue quand le fournisseur
   journal, jamais sa valeur. `/v1/sante` et le contrat se lisent sans clé.
 - **Débit** par clé : 60 requêtes par fenêtre glissante d'une minute, **communes** à la
   recherche et à la réponse. Au-delà, 429 et `Retry-After`. Le refus est compté par nom
-  de clé (`/metrics`).
+  de clé (`/metrics`). Le test des clés (`/v1/verification`, 1.5.0) a, en plus, sa borne
+  à lui : **un appel par minute et par clé**.
 - **Version dans l'adresse** : `/v1/`. Une rupture ouvre `/v2/`.
 - **Où vivent les secrets** : clés d'accès, clés des fournisseurs et DSN dans `.env` ;
   mot de passe de la base dans un pgpass (`~/.pgpass`, ou `.pgpass.conteneur` monté en
@@ -1248,7 +1296,9 @@ Pour ajouter une route :
 4. Monter la version **mineure** du `pyproject.toml` (1.1.0 pour `/v1/reponse`, 1.2.0 pour
    `metadonnees`, 1.3.0 pour `auteurs`, 1.4.0 pour le mode enrichi : une valeur
    d'énumération d'entrée et trois champs facultatifs ; contrat figé à côté,
-   `contrat/openapi_v1.3.1.json`, comparé par un test) : la
+   `contrat/openapi_v1.3.1.json`, comparé par un test ; 1.5.0 pour
+   `/v1/verification`, une route et deux schémas, sur `contrat/openapi_v1.4.0.json`
+   figé) : la
    majeure reste celle de l'adresse. Un en-tête documenté, sans champ ni route, monte la
    corrective (1.3.1 pour `Retry-After`).
 
