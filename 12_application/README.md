@@ -974,7 +974,10 @@ libraire, administrateur), la commande du premier administrateur (ci-dessus). **
 critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
 lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
 la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compte par son
-titulaire, le droit à l'effacement (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
-l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
-et de l'état des services ; le serveur avec préproduction et production ; l'identité
-visuelle, sur `theme.css`.
+titulaire, le droit à l'effacement (ci-dessus). **Lot 5 (l'administration)** : le profil
+actif, l'état et le test des clés, les coûts et la jauge du budget, l'état des services
+(ci-dessus). **Lot 6 (l'habillage, 0.8.0)** : l'identité Senpai, Kōhai animé, le seul
+script, les tableaux défilants (ci-dessus). À venir : l'apparence réglée par
+l'administrateur ; l'entrée des critiques de libraires dans le corpus ; le masquage à
+l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
+production.
