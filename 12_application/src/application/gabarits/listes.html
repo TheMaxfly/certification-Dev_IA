@@ -20,7 +20,7 @@
 {% if section.lignes %}
 <ul>
 {% for ligne in section.lignes %}
-<li>
+<li class="carte-serie">
 <a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a>
 <small><time datetime="{{ ligne.datetime }}">{{ ligne.date }}</time></small>
 <form method="post" action="/listes/{{ ligne.series_id }}">

@@ -32,8 +32,9 @@
 <section class="zone-cout-historique">
 <h2>{{ historique.titre }}</h2>
 {% if historique.jours %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="tableau-couts">
 <table>
-<caption>{{ t.admin_couts_tableau }}</caption>
+<caption id="tableau-couts">{{ t.admin_couts_tableau }}</caption>
 <thead>
 <tr><th scope="col">{{ t.admin_couts_colonne_jour }}</th><th scope="col">{{ t.admin_couts_colonne_profil }}</th><th scope="col">{{ t.admin_couts_colonne_mode }}</th><th scope="col">{{ t.admin_couts_colonne_appels }}</th><th scope="col">{{ t.admin_couts_colonne_cout }}</th></tr>
 </thead>
@@ -46,6 +47,7 @@
 </tbody>
 {% endfor %}
 </table>
+</div>
 {% else %}
 <p>{{ t.admin_couts_vide }}</p>
 {% endif %}

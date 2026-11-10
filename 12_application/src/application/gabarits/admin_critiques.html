@@ -4,7 +4,7 @@
 {% block titre %}{{ t.admin_critiques_titre }}{% endblock %}
 {% block contenu %}
 {% include "composants/onglets_admin.html" %}
-<h1>{{ t.admin_critiques_titre }}</h1>
+<h1 id="moderation-titre">{{ t.admin_critiques_titre }}</h1>
 {% if avis %}
 {{ c.avis(avis, focus == "avis") }}
 {% endif %}
@@ -25,6 +25,7 @@
 <button type="submit">{{ t.critiques_filtre_bouton }}</button>
 </form>
 {% if lignes %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="moderation-titre">
 <table>
 <thead>
 <tr><th scope="col">{{ t.admin_critiques_colonne_libraire }}</th><th scope="col">{{ t.critiques_colonne_serie }}</th><th scope="col">{{ t.critiques_colonne_tome }}</th><th scope="col">{{ t.critiques_colonne_note }}</th><th scope="col">{{ t.critiques_colonne_label }}</th><th scope="col">{{ t.admin_critiques_colonne_date }}</th><th scope="col">{{ t.admin_critiques_colonne_debut }}</th><th scope="col">{{ t.critiques_colonne_action }}</th></tr>
@@ -44,6 +45,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% else %}
 <p>{{ t.admin_critiques_vide }}</p>
 {% endif %}

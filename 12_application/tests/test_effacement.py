@@ -467,6 +467,16 @@ def pages_neuves(appli, base) -> dict[str, BeautifulSoup]:
     return {nom: soupe(r) for nom, r in rendues.items()}
 
 
+def test_un_seul_titre_dit_supprimer_mon_compte(appli, base):
+    """E4, lot 6 (écart 15 du lot 4) : le `h1` dit « Supprimer mon compte », le `h2`
+    « Ce qui sera supprimé »."""
+    page = pages_neuves(appli, base)["compte_supprimer"]
+
+    titres = [h.get_text(strip=True) for h in page.select("main h1, main h2")]
+    assert titres[:2] == ["Supprimer mon compte", "Ce qui sera supprimé"]
+    assert sum("Supprimer" in t and "compte" in t for t in titres) == 1
+
+
 def test_balisage_titres_evitement_langue_mention_et_focus(appli, base):
     for nom, page in pages_neuves(appli, base).items():
         niveaux = [int(h.name[1]) for h in page.select("main h1, main h2, main h3")]

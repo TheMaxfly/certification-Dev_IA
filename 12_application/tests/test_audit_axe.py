@@ -464,6 +464,10 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
             navigateur, source, adresse, adresse_sans_api, adresse_doublure, console
         )
         pages |= des_kohai
+        des_etroits, ecarts_etroits = auditer_etroit(
+            navigateur, source, adresse_comptes, console
+        )
+        pages |= des_etroits
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()
@@ -487,8 +491,11 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
     assert not ecarts_kohai, ecarts_kohai
+    assert not ecarts_etroits, ecarts_etroits
     # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).
-    assert len(pages) == len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI)
+    assert len(pages) == (
+        len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI) + 1
+    ), "+ admin_couts_etroit"
 
 
 @dataclass(frozen=True)
@@ -939,6 +946,52 @@ def auditer_kohai(
         ecarts.append("sans JavaScript : la pose d'attente est apparue")
     contexte.close()
     assert sorted(pages) == sorted(ECRANS_KOHAI)
+    return pages, ecarts
+
+
+#: La page tient dans la largeur ; chaque tableau, dans son conteneur défilant.
+LARGEURS = """() => ({
+  page: document.documentElement.scrollWidth,
+  fenetre: window.innerWidth,
+  tableaux: [...document.querySelectorAll("table")].map((t) => ({
+    conteneur: t.parentElement.classList.contains("defilant"),
+    defile: t.parentElement.scrollWidth > t.parentElement.clientWidth,
+    deborde: t.parentElement.getBoundingClientRect().right > window.innerWidth + 1,
+  })),
+})"""
+
+
+def auditer_etroit(
+    navigateur: Any, source: str, adresse: str, console: list[str]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Les coûts de l'administration sur un écran de 360 px (E4, lot 6, guide § 8) : la
+    page ne déborde pas, le tableau défile dans son conteneur."""
+    ecarts: list[str] = []
+    contexte = navigateur.new_context(viewport={"width": 360, "height": 740})
+    connecter_dans(contexte, adresse, "conseiller_admin_audit")
+    page = contexte.new_page()
+    page.on(
+        "console",
+        lambda m: (
+            console.append(f"admin_couts_etroit : {m.text}")
+            if "Content Security Policy" in m.text
+            else None
+        ),
+    )
+    page.goto(adresse + "/admin/couts")
+    largeurs = page.evaluate(LARGEURS)
+    if largeurs["page"] > largeurs["fenetre"]:
+        ecarts.append(f"360 px : la page déborde ({largeurs['page']} px)")
+    if not largeurs["tableaux"]:
+        ecarts.append("360 px : aucun tableau sur la page des coûts")
+    for tableau in largeurs["tableaux"]:
+        if not tableau["conteneur"] or tableau["deborde"]:
+            ecarts.append(f"360 px : tableau hors de son conteneur {tableau}")
+    captures = os.environ.get("CAPTURES_KOHAI")
+    if captures:
+        page.screenshot(path=f"{captures}/admin_couts_etroit.png", full_page=True)
+    pages = {"admin_couts_etroit": auditer(page, source, adresse)}
+    contexte.close()
     return pages, ecarts
 
 

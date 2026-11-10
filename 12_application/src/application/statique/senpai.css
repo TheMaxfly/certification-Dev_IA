@@ -348,3 +348,5 @@ body.esp-menthe:not(.en-attente) main:has(>section[aria-live]>h2):not(:has(>sect
 body.en-attente .kohai-principal{display:none}
 /* écart 11 : le petit Kōhai de la fiche est une image (::before) : il porte le nom de transition */
 body .zone-pont-conseiller a::before{view-transition-name:kohai}
+/* écart 19 (spec 03, guide § 8) : un tableau large défile dans son conteneur focalisable */
+body .defilant{overflow-x:auto}

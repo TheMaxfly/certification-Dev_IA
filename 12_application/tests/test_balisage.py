@@ -416,7 +416,7 @@ def test_wcag_1_4_1_chaque_etat_a_un_texte(pages):
 def test_wcag_1_3_1_le_classement_a_des_en_tetes_de_colonnes(pages):
     vus = 0
     for page in pages:
-        for tableau in page.soupe.select("#trace ~ table"):
+        for tableau in page.soupe.select("#trace ~ .defilant > table"):
             entetes = tableau.select("thead th")
             assert len(entetes) == 5, page.ecran.nom
             for entete in entetes:
@@ -633,3 +633,29 @@ def test_le_menu_marque_la_page_courante_sur_chaque_ecran(pages):
         assert all(a["aria-current"] == "page" for a in marques), page.ecran.nom
         vus.update(attendu)
     assert {"/", "/catalogue", "/admin/comptes"} <= vus
+
+
+def test_chaque_tableau_rendu_defile_dans_un_conteneur_nomme(pages):
+    """E4, lot 6 (guide § 8) : sur un écran étroit, le tableau défile dans un conteneur
+    focalisable, nommé par sa légende ou par le titre qui le précède."""
+    vus = 0
+    for page in pages:
+        for tableau in page.soupe.select("table"):
+            conteneur = tableau.parent
+            assert conteneur.name == "div", page.ecran.nom
+            assert "defilant" in conteneur["class"], page.ecran.nom
+            assert conteneur["tabindex"] == "0", page.ecran.nom
+            assert conteneur["role"] == "region", page.ecran.nom
+            nom = page.soupe.select_one(f"#{conteneur['aria-labelledby']}")
+            assert nom is not None and nom.get_text(strip=True), page.ecran.nom
+            vus += 1
+    assert vus >= 5
+
+
+def test_les_profils_indisponibles_portent_l_etiquette_de_statut(pages):
+    page = next(p for p in pages if p.ecran.nom == "admin_reglages_indisponible")
+    zone = page.soupe.select_one(".zone-profils-indisponibles")
+
+    if zone is not None:
+        for ligne in zone.select("li"):
+            assert ligne["class"] == ["badge", "statut", "ouvert"]

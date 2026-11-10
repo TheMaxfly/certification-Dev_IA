@@ -233,3 +233,66 @@ def test_le_menu_marque_la_page_courante(navigateur, chemin, courant):
     marques = page.select("header nav a[aria-current]")
     assert [a["href"] for a in marques] == courant
     assert all(a["aria-current"] == "page" for a in marques)
+
+
+# --------------------------------------------------------------------------- #
+#  Les restes (spec 03 du lot 6)
+# --------------------------------------------------------------------------- #
+def test_la_page_413_dit_un_texte_generique(navigateur):
+    r = navigateur.post("/question", content=b"x" * 16385)
+
+    texte = soupe(r).select_one("main").get_text()
+    assert r.status_code == 413
+    assert "La demande est trop volumineuse." in texte
+    assert "Réduisez le texte envoyé et réessayez." in texte
+    assert "critique" not in texte and "conversation" not in texte
+
+
+def test_chaque_tableau_des_gabarits_est_dans_son_conteneur_defilant():
+    vus = 0
+    for fichier in sorted(GABARITS.rglob("*.html")):
+        texte = fichier.read_text(encoding="utf-8")
+        tableaux = texte.count("<table>")
+        conteneurs = re.findall(
+            r'<div class="defilant" tabindex="0" role="region"'
+            r' aria-labelledby="([\w-]+)">\n<table>',
+            texte,
+        )
+        assert len(conteneurs) == tableaux, fichier.name
+        for identifiant in conteneurs:
+            assert f'id="{identifiant}"' in texte, (fichier.name, identifiant)
+        vus += tableaux
+    assert vus == 8
+    assert "body .defilant{overflow-x:auto}" in (STATIQUE / "senpai.css").read_text(
+        "utf-8"
+    )
+
+
+def test_le_tableau_rendu_est_nomme_par_son_titre(navigateur):
+    page = soupe(navigateur.get("/a-propos"))
+
+    conteneur = page.select_one("div.defilant")
+    assert conteneur.select_one(":scope > table") is not None
+    assert conteneur["tabindex"] == "0" and conteneur["role"] == "region"
+    nom = page.select_one(f"#{conteneur['aria-labelledby']}").get_text(strip=True)
+    assert nom == "Les profils proposés"
+
+
+def test_les_profils_indisponibles_portent_l_etiquette_de_statut_contrastee():
+    gabarit = (GABARITS / "admin_reglages.html").read_text(encoding="utf-8")
+    theme = (STATIQUE / "theme.css").read_text(encoding="utf-8")
+    valeurs = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", theme))
+
+    assert '<li class="badge statut ouvert">{{ ligne }}</li>' in gabarit
+    # L'étiquette : l'encre sur le papier (section 15 de senpai.css).
+    assert contraste(valeurs["--sp-encre"], valeurs["--sp-papier"]) >= 4.5
+
+
+def contraste(a: str, b: str) -> float:
+    def luminance(couleur: str) -> float:
+        rvb = [int(couleur[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rvb]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+    clair, sombre = sorted((luminance(a), luminance(b)), reverse=True)
+    return (clair + 0.05) / (sombre + 0.05)
