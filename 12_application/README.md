@@ -69,14 +69,15 @@ administrateur.
 
 Un seul écran, `/`, dans l'ordre de lecture :
 
-1. le lien d'évitement ; le nom de la librairie, fictive ; la mention courte ; le bouton
-   **Nouvelle conversation**, sur chaque écran : un formulaire `GET /` sans champ, donc sans
-   script, et l'historique ne le suit pas ;
+1. le lien d'évitement ; l'en-tête : le nom de la librairie, fictive ; la mention courte ;
+   les deux navigations (« L'en-tête », ci-dessous) ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
 4. le formulaire : la question ; les **Réglages**, repliés, pour un libraire ou
    l'administrateur seulement (« Le conseiller selon le rôle ») ; le champ caché de
-   l'historique ;
+   l'historique ; puis, **quand une conversation existe** (une réponse, un encart, ou un
+   historique porté par la page), le bouton **Nouvelle conversation** : un formulaire
+   `GET /` sans champ, donc sans script, et l'historique ne le suit pas ;
 5. la réponse ou le refus ; la ligne discrète (profil, fournisseur, modèle, date de l'appel,
    reformulation, coût estimé, latence) ; une carte par série citée, ses métadonnées et ses
    seuls passages cités ; les détails techniques, repliés ;
@@ -99,6 +100,26 @@ cible de Prometheus. **Le catalogue** (E4, lot 2a) :
 issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
 `application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
 chaque appel.
+
+### L'en-tête (E4, lot 7)
+
+- **Deux navigations nommées** : « Pages » (Conseiller, Catalogue, puis selon le rôle Mes
+  listes, Mes critiques ou Administration) et « Votre compte » (un visiteur : Connexion,
+  Créer un compte ; connecté : la pastille du nom affiché, Mon compte, Déconnexion — un
+  formulaire `POST` avec jeton). Le lecteur d'écran les nomme ; `aria-current="page"` reste
+  sur la page courante, dans l'une ou l'autre. « Mon compte » est dans la zone du compte :
+  c'est le compte, pas une page du réseau.
+- **Placement par la feuille, pas par le balisage** : deux règles en section 16 de
+  `senpai.css` — les pages à la taille de leur contenu, à gauche ; la zone du compte poussée
+  à droite ; sur un écran étroit (360 px), elle passe à la ligne sous les pages (l'audit le
+  vérifie).
+- **« Nouvelle conversation » quitte l'en-tête** : c'est une action du conseiller, pas une
+  page ; elle est rendue dans `index.html` seulement, à côté du formulaire de question, et
+  seulement quand une conversation existe — à l'accueil vierge, elle n'apparaît pas. Même
+  action `GET /`, même texte.
+- Aucune route, aucun comportement ne change : le pont depuis la fiche, le quota, le cookie,
+  les renvois (303) sont intacts. Pas de page d'accueil séparée : le conseiller **est**
+  l'accueil.
 
 ### Le conseiller selon le rôle (E4, lot 2b)
 
@@ -411,7 +432,8 @@ physiquement et immédiatement.
 Toutes les pages `/admin/*` exigent le rôle **administrateur** : un autre rôle reçoit 403,
 un visiteur la page de connexion (`GET`) ou 401 (`POST`) ; chaque `POST` porte son jeton.
 Elles partagent une **barre d'onglets** (`nav.onglets`, `aria-label` « Administration »),
-dans cet ordre : Comptes · Modération · Réglages · Clés · Coûts · Services. La barre est
+dans cet ordre : Comptes · Modération · Réglages · Clés · Coûts · Services · Apparence
+(lot 7). La barre est
 construite à partir des **routes enregistrées** (`pages_admin.ONGLETS`, filtrée) : un onglet
 n'apparaît que si sa page existe ; la page courante porte `aria-current="page"`. Le menu
 principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
@@ -561,8 +583,9 @@ scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédi
   `statique/EMPREINTES`, commentaires de provenance compris. Ses pages d'aperçu et ses
   scripts de génération restent hors dépôt. Tout écart au paquet est relevé au rapport du lot.
 - **`base.html`, trois retouches** : `senpai.css` après `theme.css` ; la classe d'espace
-  sur `<body>` (`esp-{% block espace %}ciel{% endblock %}`), chaque gabarit déclarant la
-  sienne ; `aria-current="page"` sur le lien du menu de la page courante (toute
+  sur `<body>`, chaque gabarit déclarant la sienne (`{% block espace %}…{% endblock %}` ;
+  depuis le lot 7, la classe est calculée par le serveur d'après ce bloc, voir
+  « L'apparence ») ; `aria-current="page"` sur le lien du menu de la page courante (toute
   l'administration sous « Administration » ; la page du conseiller aussi après une
   question). Le logo est une image de fond du premier paragraphe de l'en-tête : aucune
   balise ajoutée.
@@ -575,10 +598,11 @@ scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédi
 | `sakura` | `serie.html` |
 | `yuzu` | `mot_de_passe.html`, `listes.html`, `compte_supprimer.html` |
 | `glycine` | `critiques.html`, `critique_formulaire.html`, `critique_retirer.html` |
-| `brume` | les sept pages `admin_*.html` |
+| `brume` | les huit pages `admin_*.html` |
 
-  Un test lit le dossier des gabarits et compare chaque déclaration à cette table ; un
-  gabarit neuf sans déclaration hérite de `ciel`, c'est voulu.
+  Un test lit le dossier des gabarits et compare chaque déclaration à cette table ; depuis
+  le lot 7, chaque gabarit de page en déclare exactement une (un gabarit sans déclaration
+  ne se rend pas).
 - **Les règles du design** : une page, une couleur (lavis, survol, onglets, étiquettes,
   jauge) ; un seul bouton, blanc, trait d'encre et ombre décalée ; le bleu nuit pour ce qui
   est choisi ou la page courante, la framboise pour les erreurs et les liens posés sur le
@@ -598,6 +622,63 @@ scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédi
 - **Le poids** : `statique/` passe de 73 477 à 349 896 octets (≈ 72 à 342 Ko) : polices
   58 880, lavis 112 828, touches 9 084, images 28 845, icônes 15 346, `senpai.css` 29 857 ;
   l'image Docker grossit d'autant.
+
+### L'apparence (E4, lot 7)
+
+L'administrateur choisit, à `/admin/apparence` (septième onglet), **la couleur de chacun
+des six espaces** parmi les six pigments du paquet, et pour toute l'application
+**l'intensité du lavis** (60, 70, 85, 100 %) et **la matière** (aquarelle ou aplat). Story
+AP1 ; la préférence par libraire est hors périmètre (elle demanderait une migration).
+
+- **Les clés** : `application.reglages` (migration 027, aucune migration neuve) —
+  `apparence_menthe`, `apparence_ciel`, `apparence_sakura`, `apparence_yuzu`,
+  `apparence_glycine`, `apparence_brume` (la couleur posée sur l'espace qui porte ce nom
+  d'origine), `apparence_intensite`, `apparence_matiere` ; ajoutées à `reglages_app.CLES`.
+- **Liste blanche côté serveur, puis dictionnaire de constantes** (`apparence.py`) :
+  couleurs ∈ {menthe, ciel, sakura, yuzu, glycine, brume}, intensité ∈ {60, 70, 85, 100},
+  matière ∈ {aquarelle, aplat} ; toute valeur hors liste → **422**, rien d'écrit, le groupe
+  fautif désigné (`aria-describedby`). La classe de `<body>` et le chemin de la pastille
+  sont traduits par des dictionnaires écrits dans le code, **jamais composés depuis une
+  valeur lue** ; une valeur piégée en base vaut le défaut de sa clé et se journalise par
+  sa clé (`apparence_valeur_ignoree`), jamais par sa valeur. Pas de sélecteur de couleur
+  libre, pas de style en ligne : la politique de sécurité du contenu ne change pas.
+- **Les espaces restent des espaces** : chaque gabarit déclare toujours son espace
+  d'origine ; `base.html` porte `<body class="{{ classes_body(self.espace()) }}">` — le
+  serveur lit le bloc du gabarit, le traduit en la couleur réglée (`esp-<couleur>`) et
+  ajoute `intensite-<n>` et `matiere-aplat` s'il y a lieu. **Sans réglage : la couleur
+  d'origine, 85 %, aquarelle — le rendu du lot 6 à l'identique** (un test compare les
+  classes de `<body>` de chaque écran à la liste relevée au lot 6).
+- **La lecture au rendu** : une dépendance de l'application, après la garde de session (le
+  compte relu, une session refusée vidée), lit les huit clés **en une requête**
+  (`cle = ANY(%s)`), une fois par requête (`request.state`), sans cache au-delà ; sauf
+  `/sante` et `/metrics`. Base non configurée ou injoignable : les défauts, sans erreur ni
+  événement propre à l'apparence (le journal de la base garde son `base_indisponible`
+  habituel) ; le conseiller d'un visiteur ne dépend jamais de la base pour s'afficher.
+- **La page d'erreur de l'enveloppe** (413, 500), rendue sans requête, ne lit pas la base :
+  elle garde `esp-ciel` et le défaut. Les autres pages d'erreur suivent l'espace de leur
+  gabarit (« catalogue et comptes »).
+- **Pas de ligne au journal des actions** : la contrainte de `journal_actions` n'a pas
+  d'action pour l'apparence et l'ajouter serait une migration ; `modifie_par` et
+  `modifie_le` disent qui et quand, et l'écran l'affiche (« Choisi par … le … »).
+  L'apparence n'est ni une donnée ni un droit.
+- **L'avertissement, pas l'interdiction** : quand plusieurs espaces reçoivent la même
+  couleur, l'écran le dit (« Deux espaces partagent la couleur sakura … : le repère de page
+  s'affaiblit ») et applique quand même — une règle du design, pas de sécurité.
+- **L'aperçu** : la page « Apparence » est dans l'espace « administration » et se rend avec
+  l'apparence réglée ; chaque couleur y est montrée par une **pastille** — la touche du
+  pigment du paquet, découpée en carré par le `viewBox` d'un SVG, à la taille d'une
+  étiquette (`.badge`) ; décorative, le nom de la couleur est toujours écrit. Pas
+  d'aperçu en direct sans JavaScript : « Appliquer », la page se recharge.
+- **Revenir à l'apparence d'origine** : un bouton (`POST`, jeton) écrit les valeurs par
+  défaut (pas de `DELETE` : `app_rw` n'en a pas sur la table).
+- **Kōhai suit la page** (écart au paquet, décidé par Max le 10 novembre) : la feuille se
+  servait de `esp-menthe` pour reconnaître le conseiller ; une page réglée en menthe
+  aurait reçu Kōhai à côté de son titre, et le conseiller dans une autre couleur aurait
+  perdu la mise en page du sien. Trois règles à la fin de la section 16 de `senpai.css`
+  reconnaissent le conseiller à son Kōhai principal (`.kohai-principal`), sans classe
+  neuve ; l'audit le vérifie dans Chromium sur les écrans réglés.
+- **La métrique** : `application_apparence_info{espace, couleur}`, 1 sur la couleur réglée
+  de chaque espace, rafraîchie à chaque lecture.
 
 ### Kōhai, la mascotte
 
@@ -621,7 +702,8 @@ scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédi
   règle par manque relevé (l'image de la phase 1 retirée quand le SVG est là, un refus en
   pose « perdu », le Kōhai principal caché pendant l'attente, le nom de transition sur le
   Kōhai de la fiche) ; aucune règle du paquet modifiée (un test garde l'empreinte de ce qui
-  précède).
+  précède). Au lot 7, trois règles de plus rattachent Kōhai **à la page** et non plus à la
+  couleur `menthe` (voir « L'apparence »), et deux placent l'en-tête (« L'en-tête »).
 
 ### Le seul script
 
@@ -797,6 +879,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
 | Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
 | Contrôle d'accès (A01) : l'administration | **toute page `/admin/*` exige le rôle admin** (`sessions.exiger_role("admin")`, en `GET` comme en `POST`) : un client, un libraire reçoivent 403, un visiteur la connexion ; le profil choisi est validé contre la liste de `/v1/info` avant d'être écrit ; mutations E4A-02 (profil hors liste), **E4A-03** (garde de rôle retirée) |
+| Injection (A03), contrôle d'accès (A01) : l'apparence | **aucune valeur de l'utilisateur n'atteint le CSS** : liste blanche côté serveur puis dictionnaire de constantes, pour la classe de `<body>` comme pour le chemin de la pastille ; aucun style en ligne, politique inchangée ; `/admin/apparence` exige le rôle admin ; mutations **E4P-01** (valeur hors liste acceptée), **E4P-02** (classe composée depuis la valeur), **E4P-03** (garde de rôle retirée) |
 | Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
 | Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
 | Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
@@ -977,7 +1060,8 @@ la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compt
 titulaire, le droit à l'effacement (ci-dessus). **Lot 5 (l'administration)** : le profil
 actif, l'état et le test des clés, les coûts et la jauge du budget, l'état des services
 (ci-dessus). **Lot 6 (l'habillage, 0.8.0)** : l'identité Senpai, Kōhai animé, le seul
-script, les tableaux défilants (ci-dessus). À venir : l'apparence réglée par
-l'administrateur ; l'entrée des critiques de libraires dans le corpus ; le masquage à
+script, les tableaux défilants (ci-dessus). **Lot 7 (l'apparence, 0.9.0)** : la couleur des
+six espaces, l'intensité et la matière réglées par l'administrateur ; l'en-tête en deux
+navigations (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
 l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
 production.

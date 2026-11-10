@@ -7,6 +7,9 @@ import json
 from dataclasses import dataclass
 
 import doublure_api as d
+import psycopg
+
+from application import apparence as ap
 
 
 def echanges(n: int) -> str:
@@ -47,9 +50,25 @@ class Ecran:
     #: `budget`, `inscription`. Son application la serre à une unité
     #: (`BORNES_SERREES`) ; l'écran vient après un premier passage. Une base jetable.
     borne: str | None = None
+    #: L'apparence réglée avant l'écran (E4, lot 7) : des couples (clé, valeur) de
+    #: `application.reglages`, les autres clés à leur défaut ; remise aux défauts après.
+    #: Un rôle, donc une base jetable.
+    apparence: tuple[tuple[str, str], ...] = ()
 
 
 QUESTION = "Un manga factice pour débuter ?"
+#: L'apparence des écrans réglés (E4, lot 7) : chaque espace prend la couleur du
+#: suivant, le lavis à 60 %, la matière en aplat.
+APPARENCE_ECRANS = (
+    ("apparence_menthe", "ciel"),
+    ("apparence_ciel", "sakura"),
+    ("apparence_sakura", "yuzu"),
+    ("apparence_yuzu", "glycine"),
+    ("apparence_glycine", "brume"),
+    ("apparence_brume", "menthe"),
+    ("apparence_intensite", "60"),
+    ("apparence_matiere", "aplat"),
+)
 LONGUE = json.dumps(
     [
         {"role": "libraire", "contenu": "y" * 1990},
@@ -197,6 +216,35 @@ ECRANS: tuple[Ecran, ...] = (
         role="admin",
         catalogue="indisponible",
     ),
+    # E4, lot 7, spec 02 : l'en-tête en deux navigations, par rôle (1280 px ; à 360 px :
+    # `entete_360`, dans l'audit) ; « Nouvelle conversation » après une réponse.
+    Ecran("entete_visiteur", chemin="/catalogue"),
+    Ecran("entete_client", chemin="/catalogue", role="client"),
+    Ecran("entete_admin", chemin="/catalogue", role="admin"),
+    Ecran("conseiller_apres_reponse", question=QUESTION, role="client"),
+    # E4, lot 7 : l'apparence. L'écran des réglages d'abord, sans réglage ; puis les
+    # écrans réglés (`APPARENCE_ECRANS`, `APPARENCE_PARTAGEE`) : un par espace, et la
+    # page des réglages elle-même dans une autre couleur. Chacun pose son réglage et le
+    # remet aux défauts après lui (`poser_apparence`).
+    Ecran("admin_apparence", chemin="/admin/apparence", role="admin"),
+    Ecran(
+        "admin_apparence_partage",
+        chemin="/admin/apparence",
+        role="admin",
+        apparence=(("apparence_ciel", "menthe"), ("apparence_sakura", "menthe")),
+    ),
+    *(
+        Ecran(nom, chemin=chemin, role=role, apparence=APPARENCE_ECRANS)
+        for nom, chemin, role in (
+            ("admin_apparence_reglee", "/admin/apparence", "admin"),
+            ("apparence_conseiller", "/", "client"),
+            ("apparence_catalogue", "/catalogue", "client"),
+            ("apparence_fiche", "/series/101", "client"),
+            ("apparence_listes", "/compte/listes", "client"),
+            ("apparence_libraire", "/libraire/critiques", "libraire"),
+            ("apparence_administration", "/admin/comptes", "admin"),
+        )
+    ),
 )
 #: Le réglage posé dans la base des écrans d'un rôle (E4, lot 5) : le profil actif de
 #: l'application, égal au défaut de l'API — aucun autre écran n'en change.
@@ -217,3 +265,16 @@ BORNES_SERREES: dict[str, dict[str, float]] = {
 }
 #: Le mot de passe des inscriptions des écrans bornés.
 MDP_INSCRIPTION = "mot de passe factice de l'inscription bornée"
+
+
+def poser_apparence(dsn: str, valeurs: tuple[tuple[str, str], ...]) -> None:
+    """Les huit clés de l'apparence dans la base des écrans : `valeurs`, les autres à
+    leur défaut (des lignes explicites : le rendu est celui du défaut)."""
+    toutes = {**ap.DEFAUT.valeurs(), **dict(valeurs)}
+    with psycopg.connect(dsn) as cx:
+        for cle, valeur in toutes.items():
+            cx.execute(
+                "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)"
+                " ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur",
+                (cle, valeur),
+            )

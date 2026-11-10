@@ -98,7 +98,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
             " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
             " erreur_comptes_titre erreur_comptes_texte"
-            " menu_etiquette menu_conseiller menu_mon_compte menu_critiques"
+            " menu_etiquette compte_etiquette menu_conseiller menu_mon_compte"
+            " menu_critiques"
             " menu_administration"
             " menu_connexion menu_inscription menu_deconnexion champ_pseudo"
             " champ_mot_de_passe champ_confirmation champ_ancien champ_nouveau"
@@ -233,6 +234,20 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " effacement_refus effacement_reseau_titre effacement_reseau"
             " effacement_avis effacement_impossible_titre effacement_impossible"
             " apropos_effacement_titre apropos_effacement"
+            # E4, lot 7 : l'apparence.
+            " onglet_apparence admin_apparence_titre admin_apparence_intro"
+            " admin_apparence_origine_jamais espace_menthe espace_ciel espace_sakura"
+            " espace_yuzu espace_glycine espace_brume couleur_menthe couleur_ciel"
+            " couleur_sakura couleur_yuzu couleur_glycine couleur_brume"
+            " admin_apparence_intensite_legende admin_apparence_matiere_legende"
+            " matiere_aquarelle matiere_aplat admin_apparence_nombre_2"
+            " admin_apparence_nombre_3 admin_apparence_nombre_4"
+            " admin_apparence_nombre_5 admin_apparence_nombre_6"
+            " admin_apparence_bouton admin_apparence_erreur"
+            " admin_apparence_origine_titre admin_apparence_origine_aide"
+            " admin_apparence_origine_bouton admin_apparence_avis_appliquee"
+            " admin_apparence_avis_inchangee admin_apparence_avis_origine"
+            " apropos_apparence"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -265,7 +280,6 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_identifiant": frozenset({"identifiant"}),
     "trace_non_cites_resume": frozenset({"titre", "n"}),
     "trace_cout_valeur": frozenset({"cout"}),
-    "menu_connecte": frozenset({"nom"}),
     "aide_pseudo": frozenset({"min", "max"}),
     "aide_mot_de_passe": frozenset({"min", "max"}),
     "erreur_pseudo_forme": frozenset({"min", "max"}),
@@ -339,6 +353,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "admin_services_modele_langage": frozenset({"profil"}),
     "admin_services_profil_actif": frozenset({"profil", "etat"}),
     "admin_services_normalisation": frozenset({"normalisation"}),
+    "admin_apparence_intensite": frozenset({"n"}),
+    "admin_apparence_partage": frozenset({"nombre", "couleur", "espaces"}),
 }
 
 

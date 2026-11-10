@@ -10,27 +10,34 @@
 <link rel="stylesheet" href="/statique/senpai.css">
 <script src="/statique/attente.js" defer></script>
 </head>
-<body class="esp-{% block espace %}ciel{% endblock %}">
+<body class="{{ classes_body(self.espace()) }}">
 <a href="#contenu">{{ t.evitement }}</a>
 <header>
 <p>{{ t.nom_librairie }}</p>
 <p>{{ t.mention_courte }}</p>
+{# L'en-tête (E4, lot 7) : deux navigations nommées — les pages, puis le compte, poussé à
+   droite par la feuille (section 16). « Nouvelle conversation » est une action du
+   conseiller : elle vit dans sa page. #}
 <nav aria-label="{{ t.menu_etiquette }}">
 <ul>
 <li><a href="/"{% if menu_courant == "/" %} aria-current="page"{% endif %}>{{ t.menu_conseiller }}</a></li>
 <li><a href="/catalogue"{% if menu_courant == "/catalogue" %} aria-current="page"{% endif %}>{{ t.menu_catalogue }}</a></li>
-{% if compte %}
-{% if compte.role == "client" %}
+{% if compte and compte.role == "client" %}
 <li><a href="/compte/listes"{% if menu_courant == "/compte/listes" %} aria-current="page"{% endif %}>{{ t.menu_listes }}</a></li>
 {% endif %}
-<li><a href="/compte/mot-de-passe"{% if menu_courant == "/compte/mot-de-passe" %} aria-current="page"{% endif %}>{{ t.menu_mon_compte }}</a></li>
-{% if compte.role == "libraire" %}
+{% if compte and compte.role == "libraire" %}
 <li><a href="/libraire/critiques"{% if menu_courant == "/libraire/critiques" %} aria-current="page"{% endif %}>{{ t.menu_critiques }}</a></li>
 {% endif %}
-{% if compte.role == "admin" %}
+{% if compte and compte.role == "admin" %}
 <li><a href="/admin/comptes"{% if menu_courant == "/admin/comptes" %} aria-current="page"{% endif %}>{{ t.menu_administration }}</a></li>
 {% endif %}
-<li>{{ connecte }}</li>
+</ul>
+</nav>
+<nav class="compte-zone" aria-label="{{ t.compte_etiquette }}">
+<ul>
+{% if compte %}
+<li><span class="compte">{{ compte.nom_affiche }}</span></li>
+<li><a href="/compte/mot-de-passe"{% if menu_courant == "/compte/mot-de-passe" %} aria-current="page"{% endif %}>{{ t.menu_mon_compte }}</a></li>
 <li><form method="post" action="/deconnexion"><input type="hidden" name="jeton" value="{{ jeton }}"><button>{{ t.menu_deconnexion }}</button></form></li>
 {% else %}
 <li><a href="/connexion{{ suffixe_menu }}">{{ t.menu_connexion }}</a></li>
@@ -38,7 +45,6 @@
 {% endif %}
 </ul>
 </nav>
-<form method="get" action="/"><button>{{ t.nouvelle_conversation }}</button></form>
 </header>
 <main id="contenu">
 {% block contenu %}{% endblock %}

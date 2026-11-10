@@ -83,9 +83,10 @@ def soupe(reponse) -> BeautifulSoup:
 
 
 def menu(reponse) -> list[str]:
-    nav = soupe(reponse).select_one("header nav")
-    assert nav is not None
-    return [e.get_text(strip=True) for e in nav.select("a, button")]
+    # E4, lot 7 : le menu = les deux navigations de l'en-tête (les pages, le compte).
+    navs = soupe(reponse).select("header nav")
+    assert len(navs) == 2
+    return [e.get_text(strip=True) for nav in navs for e in nav.select("a, button")]
 
 
 def ligne(dsn: str, requete: str, params=()) -> tuple:
@@ -108,9 +109,9 @@ def etat_des_comptes(dsn: str) -> tuple:
 
 
 def liens_du_menu(reponse) -> dict[str, str]:
-    nav = soupe(reponse).select_one("header nav")
-    assert nav is not None
-    return {a.get_text(strip=True): a["href"] for a in nav.select("a")}
+    navs = soupe(reponse).select("header nav")
+    assert len(navs) == 2
+    return {a.get_text(strip=True): a["href"] for nav in navs for a in nav.select("a")}
 
 
 def un_seul_focus(page: BeautifulSoup) -> str:
@@ -864,10 +865,9 @@ def test_parcours_inscription_deconnexion_connexion(appli):
     assert client.post("/deconnexion", data={}).status_code == 200
     assert "Connexion" in menu(client.get("/"))
     assert connecter(client, "client_essai").headers["location"] == "/"
-    assert (
-        "Connecté : client_essai"
-        in soupe(client.get("/")).select_one("header nav").get_text()
-    )
+    # E4, lot 7 : la pastille du nom, dans la zone du compte.
+    zone = soupe(client.get("/")).select_one("header nav.compte-zone")
+    assert zone.select_one("span.compte").get_text(strip=True) == "client_essai"
 
 
 def test_parcours_cinq_echecs_verrou_message_identique_fin_du_verrou(appli, base):

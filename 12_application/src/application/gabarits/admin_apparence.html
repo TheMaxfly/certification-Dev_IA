@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block espace %}brume{% endblock %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.admin_apparence_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1>{{ t.admin_apparence_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
+<section class="zone-apparence">
+<p>{{ t.admin_apparence_intro }}</p>
+<p>{{ choisi_par }}</p>
+{% if avertissements %}
+<article class="zone-apparence-partage">
+<div role="status">
+{% for texte in avertissements %}
+<p>{{ texte }}</p>
+{% endfor %}
+</div>
+</article>
+{% endif %}
+{# Les pastilles (E4, lot 7) : la touche du pigment du paquet, découpée en carré par le
+   viewBox, à la taille d'une étiquette (section 15 de senpai.css) ; décoratives, le nom
+   de la couleur est toujours écrit. #}
+<form method="post" action="/admin/apparence">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+{% for groupe in groupes %}
+<fieldset{% if groupe.erreur %} aria-describedby="{{ groupe.champ }}-erreur"{% endif %}>
+<legend>{{ groupe.legende }}</legend>
+{% for choix in groupe.choix %}
+<label for="{{ groupe.champ }}-{{ choix.valeur }}"><input id="{{ groupe.champ }}-{{ choix.valeur }}" type="radio" name="{{ groupe.champ }}" value="{{ choix.valeur }}"{% if choix.coche %} checked{% endif %}{% if groupe.champ == premier_fautif and loop.first %} autofocus{% endif %}> {% if choix.touche %}<span class="badge"><svg viewBox="160 0 160 160" aria-hidden="true" focusable="false"><image href="{{ choix.touche }}"/></svg>{{ choix.libelle }}</span>{% else %}{{ choix.libelle }}{% endif %}</label>
+{% endfor %}
+</fieldset>
+{% if groupe.erreur %}<p id="{{ groupe.champ }}-erreur">{{ groupe.erreur }}</p>
+{% endif %}
+{% endfor %}
+<button type="submit">{{ t.admin_apparence_bouton }}</button>
+</form>
+</section>
+<section class="zone-apparence-origine" aria-labelledby="apparence-origine-titre">
+<h2 id="apparence-origine-titre">{{ t.admin_apparence_origine_titre }}</h2>
+<p>{{ t.admin_apparence_origine_aide }}</p>
+<form method="post" action="/admin/apparence/origine">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<button type="submit">{{ t.admin_apparence_origine_bouton }}</button>
+</form>
+</section>
+{% endblock %}

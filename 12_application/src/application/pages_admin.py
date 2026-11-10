@@ -57,6 +57,7 @@ ONGLETS = (
     ("/admin/cles", "onglet_cles"),
     ("/admin/couts", "onglet_couts"),
     ("/admin/services", "onglet_services"),
+    ("/admin/apparence", "onglet_apparence"),
 )
 #: Le dernier test des clés, gardé dans la session (le cookie signé) : un geste de
 #: l'instant, jamais en base ; et l'attente annoncée par un refus de la borne.

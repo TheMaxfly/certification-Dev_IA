@@ -526,8 +526,9 @@ def test_a1_hors_de_l_administration_aucun_onglet(appli, base):
 
 
 def menu(reponse) -> list[str]:
-    nav = soupe(reponse).select_one("header nav")
-    return [e.get_text(strip=True) for e in nav.select("a, button")]
+    # E4, lot 7 : le menu = les deux navigations de l'en-tête (les pages, le compte).
+    navs = soupe(reponse).select("header nav")
+    return [e.get_text(strip=True) for nav in navs for e in nav.select("a, button")]
 
 
 @pytest.mark.parametrize(

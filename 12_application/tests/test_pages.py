@@ -657,3 +657,59 @@ def test_aucun_gabarit_ne_marque_un_texte_comme_sur():
 
 def test_l_application_se_construit_sans_transport():
     assert creer_application(charger(ENVIRONNEMENT)).title == "Conseiller de lecture"
+
+
+# --------------------------------------------------------------------------- #
+#  « Nouvelle conversation », une action du conseiller (E4, lot 7, spec 02)
+# --------------------------------------------------------------------------- #
+NOUVELLE = 'main form.zone-nouvelle-conversation[method="get"][action="/"]'
+
+
+def test_nouvelle_conversation_absente_de_l_accueil_vierge_et_hors_du_conseiller(
+    navigateur,
+):
+    for chemin in ("/", "/catalogue", "/a-propos", "/route-inconnue"):
+        page = soupe(navigateur.get(chemin))
+        assert page.select_one(NOUVELLE) is None, chemin
+        assert page.select_one('header form[action="/"]') is None, chemin
+
+
+def test_nouvelle_conversation_presente_apres_une_reponse(navigateur):
+    r = navigateur.post(
+        "/question",
+        data={"question": "Un manga factice ?", "temperature": "0.0", "historique": ""},
+    )
+
+    assert r.status_code == 200
+    bouton = soupe(r).select_one(NOUVELLE + " button")
+    assert bouton.get_text(strip=True) == "Nouvelle conversation"
+
+
+def test_nouvelle_conversation_presente_apres_un_encart(navigateur):
+    r = navigateur.post(
+        "/question",
+        data={
+            "question": "Un manga factice ?",
+            "temperature": "0.0",
+            "historique": "{",
+        },
+    )
+
+    assert r.status_code == 422
+    assert soupe(r).select_one(NOUVELLE) is not None
+
+
+def test_nouvelle_conversation_presente_avec_un_historique_et_un_champ_fautif(
+    navigateur,
+):
+    historique = (
+        '[{"role": "libraire", "contenu": "Une question ?"},'
+        ' {"role": "assistant", "contenu": "Une réponse."}]'
+    )
+    r = navigateur.post(
+        "/question",
+        data={"question": "", "temperature": "0.0", "historique": historique},
+    )
+
+    assert r.status_code == 422
+    assert soupe(r).select_one(NOUVELLE) is not None

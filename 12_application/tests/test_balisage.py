@@ -37,6 +37,7 @@ from ecrans import (
     MDP_INSCRIPTION,
     REGLAGE_ECRANS,
     Ecran,
+    poser_apparence,
 )
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -190,7 +191,11 @@ def pages(base_balisage: str) -> Iterator[list[Page]]:
                 )
                 r = rendre_borne(application, ecran, base_balisage)
             elif ecran.role is not None:
+                if ecran.apparence:
+                    poser_apparence(base_balisage, ecran.apparence)
                 r = rendre(par_role[ecran.role], ecran)
+                if ecran.apparence:
+                    poser_apparence(base_balisage, ())
             else:
                 r = rendre(client_sans_api if ecran.api_fermee else client, ecran)
             rendues.append(
@@ -460,19 +465,70 @@ def test_sans_le_mode_aucun_ecran_ne_porte_score_ni_rang_ni_section(pages):
         assert page.soupe.select_one("#trace") is None, page.ecran.nom
 
 
-def test_nouvelle_conversation_est_un_bouton_en_tete_de_chaque_ecran(pages):
+def test_nouvelle_conversation_est_une_action_du_conseiller_seulement(pages):
+    """E4, lot 7 (spec 02) : le bouton quitte l'en-tête ; il est rendu dans le
+    conseiller seulement, quand une conversation existe (une réponse, un encart, un
+    historique) — jamais à l'accueil vierge, jamais sur une autre page."""
+    vus = {"present": 0, "absent": 0}
     for page in pages:
-        # Connecté, l'en-tête porte aussi le formulaire de déconnexion (POST).
-        formulaire = page.soupe.select_one('header form[action="/"]')
+        assert page.soupe.select_one('header form[action="/"]') is None, page.ecran.nom
+        formulaire = page.soupe.select_one('main form[method="get"][action="/"]')
+        zone = page.soupe.select_one("main > section[aria-live]")
+        conversation = page.soupe.select_one('main form[action="/question"]') and (
+            (zone is not None and zone.find(True) is not None)
+            or any(
+                h.get_text(strip=True) == "Conversation en cours"
+                for h in page.soupe.select("main > section > h2")
+            )
+        )
+        if not conversation:
+            assert formulaire is None, page.ecran.nom
+            vus["absent"] += 1
+            continue
+        vus["present"] += 1
         assert formulaire is not None, page.ecran.nom
-        assert formulaire["method"] == "get", page.ecran.nom
-        assert formulaire["action"] == "/", page.ecran.nom
+        assert formulaire["class"] == ["zone-nouvelle-conversation"], page.ecran.nom
         bouton = formulaire.select_one("button")
         assert bouton.get_text(strip=True) == "Nouvelle conversation", page.ecran.nom
         # Sans attribut type : Pico n'élargit que button[type=submit].
         assert not bouton.has_attr("type"), page.ecran.nom
         # Aucun champ : l'historique ne le suit pas, la page d'arrivée est vide.
         assert not formulaire.select("input, select, textarea"), page.ecran.nom
+    assert vus["present"] >= 20 and vus["absent"] >= 20, vus
+    vierge = next(p for p in pages if p.ecran.nom == "page_vide")
+    assert vierge.soupe.select_one('main form[method="get"][action="/"]') is None
+
+
+def test_l_en_tete_porte_deux_navigations_nommees(pages):
+    """E4, lot 7 (spec 02) : un seul `header`, deux `nav` nommés, aucun imbriqué — les
+    pages, puis le compte ; « Mon compte » et la déconnexion dans la zone du compte."""
+    for page in pages:
+        entetes = page.soupe.select("header")
+        assert len(entetes) == 1, page.ecran.nom
+        navs = entetes[0].select("nav")
+        assert [n.get("aria-label") for n in navs] == ["Pages", "Votre compte"]
+        assert navs[1]["class"] == ["compte-zone"], page.ecran.nom
+        assert not page.soupe.select("nav nav"), page.ecran.nom
+        pages_ = [a["href"] for a in navs[0].select("a")]
+        assert pages_[:2] == ["/", "/catalogue"], page.ecran.nom
+        assert "/compte/mot-de-passe" not in pages_, page.ecran.nom
+        assert not navs[0].select("form, span.compte"), page.ecran.nom
+        compte = navs[1]
+        role = page.ecran.role
+        connecte = role is not None and compte.select_one("span.compte") is not None
+        if connecte:
+            assert [a["href"] for a in compte.select("a")] == ["/compte/mot-de-passe"]
+            assert compte.select_one('form[action="/deconnexion"]') is not None
+            attendu = {
+                "client": ["/", "/catalogue", "/compte/listes"],
+                "libraire": ["/", "/catalogue", "/libraire/critiques"],
+                "admin": ["/", "/catalogue", "/admin/comptes"],
+            }[role]
+            assert pages_ == attendu, page.ecran.nom
+        elif role is None:
+            hrefs = [a["href"].split("?")[0] for a in compte.select("a")]
+            assert hrefs == ["/connexion", "/inscription"], page.ecran.nom
+            assert pages_ == ["/", "/catalogue"], page.ecran.nom
 
 
 def test_les_positions_de_temperature_ne_parlent_pas_de_mesure(pages):
@@ -614,6 +670,8 @@ def test_chaque_ecran_porte_un_seul_espace_celui_de_sa_page(pages):
             "Série introuvable",
         }:
             continue
+        if page.ecran.apparence:
+            continue  # E4, lot 7 : la couleur réglée (test_apparence_des_ecrans_regles)
         attendu = next(e for p, e in ESPACE_DU_CHEMIN if chemin.startswith(p))
         if page.statut == 200:
             assert espaces == [f"esp-{attendu}"], page.ecran.nom
@@ -659,3 +717,180 @@ def test_les_profils_indisponibles_portent_l_etiquette_de_statut(pages):
     if zone is not None:
         for ligne in zone.select("li"):
             assert ligne["class"] == ["badge", "statut", "ouvert"]
+
+
+#: Les classes de `<body>` de chaque écran au lot 6 (relevées le 2026-11-10 sur
+#: `d87f7bc`, avant le lot 7) : sans réglage, l'apparence ne change aucune d'elles.
+CLASSES_DU_LOT_6: dict[str, tuple[str, ...]] = {
+    "esp-brume": (
+        "admin_cles",
+        "admin_couts",
+        "admin_couts_plafond_atteint",
+        "admin_reglages",
+        "admin_reglages_api_absente",
+        "admin_reglages_indisponible",
+        "admin_services",
+        "admin_services_degrades",
+    ),
+    "esp-ciel": (
+        "a_propos",
+        "a_propos_sans_api",
+        "catalogue",
+        "catalogue_erreur_saisie",
+        "catalogue_indisponible",
+        "catalogue_resultats",
+        "catalogue_suggestions",
+        "catalogue_vide",
+        "inscription_bornee",
+        "page_404",
+        "serie_introuvable",
+    ),
+    "esp-menthe": (
+        "api_indisponible",
+        "aucun_profil",
+        "cle_refusee",
+        "conseiller_admin",
+        "conseiller_budget_atteint",
+        "conseiller_client",
+        "conseiller_debit_atteint",
+        "conseiller_libraire",
+        "conseiller_prerempli",
+        "conseiller_public",
+        "conseiller_quota_atteint",
+        "conseiller_quota_client_atteint",
+        "conversation_3_tours",
+        "conversation_5_tours",
+        "conversation_close",
+        "conversation_invalide",
+        "conversation_pleine",
+        "conversation_trop_longue",
+        "degrade_api_injoignable",
+        "degrade_base_indisponible",
+        "degrade_cle_invalide",
+        "degrade_corps_hors_contrat",
+        "degrade_corps_trop_volumineux",
+        "degrade_debit_depasse",
+        "degrade_debit_sans_entete",
+        "degrade_delai",
+        "degrade_encodage_en_service_change",
+        "degrade_entree_invalide",
+        "degrade_erreur_interne",
+        "degrade_fournisseur_corps_inattendu",
+        "degrade_fournisseur_delai",
+        "degrade_fournisseur_injoignable",
+        "degrade_fournisseur_longueur",
+        "degrade_fournisseur_refus_429",
+        "degrade_fournisseur_refus_429_sans_entete",
+        "degrade_fournisseur_refus_500",
+        "degrade_historique_invalide",
+        "degrade_profil_inconnu",
+        "degrade_profil_indisponible",
+        "degrade_question_trop_longue",
+        "degrade_reglage_non_expose",
+        "degrade_reponse_hors_contrat",
+        "degrade_service_embedding_incoherent",
+        "degrade_service_embedding_indisponible",
+        "degrade_sortie_demographie",
+        "degrade_sortie_disponibilite",
+        "degrade_sortie_fragment_inconnu",
+        "degrade_sortie_pseudonyme",
+        "degrade_sortie_refus_incoherent",
+        "degrade_sortie_schema",
+        "degrade_sortie_serie_inconnue",
+        "deux_modes",
+        "erreur_profil",
+        "erreur_question_longue",
+        "erreur_question_vide",
+        "erreur_temperature",
+        "page_vide",
+        "refus_aucun_passage",
+        "refus_demonstration",
+        "refus_hors_catalogue",
+        "refus_inconnu",
+        "reponse",
+        "reponse_cartes_client",
+        "reponse_complement",
+        "reponse_demonstration",
+        "reponse_metadonnees_nulles",
+        "reponse_reformulee",
+        "reponse_refus_avec_pont",
+        "reponse_refus_debit",
+        "reponse_sans_carte_avec_pont",
+        "reponse_sans_passage",
+        "reponse_titres",
+    ),
+    "esp-sakura": (
+        "serie",
+        "serie_critiques_indisponibles",
+        "serie_deux_resumes",
+        "serie_listes_client",
+        "serie_listes_visiteur",
+        "serie_resume_kitsu",
+        "serie_sans_note",
+        "serie_sans_resume",
+    ),
+}
+
+
+def test_sans_reglage_les_classes_du_corps_sont_celles_du_lot_6(pages):
+    """E4, lot 7 (décision 3) : sans réglage, le rendu du lot 6 à l'identique — la
+    même classe de `<body>`, et rien d'autre, sur chaque écran du catalogue."""
+    attendues = {nom: c for c, noms in CLASSES_DU_LOT_6.items() for nom in noms}
+    rendues = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in attendues
+    }
+    assert rendues == attendues
+    nouveaux = {p.ecran.nom for p in pages} - set(attendues)
+    assert all(
+        n.startswith(("admin_apparence", "apparence_")) for n in nouveaux - SPEC_02
+    )
+    rendues_02 = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in SPEC_02
+    }
+    assert rendues_02 == {
+        "entete_visiteur": "esp-ciel",
+        "entete_client": "esp-ciel",
+        "entete_admin": "esp-ciel",
+        "conseiller_apres_reponse": "esp-menthe",
+    }
+
+
+#: Les écrans de l'en-tête (E4, lot 7, spec 02), sans réglage d'apparence.
+SPEC_02 = {
+    "entete_visiteur",
+    "entete_client",
+    "entete_admin",
+    "conseiller_apres_reponse",
+}
+
+
+#: Les classes attendues des écrans réglés par `APPARENCE_ECRANS` : la couleur du
+#: suivant, 60 %, l'aplat.
+REGLEES = {
+    "admin_apparence_reglee": "esp-menthe intensite-60 matiere-aplat",
+    "apparence_conseiller": "esp-ciel intensite-60 matiere-aplat",
+    "apparence_catalogue": "esp-sakura intensite-60 matiere-aplat",
+    "apparence_fiche": "esp-yuzu intensite-60 matiere-aplat",
+    "apparence_listes": "esp-glycine intensite-60 matiere-aplat",
+    "apparence_libraire": "esp-brume intensite-60 matiere-aplat",
+    "apparence_administration": "esp-menthe intensite-60 matiere-aplat",
+    "admin_apparence": "esp-brume",
+    "admin_apparence_partage": "esp-brume",
+}
+
+
+def test_apparence_des_ecrans_regles(pages):
+    """E4, lot 7 : chaque espace rend la couleur réglée pour lui ; l'intensité et la
+    matière, sur toutes les pages."""
+    rendues = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in REGLEES
+    }
+    assert rendues == REGLEES
+    statuts = {p.ecran.nom: p.statut for p in pages if p.ecran.nom in REGLEES}
+    assert set(statuts.values()) == {200}, statuts

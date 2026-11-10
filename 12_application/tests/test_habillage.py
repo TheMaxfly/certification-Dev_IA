@@ -37,6 +37,7 @@ ESPACES = {
     "admin_comptes.html": "brume",
     "admin_critiques.html": "brume",
     "admin_critique_retirer.html": "brume",
+    "admin_apparence.html": "brume",
     "admin_reglages.html": "brume",
     "admin_cles.html": "brume",
     "admin_couts.html": "brume",
@@ -165,16 +166,21 @@ def test_chaque_gabarit_declare_l_espace_de_la_table():
     assert len(gabarits) == len(ESPACES)
     for fichier in gabarits:
         blocs = BLOC_ESPACE.findall(fichier.read_text(encoding="utf-8"))
-        declare = blocs[0] if blocs else "ciel"
-        assert len(blocs) <= 1, fichier.name
+        # E4, lot 7 : `base.html` lit le bloc (`self.espace()`), il n'en déclare plus :
+        # chaque gabarit de page déclare le sien, exactement un.
+        assert len(blocs) == 1, fichier.name
+        declare = blocs[0]
         assert declare in SIX, fichier.name
         assert declare == ESPACES.get(fichier.name, "ciel"), fichier.name
 
 
-def test_la_base_pose_l_espace_sur_le_corps_ciel_par_defaut():
+def test_la_base_pose_les_classes_calculees_d_apres_le_bloc_espace():
+    """E4, lot 7 : la classe de `<body>` est calculée par le serveur à partir du bloc
+    `espace` du gabarit (la couleur réglée de l'espace) ; une ligne de `base.html`."""
     base = (GABARITS / "base.html").read_text(encoding="utf-8")
 
-    assert '<body class="esp-{% block espace %}ciel{% endblock %}">' in base
+    assert '<body class="{{ classes_body(self.espace()) }}">' in base
+    assert "esp-" not in base
 
 
 @pytest.mark.parametrize(
@@ -311,3 +317,22 @@ def test_les_ressources_vendues_partent_avec_leur_type(navigateur, ressource, at
     d'intégration le vérifie dans le conteneur)."""
     assert TYPES_STATIQUES == {".woff2": "font/woff2", ".webp": "image/webp"}
     assert navigateur.get(ressource).headers["content-type"] == attendu
+
+
+def test_les_complements_du_lot_7_rattachent_kohai_a_la_page():
+    """E4, lot 7 (écart 1, décision de Max du 10 novembre) : `esp-menthe` n'est plus le
+    repère de la page du conseiller ; trois règles à la fin de la section 16, rien
+    d'autre n'est modifié (`test_kohai` garde l'empreinte des sections 1 à 15)."""
+    feuille = (STATIQUE / "senpai.css").read_text(encoding="utf-8")
+    debut = feuille.index("/* Compléments du lot 7")
+
+    assert debut > feuille.index("/* ---------- 16. Compléments du lot 6")
+    regles = [
+        "body main>h1:has(.kohai-principal){display:flex;align-items:center;"
+        "justify-content:space-between;gap:1rem}",
+        "body.esp-menthe main>h1:not(:has(.kohai-principal)){display:block}",
+        "body.esp-menthe main>h1:not(:has(.kohai-principal))::after{content:none}",
+    ]
+    for regle in regles:
+        assert feuille.count(regle) == 1, regle
+        assert feuille.index(regle) > debut, regle

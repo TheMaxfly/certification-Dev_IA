@@ -350,3 +350,17 @@ body.en-attente .kohai-principal{display:none}
 body .zone-pont-conseiller a::before{view-transition-name:kohai}
 /* écart 19 (spec 03, guide § 8) : un tableau large défile dans son conteneur focalisable */
 body .defilant{overflow-x:auto}
+/* Compléments du lot 7 (apparence réglée par l'administrateur, 10 novembre) : même
+   protocole ; le numéro est celui de l'écart au rapport du lot 7.
+   écart 1 : Kōhai suit la page (le conseiller, reconnu à son Kōhai principal), plus la
+   couleur ; une page réglée en menthe n'a pas de Kōhai, le conseiller en garde la mise en
+   page dans toute couleur */
+body main>h1:has(.kohai-principal){display:flex;align-items:center;justify-content:space-between;gap:1rem}
+body.esp-menthe main>h1:not(:has(.kohai-principal)){display:block}
+body.esp-menthe main>h1:not(:has(.kohai-principal))::after{content:none}
+/* écart 7 : l'en-tête en deux navigations (spec 02 du lot 7) — les pages à gauche, à la
+   taille de leur contenu (la base de 30rem du paquet renvoyait le compte à la ligne dès
+   1 280 px), la zone du compte poussée à droite ; sur un écran étroit, elle passe à la
+   ligne sous les pages */
+body>header>nav:not(.compte-zone){flex:1 1 auto;justify-content:flex-start}
+body>header>nav.compte-zone{flex:0 1 auto;margin-inline-start:auto}

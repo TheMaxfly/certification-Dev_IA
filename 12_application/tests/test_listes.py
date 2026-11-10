@@ -144,9 +144,10 @@ def boutons(element) -> list[tuple[str, str, str]]:
 
 
 def menu(reponse) -> list[str]:
-    nav = soupe(reponse).select_one("header nav")
-    assert nav is not None
-    return [e.get_text(strip=True) for e in nav.select("a, button")]
+    # E4, lot 7 : le menu = les deux navigations de l'en-tête (les pages, le compte).
+    navs = soupe(reponse).select("header nav")
+    assert len(navs) == 2
+    return [e.get_text(strip=True) for nav in navs for e in nav.select("a, button")]
 
 
 def avis(page: BeautifulSoup) -> str | None:
