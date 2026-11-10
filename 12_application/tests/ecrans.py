@@ -216,6 +216,12 @@ ECRANS: tuple[Ecran, ...] = (
         role="admin",
         catalogue="indisponible",
     ),
+    # E4, lot 7, spec 02 : l'en-tête en deux navigations, par rôle (1280 px ; à 360 px :
+    # `entete_360`, dans l'audit) ; « Nouvelle conversation » après une réponse.
+    Ecran("entete_visiteur", chemin="/catalogue"),
+    Ecran("entete_client", chemin="/catalogue", role="client"),
+    Ecran("entete_admin", chemin="/catalogue", role="admin"),
+    Ecran("conseiller_apres_reponse", question=QUESTION, role="client"),
     # E4, lot 7 : l'apparence. L'écran des réglages d'abord, sans réglage ; puis les
     # écrans réglés (`APPARENCE_ECRANS`, `APPARENCE_PARTAGEE`) : un par espace, et la
     # page des réglages elle-même dans une autre couleur. Chacun pose son réglage et le

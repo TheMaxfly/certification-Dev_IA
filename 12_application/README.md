@@ -69,14 +69,15 @@ administrateur.
 
 Un seul écran, `/`, dans l'ordre de lecture :
 
-1. le lien d'évitement ; le nom de la librairie, fictive ; la mention courte ; le bouton
-   **Nouvelle conversation**, sur chaque écran : un formulaire `GET /` sans champ, donc sans
-   script, et l'historique ne le suit pas ;
+1. le lien d'évitement ; l'en-tête : le nom de la librairie, fictive ; la mention courte ;
+   les deux navigations (« L'en-tête », ci-dessous) ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
 4. le formulaire : la question ; les **Réglages**, repliés, pour un libraire ou
    l'administrateur seulement (« Le conseiller selon le rôle ») ; le champ caché de
-   l'historique ;
+   l'historique ; puis, **quand une conversation existe** (une réponse, un encart, ou un
+   historique porté par la page), le bouton **Nouvelle conversation** : un formulaire
+   `GET /` sans champ, donc sans script, et l'historique ne le suit pas ;
 5. la réponse ou le refus ; la ligne discrète (profil, fournisseur, modèle, date de l'appel,
    reformulation, coût estimé, latence) ; une carte par série citée, ses métadonnées et ses
    seuls passages cités ; les détails techniques, repliés ;
@@ -99,6 +100,26 @@ cible de Prometheus. **Le catalogue** (E4, lot 2a) :
 issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
 `application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
 chaque appel.
+
+### L'en-tête (E4, lot 7)
+
+- **Deux navigations nommées** : « Pages » (Conseiller, Catalogue, puis selon le rôle Mes
+  listes, Mes critiques ou Administration) et « Votre compte » (un visiteur : Connexion,
+  Créer un compte ; connecté : la pastille du nom affiché, Mon compte, Déconnexion — un
+  formulaire `POST` avec jeton). Le lecteur d'écran les nomme ; `aria-current="page"` reste
+  sur la page courante, dans l'une ou l'autre. « Mon compte » est dans la zone du compte :
+  c'est le compte, pas une page du réseau.
+- **Placement par la feuille, pas par le balisage** : deux règles en section 16 de
+  `senpai.css` — les pages à la taille de leur contenu, à gauche ; la zone du compte poussée
+  à droite ; sur un écran étroit (360 px), elle passe à la ligne sous les pages (l'audit le
+  vérifie).
+- **« Nouvelle conversation » quitte l'en-tête** : c'est une action du conseiller, pas une
+  page ; elle est rendue dans `index.html` seulement, à côté du formulaire de question, et
+  seulement quand une conversation existe — à l'accueil vierge, elle n'apparaît pas. Même
+  action `GET /`, même texte.
+- Aucune route, aucun comportement ne change : le pont depuis la fiche, le quota, le cookie,
+  les renvois (303) sont intacts. Pas de page d'accueil séparée : le conseiller **est**
+  l'accueil.
 
 ### Le conseiller selon le rôle (E4, lot 2b)
 
@@ -682,7 +703,7 @@ AP1 ; la préférence par libraire est hors périmètre (elle demanderait une mi
   pose « perdu », le Kōhai principal caché pendant l'attente, le nom de transition sur le
   Kōhai de la fiche) ; aucune règle du paquet modifiée (un test garde l'empreinte de ce qui
   précède). Au lot 7, trois règles de plus rattachent Kōhai **à la page** et non plus à la
-  couleur `menthe` (voir « L'apparence »).
+  couleur `menthe` (voir « L'apparence »), et deux placent l'en-tête (« L'en-tête »).
 
 ### Le seul script
 

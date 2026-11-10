@@ -98,7 +98,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
             " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
             " erreur_comptes_titre erreur_comptes_texte"
-            " menu_etiquette menu_conseiller menu_mon_compte menu_critiques"
+            " menu_etiquette compte_etiquette menu_conseiller menu_mon_compte"
+            " menu_critiques"
             " menu_administration"
             " menu_connexion menu_inscription menu_deconnexion champ_pseudo"
             " champ_mot_de_passe champ_confirmation champ_ancien champ_nouveau"
@@ -279,7 +280,6 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_identifiant": frozenset({"identifiant"}),
     "trace_non_cites_resume": frozenset({"titre", "n"}),
     "trace_cout_valeur": frozenset({"cout"}),
-    "menu_connecte": frozenset({"nom"}),
     "aide_pseudo": frozenset({"min", "max"}),
     "aide_mot_de_passe": frozenset({"min", "max"}),
     "erreur_pseudo_forme": frozenset({"min", "max"}),

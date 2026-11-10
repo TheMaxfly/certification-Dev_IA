@@ -32,6 +32,11 @@
 </section>
 {% endif %}
 {% include "composants/formulaire.html" %}
+{# « Nouvelle conversation » (E4, lot 7) : une action du conseiller, quand une
+   conversation existe — une réponse, un encart, ou un historique porté par la page. #}
+{% if conversation_en_cours %}
+<form method="get" action="/" class="zone-nouvelle-conversation"><button>{{ t.nouvelle_conversation }}</button></form>
+{% endif %}
 {# La pose d'attente (E4, lot 6) : cachée par la feuille ; le seul script la montre à
    l'envoi de la question. Sans script, elle n'apparaît jamais. #}
 <div class="kohai-attente" aria-live="polite">{{ k.kohai("reflexion") }}<p>{{ t.kohai_attente }}</p></div>

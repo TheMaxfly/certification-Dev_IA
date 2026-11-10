@@ -273,11 +273,6 @@ def creer_application(
                 and request.url.path.startswith("/admin/")
                 else []
             ),
-            "connecte": (
-                presentation.dire(t, "menu_connecte", nom=compte.nom_affiche)
-                if compte is not None
-                else None
-            ),
             "jeton": sessions.jeton_csrf(request) if request else None,
             **valeurs,
         }
@@ -482,6 +477,10 @@ def creer_application(
             contexte(
                 request,
                 pose_kohai=presentation.pose_de_kohai(affichage, encart),
+                # « Nouvelle conversation » (E4, lot 7) : seulement quand il y en a une.
+                conversation_en_cours=bool(tours)
+                or affichage is not None
+                or (encart is not None),
                 peut_regler=droits.regler,
                 peut_demontrer=droits.demontrer,
                 peut_choisir_mode=droits.choisir_mode,

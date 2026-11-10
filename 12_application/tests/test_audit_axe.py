@@ -520,8 +520,8 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     assert not ecarts_etroits, ecarts_etroits
     # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).
     assert len(pages) == (
-        len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI) + 1
-    ), "+ admin_couts_etroit"
+        len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI) + 2
+    ), "+ admin_couts_etroit, entete_360"
 
 
 @dataclass(frozen=True)
@@ -987,6 +987,17 @@ LARGEURS = """() => ({
 })"""
 
 
+ZONES_DE_L_EN_TETE = """() => {
+  const [pages, compte] = document.querySelectorAll("header nav");
+  return {
+    pages_bas: pages.getBoundingClientRect().bottom,
+    compte_haut: compte.getBoundingClientRect().top,
+    page: document.documentElement.scrollWidth,
+    fenetre: window.innerWidth,
+  };
+}"""
+
+
 def auditer_etroit(
     navigateur: Any, source: str, adresse: str, console: list[str]
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
@@ -1017,6 +1028,16 @@ def auditer_etroit(
     if captures:
         page.screenshot(path=f"{captures}/admin_couts_etroit.png", full_page=True)
     pages = {"admin_couts_etroit": auditer(page, source, adresse)}
+    # E4, lot 7 (spec 02) : à 360 px, la zone du compte passe sous les pages.
+    page.goto(adresse + "/catalogue")
+    zones = page.evaluate(ZONES_DE_L_EN_TETE)
+    if zones["compte_haut"] < zones["pages_bas"] - 1:
+        ecarts.append(f"360 px : la zone du compte n'est pas sous les pages {zones}")
+    if zones["page"] > zones["fenetre"]:
+        ecarts.append(f"360 px : l'en-tête déborde ({zones['page']} px)")
+    if captures:
+        page.screenshot(path=f"{captures}/entete_360.png", full_page=False)
+    pages["entete_360"] = auditer(page, source, adresse)
     contexte.close()
     return pages, ecarts
 
@@ -1036,7 +1057,7 @@ def connecter_dans(contexte: Any, adresse: str, pseudo: str) -> None:
     page.fill("#mot_de_passe", MDP)
     with page.expect_navigation():
         page.click(ENVOYER)
-    menu = page.inner_text("header nav")
+    menu = page.inner_text("header nav.compte-zone")
     assert "/connexion" not in page.url and "Mon compte" in menu, pseudo
     page.close()
 

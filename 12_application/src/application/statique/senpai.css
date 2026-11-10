@@ -358,3 +358,9 @@ body .defilant{overflow-x:auto}
 body main>h1:has(.kohai-principal){display:flex;align-items:center;justify-content:space-between;gap:1rem}
 body.esp-menthe main>h1:not(:has(.kohai-principal)){display:block}
 body.esp-menthe main>h1:not(:has(.kohai-principal))::after{content:none}
+/* écart 7 : l'en-tête en deux navigations (spec 02 du lot 7) — les pages à gauche, à la
+   taille de leur contenu (la base de 30rem du paquet renvoyait le compte à la ligne dès
+   1 280 px), la zone du compte poussée à droite ; sur un écran étroit, elle passe à la
+   ligne sous les pages */
+body>header>nav:not(.compte-zone){flex:1 1 auto;justify-content:flex-start}
+body>header>nav.compte-zone{flex:0 1 auto;margin-inline-start:auto}

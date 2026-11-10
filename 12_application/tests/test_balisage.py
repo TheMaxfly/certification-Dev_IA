@@ -465,19 +465,70 @@ def test_sans_le_mode_aucun_ecran_ne_porte_score_ni_rang_ni_section(pages):
         assert page.soupe.select_one("#trace") is None, page.ecran.nom
 
 
-def test_nouvelle_conversation_est_un_bouton_en_tete_de_chaque_ecran(pages):
+def test_nouvelle_conversation_est_une_action_du_conseiller_seulement(pages):
+    """E4, lot 7 (spec 02) : le bouton quitte l'en-tête ; il est rendu dans le
+    conseiller seulement, quand une conversation existe (une réponse, un encart, un
+    historique) — jamais à l'accueil vierge, jamais sur une autre page."""
+    vus = {"present": 0, "absent": 0}
     for page in pages:
-        # Connecté, l'en-tête porte aussi le formulaire de déconnexion (POST).
-        formulaire = page.soupe.select_one('header form[action="/"]')
+        assert page.soupe.select_one('header form[action="/"]') is None, page.ecran.nom
+        formulaire = page.soupe.select_one('main form[method="get"][action="/"]')
+        zone = page.soupe.select_one("main > section[aria-live]")
+        conversation = page.soupe.select_one('main form[action="/question"]') and (
+            (zone is not None and zone.find(True) is not None)
+            or any(
+                h.get_text(strip=True) == "Conversation en cours"
+                for h in page.soupe.select("main > section > h2")
+            )
+        )
+        if not conversation:
+            assert formulaire is None, page.ecran.nom
+            vus["absent"] += 1
+            continue
+        vus["present"] += 1
         assert formulaire is not None, page.ecran.nom
-        assert formulaire["method"] == "get", page.ecran.nom
-        assert formulaire["action"] == "/", page.ecran.nom
+        assert formulaire["class"] == ["zone-nouvelle-conversation"], page.ecran.nom
         bouton = formulaire.select_one("button")
         assert bouton.get_text(strip=True) == "Nouvelle conversation", page.ecran.nom
         # Sans attribut type : Pico n'élargit que button[type=submit].
         assert not bouton.has_attr("type"), page.ecran.nom
         # Aucun champ : l'historique ne le suit pas, la page d'arrivée est vide.
         assert not formulaire.select("input, select, textarea"), page.ecran.nom
+    assert vus["present"] >= 20 and vus["absent"] >= 20, vus
+    vierge = next(p for p in pages if p.ecran.nom == "page_vide")
+    assert vierge.soupe.select_one('main form[method="get"][action="/"]') is None
+
+
+def test_l_en_tete_porte_deux_navigations_nommees(pages):
+    """E4, lot 7 (spec 02) : un seul `header`, deux `nav` nommés, aucun imbriqué — les
+    pages, puis le compte ; « Mon compte » et la déconnexion dans la zone du compte."""
+    for page in pages:
+        entetes = page.soupe.select("header")
+        assert len(entetes) == 1, page.ecran.nom
+        navs = entetes[0].select("nav")
+        assert [n.get("aria-label") for n in navs] == ["Pages", "Votre compte"]
+        assert navs[1]["class"] == ["compte-zone"], page.ecran.nom
+        assert not page.soupe.select("nav nav"), page.ecran.nom
+        pages_ = [a["href"] for a in navs[0].select("a")]
+        assert pages_[:2] == ["/", "/catalogue"], page.ecran.nom
+        assert "/compte/mot-de-passe" not in pages_, page.ecran.nom
+        assert not navs[0].select("form, span.compte"), page.ecran.nom
+        compte = navs[1]
+        role = page.ecran.role
+        connecte = role is not None and compte.select_one("span.compte") is not None
+        if connecte:
+            assert [a["href"] for a in compte.select("a")] == ["/compte/mot-de-passe"]
+            assert compte.select_one('form[action="/deconnexion"]') is not None
+            attendu = {
+                "client": ["/", "/catalogue", "/compte/listes"],
+                "libraire": ["/", "/catalogue", "/libraire/critiques"],
+                "admin": ["/", "/catalogue", "/admin/comptes"],
+            }[role]
+            assert pages_ == attendu, page.ecran.nom
+        elif role is None:
+            hrefs = [a["href"].split("?")[0] for a in compte.select("a")]
+            assert hrefs == ["/connexion", "/inscription"], page.ecran.nom
+            assert pages_ == ["/", "/catalogue"], page.ecran.nom
 
 
 def test_les_positions_de_temperature_ne_parlent_pas_de_mesure(pages):
@@ -792,7 +843,29 @@ def test_sans_reglage_les_classes_du_corps_sont_celles_du_lot_6(pages):
     }
     assert rendues == attendues
     nouveaux = {p.ecran.nom for p in pages} - set(attendues)
-    assert all(n.startswith(("admin_apparence", "apparence_")) for n in nouveaux)
+    assert all(
+        n.startswith(("admin_apparence", "apparence_")) for n in nouveaux - SPEC_02
+    )
+    rendues_02 = {
+        p.ecran.nom: " ".join(p.soupe.body.get("class", []))
+        for p in pages
+        if p.ecran.nom in SPEC_02
+    }
+    assert rendues_02 == {
+        "entete_visiteur": "esp-ciel",
+        "entete_client": "esp-ciel",
+        "entete_admin": "esp-ciel",
+        "conseiller_apres_reponse": "esp-menthe",
+    }
+
+
+#: Les écrans de l'en-tête (E4, lot 7, spec 02), sans réglage d'apparence.
+SPEC_02 = {
+    "entete_visiteur",
+    "entete_client",
+    "entete_admin",
+    "conseiller_apres_reponse",
+}
 
 
 #: Les classes attendues des écrans réglés par `APPARENCE_ECRANS` : la couleur du
