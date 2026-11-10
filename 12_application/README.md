@@ -546,6 +546,106 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   make app-admin-creer
 ```
 
+## L'identité Senpai (E4, lot 6)
+
+**Senpai** est le nom de travail du réseau fictif (`nom_librairie`, `config/reglages.toml`,
+modifiable) ; le pied de page le dit, après la mention de l'IA : « Senpai est un réseau
+fictif de librairies : projet de certification Développeur en intelligence artificielle
+(formation Simplon). » Le logo est une image qui porte le nom : si le nom change, les
+scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédit du pied de page
+(`mention_complete`) se réécrit à la main.
+
+- **Le paquet** : remis par la session design du 9 novembre 2026, versé **tel quel** dans
+  `src/application/statique/` — `theme.css` (remplacé), `senpai.css` (nouveau), `polices/`,
+  `lavis/`, `touches/`, `images/`, `icones/`, leurs licences ; ses empreintes ajoutées à
+  `statique/EMPREINTES`, commentaires de provenance compris. Ses pages d'aperçu et ses
+  scripts de génération restent hors dépôt. Tout écart au paquet est relevé au rapport du lot.
+- **`base.html`, trois retouches** : `senpai.css` après `theme.css` ; la classe d'espace
+  sur `<body>` (`esp-{% block espace %}ciel{% endblock %}`), chaque gabarit déclarant la
+  sienne ; `aria-current="page"` sur le lien du menu de la page courante (toute
+  l'administration sous « Administration » ; la page du conseiller aussi après une
+  question). Le logo est une image de fond du premier paragraphe de l'en-tête : aucune
+  balise ajoutée.
+- **Les espaces** (une page, une couleur) :
+
+| Espace | Gabarits |
+|---|---|
+| `menthe` | `index.html` (le conseiller) |
+| `ciel` (défaut) | `catalogue.html`, `connexion.html`, `inscription.html`, `a_propos.html`, `erreur.html` (et la page d'erreur de l'enveloppe, 413 et 500) |
+| `sakura` | `serie.html` |
+| `yuzu` | `mot_de_passe.html`, `listes.html`, `compte_supprimer.html` |
+| `glycine` | `critiques.html`, `critique_formulaire.html`, `critique_retirer.html` |
+| `brume` | les sept pages `admin_*.html` |
+
+  Un test lit le dossier des gabarits et compare chaque déclaration à cette table ; un
+  gabarit neuf sans déclaration hérite de `ciel`, c'est voulu.
+- **Les règles du design** : une page, une couleur (lavis, survol, onglets, étiquettes,
+  jauge) ; un seul bouton, blanc, trait d'encre et ombre décalée ; le bleu nuit pour ce qui
+  est choisi ou la page courante, la framboise pour les erreurs et les liens posés sur le
+  papier ; sur le lavis, l'encre seule. Le sens n'est jamais porté par la couleur seule.
+  Cibles de 44 px, focus visible de 3 px.
+- **Ressources vendues et licences** : polices Mochiy Pop One, Zen Maru Gothic (500, 700),
+  Yusei Magic, sous-ensembles latins en woff2, **SIL Open Font License 1.1**
+  (`polices/LICENCE-OFL`) ; 33 icônes **Phosphor Icons**, **MIT** (`icones/LICENCE-phosphor`) ;
+  lavis, touches, logo et poses de la mascotte créés pour le projet. Rien n'est chargé
+  d'ailleurs : toutes les `url()` de `senpai.css` visent `/statique/` (test).
+- **Politique de sécurité du contenu** : `font-src 'self'` ajouté pour les polices vendues,
+  et `script-src 'self'` pour le seul script vendu (la pose d'attente de la mascotte) ;
+  `default-src 'none'`, `style-src 'self'`, `img-src 'self' data:` inchangés ; aucun style
+  ni script en ligne, nulle part (test sur chaque écran).
+- **Pas de mode sombre** : `base.html` force `data-theme="light"`, et le thème n'a pas de
+  variante sombre.
+- **Le poids** : `statique/` passe de 73 477 à 349 896 octets (≈ 72 à 342 Ko) : polices
+  58 880, lavis 112 828, touches 9 084, images 28 845, icônes 15 346, `senpai.css` 29 857 ;
+  l'image Docker grossit d'autant.
+
+### Kōhai, la mascotte
+
+- **Phase 1** (le paquet, sans gabarit) : Kōhai en image, choisi par la feuille selon ce
+  que la page affiche (`:has()`) ; sur la fiche, le petit Kōhai du bouton « Demander au
+  conseiller ».
+- **Phase 2** (SVG en ligne) : `composants/kohai.html` inclut un des cinq dessins de
+  `gabarits/kohai/` (tels que remis) dans un cadre `aria-hidden` qui choisit l'animation
+  (`k-anim-*`). Sur le conseiller, dans le titre, la pose vient du serveur : **arrivée** à
+  chaque chargement de l'accueil (comme la phase 1 : rien n'est gardé dans la session, le
+  cookie ne porte que le strict nécessaire), **trouvé** quand la réponse cite au moins une
+  série, **perdu** sur un refus ou un encart. Kōhai est décoratif : le texte de la page dit
+  toujours l'état.
+- **Transitions entre pages** : `@view-transition` (Chrome et Edge 126+, Safari 18.2+ ;
+  Firefox change de page normalement) ; Kōhai passe du conseiller à la fiche (nom de
+  transition `kohai`). `:has()` : Chrome 105, Safari 15.4, Firefox 121 ; sans lui, la pose
+  « bonjour » reste.
+- **Mouvement réduit** : sous `prefers-reduced-motion: reduce`, aucune animation ni
+  transition (test sur le texte de la feuille ; écran de l'audit émulé).
+- **Compléments de la feuille** : une section 16 ajoutée à la fin de `senpai.css`, une
+  règle par manque relevé (l'image de la phase 1 retirée quand le SVG est là, un refus en
+  pose « perdu », le Kōhai principal caché pendant l'attente, le nom de transition sur le
+  Kōhai de la fiche) ; aucune règle du paquet modifiée (un test garde l'empreinte de ce qui
+  précède).
+
+### Le seul script
+
+- **Ce qu'il fait** : `statique/attente.js`, neuf lignes, sans dépendance, en mode strict :
+  à l'envoi du formulaire de question, il pose la classe `en-attente` sur `<body>` ; la
+  feuille montre alors Kōhai qui lit et la phrase « Kōhai lit les critiques… » (zone
+  `aria-live`), déjà dans la page et cachée.
+- **Ce qu'il ne fait pas** : il ne lit aucune donnée, n'envoie rien, ne touche ni cookie ni
+  stockage ; hors du conseiller, il ne trouve pas le formulaire et s'arrête.
+- **Pourquoi une exception** : la page suivante arrive avec la réponse ; la pose d'attente ne
+  peut donc pas venir du serveur.
+- **La politique** : `script-src 'self'`, une seule balise, dans `<head>`, `defer`, le fichier
+  empreinté dans `EMPREINTES` ; jamais en ligne.
+- **L'application est identique sans lui** : les tests rendent les pages sans exécuter de
+  script ; l'audit vérifie dans Chromium, JavaScript actif, que l'envoi pose la classe et
+  montre la phrase, et, JavaScript coupé, que la page ne change pas et que la question part.
+
+### Ressources
+
+`statique/EMPREINTES` liste chaque fichier vendu et son empreinte SHA-256 : Pico, puis les
+59 fichiers du paquet Senpai, puis le seul script (`attente.js`). Un test exige que **chaque** fichier de `statique/` qui n'est
+pas écrit pour l'application (`theme.css`, `senpai.css`) ou une licence y figure, avec
+l'empreinte exacte.
+
 ## Accessibilité
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
@@ -560,8 +660,11 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   modération, sa liste vide, sa confirmation), sur une base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
   reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
-- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
-  sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
+- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md),
+  versionné, réécrit par le test si le résultat change. Sa sortie brute,
+  `rapport_axe.json`, reste sur le poste (ignorée par git, régénérée à chaque audit) :
+  avec l'habillage, chaque texte posé sur une image de fond y figure avec son nœud (plus
+  de 4 Mo).
   **Défauts inscrits : aucun.** Une règle reste à relire à l'œil, dite au rapport.
 - **Sans navigateur, sur le poste et sur GitHub** : des tests de balisage par critère
   (`-k wcag`) : langue, titres, étiquettes, lien d'évitement, focus, zone annoncée, contraste
@@ -587,9 +690,10 @@ APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_prepro
   module (`APPLICATION_CLE_API`, le secret seul). Jamais dans un fichier suivi, une page, un
   journal : un test le vérifie, et les hooks la refusent par valeur et par aspect. Pour la
   révoquer : la retirer du trousseau, redémarrer l'API.
-- **En-têtes** : politique de sécurité du contenu stricte (aucun script, aucune ressource
-  externe ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14 occurrences,
-  toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
+- **En-têtes** : politique de sécurité du contenu stricte (aucune ressource externe, rien
+  en ligne ; `font-src 'self'` et `script-src 'self'` pour les polices et le seul script
+  vendus, E4, lot 6 ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14
+  occurrences, toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
   `Referrer-Policy`, `Cache-Control: no-store` sur les pages de conversation.
 - **Formulaire** : en `POST`, corps borné, gabarits échappés, aucun marquage « sûr » d'un
   texte venu de l'API ; **un jeton CSRF** dans chaque formulaire `POST` (celui du conseiller
@@ -682,7 +786,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Risque | Ici |
 |---|---|
 | Injection | requêtes paramétrées seules, sur le schéma `application` ; le rôle n'a rien ailleurs (refus `42501` éprouvés) ; l'API par son contrat |
-| XSS | échappement des gabarits, politique de sécurité du contenu sans script |
+| XSS (A03), mauvaise configuration (A05) : la politique | échappement des gabarits ; politique de sécurité du contenu sans rien en ligne : `script-src 'self'` pour **le seul script vendu**, empreinté (`attente.js`, E4, lot 6), aucun `<script>` en ligne ni attribut `on*` (test sur chaque écran ; mutations **E4H-02**, **E4H-07**) ; `font-src 'self'` (**E4H-01**) |
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
@@ -870,7 +974,10 @@ libraire, administrateur), la commande du premier administrateur (ci-dessus). **
 critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
 lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
 la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compte par son
-titulaire, le droit à l'effacement (ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
-l'affichage des mentions de membres connues du corpus ; l'administration du profil actif
-et de l'état des services ; le serveur avec préproduction et production ; l'identité
-visuelle, sur `theme.css`.
+titulaire, le droit à l'effacement (ci-dessus). **Lot 5 (l'administration)** : le profil
+actif, l'état et le test des clés, les coûts et la jauge du budget, l'état des services
+(ci-dessus). **Lot 6 (l'habillage, 0.8.0)** : l'identité Senpai, Kōhai animé, le seul
+script, les tableaux défilants (ci-dessus). À venir : l'apparence réglée par
+l'administrateur ; l'entrée des critiques de libraires dans le corpus ; le masquage à
+l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
+production.

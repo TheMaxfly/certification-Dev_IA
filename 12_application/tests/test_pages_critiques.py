@@ -220,7 +220,7 @@ def test_l2_le_libraire_ecrit_depuis_la_fiche(client, base):
         page.select_one("#texte-aide").get_text()
         == "Entre 50 et 2\u202f000 caractères."
     )
-    assert page.select_one("script") is None
+    assert page.select_one("script:not([src='/statique/attente.js'])") is None
 
 
 def test_l2_la_critique_parait_a_l_instant_signee_et_horodatee(client, base):
@@ -1152,7 +1152,7 @@ def test_balisage_titres_dans_l_ordre_evitement_langue_et_mention(
         assert page.select_one('a[href="#contenu"]') is not None, nom
         assert page.select_one("html")["lang"] == "fr", nom
         assert "Vous parlez à une IA." in page.get_text(), nom
-        assert page.select_one("script") is None, nom
+        assert page.select_one("script:not([src='/statique/attente.js'])") is None, nom
         assert len(page.select("[autofocus]")) <= 1, nom
 
 

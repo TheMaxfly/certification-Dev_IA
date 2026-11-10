@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}brume{% endblock %}
 {% import "composants/champ.html" as c %}
 {% block titre %}{{ t.admin_titre }}{% endblock %}
 {% block contenu %}
@@ -27,7 +28,7 @@
 </form>
 </section>
 <section>
-<h2>{{ t.admin_liste_titre }}</h2>
+<h2 id="comptes-liste-titre">{{ t.admin_liste_titre }}</h2>
 <form method="get" action="/admin/comptes">
 <label for="filtre-role">{{ t.admin_filtre_etiquette }}</label>
 <select id="filtre-role" name="role">
@@ -39,6 +40,7 @@
 <button type="submit">{{ t.admin_filtre_bouton }}</button>
 </form>
 {% if lignes %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="comptes-liste-titre">
 <table>
 <thead>
 <tr><th scope="col">{{ t.admin_colonne_pseudo }}</th><th scope="col">{{ t.admin_colonne_nom }}</th><th scope="col">{{ t.admin_colonne_role }}</th><th scope="col">{{ t.admin_colonne_etat }}</th><th scope="col">{{ t.admin_colonne_cree }}</th><th scope="col">{{ t.admin_colonne_action }}</th></tr>
@@ -54,6 +56,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% else %}
 <p>{{ t.admin_aucun }}</p>
 {% endif %}

@@ -489,11 +489,15 @@ def test_les_en_tetes_de_securite_sont_sur_chaque_reponse(navigateur, chemin):
     assert entetes["X-Identifiant-Requete"]
 
 
-def test_la_politique_interdit_script_et_ressource_externe():
+def test_la_politique_n_admet_que_l_application_elle_meme():
+    """E4, lot 6 : `font-src` et `script-src` à `'self'` seul (les polices et le script
+    vendus) ; ni `'unsafe-inline'`, ni hôte externe, nulle part."""
     directives = dict(d_.split(" ", 1) for d_ in POLITIQUE.split("; "))
 
     assert directives["default-src"] == "'none'"
-    assert "script-src" not in directives
+    assert directives["script-src"] == "'self'"
+    assert directives["font-src"] == "'self'"
+    assert "unsafe" not in POLITIQUE and "http" not in POLITIQUE
     assert directives["style-src"] == "'self'"
     assert directives["img-src"] == "'self' data:"
     assert directives["form-action"] == "'self'"
@@ -511,7 +515,10 @@ def test_les_pages_de_conversation_ne_vont_pas_en_cache(navigateur):
 def test_aucune_ressource_externe_ni_script_dans_le_html(navigateur, chemin):
     page = soupe(navigateur.get(chemin))
 
-    assert not page.select("script")
+    # E4, lot 6 : le seul script, vendu, servi par l'application — jamais en ligne.
+    assert [s_.attrs for s_ in page.select("script")] == [
+        {"src": "/statique/attente.js", "defer": ""}
+    ]
     for balise, attribut in (("link", "href"), ("img", "src"), ("a", "href")):
         for element in page.select(balise):
             valeur = element.get(attribut, "")

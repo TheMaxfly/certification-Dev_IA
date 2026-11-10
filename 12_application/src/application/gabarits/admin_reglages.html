@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}brume{% endblock %}
 {% import "composants/champ.html" as c %}
 {% block titre %}{{ t.admin_reglages_titre }}{% endblock %}
 {% block contenu %}
@@ -51,7 +52,7 @@
 <p>{{ t.admin_reglages_indisponibles_aide }}</p>
 <ul>
 {% for ligne in indisponibles %}
-<li>{{ ligne }}</li>
+<li class="badge statut ouvert">{{ ligne }}</li>
 {% endfor %}
 </ul>
 </section>

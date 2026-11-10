@@ -43,6 +43,7 @@ from fastapi.testclient import TestClient
 
 from application.app import GABARITS, STATIQUE, creer_application
 from application.config import charger
+from application.presentation import entree_du_menu
 
 ACCESSIBILITE = Path(__file__).resolve().parents[1] / "accessibilite"
 TITRES = ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -328,8 +329,14 @@ def test_wcag_1_1_1_toute_image_a_un_texte_de_remplacement(pages):
 
 
 def test_wcag_1_3_1_ni_style_en_ligne_ni_script(pages):
+    """E4, lot 6 : une seule balise `<script>`, celle du script vendu, vide et
+    différée ; rien d'autre, nulle part."""
     for page in pages:
-        assert not page.soupe.select("script, [style]"), page.ecran.nom
+        assert not page.soupe.select("style, [style]"), page.ecran.nom
+        scripts = page.soupe.select("script")
+        assert len(scripts) == 1, page.ecran.nom
+        assert scripts[0].attrs == {"src": "/statique/attente.js", "defer": ""}
+        assert not scripts[0].get_text(strip=True), page.ecran.nom
         for element in page.soupe.find_all(True):
             assert not [a for a in element.attrs if a.startswith("on")], page.ecran.nom
         assert "default-src 'none'" in page.entetes["Content-Security-Policy"]
@@ -389,7 +396,10 @@ def test_wcag_1_4_4_aucune_largeur_fixe_sur_les_conteneurs_de_texte():
     theme = (STATIQUE / "theme.css").read_text(encoding="utf-8")
 
     assert not re.search(r"\bwidth\s*:\s*\d+px", theme)
-    for fichier in GABARITS.rglob("*.html"):
+    # Les gabarits, et les SVG de la mascotte inclus en ligne (E4, lot 6).
+    fichiers = [*GABARITS.rglob("*.html"), *GABARITS.rglob("*.svg")]
+    assert len([f for f in fichiers if f.suffix == ".svg"]) == 5
+    for fichier in fichiers:
         texte = fichier.read_text(encoding="utf-8")
         assert not re.search(r"\s(width|height)=", texte), fichier.name
 
@@ -406,7 +416,7 @@ def test_wcag_1_4_1_chaque_etat_a_un_texte(pages):
 def test_wcag_1_3_1_le_classement_a_des_en_tetes_de_colonnes(pages):
     vus = 0
     for page in pages:
-        for tableau in page.soupe.select("#trace ~ table"):
+        for tableau in page.soupe.select("#trace ~ .defilant > table"):
             entetes = tableau.select("thead th")
             assert len(entetes) == 5, page.ecran.nom
             for entete in entetes:
@@ -579,3 +589,73 @@ def test_les_ecrans_de_l_administration_rendent_l_etat_voulu(pages):
         for tableau in vues[nom].soupe.select("main table"):
             assert tableau.select_one("caption").get_text(strip=True), nom
             assert all(th["scope"] == "col" for th in tableau.select("thead th")), nom
+
+
+#: L'espace attendu d'une page rendue, selon son chemin (E4, lot 6) ; les pages
+#: d'erreur sont `ciel`, quel que soit leur chemin.
+ESPACE_DU_CHEMIN = (
+    ("/admin/", "brume"),
+    ("/series/", "sakura"),
+    ("/catalogue", "ciel"),
+    ("/a-propos", "ciel"),
+    ("/inscription", "ciel"),
+    ("/", "menthe"),
+)
+
+
+def test_chaque_ecran_porte_un_seul_espace_celui_de_sa_page(pages):
+    """E4, lot 6 : la classe d'espace sur `<body>`, posée par chaque gabarit."""
+    for page in pages:
+        espaces = [c for c in page.soupe.body.get("class", []) if c.startswith("esp-")]
+        assert len(espaces) == 1, page.ecran.nom
+        chemin = page.ecran.chemin.split("?")[0]
+        if page.soupe.select_one("main h1").get_text() in {
+            "Page introuvable",
+            "Série introuvable",
+        }:
+            continue
+        attendu = next(e for p, e in ESPACE_DU_CHEMIN if chemin.startswith(p))
+        if page.statut == 200:
+            assert espaces == [f"esp-{attendu}"], page.ecran.nom
+
+
+def test_le_menu_marque_la_page_courante_sur_chaque_ecran(pages):
+    """E4, lot 6 : `aria-current="page"` sur le lien du menu de la page, et lui seul ;
+    toute l'administration sous « Administration »."""
+    vus = set()
+    for page in pages:
+        chemin = "/question" if page.ecran.question else page.ecran.chemin.split("?")[0]
+        entree = entree_du_menu(chemin)
+        hrefs = [a["href"] for a in page.soupe.select("header nav a")]
+        marques = page.soupe.select("header nav a[aria-current]")
+        attendu = [entree] if entree in hrefs else []
+        assert [a["href"] for a in marques] == attendu, page.ecran.nom
+        assert all(a["aria-current"] == "page" for a in marques), page.ecran.nom
+        vus.update(attendu)
+    assert {"/", "/catalogue", "/admin/comptes"} <= vus
+
+
+def test_chaque_tableau_rendu_defile_dans_un_conteneur_nomme(pages):
+    """E4, lot 6 (guide § 8) : sur un écran étroit, le tableau défile dans un conteneur
+    focalisable, nommé par sa légende ou par le titre qui le précède."""
+    vus = 0
+    for page in pages:
+        for tableau in page.soupe.select("table"):
+            conteneur = tableau.parent
+            assert conteneur.name == "div", page.ecran.nom
+            assert "defilant" in conteneur["class"], page.ecran.nom
+            assert conteneur["tabindex"] == "0", page.ecran.nom
+            assert conteneur["role"] == "region", page.ecran.nom
+            nom = page.soupe.select_one(f"#{conteneur['aria-labelledby']}")
+            assert nom is not None and nom.get_text(strip=True), page.ecran.nom
+            vus += 1
+    assert vus >= 5
+
+
+def test_les_profils_indisponibles_portent_l_etiquette_de_statut(pages):
+    page = next(p for p in pages if p.ecran.nom == "admin_reglages_indisponible")
+    zone = page.soupe.select_one(".zone-profils-indisponibles")
+
+    if zone is not None:
+        for ligne in zone.select("li"):
+            assert ligne["class"] == ["badge", "statut", "ouvert"]

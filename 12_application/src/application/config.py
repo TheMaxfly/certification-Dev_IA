@@ -92,6 +92,8 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " apropos_colonne_hebergement apropos_liste_inconnue"
             " apropos_conserve_titre apropos_conserve apropos_registre_titre"
             " apropos_registre apropos_licences_titre apropos_licences"
+            " apropos_identite_titre apropos_identite kohai_attente"
+            " effacement_quoi_titre"
             " erreur_400_titre erreur_400_texte erreur_404_titre erreur_404_texte"
             " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
             " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"

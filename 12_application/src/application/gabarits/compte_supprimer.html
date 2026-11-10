@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}yuzu{% endblock %}
 {% import "composants/champ.html" as c %}
 {% block titre %}{{ t.effacement_titre }}{% endblock %}
 {% block contenu %}
@@ -6,7 +7,7 @@
 {# Le droit à l'effacement (E4, lot 4, CL5) : ce qui est supprimé, ce qui reste,
    l'irréversible, puis le mot de passe exigé. #}
 <section class="zone-effacement" aria-labelledby="effacement-quoi">
-<h2 id="effacement-quoi">{{ t.apropos_effacement_titre }}</h2>
+<h2 id="effacement-quoi">{{ t.effacement_quoi_titre }}</h2>
 <p>{{ t.effacement_supprime }}</p>
 <p>{{ t.effacement_reste }}</p>
 <p><strong>{{ t.effacement_irreversible }}</strong></p>

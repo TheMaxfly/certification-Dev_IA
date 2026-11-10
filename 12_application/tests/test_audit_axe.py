@@ -7,8 +7,9 @@ navigateur, toute violation lue en console est un échec. Les `<details>` sont o
 sinon leur contenu n'est pas audité ; le formulaire est soumis, sinon une page issue
 d'un `POST` n'existe pas.
 
-Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.json`
-et `rapport_axe.md` ; un diff après un passage signale un changement à commiter.
+Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.md`
+(versionné ; un diff après un passage signale un changement à commiter) et
+`rapport_axe.json`, sa sortie brute, ignorée par git et gardée sur le poste (E4, lot 6).
 
 E4, lot 1 : les écrans des comptes (inscription, connexion, mot de passe,
 administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de rôle,
@@ -64,15 +65,27 @@ GRAVES = ("serious", "critical")
 INSCRITS: dict[str, str] = {}
 #: Ce qu'axe ne sait pas juger, avec ce qui le règle : écrit au rapport.
 A_REVOIR = {
-    "color-contrast": "le chevron d'une liste déroulante ou l'icône d'un champ invalide"
-    " est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces"
-    " champs est fixé par `theme.css`, et son contraste calculé par un test"
-    " (`test_wcag_1_4_3_…`). À relire à l'œil.",
+    "color-contrast": "le texte est posé sur une image de fond — le lavis d'aquarelle"
+    " de la page, la touche d'aquarelle d'une surface pâle (habillage Senpai, E4, lot"
+    " 6), le chevron d'une liste déroulante ou l'icône d'un champ invalide : axe ne"
+    " déduit pas la couleur du fond. Les couples du thème sont calculés par un test"
+    " (`test_wcag_1_4_3_…`) ; l'encre sur les lavis et les touches est mesurée au pire"
+    " pixel par les scripts du paquet d'habillage (au moins 7:1 sur le lavis à 100 %,"
+    " 10,1:1 sur les touches). À relire à l'œil, sur les captures de la recette.",
 }
 #: L'élément qui devrait avoir le focus l'a-t-il, une fois la page chargée ?
 FOCUS = """() => {
   const attendu = document.querySelector("[autofocus]");
   return attendu === null ? null : attendu === document.activeElement;
+}"""
+#: E4, lot 6 : avec la transition de vue entre pages (`@view-transition` de
+#: l'habillage), le navigateur pose le focus d'`autofocus` à la fin de la transition,
+#: après `load` ; sans elle (mouvement réduit), aussitôt. Le contrôle attend donc le
+#: focus, deux secondes au plus, puis le lit : un focus qui n'arrive jamais reste un
+#: échec.
+FOCUS_POSE = """() => {
+  const attendu = document.querySelector("[autofocus]");
+  return attendu === null || attendu === document.activeElement;
 }"""
 PREPARER = """(valeurs) => {
   const form = document.querySelector("main form");
@@ -99,6 +112,17 @@ LANCER = """(etiquettes) => axe.run(document, {
   runOnly: {type: "tag", values: etiquettes},
   resultTypes: ["violations", "incomplete"],
 })"""
+
+
+def focus_tenu(page: Any) -> bool | None:
+    """Le focus est-il sur l'élément `autofocus`, la transition de vue finie ?"""
+    from playwright.sync_api import TimeoutError as DelaiDepasse
+
+    try:
+        page.wait_for_function(FOCUS_POSE, timeout=2000)
+    except DelaiDepasse:
+        pass
+    return page.evaluate(FOCUS)
 
 
 def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
@@ -427,7 +451,7 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
                 ouvrir_borne(page, base, ecran)
             else:
                 ouvrir_ecran(page, base, ecran)
-            if page.evaluate(FOCUS) is False:
+            if focus_tenu(page) is False:
                 sans_focus.append(ecran.nom)
             if (page.query_selector("#trace") is not None) != ecran.demonstration:
                 ecarts_de_trace.append(ecran.nom)
@@ -436,6 +460,14 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
             pages[ecran.nom] = resume(page.evaluate(LANCER, ETIQUETTES), base)
             page.close()
             pile.close()
+        des_kohai, ecarts_kohai = auditer_kohai(
+            navigateur, source, adresse, adresse_sans_api, adresse_doublure, console
+        )
+        pages |= des_kohai
+        des_etroits, ecarts_etroits = auditer_etroit(
+            navigateur, source, adresse_comptes, console
+        )
+        pages |= des_etroits
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()
@@ -458,7 +490,12 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     assert not console, console
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
-    assert len(pages) == len(ECRANS) + len(ECRANS_COMPTES) + 1
+    assert not ecarts_kohai, ecarts_kohai
+    assert not ecarts_etroits, ecarts_etroits
+    # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).
+    assert len(pages) == (
+        len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI) + 1
+    ), "+ admin_couts_etroit"
 
 
 @dataclass(frozen=True)
@@ -753,6 +790,211 @@ REMPLIR = """([saisies, action]) => {
 }"""
 
 
+#: Ce que la page montre de Kōhai : la pose du principal, sa visibilité, la phrase de
+#: l'attente, la classe du corps, les animations en cours.
+ETAT_KOHAI = """() => {
+  const p = document.querySelector(".kohai-principal");
+  const a = document.querySelector(".kohai-attente");
+  const h = document.querySelector("main > h1");
+  return {
+    pose: p ? [...p.classList].find((c) => c.startsWith("k-anim-")) : null,
+    principal_visible: p ? p.getBoundingClientRect().width > 0 : false,
+    attente_visible: a ? getComputedStyle(a).display !== "none" : false,
+    image_phase_1: h ? getComputedStyle(h, "::after").content : null,
+    corps: document.body.className,
+    animations: document.getAnimations().length,
+  };
+}"""
+
+
+#: Les écrans de Kōhai audités par `auditer_kohai` (E4, lot 6).
+ECRANS_KOHAI = (
+    "conseiller_accueil_kohai",
+    "conseiller_reponse_kohai",
+    "conseiller_attente",
+    "conseiller_perdu_kohai",
+    "conseiller_mouvement_reduit",
+)
+SANS_TRANSITION = """() => !document.getAnimations().some(
+  (a) => (a.effect?.pseudoElement || "").startsWith("::view-transition"))"""
+GARDER_LA_PAGE = """() => document.querySelector("form[action='/question']")
+  .addEventListener("submit", (evenement) => evenement.preventDefault())"""
+
+
+def kohai_de(page: Any) -> dict[str, Any]:
+    return page.evaluate(ETAT_KOHAI)
+
+
+def envoyer_question(page: Any) -> None:
+    page.fill("#question", "Un manga factice pour débuter ?")
+    page.click("main form button[type=submit]")
+
+
+def auditer_kohai(
+    navigateur: Any,
+    source: str,
+    adresse: str,
+    adresse_sans_api: str,
+    adresse_doublure: str,
+    console: list[str],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Kōhai dans Chromium (E4, lot 6) : chaque pose, l'attente montrée par le seul
+    script, le mouvement réduit ; et, JavaScript coupé, la page sans changement et la
+    question qui part. Chaque écran est audité ; les captures, si `CAPTURES_KOHAI` nomme
+    un dossier (hors dépôt), y sont écrites."""
+    pages: dict[str, dict[str, Any]] = {}
+    ecarts: list[str] = []
+    captures = os.environ.get("CAPTURES_KOHAI")
+
+    def scenario(reponse: str) -> None:
+        httpx.post(
+            f"{adresse_doublure}/_essai/scenario",
+            json={"info": "nominale", "reponse": reponse, "catalogue": "nominal"},
+        ).raise_for_status()
+
+    def attendre(nom: str, etat: dict[str, Any], **attendu: object) -> None:
+        for cle, valeur in attendu.items():
+            if etat[cle] != valeur:
+                ecarts.append(f"{nom} : {cle} = {etat[cle]!r}, attendu {valeur!r}")
+
+    def noter(nom: str, page: Any, base: str) -> None:
+        # La transition de vue entre pages finie : la capture montre la page arrivée.
+        page.wait_for_function(SANS_TRANSITION, timeout=5000)
+        if captures:
+            page.screenshot(path=f"{captures}/{nom}.png", full_page=True)
+        pages[nom] = auditer(page, source, base)
+
+    def ecouter(page: Any, nom: str) -> None:
+        page.on(
+            "console",
+            lambda m: (
+                console.append(f"{nom} : {m.text}")
+                if "Content Security Policy" in m.text
+                else None
+            ),
+        )
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_accueil_kohai")
+    page.goto(adresse + "/")
+    attendre(
+        "arrivée",
+        kohai_de(page),
+        pose="k-anim-arrivee",
+        principal_visible=True,
+        image_phase_1="none",
+    )
+    page.goto(adresse + "/")
+    # Écart 16 : l'arrivée à chaque chargement de l'accueil, rien dans la session.
+    attendre("accueil", kohai_de(page), pose="k-anim-arrivee", attente_visible=False)
+    noter("conseiller_accueil_kohai", page, adresse)
+    scenario("nominale")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("réponse", kohai_de(page), pose="k-anim-trouve", image_phase_1="none")
+    noter("conseiller_reponse_kohai", page, adresse)
+    # L'attente : pendant une navigation, la page d'avant ne se lit plus. Un écouteur
+    # ajouté après celui du script (chargé avant `load`) arrête la seule navigation : le
+    # script a réagi au vrai envoi, la page reste à lire. Que la question parte, avec ou
+    # sans script, est vérifié ailleurs.
+    page.goto(adresse + "/")
+    page.evaluate(GARDER_LA_PAGE)
+    envoyer_question(page)
+    page.wait_for_selector("body.en-attente", state="attached", timeout=3000)
+    attendre(
+        "attente",
+        kohai_de(page),
+        attente_visible=True,
+        principal_visible=False,
+        corps="esp-menthe en-attente",
+    )
+    noter("conseiller_attente", page, adresse)
+    page.close()
+    contexte.close()
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_perdu_kohai")
+    page.goto(adresse_sans_api + "/")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("perdu", kohai_de(page), pose="k-anim-perdu", image_phase_1="none")
+    noter("conseiller_perdu_kohai", page, adresse_sans_api)
+    contexte.close()
+
+    contexte = navigateur.new_context(reduced_motion="reduce")
+    page = contexte.new_page()
+    ecouter(page, "conseiller_mouvement_reduit")
+    page.goto(adresse + "/")
+    attendre("mouvement réduit", kohai_de(page), pose="k-anim-arrivee", animations=0)
+    noter("conseiller_mouvement_reduit", page, adresse)
+    contexte.close()
+
+    # JavaScript coupé : rien ne change, la question part, pas de pose d'attente.
+    contexte = navigateur.new_context(java_script_enabled=False)
+    page = contexte.new_page()
+    page.goto(adresse + "/")
+    brut = page.request.get(adresse + "/").text()
+    if 'class="esp-menthe"' not in brut or "en-attente" in page.content():
+        ecarts.append("sans JavaScript : la page diffère de celle du serveur")
+    with page.expect_navigation():
+        envoyer_question(page)
+    if page.inner_text("section[aria-live] h2") != "Réponse":
+        ecarts.append("sans JavaScript : la question n'est pas partie")
+    if "en-attente" in (page.get_attribute("body", "class") or ""):
+        ecarts.append("sans JavaScript : la pose d'attente est apparue")
+    contexte.close()
+    assert sorted(pages) == sorted(ECRANS_KOHAI)
+    return pages, ecarts
+
+
+#: La page tient dans la largeur ; chaque tableau, dans son conteneur défilant.
+LARGEURS = """() => ({
+  page: document.documentElement.scrollWidth,
+  fenetre: window.innerWidth,
+  tableaux: [...document.querySelectorAll("table")].map((t) => ({
+    conteneur: t.parentElement.classList.contains("defilant"),
+    defile: t.parentElement.scrollWidth > t.parentElement.clientWidth,
+    deborde: t.parentElement.getBoundingClientRect().right > window.innerWidth + 1,
+  })),
+})"""
+
+
+def auditer_etroit(
+    navigateur: Any, source: str, adresse: str, console: list[str]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Les coûts de l'administration sur un écran de 360 px (E4, lot 6, guide § 8) : la
+    page ne déborde pas, le tableau défile dans son conteneur."""
+    ecarts: list[str] = []
+    contexte = navigateur.new_context(viewport={"width": 360, "height": 740})
+    connecter_dans(contexte, adresse, "conseiller_admin_audit")
+    page = contexte.new_page()
+    page.on(
+        "console",
+        lambda m: (
+            console.append(f"admin_couts_etroit : {m.text}")
+            if "Content Security Policy" in m.text
+            else None
+        ),
+    )
+    page.goto(adresse + "/admin/couts")
+    largeurs = page.evaluate(LARGEURS)
+    if largeurs["page"] > largeurs["fenetre"]:
+        ecarts.append(f"360 px : la page déborde ({largeurs['page']} px)")
+    if not largeurs["tableaux"]:
+        ecarts.append("360 px : aucun tableau sur la page des coûts")
+    for tableau in largeurs["tableaux"]:
+        if not tableau["conteneur"] or tableau["deborde"]:
+            ecarts.append(f"360 px : tableau hors de son conteneur {tableau}")
+    captures = os.environ.get("CAPTURES_KOHAI")
+    if captures:
+        page.screenshot(path=f"{captures}/admin_couts_etroit.png", full_page=True)
+    pages = {"admin_couts_etroit": auditer(page, source, adresse)}
+    contexte.close()
+    return pages, ecarts
+
+
 def auditer(page: Any, source: str, base: str) -> dict[str, Any]:
     page.evaluate(OUVRIR)
     page.evaluate(source)
@@ -812,7 +1054,7 @@ def auditer_les_comptes(
                 page.click(ecran.bouton)
         titre = page.inner_text("main h1")
         assert titre == ecran.titre, (nom, titre)
-        if page.evaluate(FOCUS) is False:
+        if focus_tenu(page) is False:
             sans_focus.append(nom)
         pages[nom] = auditer(page, source, adresse)
         page.close()

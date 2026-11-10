@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}brume{% endblock %}
 {% import "composants/champ.html" as c %}
 {% block titre %}{{ t.admin_cles_titre }}{% endblock %}
 {% block contenu %}
@@ -17,8 +18,9 @@
 </div>
 </article>
 {% else %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="tableau-cles">
 <table>
-<caption>{{ t.admin_cles_tableau }}</caption>
+<caption id="tableau-cles">{{ t.admin_cles_tableau }}</caption>
 <thead>
 <tr><th scope="col">{{ t.admin_cles_colonne_profil }}</th><th scope="col">{{ t.admin_cles_colonne_fournisseur }}</th><th scope="col">{{ t.admin_cles_colonne_modele }}</th><th scope="col">{{ t.admin_cles_colonne_variable }}</th><th scope="col">{{ t.admin_cles_colonne_demarrage }}</th><th scope="col">{{ t.admin_cles_colonne_test }}</th></tr>
 </thead>
@@ -35,6 +37,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% endif %}
 <p>{{ t.admin_cles_procedure_avant }} <a href="{{ lien_procedure }}">{{ t.admin_cles_procedure }}</a></p>
 </section>

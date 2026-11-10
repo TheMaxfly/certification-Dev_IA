@@ -1,0 +1,352 @@
+/* Senpai — habillage de l'application (CSS personnalisé). Chargé après
+   pico.classless.min.css et theme.css ; il lit les jetons --sp-* de theme.css.
+   Il s'applique au HTML sémantique des gabarits (sans classes) et aux classes de zone déjà
+   posées par le développement (zone-titre, zone-note, zone-critiques-reseau, zone-resultats,
+   zone-suggestions, zone-pont-conseiller, zone-pont-catalogue, zone-formulaire-critique,
+   badge-label). Seule accroche nouvelle attendue : la classe d'espace sur <body>.
+
+   Règle de couleur : une page, une couleur. Le lavis, le survol des boutons, les onglets en
+   retrait, les étiquettes, les messages et la jauge prennent la couleur de l'espace ; le bleu
+   nuit marque ce qui est choisi ou la page courante ; la framboise ne sert qu'aux erreurs et
+   aux liens du texte.
+
+   Sommaire : 1 polices · 2 espaces · 3 lavis · 4 texte · 5 en-tête et pied · 6 cartes ·
+   7 boutons · 8 champs · 9 navigation secondaire · 10 messages · 11 zones des écrans ·
+   12 tableaux, détails, citations · 13 Kōhai · 15 composants des écrans à venir ·
+   14 mouvement, impression, contraste forcé (en dernier) */
+
+/* ---------- 1. Polices (OFL, sous-ensembles latins, vendues ; CSP : font-src 'self') ---------- */
+@font-face{font-family:"Mochiy Pop One";src:url(/statique/polices/mochiy-pop-one-400.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Zen Maru Gothic";src:url(/statique/polices/zen-maru-gothic-500.woff2) format("woff2");font-weight:400 500;font-style:normal;font-display:swap}
+@font-face{font-family:"Zen Maru Gothic";src:url(/statique/polices/zen-maru-gothic-700.woff2) format("woff2");font-weight:600 700;font-style:normal;font-display:swap}
+@font-face{font-family:"Yusei Magic";src:url(/statique/polices/yusei-magic-400.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+
+/* ---------- 2. Espaces : la couleur de chaque page ----------
+   <body class="esp-menthe"> sur l'assistant, esp-ciel catalogue et comptes, esp-sakura série,
+   esp-yuzu listes et compte, esp-glycine espace libraire, esp-brume administration.
+   Sans classe : ciel. Réglages facultatifs : intensite-60 | -70 | -85 | -100, matiere-aplat. */
+body{
+  --pico-border-width:2px;
+  --sp-lavis:url(/statique/lavis/lavis-ciel.webp);
+  --sp-touche:url(/statique/touches/touche-ciel.webp);
+}
+body.esp-ciel{--sp-accent:#7db8e8;--sp-accent-pale:#d8e8f3;--sp-voile:#d6e6f1;--sp-lavis:url(/statique/lavis/lavis-ciel.webp);--sp-touche:url(/statique/touches/touche-ciel.webp)}
+body.esp-sakura{--sp-accent:#f28db2;--sp-accent-pale:#fbdbe2;--sp-voile:#f9d9e1;--sp-lavis:url(/statique/lavis/lavis-sakura.webp);--sp-touche:url(/statique/touches/touche-sakura.webp)}
+body.esp-menthe{--sp-accent:#86d6bc;--sp-accent-pale:#dbf1e5;--sp-voile:#d9efe4;--sp-lavis:url(/statique/lavis/lavis-menthe.webp);--sp-touche:url(/statique/touches/touche-menthe.webp)}
+body.esp-yuzu{--sp-accent:#f7d35e;--sp-accent-pale:#fdf0c9;--sp-voile:#fbeec8;--sp-lavis:url(/statique/lavis/lavis-yuzu.webp);--sp-touche:url(/statique/touches/touche-yuzu.webp)}
+body.esp-glycine{--sp-accent:#b7a3ec;--sp-accent-pale:#e9e2f4;--sp-voile:#e7e0f2;--sp-lavis:url(/statique/lavis/lavis-glycine.webp);--sp-touche:url(/statique/touches/touche-glycine.webp)}
+body.esp-brume{--sp-accent:#8f9ac8;--sp-accent-pale:#dddfe9;--sp-voile:#dfe1e9;--sp-lavis:url(/statique/lavis/lavis-brume.webp);--sp-touche:url(/statique/touches/touche-brume.webp)}
+body.intensite-60{--sp-intensite:.6}
+body.intensite-70{--sp-intensite:.7}
+body.intensite-85{--sp-intensite:.85}
+body.intensite-100{--sp-intensite:1}
+body.matiere-aplat{--sp-touche:none}
+
+/* surface pâle de l'espace : touche d'aquarelle sur l'aplat (repli si l'image manque) */
+body{--sp-surface:var(--sp-touche) center / cover no-repeat, var(--sp-accent-pale)}
+
+/* ---------- 3. Le lavis : dégradé d'aquarelle sur toute la page, voile jusqu'en bas ----------
+   Contraste garanti par construction : encre ≥ 7:1 au pixel le plus foncé, lavis à 100 %. */
+html{background-color:var(--sp-page)}
+body{position:relative;isolation:isolate;min-height:100vh;background:transparent;color:var(--sp-encre);font-weight:500}
+body::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:var(--sp-lavis) center top / max(100%, 1100px) auto no-repeat, var(--sp-voile);
+  opacity:var(--sp-intensite)}
+
+/* ---------- 4. Texte ---------- */
+h1,h2{font-family:var(--sp-police-titre);font-weight:400;letter-spacing:0}
+h1{font-size:clamp(1.8rem,1.3rem + 2vw,2.5rem);line-height:1.2;margin-bottom:.75rem}
+h2{font-size:clamp(1.3rem,1.1rem + 1vw,1.65rem);line-height:1.25}
+h3{font-weight:700;font-size:1.15rem}
+strong,b{font-weight:700}
+/* Sur le lavis : l'encre seule (petits textes, liens, intitulés compris). Sur le papier des
+   cartes : l'encre douce pour le secondaire, la framboise pour les liens. */
+body small{color:var(--sp-encre)}
+body main a:not([role=button]){color:var(--sp-encre);text-underline-offset:.2em;text-decoration-thickness:2px}
+body :is(article,details,table,.zone-titre,.zone-resultats li,.zone-note>p,.zone-formulaire-critique form,main>form:has([type=password]),main>section>form[method=post]) small,
+body :is(article,.zone-titre) dt{color:var(--sp-encre-douce)}
+body :is(article,details,table,.zone-titre,.zone-note>p,.zone-formulaire-critique form,main>form:has([type=password]),main>section>form[method=post]) a:not([role=button]),
+body>footer a{color:var(--sp-framboise)}
+body a:not([role=button]):hover{text-decoration-thickness:3px}
+/* lien d'évitement : visible au focus seulement */
+body>a[href="#contenu"]:first-child{position:absolute;left:.75rem;top:-5rem;z-index:10;padding:.5rem .9rem;border:2px solid var(--sp-encre);border-radius:10px;background:var(--sp-papier);color:var(--sp-encre);font-weight:700}
+body>a[href="#contenu"]:first-child:focus{top:.75rem}
+:focus-visible{outline:3px solid var(--sp-encre);outline-offset:3px}
+
+/* ---------- 5. En-tête et pied de page ---------- */
+body>header{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.25rem;padding-block:1rem;border-bottom:3px solid var(--sp-encre)}
+body>header>p:first-of-type{margin:0;display:flex;align-items:center;gap:.6rem;font-family:var(--sp-police-titre);font-size:1.7rem;line-height:1.1}
+body>header>p:first-of-type::before{content:"";flex:none;width:2.4rem;height:2.4rem;background:url(/statique/images/logo-senpai.svg) center / contain no-repeat}
+body>header>p:nth-of-type(2){margin:0;padding:.15rem .7rem;border:2px dashed var(--sp-encre);border-radius:999px;background:var(--sp-papier);font-size:.9rem;font-weight:700}
+body>header>nav{flex:1 1 30rem;justify-content:flex-end}
+body>header>nav ul:nth-of-type(n){flex-wrap:wrap;gap:.5rem;margin:0}
+body>header>nav li{padding:0}
+body>header>nav li:not(:has(a,form)){font-size:.95rem;color:var(--sp-encre)}
+body>header>nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 1rem;margin:0;box-sizing:border-box;
+  border:2px solid var(--sp-encre);border-radius:999px;background-color:var(--sp-papier);color:var(--sp-encre);font-weight:700;text-decoration:none;
+  transition:background-color .15s}
+body>header>nav a:hover{background:var(--sp-surface);color:var(--sp-encre)}
+body>header>nav a[aria-current=page]{background:var(--sp-encre);color:#fff}
+body>header>nav form,body>header>form{margin:0}
+body>footer{margin-block:2rem 1.5rem;padding:1rem 1.5rem;border:2px dashed var(--sp-encre);border-radius:var(--sp-rayon-carte);background:var(--sp-papier);font-size:.95rem;line-height:1.55}
+body>footer p{margin:.25rem 0}
+body>footer>p:first-of-type{font-weight:700}
+
+/* ---------- 6. Cartes (article de Pico) ---------- */
+body article{background-color:var(--sp-papier);border:2.5px solid var(--sp-encre);border-radius:var(--sp-rayon-carte);box-shadow:var(--sp-ombre-carte);padding:1.25rem 1.5rem;margin-block:1.25rem}
+body article article{box-shadow:none;border-width:2px;border-radius:16px}
+
+/* ---------- 7. Boutons : un seul, blanc ; au survol, la couleur de la page ---------- */
+body :is(button,[type=submit],[type=button],[type=reset],[role=button]),
+body .zone-pont-conseiller a,body .zone-pont-catalogue a{
+  font:inherit;font-weight:700;font-size:1rem;line-height:1.2;
+  display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  width:auto;min-height:44px;padding:.55rem 1.25rem;box-sizing:border-box;margin-bottom:0;
+  border:2px solid var(--sp-encre);border-radius:999px;
+  background:var(--sp-papier);color:var(--sp-encre);box-shadow:var(--sp-ombre);
+  text-decoration:none;cursor:pointer;
+  transition:transform .15s cubic-bezier(.3,.7,.4,1),box-shadow .15s cubic-bezier(.3,.7,.4,1),background-color .15s}
+body :is(button,[type=submit],[type=button],[type=reset],[role=button]):hover,
+body .zone-pont-conseiller a:hover,body .zone-pont-catalogue a:hover{
+  transform:translate(-1px,-1px);box-shadow:var(--sp-ombre-haute);background:var(--sp-surface);color:var(--sp-encre)}
+body :is(button,[type=submit],[type=button],[type=reset],[role=button]):active,
+body .zone-pont-conseiller a:active,body .zone-pont-catalogue a:active{
+  transform:translate(2px,2px);box-shadow:var(--sp-ombre-basse);background:var(--sp-surface)}
+body :is(button,[type=submit],[type=button],[type=reset],[role=button]):focus-visible,
+body .zone-pont-conseiller a:focus-visible,body .zone-pont-catalogue a:focus-visible{outline:3px solid var(--sp-encre);outline-offset:3px}
+body :is(button,[type=submit],[type=button],[type=reset],[role=button]):is(:disabled,[aria-disabled=true]){
+  background:var(--sp-papier);color:var(--sp-encre-douce);border:2px dashed var(--sp-trait);box-shadow:none;transform:none;cursor:not-allowed;opacity:1}
+body>header :is(button,[type=submit]){min-height:40px;padding:.4rem 1rem;font-size:.95rem}
+
+/* ---------- 8. Champs ---------- */
+body label,body legend{font-weight:700}
+body :is(input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=hidden],[type=submit],[type=button],[type=reset]),select,textarea){
+  border:2px solid var(--sp-encre);border-radius:var(--sp-rayon-champ);background-color:var(--sp-papier);color:var(--sp-encre);
+  box-shadow:inset 3px 3px 0 rgba(29,35,70,.07);font-size:1rem;min-height:46px}
+body :is(input,select,textarea):focus-visible{outline:3px solid var(--sp-encre);outline-offset:2px;background-color:#fff}
+body :is(input,select,textarea)::placeholder{color:var(--sp-encre-douce);opacity:1}
+body :is(input:not([type=checkbox],[type=radio]),textarea)[aria-invalid=true]{border-color:var(--sp-framboise);background-image:none}
+body select[aria-invalid=true]{border-color:var(--sp-framboise)}
+body form small{display:block;margin-top:-.5rem;margin-bottom:var(--pico-spacing);color:var(--sp-encre-douce)}
+body p[id$="-erreur"]{display:block;margin-top:-.4rem;padding-left:1.7rem;color:var(--sp-framboise);font-weight:700;
+  background:url(/statique/images/alerte-framboise.svg) left .1em / 1.25rem no-repeat}
+body [type=checkbox],body [type=radio]{border:2px solid var(--sp-encre)}
+body [type=checkbox]:not([role=switch]):hover,body [type=radio]:hover{background-color:var(--sp-accent-pale)}
+body [type=checkbox][role=switch]{background-color:var(--sp-papier);border:2px solid var(--sp-encre)}
+body [type=checkbox][role=switch]::before{background-color:var(--sp-encre);box-shadow:none}
+body [type=checkbox][role=switch]:checked{background-color:var(--sp-accent);background-image:none;border-color:var(--sp-encre)}
+body [role=search]{gap:.6rem;box-shadow:none;border-radius:0}
+body [role=search]>:is(input,button,[type=submit]){border-radius:999px}
+
+/* ---------- 9. Navigation secondaire : pagination ---------- */
+body main nav{flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:.6rem;margin-block:1.25rem}
+body main nav>p[aria-current=page]{margin:0;padding:.45rem 1rem;border-radius:999px;background:var(--sp-encre);color:#fff;font-weight:700}
+body main nav>a{display:inline-flex;align-items:center;min-height:44px;padding:0 1.1rem;border:2px solid var(--sp-encre);border-radius:999px;
+  background:var(--sp-papier);color:var(--sp-encre);font-weight:700;text-decoration:none;box-shadow:var(--sp-ombre)}
+body main nav>a:hover{background:var(--sp-surface)}
+
+/* ---------- 10. Messages : avis (role=status) et encarts (role=alert) ---------- */
+body article:has(>[role=status]),body article:has(>[role=alert]){background:var(--sp-surface);box-shadow:4px 4px 0 var(--sp-encre)}
+body article>[role=status]>p:first-child{padding-left:2rem;background:url(/statique/images/confirme-encre.svg) left .1em / 1.4rem no-repeat}
+body article>[role=status]>p:last-child,body article>[role=alert]>p:last-child{margin-bottom:0}
+body article>[role=alert]>h2{font-size:1.25rem}
+
+/* ---------- 11. Zones des écrans ---------- */
+/* fiche de série : métadonnées en vis-à-vis, les deux notes côte à côte */
+body .zone-titre{padding:1.1rem 1.4rem;border:2.5px solid var(--sp-encre);border-radius:var(--sp-rayon-carte);background:var(--sp-papier);box-shadow:var(--sp-ombre-carte);margin-block:1rem 1.25rem}
+body .zone-titre>p:last-child{margin-bottom:0}
+body .zone-titre dl,body article dl{display:grid;grid-template-columns:max-content 1fr;gap:.3rem 1rem;margin:0 0 .75rem}
+body :is(.zone-titre,article) dt{font-weight:500}
+body :is(.zone-titre,article) dd{margin:0;font-weight:700}
+body .zone-note{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:1rem;margin-block:1.25rem}
+body .zone-note>p{margin:0;padding:1rem 1.25rem;border:2.5px solid var(--sp-encre);border-radius:var(--sp-rayon-carte);background:var(--sp-papier);font-weight:700}
+body .zone-note>p:first-child{background:var(--sp-surface);box-shadow:4px 4px 0 var(--sp-encre);font-family:var(--sp-police-titre);font-weight:400;font-size:1.35rem}
+body .zone-note>p:only-child{background:var(--sp-papier);box-shadow:none;font-family:inherit;font-weight:700;font-size:1rem;color:var(--sp-encre-douce)}
+body .zone-pont-conseiller,body .zone-pont-catalogue{margin-block:1rem}
+/* critiques signées : des bulles, la plus récente en premier */
+body .zone-critiques-reseau>ul{list-style:none;padding:0;margin:0;display:grid;gap:1.25rem}
+body .zone-critiques-reseau>ul>li{list-style:none}
+body .zone-critiques-reseau article{position:relative;margin:0;box-shadow:4px 4px 0 var(--sp-encre)}
+body .zone-critiques-reseau article::after{content:"";position:absolute;left:2.25rem;bottom:-11px;width:18px;height:18px;background:var(--sp-papier);
+  border-right:2.5px solid var(--sp-encre);border-bottom:2.5px solid var(--sp-encre);transform:rotate(45deg)}
+body .zone-critiques-reseau article>:is(h2,h3,h4){font-family:var(--sp-police-titre);font-weight:400;font-size:1.15rem;margin-bottom:.25rem}
+body .badge-label{display:inline-flex;align-items:center;padding:.05rem .65rem;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-surface);color:var(--sp-encre);font-weight:700;font-size:.85rem;line-height:1.4}
+body .zone-synopsis ul{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:.5rem}
+body .zone-synopsis li{list-style:none;margin:0;padding:.1rem .7rem;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-papier);font-weight:700;font-size:.9rem}
+/* catalogue : résultats en fiches, suggestions en pastilles */
+body .zone-resultats>ol{list-style:none;padding:0;display:grid;gap:.75rem}
+body .zone-resultats>ol>li{list-style:none;margin:0;padding:.85rem 1.1rem;border:2px solid var(--sp-encre);border-radius:16px;background:var(--sp-papier);box-shadow:3px 3px 0 var(--sp-encre)}
+body .zone-resultats>ol>li>a{font-weight:700;font-size:1.1rem;color:var(--sp-encre)}
+body .zone-resultats>ol>li:hover{background:var(--sp-surface)}
+body .zone-suggestions ul{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:.5rem}
+body .zone-suggestions li{list-style:none;margin:0}
+body .zone-suggestions a{display:inline-flex;align-items:center;min-height:40px;padding:0 1rem;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-papier);color:var(--sp-encre);font-weight:700;text-decoration:none}
+body .zone-suggestions a:hover{background:var(--sp-surface)}
+/* assistant : la conversation et les cartes citées */
+body main>section>ol{padding-left:1.25rem}
+body main>section[aria-live] article h3{font-family:var(--sp-police-titre);font-weight:400;font-size:1.25rem}
+/* formulaire de critique et formulaires de compte : une carte de papier */
+body .zone-formulaire-critique form,body main>form:has([type=password]),body main>section>form[method=post]{padding:1.25rem 1.5rem;border:2.5px solid var(--sp-encre);border-radius:var(--sp-rayon-carte);background:var(--sp-papier);box-shadow:var(--sp-ombre-carte)}
+
+/* ---------- 12. Tableaux, détails, citations ---------- */
+body table{border-collapse:collapse;border:2px solid var(--sp-encre);background:var(--sp-papier)}
+body :is(th,td){background-color:transparent;border-bottom:2px dashed #d9d6e4;padding:.6rem .8rem}
+body thead th{background:var(--sp-surface);border-bottom:2px solid var(--sp-encre);font-weight:700}
+body tbody tr:last-child>*{border-bottom:0}
+body details{margin-block:1rem;padding:.6rem 1rem;border:2px solid var(--sp-encre);border-radius:14px;background:var(--sp-papier)}
+body details>summary{font-weight:700;line-height:1.4;min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+body details[open]>summary{margin-bottom:.6rem}
+body blockquote{margin:1rem 0;padding:.75rem 1rem;border:2px solid var(--sp-encre);border-inline-start:6px solid var(--sp-accent);border-radius:14px;background:var(--sp-papier)}
+body blockquote footer{margin-top:.4rem;padding:0;border:0;background:none}
+
+/* ---------- 13. Kōhai ----------
+   Phase 1, sans toucher aux gabarits : Kōhai en image fixe, choisi selon l'état de la page
+   (les sélecteurs :has() lisent ce que la page affiche). Phase 2, facultative : le SVG en
+   ligne (gabarits/kohai/*.svg), animé par les classes ci-dessous. */
+body.esp-menthe main>h1{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+body.esp-menthe main>h1::after{content:"";flex:none;width:clamp(4.5rem,4rem + 4vw,7rem);aspect-ratio:200 / 246;
+  background:url(/statique/images/kohai-bonjour.svg) center / contain no-repeat;animation:sp-kohai-arrive .6s cubic-bezier(.3,1.35,.6,1) both}
+body.esp-menthe main:has(>section[aria-live]>h2)>h1::after{background-image:url(/statique/images/kohai-trouve.svg)}
+body.esp-menthe main:has(>section[aria-live] [role=alert])>h1::after{background-image:url(/statique/images/kohai-perdu.svg)}
+body.esp-menthe.en-attente main>h1::after{background-image:url(/statique/images/kohai-cherche.svg)}
+body .zone-pont-conseiller a::before{content:"";flex:none;width:1.9rem;height:2.3rem;margin-block:-.3rem;background:url(/statique/images/kohai-cherche.svg) center / contain no-repeat}
+@keyframes sp-kohai-arrive{0%{transform:translateY(14px) scale(.4);opacity:0}60%{transform:translateY(-4px) scale(1.05);opacity:1}100%{transform:none;opacity:1}}
+
+/* phase 2 : SVG en ligne ; l'animation se choisit par une classe sur le SVG ou sur son cadre */
+.kohai{display:block;width:clamp(5rem,4rem + 6vw,10rem);height:auto;overflow:visible}
+.kohai .k-a{transform-box:view-box;transform-origin:0 0}
+.kohai-principal{view-transition-name:kohai}
+@keyframes k-pop{0%{transform:translateY(26px) scale(.35);opacity:0}55%{transform:translateY(-8px) scale(1.06);opacity:1}78%{transform:translateY(2px) scale(.97,1.03)}100%{transform:none;opacity:1}}
+@keyframes k-salut{0%,100%{transform:none}30%{transform:rotate(16deg)}70%{transform:rotate(-12deg)}}
+@keyframes k-cligne{0%,100%{transform:none}50%{transform:scaleY(.12)}}
+@keyframes k-scintille{0%{transform:scale(0) rotate(-60deg);opacity:0}60%{transform:scale(1.3) rotate(8deg);opacity:1}100%{transform:none;opacity:1}}
+@keyframes k-flotte{0%,100%{transform:none}50%{transform:translateY(-5px)}}
+@keyframes k-halo{0%,100%{opacity:0}35%{opacity:.9}70%{opacity:0}}
+@keyframes k-point{0%,55%,100%{transform:none}25%{transform:translateY(-5px)}}
+@keyframes k-pulse{0%,100%{transform:none}50%{transform:scale(1.4)}}
+@keyframes k-saut{0%{transform:none}14%{transform:scale(1.08,.9)}42%{transform:translateY(-26px) scale(.95,1.06)}70%{transform:scale(1.07,.92)}84%{transform:scale(.98,1.02)}100%{transform:none}}
+@keyframes k-hoche{0%,100%{transform:none}18%{transform:rotate(-9deg)}42%{transform:rotate(7deg)}66%{transform:rotate(-4deg)}84%{transform:rotate(2deg)}}
+@keyframes k-apparait{0%{transform:scale(0);opacity:0}65%{transform:scale(1.2);opacity:1}100%{transform:none;opacity:1}}
+@keyframes k-glisse{0%{transform:translateY(-8px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes k-zzz{0%{transform:translate(-6px,10px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes k-respire{0%,100%{transform:none}50%{transform:scale(1.025,.985)}}
+.k-anim-arrivee .k-tout{animation:k-pop .7s cubic-bezier(.3,1.35,.6,1) both}
+.k-anim-arrivee .k-bras-g,.k-anim-salut .k-bras-g{animation:k-salut .55s ease-in-out .75s 3}
+.k-anim-salut .k-bras-g{animation-delay:.1s}
+.k-anim-arrivee .k-yeux,.k-anim-salut .k-yeux{animation:k-cligne .24s ease-in-out 2.6s}
+.k-anim-salut .k-yeux{animation-delay:1.9s}
+.k-anim-arrivee .k-etincelle,.k-anim-salut .k-etincelle{animation:k-scintille .5s ease-out .55s both}
+.k-anim-arrivee .k-e2,.k-anim-salut .k-e2{animation-delay:.75s}
+.k-anim-reflexion .k-tout{animation:k-flotte 1.8s ease-in-out 14}
+.k-anim-reflexion .k-c1{animation:k-halo 1.2s ease-in-out 21}
+.k-anim-reflexion .k-c2{animation:k-halo 1.2s ease-in-out .3s 21}
+.k-anim-reflexion .k-c3{animation:k-halo 1.2s ease-in-out .6s 21}
+.k-anim-reflexion .k-p1{animation:k-point 1.2s ease-in-out 21}
+.k-anim-reflexion .k-p2{animation:k-point 1.2s ease-in-out .15s 21}
+.k-anim-reflexion .k-p3{animation:k-point 1.2s ease-in-out .3s 21}
+.k-anim-reflexion .k-noeud{animation:k-pulse 1.2s ease-in-out .6s 21}
+.k-anim-trouve .k-tout{animation:k-saut .8s ease-out}
+.k-anim-trouve .k-etincelle{animation:k-scintille .5s ease-out .3s both}
+.k-anim-trouve .k-e2{animation-delay:.45s}
+.k-anim-trouve .k-e3{animation-delay:.6s}
+.k-anim-perdu .k-tete{animation:k-hoche 1s ease-in-out .1s}
+.k-anim-perdu .k-question{animation:k-apparait .45s ease-out .6s both}
+.k-anim-perdu .k-goutte{animation:k-glisse .6s ease-out 1s both}
+.k-anim-pause .k-tout{animation:k-respire 2.4s ease-in-out 2}
+.k-anim-pause .k-z1{animation:k-zzz .7s ease-out .2s both}
+.k-anim-pause .k-z2{animation:k-zzz .7s ease-out .8s both}
+.k-anim-pause .k-z3{animation:k-zzz .7s ease-out 1.4s both}
+/* garniture facultative « réflexion » : un petit script pose .en-attente sur <body> à l'envoi
+   de la question ; sans script, le chargement habituel du navigateur */
+.kohai-attente{display:none}
+body.en-attente .kohai-attente{display:flex;align-items:center;gap:.75rem;font-family:var(--sp-police-kohai);font-size:1.2rem}
+
+/* ---------- 15. Composants des écrans à venir (lots 4 et 5 : listes, administration) ----------
+   Classes à poser dans les nouveaux gabarits ; balisage de référence : canevas, planche
+   « Composants » et « Page test : Mes listes ». */
+body{--sp-trame:radial-gradient(circle at 1.5px 1.5px, var(--sp-accent) 1.1px, transparent 1.7px) 0 0 / 6px 6px}
+/* onglets d'intercalaire : des liens, un par page (marche sans JavaScript) */
+body main nav.onglets{display:block;margin:1rem 0 0}
+body nav.onglets ul:nth-of-type(n){display:flex;gap:.4rem;align-items:flex-end;margin:0;padding:0 0 0 1.1rem;list-style:none;overflow-x:auto}
+body nav.onglets li{flex:none;padding:0}
+body nav.onglets a{position:relative;display:inline-flex;align-items:center;gap:.5rem;min-height:44px;padding:0 1.1rem .25rem;box-sizing:border-box;
+  border:2px solid var(--sp-encre);border-bottom:0;border-radius:14px 14px 0 0;background:var(--sp-surface);
+  color:var(--sp-encre);font-weight:700;text-decoration:none;white-space:nowrap;transform:translateY(5px);transition:transform .15s}
+body nav.onglets a svg{width:1.15em;height:1.15em;flex:none}
+body nav.onglets a:hover{transform:translateY(2px);background:var(--sp-trame),var(--sp-surface)}
+body nav.onglets a[aria-current=page]{background:var(--sp-papier);transform:translateY(2px);z-index:1;padding-bottom:.4rem}
+body nav.onglets a[aria-current=page]::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:6px;background:var(--sp-papier)}
+body .panneau-onglet{position:relative;margin-top:0;padding:1.1rem 1.25rem;border:2px solid var(--sp-encre);border-radius:0 16px 16px 16px;background:var(--sp-papier);box-shadow:var(--sp-ombre-carte)}
+body .compte{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .45rem;box-sizing:border-box;border-radius:999px;background:var(--sp-encre);color:#fff;font-size:.8rem;font-weight:700}
+/* filtre segmenté : le choix en bleu nuit */
+body [role=group].segments{display:inline-flex;width:auto;gap:2px;padding:3px;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-papier);box-shadow:var(--sp-ombre)}
+body [role=group].segments>:is(button,a){min-height:38px;padding:0 1rem;border:0;border-radius:999px;box-shadow:none;background:transparent;color:var(--sp-encre);font-size:.95rem;transform:none;text-decoration:none;display:inline-flex;align-items:center}
+body [role=group].segments>:is(button,a):hover{transform:none;box-shadow:none;background:var(--sp-surface)}
+body [role=group].segments>:is([aria-pressed=true],[aria-current=page]){background:var(--sp-encre);color:#fff}
+/* bascule (aria-pressed) : active = couleur de la page, icône pleine, coche */
+body :is(button,[role=button])[aria-pressed=true]{background:var(--sp-surface)}
+/* boutons : icône seule (nom par aria-label), petit format */
+body :is(button,[role=button]).icone{width:44px;padding:0}
+body :is(button,[role=button]).petit{min-height:36px;padding:0 .9rem;font-size:.9rem}
+body :is(button,[role=button]).petit.icone{width:36px;padding:0}
+body :is(button,[role=button]) svg{width:1.15em;height:1.15em;flex:none}
+/* étiquettes : une seule couleur, celle de la page ; le sens par l'icône et le mot */
+body .badge{display:inline-flex;align-items:center;gap:.35rem;min-height:1.75rem;padding:.1rem .7rem;box-sizing:border-box;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-papier);color:var(--sp-encre);font-size:.85rem;font-weight:700;line-height:1.2}
+body .badge svg{width:1em;height:1em;flex:none}
+body .badge.label{background:var(--sp-surface)}
+body .badge.statut::before{content:"";width:10px;height:10px;box-sizing:border-box;border-radius:50%;border:2px solid var(--sp-encre);background:var(--sp-encre)}
+body .badge.statut.ouvert::before{background:transparent}
+body .badge.non-verifie{border-style:dashed;background:repeating-linear-gradient(-45deg,rgba(29,35,70,.13) 0 3px,transparent 3px 9px),var(--sp-papier)}
+body .note-badge{display:inline-flex;align-items:baseline;gap:.2rem;padding:.35rem .85rem;border:2px solid var(--sp-encre);border-radius:14px;background:var(--sp-surface);box-shadow:var(--sp-ombre)}
+body .note-badge strong{font-family:var(--sp-police-titre);font-weight:400;font-size:1.8rem;line-height:1}
+/* carte de série (listes, résultats enrichis) et sa vignette au lavis de la page */
+body .carte-serie{display:flex;gap:1rem;padding:1rem;border:2px solid var(--sp-encre);border-radius:16px;background:var(--sp-papier);box-shadow:4px 4px 0 var(--sp-encre)}
+body .carte-serie h3{margin:0;font-size:1.1rem}
+body .carte-serie p{margin:.35rem 0}
+body .carte-serie h3 a{color:var(--sp-encre)}
+body .vignette{flex:none;align-self:flex-start;width:5.4rem;aspect-ratio:86 / 124;box-sizing:border-box;border:2px solid var(--sp-encre);border-radius:3px;
+  background:var(--sp-lavis) center top / cover no-repeat,var(--sp-papier);display:flex;align-items:flex-end;justify-content:flex-end;padding:.25rem .4rem;
+  font-family:var(--sp-police-titre);font-size:1.9rem;line-height:1}
+/* jauge (progress) : rayures de la couleur de la page */
+body progress{height:1rem;border:2px solid var(--sp-encre);border-radius:999px;background:var(--sp-papier);overflow:hidden}
+body progress::-webkit-progress-bar{background:var(--sp-papier);border-radius:999px}
+body progress::-webkit-progress-value{background:repeating-linear-gradient(-45deg,var(--sp-accent) 0 6px,var(--sp-accent-pale) 6px 12px);border-right:2px solid var(--sp-encre)}
+body progress::-moz-progress-bar{background:repeating-linear-gradient(-45deg,var(--sp-accent) 0 6px,var(--sp-accent-pale) 6px 12px)}
+/* note sur 10 en pastilles radio (formulaire de critique), sans JavaScript */
+body .note-pastilles{display:flex;flex-wrap:wrap;gap:.4rem}
+body .note-pastilles label{position:relative;margin:0}
+body .note-pastilles input{position:absolute;opacity:0;width:1px;height:1px}
+body .note-pastilles span{display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;box-sizing:border-box;border:2px solid var(--sp-encre);border-radius:50%;background:var(--sp-papier);font-family:var(--sp-police-titre);cursor:pointer}
+body .note-pastilles span:hover{background:var(--sp-surface)}
+body .note-pastilles input:checked+span{background:var(--sp-encre);color:#fff}
+body .note-pastilles input:focus-visible+span{outline:3px solid var(--sp-encre);outline-offset:2px}
+
+/* ---------- 14. Mouvement, transitions entre pages, impression, contraste forcé ---------- */
+@view-transition{navigation:auto}
+@media (prefers-reduced-motion: reduce){
+  @view-transition{navigation:none}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+@media print{
+  body::before{display:none}
+  body :is(article,button,[role=button]){box-shadow:none}
+}
+@media (forced-colors: active){
+  body::before{display:none}
+  body :is(button,[type=submit],[role=button]),body article{border:2px solid CanvasText;box-shadow:none}
+}
+
+/* ---------- 16. Compléments du lot 6 (orchestration, 10 novembre) ----------
+   Ajoutés à l'exécution, une règle par manque relevé ; aucune règle des sections 1 à 15
+   n'est modifiée. Le numéro est celui de l'écart au rapport du lot 6, remis à la session
+   design. */
+/* écart 4 : le SVG en ligne présent (phase 2), l'image de la phase 1 se retire */
+body.esp-menthe main>h1:has(.kohai)::after{content:none}
+/* écart 3 : un refus — une réponse sans aucune série citée — donne la pose « perdu » */
+body.esp-menthe:not(.en-attente) main:has(>section[aria-live]>h2):not(:has(>section[aria-live] article>h3))>h1::after{background-image:url(/statique/images/kohai-perdu.svg)}
+/* écart 10 : pendant l'attente, le Kōhai qui lit remplace le Kōhai principal */
+body.en-attente .kohai-principal{display:none}
+/* écart 11 : le petit Kōhai de la fiche est une image (::before) : il porte le nom de transition */
+body .zone-pont-conseiller a::before{view-transition-name:kohai}
+/* écart 19 (spec 03, guide § 8) : un tableau large défile dans son conteneur focalisable */
+body .defilant{overflow-x:auto}

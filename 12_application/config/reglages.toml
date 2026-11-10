@@ -141,10 +141,12 @@ hebergement = "hors Union européenne par défaut"
 [textes]
 # Généraux
 titre_application = "Conseiller de lecture"
-nom_librairie = "Librairie de démonstration"
+# Nom de travail, modifiable (E4, lot 6) : le logo de l'habillage le porte ; si le nom
+# change, les scripts `outils/` du paquet d'habillage régénèrent le logo (README).
+nom_librairie = "Senpai"
 evitement = "Aller au contenu"
 mention_courte = "Vous parlez à une IA."
-mention_complete = "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à partir de critiques et de résumés du catalogue ; elles peuvent être incomplètes."
+mention_complete = "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à partir de critiques et de résumés du catalogue ; elles peuvent être incomplètes. Senpai est un réseau fictif de librairies : projet de certification Développeur en intelligence artificielle (formation Simplon)."
 etat_ok = "Service disponible — profil actif : {profil} (modèle {modele})."
 etat_ko = "Le service de recommandation ne répond pas."
 etat_cle = "Le service de recommandation refuse l'accès de l'application : l'exploitant doit vérifier sa clé."
@@ -323,7 +325,10 @@ apropos_conserve = "La conversation n'est pas conservée : elle vit dans la page
 apropos_registre_titre = "Registre des traitements"
 apropos_registre = "Ce traitement sera inscrit au registre des traitements du projet avant toute mise en service."
 apropos_licences_titre = "Licences"
-apropos_licences = "Feuille de style : Pico CSS (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
+apropos_identite_titre = "L'identité Senpai"
+apropos_identite = "Senpai est le nom de travail d'un réseau fictif de librairies, imaginé pour un projet de certification. Kōhai, la mascotte, illustre le conseiller : elle est décorative, et le texte dit toujours l'état de la page. Les polices Mochiy Pop One, Zen Maru Gothic et Yusei Magic sont servies par l'application, sous licence SIL Open Font License 1.1. Les icônes viennent de Phosphor Icons, sous licence MIT. Une petite animation de la mascotte utilise un script, sans aucune donnée."
+kohai_attente = "Kōhai lit les critiques…"
+apropos_licences = "Feuille de style : Pico CSS (MIT). Polices : SIL Open Font License 1.1. Icônes : Phosphor Icons (MIT). Audit d'accessibilité : axe-core (MPL 2.0), hors de l'application servie."
 # Pages d'erreur
 erreur_400_titre = "Demande illisible"
 erreur_400_texte = "Le formulaire reçu n'a pas pu être lu."
@@ -332,7 +337,7 @@ erreur_404_texte = "Cette adresse n'existe pas."
 erreur_405_titre = "Action non permise"
 erreur_405_texte = "Cette action n'est pas permise à cette adresse."
 erreur_413_titre = "Demande trop volumineuse"
-erreur_413_texte = "La question et la conversation dépassent la taille admise. Commencez une nouvelle conversation."
+erreur_413_texte = "La demande est trop volumineuse. Réduisez le texte envoyé et réessayez."
 erreur_500_titre = "Erreur de l'application"
 erreur_500_texte = "Une erreur imprévue est survenue."
 erreur_401_titre = "Connexion requise"
@@ -603,6 +608,7 @@ effacement_avis = "Votre compte a été supprimé."
 effacement_impossible_titre = "Suppression impossible"
 effacement_impossible = "Ce compte ne peut pas être supprimé."
 apropos_effacement_titre = "Supprimer votre compte"
+effacement_quoi_titre = "Ce qui sera supprimé"
 apropos_effacement = "Depuis « Mon compte », le lien « Supprimer mon compte » ouvre une page de confirmation ; votre mot de passe est demandé. La suppression est immédiate, sans délai de rétention : le compte, le pseudo, l'empreinte du mot de passe, les listes et les compteurs de questions sont effacés de la base, et le pseudo redevient libre. Il ne reste qu'une ligne du journal sans identité : « un compte a été supprimé », et sa date. Les comptes du réseau (libraires, administrateurs) ne se suppriment pas : l'administrateur les désactive, leurs critiques signées restant attribuables."
 
 # E4, lot 5 : l'administration — la barre d'onglets, le profil IA actif (A2)

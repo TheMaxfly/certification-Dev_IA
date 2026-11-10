@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block espace %}ciel{% endblock %}
 {% block titre %}{{ t.apropos_titre }}{% endblock %}
 {% block contenu %}
 <h1>{{ t.apropos_titre }}</h1>
@@ -11,8 +12,9 @@
 <p>{{ t.apropos_transmis }}</p>
 </section>
 <section>
-<h2>{{ t.apropos_profils_titre }}</h2>
+<h2 id="profils-titre">{{ t.apropos_profils_titre }}</h2>
 {% if info_connue %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="profils-titre">
 <table>
 <thead>
 <tr><th scope="col">{{ t.apropos_colonne_profil }}</th><th scope="col">{{ t.apropos_colonne_fournisseur }}</th><th scope="col">{{ t.apropos_colonne_hebergement }}</th></tr>
@@ -23,6 +25,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% else %}
 <p>{{ t.apropos_liste_inconnue }}</p>
 {% endif %}
@@ -52,6 +55,10 @@
 <section>
 <h2>{{ t.apropos_registre_titre }}</h2>
 <p>{{ t.apropos_registre }}</p>
+</section>
+<section id="identite">
+<h2>{{ t.apropos_identite_titre }}</h2>
+<p>{{ t.apropos_identite }}</p>
 </section>
 <section>
 <h2>{{ t.apropos_licences_titre }}</h2>

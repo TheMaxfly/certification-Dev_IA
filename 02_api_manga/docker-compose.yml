@@ -8,7 +8,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-API Manga}
-      APP_VERSION: ${APP_VERSION:-0.6.0}
+      APP_VERSION: ${APP_VERSION:-0.7.0}
       # Trousseau d'autorisation. Transmis vide s'il est absent de
       # l'environnement : c'est alors l'API qui refuse de démarrer, avec un
       # message explicite. Le refus appartient à l'application, en un seul

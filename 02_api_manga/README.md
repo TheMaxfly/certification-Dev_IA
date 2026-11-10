@@ -52,7 +52,7 @@ Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
 ### Dans la pile
 
 Dans la pile de l'application (E4, lot 2a), ce module est le service `catalogue` du
-fichier de fusion du module 12 (`12_application/compose.yaml`), image `api-catalogue:0.6.0`,
+fichier de fusion du module 12 (`12_application/compose.yaml`), image `api-catalogue:0.7.0`,
 lu par l'application sur un réseau interne et publié sur `127.0.0.1:8000` seulement ; il
 lit la base de l'hôte par un sous-réseau fixe, le mot de passe de `manga_api` dans un pgpass
 monté. Formes et gestes : [`../12_application/README.md`](../12_application/README.md),
@@ -426,7 +426,7 @@ médiane > 300 ms écartée. Le cinquième terme compare titre et saisie **sans 
 - **« onepice » reste sans *One Piece*** (deux fautes : 0,29 < 0,4) ; le cinquième terme le
   rattraperait (0,55) — un cas que le jeu à une faute ne mesure pas.
 
-**Le résumé servi (contrat 0.6.0).** La collecte du référentiel a recopié, dans des
+**Le résumé servi (contrat 0.6.0 ; seconde coupe en 0.7.0).** La collecte du référentiel a recopié, dans des
 résumés Manga Sanctuary, des critiques de lecteurs à la suite du résumé : **1 844
 séries** (requête du lot 2a, rejouée le 2026-11-08 : 14 670 séries, 10 870 résumés non
 vides ; les mêmes 1 844 en production et en préproduction ; *Naruto* touché). Les données
@@ -466,6 +466,25 @@ chiffrée, adresse au lecteur, appréciation), 1 492 au moins une ; un tirage de
 règle ci-dessus ne peut pas les voir (*Naruto* en garde un). **Décision : aucune coupe de
 plus dans ce lot** ; une seconde coupe à la première marque (120 résumés coupés en plus,
 2 passés à Kitsu, 6 indisponibles) est soumise ; le vrai remède est la collecte.
+**Décision du 9 novembre : seconde coupe, lot 6** (ci-dessous).
+
+**La seconde coupe (contrat 0.7.0, E4, lot 6).** Après la première coupe et avant le
+plancher, le résumé est cherché par les **cinq familles de marques** (`MARQUES_CRITIQUE`
+dans `app/resumes.py`, les motifs mesurés au lot 4 : tomes lus, première personne, note
+chiffrée, adresse au lecteur, appréciation), sur le texte normalisé comme ci-dessus,
+l'apostrophe typographique ramenée. **Deux familles au moins** : coupe à la **première
+marque**, toutes familles confondues, ramenée à la fin de la phrase précédente ; puis le
+plancher (100), sinon Kitsu, sinon `null`. **Une seule famille ne coupe rien** : la
+première personne seule apparaît dans des résumés d'éditeur (relecture du lot 4). Le
+contrat ne change pas (`synopsis_source` garde ses valeurs) ; seule la version monte.
+
+**Mesure après, le 2026-11-10** (préproduction, lecture seule, les 14 670 séries) : les
+**128** résumés servis touchés par deux familles deviennent **120 coupés et gardés, 2
+passés à Kitsu, 6 indisponibles** (la proposition du lot 4, à l'unité) ; **0** résumé servi
+touché par deux familles après la coupe ; **aucun autre résumé ne change**. Sources
+servies : 8 919 Manga Sanctuary (8 927 avant), 1 764 Kitsu (1 762), 3 987 sans résumé
+(3 981). *Naruto* (745) : servi en français, 850 → **456 caractères**, sans l'extrait
+« Tome 1 à 13 ».
 
 **Le moyeu, pas l'ancien appariement.** Parmi les 5 671 séries sans résumé Manga
 Sanctuary, l'ancien champ `series_synopsis_enriched` portait un résumé Kitsu pour 1 871

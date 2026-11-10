@@ -78,7 +78,7 @@ def case_cochee(page: BeautifulSoup) -> bool:
 def lignes_du_classement(page: BeautifulSoup) -> list[list[str]]:
     return [
         [plat(cellule) for cellule in ligne.select("td")]
-        for ligne in page.select("#trace ~ table tbody tr")
+        for ligne in page.select("#trace ~ .defilant > table tbody tr")
     ]
 
 
@@ -284,7 +284,7 @@ def test_coche_le_classement_suit_le_rang_pas_l_ordre_recu(navigateur, doublure)
 
 def test_coche_les_citees_ont_une_ancre_vers_leur_carte(navigateur):
     page = soupe(poser(navigateur, coche=True))
-    lignes = page.select("#trace ~ table tbody tr")
+    lignes = page.select("#trace ~ .defilant > table tbody tr")
 
     assert lignes[0].select_one("a")["href"] == "#serie-101"
     assert lignes[1].select_one("a")["href"] == "#serie-102"
@@ -363,7 +363,7 @@ def test_coche_une_serie_citee_sans_passage_reste_citee(navigateur, monkeypatch)
         ["1", "Série factice A", "0,83", "citée", "0"],
         ["2", "Série factice C", "0,64", "non citée", "1"],
     ]
-    assert page.select_one("#trace ~ table a")["href"] == "#serie-101"
+    assert page.select_one("#trace ~ .defilant > table a")["href"] == "#serie-101"
     assert "Aucun passage cité pour cette série." in plat(page)
 
 
@@ -424,7 +424,7 @@ def test_coche_une_serie_sans_identifiant_est_non_citee_et_sans_ancre(
 
     page = soupe(poser(navigateur, coche=True))
 
-    lignes = page.select("#trace ~ table tbody tr")
+    lignes = page.select("#trace ~ .defilant > table tbody tr")
     assert [plat(td) for td in lignes[2].select("td")] == [
         "3",
         "Œuvre factice K",
@@ -655,7 +655,7 @@ def test_refus_aucun_passage_coche_classement_vide_et_mention(navigateur, doublu
     page = soupe(poser(navigateur, coche=True))
 
     assert page.select_one("h2#trace") is not None
-    assert not page.select("#trace ~ table")
+    assert not page.select("#trace ~ .defilant > table")
     assert "aucune série retrouvée" in plat(page).lower()
     assert "Aucun passage non cité." in plat(page)
     assert "aucun appel au modèle" in [plat(li) for li in page.select("#trace ~ ul li")]
@@ -670,7 +670,7 @@ def test_refus_avec_des_series_le_classement_est_affiche_aucune_citee(
 
     lignes = lignes_du_classement(page)
     assert [ligne[3] for ligne in lignes] == ["non citée"]
-    assert not page.select("#trace ~ table a")
+    assert not page.select("#trace ~ .defilant > table a")
     assert "aucune série retrouvée" not in plat(page).lower()
     assert "Passage factice n° 31." in plat(page)
 
@@ -748,8 +748,8 @@ def test_un_extrait_ou_un_titre_non_cite_pieges_sont_echappes(navigateur, doublu
     r = poser(navigateur, coche=True)
     page = soupe(r)
 
-    assert not page.select("script")
-    assert not page.select("#trace ~ details b, #trace ~ table b")
+    assert not page.select("script:not([src='/statique/attente.js'])")
+    assert not page.select("#trace ~ details b, #trace ~ .defilant > table b")
     assert "&lt;script&gt;alert(2)&lt;/script&gt; Extrait piégé." in r.text
     assert "&lt;b&gt;Titre piégé&lt;/b&gt;" in r.text
 

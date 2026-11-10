@@ -1,8 +1,9 @@
 {% set trace = affichage.trace %}
 <h2 id="trace">{{ t.trace_titre }}</h2>
 <p>{{ texte.segments(trace.phrase) }}</p>
-<h3>{{ t.trace_classement_titre }}</h3>
+<h3 id="classement-titre">{{ t.trace_classement_titre }}</h3>
 {% if trace.classement %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="classement-titre">
 <table>
 <thead>
 <tr>
@@ -25,6 +26,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 {% else %}
 <p>{{ t.trace_aucune_serie }}</p>
 {% endif %}

@@ -1,26 +1,48 @@
-/* Le thème de l'application : des variables seules, sur celles de Pico. L'habillage se
-   change ici, sans toucher aux gabarits. Les contrastes de ces couples sont calculés par
-   un test (au moins 4,5 : 1). Le sens n'est jamais porté par la couleur seule : les états
-   ont toujours un libellé. */
+/* Le thème de l'application : des variables seules, sur celles de Pico, et les jetons de
+   l'identité Senpai (préfixe --sp-), lus par senpai.css. L'habillage se change ici, sans
+   toucher aux gabarits. Les contrastes des couples de Pico sont calculés par un test (au
+   moins 4,5 : 1 pour le texte, 3 : 1 pour les bords et le focus). Le sens n'est jamais
+   porté par la couleur seule : les états ont toujours un libellé.
+   Couleurs de l'espace (lavis, pâle, touche d'aquarelle) : valeurs par défaut ici (ciel),
+   remplacées par la classe d'espace posée sur <body> (senpai.css). */
 :root:not([data-theme="dark"]),
 [data-theme="light"] {
-  --pico-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --pico-background-color: #ffffff;
-  --pico-color: #2b2f36;
-  --pico-muted-color: #5a616e;
-  --pico-h1-color: #1d2026;
-  --pico-h2-color: #1d2026;
-  --pico-h3-color: #2b2f36;
-  --pico-primary: #0b5a8a;
-  --pico-primary-hover: #084568;
-  --pico-primary-background: #0b5a8a;
-  --pico-primary-hover-background: #084568;
+  --pico-font-family: "Zen Maru Gothic", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pico-background-color: #fcfaf5;
+  --pico-color: #1d2346;
+  --pico-muted-color: #4b5070;
+  --pico-h1-color: #1d2346;
+  --pico-h2-color: #1d2346;
+  --pico-h3-color: #1d2346;
+  --pico-primary: #c3145a;
+  --pico-primary-hover: #1d2346;
+  --pico-primary-background: #1d2346;
+  --pico-primary-hover-background: #2b3263;
   --pico-primary-inverse: #ffffff;
-  --pico-card-background-color: #f4f6f8;
-  --pico-form-element-background-color: #ffffff;
-  --pico-form-element-color: #2b2f36;
-  --pico-form-element-border-color: #767c88;
-  --pico-primary-border: #0b5a8a;
-  --pico-primary-focus: #0b5a8a;
+  --pico-card-background-color: #fffdf7;
+  --pico-form-element-background-color: #fffdf7;
+  --pico-form-element-color: #1d2346;
+  --pico-form-element-border-color: #1d2346;
+  --pico-primary-border: #1d2346;
+  --pico-primary-focus: #1d2346;
   --pico-spacing: 1rem;
+  --pico-border-radius: 10px;
+  --sp-encre: #1d2346;
+  --sp-encre-douce: #4b5070;
+  --sp-trait: #737896;
+  --sp-papier: #fffdf7;
+  --sp-page: #fcfaf5;
+  --sp-framboise: #c3145a;
+  --sp-accent: #7db8e8;
+  --sp-accent-pale: #d8e8f3;
+  --sp-voile: #d6e6f1;
+  --sp-intensite: 0.85;
+  --sp-police-titre: "Mochiy Pop One", "Zen Maru Gothic", system-ui, sans-serif;
+  --sp-police-kohai: "Yusei Magic", "Zen Maru Gothic", system-ui, sans-serif;
+  --sp-ombre: 3px 3px 0 #1d2346;
+  --sp-ombre-haute: 5px 5px 0 #1d2346;
+  --sp-ombre-basse: 1px 1px 0 #1d2346;
+  --sp-ombre-carte: 6px 6px 0 #1d2346;
+  --sp-rayon-carte: 20px;
+  --sp-rayon-champ: 10px;
 }
