@@ -101,7 +101,12 @@ make livrer ACTION=deployer CIBLE=production     # puis le retour à l'étiquett
   migrée.
 - **Images de l'oral d'E3** : `api-modele:1.4.0` et `application-conseiller:0.1.0`.
   `livrer` ne supprime jamais une image ; il ne retire que ses étiquettes provisoires
-  `…-candidat`.
+  `…-candidat` (tests : la construction, et l'enchaînement déployer, arrêter, revenir,
+  redéployer).
+- **Joué en production le 2026-11-11**, le mainteneur présent : le retour vers
+  `chaine-livraison` en **42 s** (l'application d'E3 de nouveau sur 8020, la base restée
+  à 30 migrations), puis le redéploiement d'`e4-livraison-1` en **23 s** ; comptes,
+  critiques et coûts intacts. Les deux journaux sont dans `journal/`.
 
 ## Les deux cibles sur un poste
 
@@ -189,6 +194,22 @@ l'historique, on le commite après le déploiement. **Aucun secret, aucune adres
 que `127.0.0.1`** : avant d'écrire, `livrer` relit le texte avec les motifs du hook
 lui-même (`.githooks/cles-fournisseurs`, `.githooks/controler-texte`). Un motif trouvé, et
 le journal n'est pas écrit.
+
+## Limites connues
+
+- **La santé juge Prometheus trop tôt.** Juste après un `up`, Prometheus n'a pas encore
+  refait sa collecte : il voit les conteneurs quittés, et le contrôle « cibles up »
+  manque. Les trois gestes de production du 2026-11-11 ont ainsi un journal « santé
+  rouge » pour une pile saine quelques secondes plus tard ; `livrer sante`, rejoué, est
+  vert. Un journal ne se réécrit pas : le constat de la relance est au rapport.
+- **`livrer sante` juge aux versions de l'étiquette de HEAD.** Après un retour arrière,
+  il jugerait la pile servie contre les versions de l'étiquette courante : la santé aux
+  versions de l'étiquette visée n'est jugée que par `livrer retour` lui-même.
+- **Le compteur « après » d'un redémarrage, en production, est lu par Prometheus** : il
+  rend encore la dernière valeur du conteneur quitté.
+- **`main` doit être à une étiquette pour déployer.** Les journaux commités après une
+  livraison avancent `main` au-delà de l'étiquette : un nouveau déploiement demande une
+  étiquette annotée sur ce commit.
 
 ## Vérifier
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from conftest import E3, SERVIES, Bouclage, Poste
 
-from livraison import retour
+from livraison import deployer, images, retour
 from livraison.codes import Arret, Code
 from livraison.outils import Outils
 
@@ -145,3 +145,32 @@ def test_la_sante_rouge_d_un_retour(o: Outils, poste: Poste, tmp_path):
         retour.retour(o, "production", E3, MOTIF, temporaire=temporaire(tmp_path))
         == Code.SANTE_ROUGE
     )
+
+
+def test_la_soiree_de_livraison_ne_retire_aucune_image_livree(
+    o: Outils, poste: Poste, bouclage: Bouclage, tmp_path
+):
+    """Déployer, arrêter, revenir à `chaine-livraison`, redéployer : `livrer` ne retire
+    jamais une image livrée — celles de l'oral d'E3 (`api-modele:1.4.0`,
+    `application-conseiller:0.1.0`) restent sur le poste, comme celles d'E4."""
+    livrees = set(poste.images)
+    assert deployer.deployer(o, "production") == Code.OK
+    assert deployer.arreter(o, "production") == Code.OK
+    poste.apres_up = dict(SERVIES[E3])
+    poste.api.update(version_api="1.4.0")
+    sante_e4 = bouclage.reponses["http://127.0.0.1:8020/sante"]
+    bouclage.reponses["http://127.0.0.1:8020/sante"] = (
+        200,
+        json.dumps({"application": "ok", "api": "ok", "version": "0.1.0"}),
+    )
+    assert (
+        retour.retour(o, "production", E3, MOTIF, temporaire=temporaire(tmp_path))
+        == Code.OK
+    )
+    poste.apres_up = None
+    poste.api.update(version_api="1.5.0")
+    bouclage.reponses["http://127.0.0.1:8020/sante"] = sante_e4
+    assert deployer.deployer(o, "production") == Code.OK
+    retirees = [a[3] for a in poste.argvs() if a[:3] == ("docker", "image", "rm")]
+    assert all(r.endswith(images.SUFFIXE_CANDIDAT) for r in retirees)
+    assert livrees <= set(poste.images)
