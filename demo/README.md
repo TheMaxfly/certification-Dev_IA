@@ -65,6 +65,39 @@ documentation interactive reste fermée. Les deux commandes emploient les mêmes
 la dernière lancée remplace l'autre. `make verify-poste` et la sauvegarde refusent un service
 d'embedding en marche : `make demo-direct-arret` avant.
 
+### L'oral d'E3 : la version d'E3, depuis son étiquette
+
+Depuis E4, les fichiers Compose de l'arbre de travail désignent l'application du libraire
+d'E4 (Senpai). Pour montrer **la version d'E3** (API 1.4.0, application 0.1.0), la
+démonstration se lance depuis un arbre de travail à l'étiquette `chaine-livraison`, à côté
+du dépôt, la production arrêtée d'abord : les deux piles portent le même nom de projet
+Compose, et un seul service d'embedding tourne à la fois.
+
+```bash
+# une fois : l'arbre de l'oral, et les fichiers hors dépôt par des liens (aucune copie)
+git worktree add --detach ../e3-oral chaine-livraison
+cd ../e3-oral && R=<chemin du dépôt principal>
+ln -s "$R/11_api_modele/.env" 11_api_modele/.env
+ln -s "$R/12_application/.env" 12_application/.env
+ln -s "$R/11_api_modele/.pgpass.conteneur" 11_api_modele/.pgpass.conteneur
+mkdir -p 10_mesures_recherche/mlflow
+ln -s "$R/10_mesures_recherche/mlflow/mlflow.db" 10_mesures_recherche/mlflow/mlflow.db
+ln -s "$R/10_mesures_recherche/.venv" 10_mesures_recherche/.venv
+
+# le jour de l'oral
+make livrer ACTION=arreter CIBLE=production    # depuis le dépôt principal
+make demo-direct                               # depuis ../e3-oral
+make demo-direct-arret                         # depuis ../e3-oral
+make livrer ACTION=deployer CIBLE=production   # depuis le dépôt principal : Senpai revient
+```
+
+Joué le 2026-11-11, mémoire disponible relevée avant : arrêt de la production **4 s**,
+lancement d'E3 **43 s** (application 0.1.0, API 1.4.0 et MLflow répondent), arrêt d'E3
+**3 s**, retour de Senpai **39 s**, santé verte. Les images d'E3
+(`api-modele:1.4.0`, `application-conseiller:0.1.0`) restent sur le poste : `livrer` ne
+supprime aucune image. Le retour de Senpai exige `main` exactement à une étiquette
+annotée (`15_livraison/README.md`, « Limites connues »).
+
 ## Sécurité de démonstration
 
 | Garde-fou | Mise en œuvre |
