@@ -1,0 +1,7 @@
+id = "E4V-06"
+origine = "E4, lot 8, correctif 0.1.1 (2026-11-11) — le filtre des journaux admet tout fichier de l'arbre"
+fichier = "15_livraison/src/livraison/depot.py"
+avant = '''            if not chemin.startswith(CHEMIN_JOURNAL):'''
+apres = '''            if not chemin:'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_depot.py", "tests/test_arbre_reel.py"]

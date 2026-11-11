@@ -1,7 +1,7 @@
 id = "E4V-02"
 origine = "E4, lot 8, spec 01 (2026-11-11) — construire et déployer acceptent un arbre sale"
 fichier = "15_livraison/src/livraison/depot.py"
-avant = '''    if s.code != 0 or s.stdout.strip():'''
-apres = '''    if s.code != 0:'''
+avant = '''    if en_cause is not None:'''
+apres = '''    if False:'''
 dossier = "15_livraison"
 commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_depot.py", "-k", "hors_etiquette"]
