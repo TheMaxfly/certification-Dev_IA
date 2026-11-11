@@ -109,19 +109,21 @@ le 2026-07-30, `013` et `014` le 2026-08-21, `015` le 2026-09-12, `016` et
 sauvegarde), `023` le 2026-10-20 (11:53 UTC, après sauvegarde, rôle de connexion
 `modele_api` créé par son script), `024` le 2026-10-27 (00:22 UTC, après sauvegarde),
 `025` le 2026-11-02 (23:35 UTC, après sauvegarde), `026` le 2026-11-03 (10:30 UTC, après
+sauvegarde), `027`, `028` et `029` le 2026-11-11 (14:27 UTC, en un passage, après
 sauvegarde) ; `000` y a été **marquée appliquée** le
-2026-07-15, sans exécution. Le contrôle affiche **27 migrations appliquées**, et
-`outils/fidelite.sh` rend un **diff vide** (extensions et versions identiques,
-2026-11-03).
+2026-07-15, sans exécution. Le contrôle affiche **30 migrations appliquées, 0 en
+attente**, et `outils/fidelite.sh` rend un **diff vide** (extensions et versions
+identiques, 2026-11-11).
 
-**`027`, `028` et `029` ne sont pas appliquées à `apimanga`** : elles le sont d'abord en
-préproduction (`apimanga_preprod` : la `027` au lot 1 d'E4, la `028` et la `029` au lot
-2b, en un passage), et la
-production les recevra au lot de livraison continue, après la sauvegarde et l'accord de
-Max. D'ici là, elles sont **déclarées en attente** dans `verification/migrations_en_attente.tsv` : l'état
-d'`apimanga` (`make verify-poste`) l'admet, et refuserait toute autre migration absente
-(cf. `CONTRIBUTING.md`, « L'état d'`apimanga` »). `migrate.py status` sur la production
-l'affiche « en attente », ce qui est voulu.
+`027`, `028` et `029` ont d'abord été appliquées en préproduction (`apimanga_preprod` :
+la `027` au lot 1 d'E4, la `028` et la `029` au lot 2b, en un passage), puis à la
+production au lot de livraison continue, avant la livraison sur `main` : `make
+verify-poste` exige que la production soit égale au dépôt. Une migration écrite pour un
+lot et pas encore appliquée à la production se **déclare en attente** dans
+`verification/migrations_en_attente.tsv` : l'état d'`apimanga` (`make verify-poste`)
+l'admet, et refuserait toute autre migration absente (cf. `CONTRIBUTING.md`, « L'état
+d'`apimanga` »). Entre deux lots, la liste est vide : **0 migration en attente** depuis
+le 2026-11-11.
 
 Depuis `021`, `bench` porte deux corpus clos, `v1` et `v2`, et trois encodages
 (1 et 2 sur le v1, 3 sur le v2). Le journal des promotions a deux lignes : la reprise
