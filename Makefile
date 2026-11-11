@@ -35,6 +35,11 @@
 #                            lancer) ; chaine-promouvoir LIVRAISON=… MOTIF="…" et
 #                            chaine-revenir MOTIF="…" sont les gestes de Max ; chaine-etat
 #                            lit le journal de la préproduction
+#   make livrer ACTION=… CIBLE=…  la livraison continue (module 15) : ACTION=construire
+#                            (RECONSTRUIRE=1), deployer, sante, arreter, retour (VERS=…
+#                            MOTIF="…") ; CIBLE=staging ou production ; A_BLANC=1 :
+#                            ce qui serait fait, sans rien lever ; livrer-etat : les
+#                            deux cibles
 #   make verify-mutations    les mutations versionnées (verification/mutations/),
 #                            rejouées dans un arbre jetable : chacune doit faire
 #                            rougir son test (poste, avant une demande vers main ;
@@ -53,12 +58,16 @@ CANDIDAT ?=
 A_BLANC ?=
 LIVRAISON ?=
 MOTIF ?=
+ACTION ?=
+CIBLE ?=
+VERS ?=
+RECONSTRUIRE ?=
 # Les fichiers suivent la base : la préproduction écrit ses échantillons dans le sien.
 EQUIVALENCE_DOSSIER ?= $(CURDIR)/09_service_embedding/mesures/equivalence_preprod
 
 .PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret app-admin-creer \
 	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret \
-	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat
+	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat livrer livrer-etat
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -141,3 +150,15 @@ chaine-revenir:
 
 chaine-etat:
 	@$(CHAINE) etat
+
+# La livraison continue (module 15) : construire à l'étiquette, déployer par cible, santé,
+# retour arrière, arrêt. Depuis main, à l'étiquette annotée ; une cible à la fois.
+LIVRER = cd 15_livraison && uv run --quiet --locked --no-env-file livrer
+
+livrer:
+	@$(LIVRER) $(ACTION) $(if $(CIBLE),--cible $(CIBLE)) $(if $(VERS),--vers "$(VERS)") \
+		$(if $(MOTIF),--motif "$(MOTIF)") $(if $(RECONSTRUIRE),--reconstruire) \
+		$(if $(A_BLANC),--a-blanc)
+
+livrer-etat:
+	@$(LIVRER) etat

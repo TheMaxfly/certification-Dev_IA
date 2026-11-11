@@ -22,6 +22,9 @@
 #            jetables, schéma `application` de la 027 ; E4, lot 1)
 #   14     ← les modules dont il lance les commandes (05, 09, 10, 11), et `indicatif.yml`
 #            (son test compare les déclencheurs du README aux workflows)
+#   15     ← les fichiers Compose qu'il compose (11, 12, 13), les fichiers d'exemple des
+#            modules (son test des secrets y lit les noms) et le fragment des motifs du
+#            hook (sa relecture des journaux)
 #   demo   ← 04, 05, 07 (états et actions), `database/`
 #
 # module	chemins
@@ -38,6 +41,7 @@
 12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml database/ 02_api_manga/openapi.json
 13	13_monitorage/ 09_service_embedding/src/ 09_service_embedding/config/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml 11_api_modele/src/api_modele/metriques.py 12_application/compose.yaml 12_application/src/application/metriques.py
 14	14_chaine/ 05_nettoyage_agregation_bdd/ 09_service_embedding/ 10_mesures_recherche/ 11_api_modele/ .github/workflows/indicatif.yml
+15	15_livraison/ 11_api_modele/docker-compose.yml 12_application/compose.yaml 13_monitorage/compose.yaml 02_api_manga/.env.example 11_api_modele/.env.example 12_application/.env.example 13_monitorage/.env.example .githooks/cles-fournisseurs .githooks/controler-texte .githooks/pre-push
 database	database/ sauvegarde/sauvegarder.sh
 demo	demo/ 04_scraping_manga_sanctuary/ 05_nettoyage_agregation_bdd/ 07_databricks_manga_export/ database/
 statique	(toujours)

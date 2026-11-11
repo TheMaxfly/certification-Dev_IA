@@ -64,6 +64,7 @@ Le depot est organise par etapes numerotees.
 | `12_application/` | Application du libraire, rendue par le serveur (FastAPI, Jinja2, sans JavaScript) : une question, la reponse de l'API du modele, les series citees, leurs metadonnees et leurs passages, une conversation de cinq echanges, un ecran par cas degrade, la mention IA. | Prototype, tronc de l'epreuve E4 : parle a l'API seule, par sa cle ; mode demonstration, eteint par defaut (rang, scores et trace de la recherche, sans rien changer a la requete) ; jauges de l'etat de l'API pour la collecte (`/v1/info`, `/sante`) ; 455 tests, couverture 100 % arrondie, audit axe-core de 63 pages sans defaut, essai d'integration du Compose (doublure de l'API) dans `make verify`. |
 | `13_monitorage/` | Monitorage du modele : Prometheus collecte, Grafana restitue et alerte, sonde d'equivalence et exporteur de qualite. Lance par Compose, sur le poste, avec l'application, l'API et le service d'embedding. | Cinq cibles collectees (service d'embedding, API, application, machine, qualite) ; deux tableaux de bord versionnes, « Modele » et « Service », charges par provisionnement ; sonde d'equivalence toutes les 15 min et derniere mesure lue en base, en lecture seule ; quatre alertes (indisponibilite, sorties invalides, cout, equivalence), canal courriel ; alerte d'indisponibilite provoquee et recue par courriel en 2 min 02 s, et premiere alerte reelle recue, sur l'equivalence (2026-11-06) ; 116 tests, couverture 99 %, essai du Compose reel sur le poste seul. |
 | `14_chaine/` | Chaine de livraison du modele : en une commande (`make chaine CANDIDAT=...`), tester les donnees, encoder le corpus, tester l'encodage, mesurer, appliquer la regle de promotion, construire l'image de l'API, ecrire un rapport de livraison versionne ; toujours en preproduction (`apimanga_preprod`), jamais de promotion. | Orchestrateur en bibliotheque standard, qui lance les commandes des modules 05, 09, 10 et 11 ; en preproduction, le 2026-11-07 : BGE-M3 encode sur le corpus v2 puis refuse par la regle (code 10) ; un retour arriere, puis la requalification de l'encodage en service (code 0) et sa promotion par le mainteneur, chacun verifie ; image de l'API de preproduction sous son propre nom ; 180 tests avec etapes factices, aucun service (2026-11-07). |
+| `15_livraison/` | Livraison continue : `make livrer`, une commande parametree par sa cible (`staging` sur `apimanga_preprod`, `production` sur `apimanga`) : construire les images a l'etiquette, deployer, verifier la sante, journaliser, revenir en arriere. | Module neuf (E4, lot 8, 2026-11-11) : tests sur doubles, journaux de deploiement versionnes dans `15_livraison/journal/`. |
 | `database/` | Migrations PostgreSQL partagees et versionnees. | 27 migrations (`000` a `026`), toutes appliquees a `apimanga`, 0 en attente ; fidelite du schema verifiee ; 390 tests sur base jetable. |
 | `demo/` | Console `manga-pipeline` : ecran d'etat et menu d'actions groupe par phase ELT, en orchestrant les CLI existantes. | Mode lecture seule par defaut ; 17 actions ; 76 tests. |
 
@@ -470,7 +471,7 @@ Une seule commande verifie le depot, sur le poste comme sur GitHub :
 ```bash
 make verify              # les modules touches depuis origin/develop et ceux qui en
                          # dependent, plus la tache statique ; TOUT=1 pour tout
-make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 13, database, demo, statique
+make verify MODULE=10    # un seul module : 01 ... 05, 07 ... 15, database, demo, statique
 make verify-indicatif    # Bandit et pip-audit, jamais exiges
 make verify-poste        # la memoire d'abord ; make verify complet sauf arbre deja
                          # vert ; puis les harnais du poste seul
@@ -484,8 +485,8 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   `make verify-poste`, en lecture seule : l'« etat d'apimanga » sous `verif_lecture`
   (membre de `verif_ro`), et l'equivalence de l'API du modele sous `modele_api`.
 - Sur GitHub, la chaine `verify` joue une tache par module, plus la tache
-  `statique` (actionlint, shellcheck, essais des hooks) : 15 controles,
-  obligatoires avant toute fusion vers `develop` ou `main`. Une tache non concernee
+  `statique` (actionlint, shellcheck, essais des hooks) ; chacune est un controle
+  obligatoire avant toute fusion vers `develop` ou `main`. Une tache non concernee
   par les changements reussit sans rien faire.
 - `make verify-poste` ajoute la fidelite du schema, l'etat d'`apimanga` en lecture
   seule et l'equivalence du service d'embedding, puis de l'API du modele. L'etat
@@ -494,6 +495,18 @@ make verify-poste        # la memoire d'abord ; make verify complet sauf arbre d
   fichier, empreinte et nombre ; tout autre est une erreur.
 - **La pile du monitorage s'arrete avant** : `make monitorage-arret`, puis
   `make verify-poste`.
+
+### Livraison : `make livrer`
+
+Le chemin d'un commit jusqu'a la production, en six etapes, chacune avec sa preuve,
+est dans **[`15_livraison/README.md`](15_livraison/README.md)** : commit et hooks, demande
+vers `develop` et ses controles, fusion, livraison vers `main` et etiquette annotee,
+puis, depuis l'etiquette, `make livrer ACTION=construire`, le staging
+(`ACTION=deployer CIBLE=staging`, sur `apimanga_preprod`) et la production
+(`CIBLE=production`, apres les migrations appliquees par le mainteneur). Chaque
+deploiement ecrit son journal versionne (`15_livraison/journal/`) ; le retour arriere
+(`ACTION=retour VERS=<etiquette>`) redeploie une etiquette precedente, sans toucher aux
+migrations.
 
 ## Demonstration
 

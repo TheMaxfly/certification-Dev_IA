@@ -1,0 +1,7 @@
+id = "E4V-03"
+origine = "E4, lot 8, spec 01 (2026-11-11) — déployer ignore l'autre cible en marche (une cible à la fois sur le poste)"
+fichier = "15_livraison/src/livraison/deployer.py"
+avant = '''    tournent = en_marche(o, autre.projet)'''
+apres = '''    tournent: list[str] = []'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "autre_cible"]

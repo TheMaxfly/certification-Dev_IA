@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "livraison"
+version = "0.1.0"
+description = "La livraison continue : construire à l'étiquette, déployer par cible, vérifier la santé, journaliser, revenir en arrière."
+readme = "README.md"
+requires-python = ">=3.12"
+# httpx : la santé lit les routes de la pile sur le bouclage. Le reste passe par les
+# commandes du poste (git, docker, psql, uv), lancées sans shell.
+dependencies = ["httpx==0.28.1"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+]
+
+[project.scripts]
+livrer = "livraison.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.pyright]
+# Exigence du module neuf : strict sur le code du module. `make verify` désigne
+# l'interpréteur du module (--pythonpath) ; en local, celui de `.venv`.
+include = ["src"]
+strict = ["src"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+[tool.bandit]
+# Lancé sur src/ seulement ; aucune règle écartée.
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
