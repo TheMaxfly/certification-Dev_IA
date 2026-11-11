@@ -173,8 +173,9 @@ comptent par jour civil UTC et se remettent à zéro à minuit UTC.
   **par appel** par le même client HTTP. Sans clé des comptes, la publique sert aux deux
   (`cle_comptes_absente` au démarrage, `/sante` : `"cles_api": "une"`, sinon `"deux"`) :
   les comptes passent alors sous le plafond de débit des visiteurs — la protection de D7
-  (une rafale de visiteurs ne bloque pas un libraire) suppose la seconde clé, posée au
-  trousseau de l'API au lot de livraison continue.
+  (une rafale de visiteurs ne bloque pas un libraire) suppose la seconde clé : **posée**
+  au trousseau de l'API, en production depuis le 2026-11-11 (`/sante` : `"cles_api":
+  "deux"`, E4, lot 8).
 - **L'inscription bornée** : 3 comptes par heure et par session (`inscriptions` dans le
   cookie, même mécanisme, gardé à l'ouverture et à la fermeture d'une session) ; au-delà,
   429, `Retry-After`, un encart au formulaire, aucune ligne en base.
@@ -887,7 +888,7 @@ désactivent (leurs critiques signées restent attribuables).
 | Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
 | Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
-| Consommation de ressources non bornée (A04) : le conseiller | **couvert** (E4, lot 2b) : quatre bornes vérifiées avant l'appel — quota par session, quota par compte client, débit de la clé publique, budget du jour persisté (« Les bornes du conseiller ») ; un refus n'appelle jamais l'API ; mutations E4Q-04 à 07, E4Q-12 |
+| Consommation de ressources non bornée (A04) : le conseiller | **couvert** (E4, lot 2b) : quatre bornes vérifiées avant l'appel — quota par session, quota par compte client, débit de la clé publique, budget du jour persisté (« Les bornes du conseiller ») ; un refus n'appelle jamais l'API ; la clé des comptes **posée** en production (2026-11-11, `cles_api: deux`) : les comptes ne partagent pas le plafond des visiteurs ; mutations E4Q-04 à 07, E4Q-12 |
 | Authentification (A07) : l'inscription | **couvert, par session** (E4, lot 2b) : 3 comptes par heure et par navigateur, aucune ligne au-delà ; limite assumée : un cookie effacé remet le compteur à zéro ; mutation E4Q-08 |
 
 ## Configuration
@@ -1104,6 +1105,8 @@ script, les tableaux défilants (ci-dessus). **Lot 7 (l'apparence, 0.9.0)** : la
 six espaces, l'intensité et la matière réglées par l'administrateur ; l'en-tête en deux
 navigations (ci-dessus). **Lot 8 (la livraison, 0.9.1)** : les comptes servis par la pile
 Compose — la base, la clé de session, la clé des comptes, un pgpass monté, un sous-réseau
-fixe vers la base (« Par Compose », ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
-l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
-production.
+fixe vers la base (« Par Compose », ci-dessus) ; **déployée en production le 2026-11-11**
+(étiquette `e4-livraison-1`, application 0.9.1, API 1.5.0, catalogue 0.7.0), après le
+staging sur la préproduction, par `make livrer` (`15_livraison/`). À venir : l'entrée des
+critiques de libraires dans le corpus ; le masquage à l'affichage des mentions de membres
+connues du corpus ; le serveur (procédure écrite au module 15, non jouée).

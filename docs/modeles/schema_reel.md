@@ -1,6 +1,6 @@
 # Schema reel — inventaire extrait de la base
 
-> Extrait de `apimanga_preprod` le 2026-11-08 par `extraire_schema.py`, sous le role `verif_lecture` en session `default_transaction_read_only = on` (lecture seule : uniquement des SELECT sur `pg_catalog`).
+> Extrait de `apimanga` le 2026-11-11 par `extraire_schema.py`, sous le role `verif_lecture` en session `default_transaction_read_only = on` (lecture seule : uniquement des SELECT sur `pg_catalog`).
 
 Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **preuve de fidelite** : rien n'y est saisi a la main, tout vient de la base. Une table dessinee qui ne figurerait pas ici serait une invention.
 
@@ -10,16 +10,19 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | --- | --- |
 | Tables `manga` | 36 |
 | Tables `staging` | 15 |
+| Tables `application` | 7 |
 | Vues (`manga`) | 10 |
-| Colonnes (total) | 735 |
-| Cles etrangeres | 23 |
-| Index (dont UNIQUE) | 123 |
-| Contraintes declarees | 100 |
+| Colonnes (total) | 781 |
+| Cles etrangeres | 28 |
+| Index (dont UNIQUE) | 133 |
+| Contraintes declarees | 131 |
+| Fonctions (hors extensions) | 1 |
+| Droits accordes (objet x role) | 106 |
 
 ## Confrontation base <-> toutes les migrations versionnees
 
-- tables `manga` + `staging` **declarees par les migrations** : **51**
-- tables `manga` + `staging` **presentes en base** : **51**
+- tables `manga` + `staging` + `application` **declarees par les migrations** : **58**
+- tables `manga` + `staging` + `application` **presentes en base** : **58**
 
 **Aucun ecart.** Chaque table de la base est creee par une migration du depot, et chaque table declaree existe en base. Le depot sait reconstruire ce qu'il decrit.
 
@@ -39,6 +42,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `010_avis_llm.sql` | `manga.llm_avis` |
 | `013_referentiel_genres.sql` | `manga.genre_mapping`, `manga.genre_ref` |
 | `015_personnages_multisources.sql` | `manga.character_descriptions`, `manga.character_forms`, `manga.character_work`, `manga.characters`, `staging.character_descriptions`, `staging.character_forms`, `staging.character_work`, `staging.characters` |
+| `027_schema_application.sql` | `application.comptes`, `application.couts_jour`, `application.critiques`, `application.journal_actions`, `application.listes`, `application.reglages` |
+| `029_quota_comptes.sql` | `application.questions_jour` |
 
 ## Vues
 
@@ -55,10 +60,146 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `manga.v_mi_ean_multiples` | manga.mi_sorties |
 | `manga.v_pseudonymes` | manga.ms_reviews_all |
 
+## Fonctions
+
+Les fonctions ecrites par les migrations (celles des extensions, `pg_trgm` et `unaccent`, exclues).
+
+### `manga.normaliser(text)`
+
+Rend `text` ; langage `sql`, `IMMUTABLE`, parallele `SAFE`, stricte.
+
+> La forme comparée par la recherche du catalogue (API data, module 02) : minuscules, sans accent. IMMUTABLE parce que le dictionnaire est nommé et qualifié (public.unaccent) : le résultat ne dépend pas du search_path. Remplace la table translate du lot 2a (E4) ; migration 028.
+
+```sql
+CREATE OR REPLACE FUNCTION manga.normaliser(text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT
+AS $function$ SELECT lower(public.unaccent('public.unaccent'::regdictionary, $1)) $function$
+```
+
+## Droits par role
+
+L'ACL de chaque objet, depliee : les droits accordes, role par role. Le proprietaire, qui a tous les droits implicitement, est donne a part.
+
+| Schema | Objet | Type | Proprietaire | Role | Droits |
+| --- | --- | --- | --- | --- | --- |
+| `application` | `application` | schema | `postgres` | `app_rw` | USAGE |
+| `application` | `comptes` | table | `postgres` | `app_rw` | DELETE, INSERT, SELECT, UPDATE |
+| `application` | `couts_jour` | table | `postgres` | `app_rw` | INSERT, SELECT, UPDATE |
+| `application` | `critiques` | table | `postgres` | `app_rw` | INSERT, SELECT, UPDATE |
+| `application` | `journal_actions` | table | `postgres` | `app_rw` | INSERT, SELECT |
+| `application` | `listes` | table | `postgres` | `app_rw` | DELETE, INSERT, SELECT, UPDATE |
+| `application` | `questions_jour` | table | `postgres` | `app_rw` | INSERT, SELECT, UPDATE |
+| `application` | `reglages` | table | `postgres` | `app_rw` | INSERT, SELECT, UPDATE |
+| `manga` | `normaliser(text)` | fonction | `postgres` | `PUBLIC` | EXECUTE |
+| `manga` | `manga` | schema | `postgres` | `manga_ro` | USAGE |
+| `manga` | `manga` | schema | `postgres` | `modele_ro` | USAGE |
+| `manga` | `manga` | schema | `postgres` | `verif_ro` | USAGE |
+| `manga` | `character_descriptions` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `character_descriptions` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `character_forms` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `character_forms` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `character_work` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `character_work` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `characters` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `characters` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `genre_mapping` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `genre_mapping` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `genre_ref` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `genre_ref` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_formes` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_formes` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_mappings` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_mappings` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_meta` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_meta` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_series_authors` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_series_authors` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_series_authors_stg` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_series_authors_stg` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_series_core` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_series_core` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_series_core_stage` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_series_core_stage` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_series_core_stg` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_series_core_stg` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_staff` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_staff` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_weekly_snapshot` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_weekly_snapshot` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_weekly_snapshot_stg` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_weekly_snapshot_stg` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `llm_avis` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `llm_avis` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `match_decision` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `match_decision` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `mi_series` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `mi_series` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `mi_sorties` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `mi_sorties` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_formes` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_formes` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_kitsu_ambiguous` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_kitsu_ambiguous` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_kitsu_map` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_kitsu_map` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_reviews` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_reviews` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_reviews_all` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_reviews_all` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_series_enriched` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_series_enriched` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `ms_volumes_enriched` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `ms_volumes_enriched` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_kitsu_docs` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_kitsu_docs` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_reviews_docs` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_reviews_docs` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `volume_identity` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `volume_identity` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `wd_auteurs` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `wd_auteurs` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `wd_auteurs_formes` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `wd_auteurs_formes` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `wd_formes` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `wd_formes` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `wd_pivot` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `wd_pivot` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `work_identity` | table | `postgres` | `manga_ro` | SELECT |
+| `manga` | `work_identity` | table | `postgres` | `verif_ro` | SELECT |
+| `manga` | `kitsu_rag_docs_v` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `kitsu_rag_docs_v` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_docs_all` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_docs_all` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_docs_all_v2` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_docs_all_v2` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_docs_scored` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_docs_scored` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_export_docs` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_export_docs` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `rag_ms_hybrid_docs` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `rag_ms_hybrid_docs` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `v_match_current` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `v_match_current` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `v_metadonnees_serie` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `v_metadonnees_serie` | vue | `postgres` | `modele_ro` | SELECT |
+| `manga` | `v_metadonnees_serie` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `v_mi_ean_multiples` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `v_mi_ean_multiples` | vue | `postgres` | `verif_ro` | SELECT |
+| `manga` | `v_pseudonymes` | vue | `postgres` | `manga_ro` | SELECT |
+| `manga` | `v_pseudonymes` | vue | `postgres` | `modele_ro` | SELECT |
+| `manga` | `v_pseudonymes` | vue | `postgres` | `verif_ro` | SELECT |
+
 ## Cles etrangeres (toutes)
 
 | Source | Colonnes | Cible | Colonnes cible |
 | --- | --- | --- | --- |
+| `application.critiques` | compte_id | `application.comptes` | id |
+| `application.journal_actions` | par_compte_id | `application.comptes` | id |
+| `application.listes` | compte_id | `application.comptes` | id |
+| `application.questions_jour` | compte_id | `application.comptes` | id |
+| `application.reglages` | modifie_par | `application.comptes` | id |
 | `manga.character_descriptions` | character_uid | `manga.characters` | character_uid |
 | `manga.character_forms` | character_uid | `manga.characters` | character_uid |
 | `manga.character_work` | character_uid | `manga.characters` | character_uid |
@@ -84,6 +225,154 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 | `manga.wd_formes` | qid | `manga.wd_pivot` | qid |
 
 ## Detail par table
+
+### `application.comptes`
+
+> Comptes de l'application : pseudo unique, empreinte Argon2id, rôle, état. Aucun courriel. Un compte libraire ne se supprime pas (ses critiques le retiennent).
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `id` | int8 | NON |  |
+| `pseudo` | text | NON |  |
+| `nom_affiche` | text | NON |  |
+| `role` | text | NON |  |
+| `hachage` | text | NON |  |
+| `actif` | bool | NON | true |
+| `generation` | int4 | NON | 0 |
+| `doit_changer_mdp` | bool | NON | false |
+| `echecs_connexion` | int4 | NON | 0 |
+| `verrou_jusqu_a` | timestamptz | oui |  |
+| `cree_le` | timestamptz | NON | now() |
+| `modifie_le` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX comptes_pkey ON application.comptes USING btree (id)`
+- **UNIQUE** : `CREATE UNIQUE INDEX comptes_pseudo_unique ON application.comptes USING btree (pseudo)`
+- **CHECK** `comptes_echecs_positifs` : `CHECK ((echecs_connexion >= 0))`
+- **CHECK** `comptes_generation_positive` : `CHECK ((generation >= 0))`
+- **CHECK** `comptes_nom_affiche_longueur` : `CHECK (((char_length(nom_affiche) >= 1) AND (char_length(nom_affiche) <= 60)))`
+- **CHECK** `comptes_pseudo_forme` : `CHECK ((pseudo ~ '^[a-z0-9_-]{3,30}$'::text))`
+- **CHECK** `comptes_role_connu` : `CHECK ((role = ANY (ARRAY['client'::text, 'libraire'::text, 'admin'::text])))`
+
+### `application.couts_jour`
+
+> Coûts estimés du modèle de langage, par jour, profil et mode (cout_estime_usd).
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `jour` | date | NON |  |
+| `profil` | text | NON |  |
+| `mode` | text | NON |  |
+| `appels` | int4 | NON | 0 |
+| `cout_usd` | numeric | NON | 0 |
+
+- **PK** : `CREATE UNIQUE INDEX couts_jour_pkey ON application.couts_jour USING btree (jour, profil, mode)`
+- **CHECK** `couts_appels_positifs` : `CHECK ((appels >= 0))`
+- **CHECK** `couts_mode_connu` : `CHECK ((mode = ANY (ARRAY['strict'::text, 'enrichi'::text])))`
+- **CHECK** `couts_montant_positif` : `CHECK ((cout_usd >= (0)::numeric))`
+
+### `application.critiques`
+
+> Critiques signées des libraires (série, ou tome par volume_url). Table distincte lue chaque mois par la construction du corpus. Retrait = statut retiree ; aucune suppression physique.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `id` | int8 | NON |  |
+| `compte_id` | int8 | NON |  |
+| `series_id` | int4 | NON |  |
+| `volume_url` | text | oui |  |
+| `volume_libelle` | text | oui |  |
+| `texte` | text | NON |  |
+| `note` | int2 | NON |  |
+| `label` | text | oui |  |
+| `statut` | text | NON | 'publiee'::text |
+| `publie_le` | timestamptz | NON | now() |
+| `modifie_le` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX critiques_pkey ON application.critiques USING btree (id)`
+- **UNIQUE** *(partiel)* : `CREATE UNIQUE INDEX critiques_une_publiee ON application.critiques USING btree (compte_id, series_id, COALESCE(volume_url, ''::text)) WHERE (statut = 'publiee'::text)`
+- **FK** : (compte_id) -> `application.comptes`(id)
+- **CHECK** `critiques_label_forme` : `CHECK ((label ~ '^[a-z_]{1,40}$'::text))`
+- **CHECK** `critiques_note_sur_dix` : `CHECK (((note >= 0) AND (note <= 10)))`
+- **CHECK** `critiques_statut_connu` : `CHECK ((statut = ANY (ARRAY['publiee'::text, 'retiree'::text])))`
+- **CHECK** `critiques_texte_longueur` : `CHECK (((char_length(texte) >= 1) AND (char_length(texte) <= 10000)))`
+- **CHECK** `critiques_tome_complet` : `CHECK (((volume_url IS NULL) = (volume_libelle IS NULL)))`
+
+### `application.journal_actions`
+
+> Journal des actions, en ajout seul (droits de app_rw : SELECT, INSERT). Jamais de texte libre ni de secret dans details : identifiants et codes seulement.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `id` | int8 | NON |  |
+| `le` | timestamptz | NON | now() |
+| `par_compte_id` | int8 | oui |  |
+| `action` | text | NON |  |
+| `objet_type` | text | oui |  |
+| `objet_id` | int8 | oui |  |
+| `details` | jsonb | NON | '{}'::jsonb |
+
+- **PK** : `CREATE UNIQUE INDEX journal_actions_pkey ON application.journal_actions USING btree (id)`
+- **FK** : (par_compte_id) -> `application.comptes`(id)
+- **CHECK** `journal_action_connue` : `CHECK ((action = ANY (ARRAY['compte_cree'::text, 'compte_desactive'::text, 'compte_reactive'::text, 'compte_supprime'::text, 'mot_de_passe_change'::text, 'critique_publiee'::text, 'critique_modifiee'::text, 'critique_retiree'::text, 'profil_actif_change'::text])))`
+- **CHECK** `journal_details_objet` : `CHECK ((jsonb_typeof(details) = 'object'::text))`
+
+### `application.listes`
+
+> Listes d'un compte : favori, à lire, à commander. series_id : identifiant du catalogue, sans clé étrangère (voir critiques.series_id).
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `compte_id` | int8 | NON |  |
+| `series_id` | int4 | NON |  |
+| `etat` | text | NON |  |
+| `ajoute_le` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX listes_pkey ON application.listes USING btree (compte_id, series_id)`
+- **FK** : (compte_id) -> `application.comptes`(id)
+- **CHECK** `listes_etat_connu` : `CHECK ((etat = ANY (ARRAY['favori'::text, 'a_lire'::text, 'a_commander'::text])))`
+
+### `application.questions_jour`
+
+> Questions posées au conseiller par compte et par jour civil UTC ; porte le quota des comptes clients. Aucun texte : un compteur.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `compte_id` | int8 | NON |  |
+| `jour` | date | NON |  |
+| `questions` | int4 | NON | 0 |
+
+- **PK** : `CREATE UNIQUE INDEX questions_jour_pkey ON application.questions_jour USING btree (compte_id, jour)`
+- **FK** : (compte_id) -> `application.comptes`(id)
+- **CHECK** `questions_jour_positif` : `CHECK ((questions >= 0))`
+
+### `application.reglages`
+
+> Réglages de l'application changés par un administrateur (clé, valeur, auteur).
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema application).
+
+| Colonne | Type | Null | Defaut |
+| --- | --- | --- | --- |
+| `cle` | text | NON |  |
+| `valeur` | text | NON |  |
+| `modifie_par` | int8 | oui |  |
+| `modifie_le` | timestamptz | NON | now() |
+
+- **PK** : `CREATE UNIQUE INDEX reglages_pkey ON application.reglages USING btree (cle)`
+- **FK** : (modifie_par) -> `application.comptes`(id)
+- **CHECK** `reglages_cle_forme` : `CHECK ((cle ~ '^[a-z_]{1,60}$'::text))`
 
 ### `manga.character_descriptions`
 
@@ -154,6 +443,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.characters`
 
+> Un personnage tel qu'une source le décrit. Aucune déduplication inter-sources : c'est l'objet du futur moyeu d'identité.
+
 47394 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -175,6 +466,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.genre_mapping`
 
+> Correspondance libellé brut -> code, une ligne par libellé distinct observé (99 pour ms, 55 pour kitsu). Journal d'arbitrage : le statut inconnu est une décision, pas une absence de décision.
+
 154 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -192,6 +485,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **CHECK** `genre_mapping_statut_check` : `CHECK ((statut = ANY (ARRAY['mappe'::text, 'exclu'::text, 'inconnu'::text])))`
 
 ### `manga.genre_ref`
+
+> Référentiel des genres : un code neutre, ses libellés par langue. Les codes préfixés « format_ » ne sont pas des genres mais des formats éditoriaux, rangés après par la colonne ordre.
 
 73 lignes.
 
@@ -214,6 +509,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.kitsu_formes`
 
+> Formes Kitsu de la cible {manga, manhwa, manhua}. Le CHECK sur subtype rend le filtre structurel : un novel ne peut pas y entrer.
+
 155003 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -234,6 +531,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.kitsu_mappings`
 
+> Pont kitsu_id -> site externe (étage kitsu_bridge de la cascade). Filtré à la promotion : subtype cible + sites manga uniquement.
+
 74866 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -246,6 +545,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **UNIQUE** : `CREATE UNIQUE INDEX kitsu_mappings_kitsu_id_external_site_external_id_key ON manga.kitsu_mappings USING btree (kitsu_id, external_site, external_id)`
 
 ### `manga.kitsu_meta`
+
+> Année (startDate) et subtype Kitsu, grain œuvre. Le CHECK sur subtype rend le filtre structurel : un novel ne peut pas y entrer.
 
 41249 lignes.
 
@@ -361,6 +662,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.kitsu_staff`
 
+> Auteurs Kitsu (staff), cible {manga, manhwa, manhua}. personne_norm vient de identity.normaliser(), comme toutes les colonnes *_norm du schéma.
+
 30678 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -411,6 +714,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.llm_avis`
 
+> Avis du juge LLM (étage R). RÉGIME AVIS-SEULEMENT au run 1 : cette table est la SEULE destination d'écriture du juge ; match_decision et work_identity restent vierges de l'étage R. Le droit d'écriture au journal est une politique du run 2, conditionnée aux mesures.
+
 2759 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -442,6 +747,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.match_decision`
 
+> Journal APPEND-ONLY des décisions de rapprochement : ni UPDATE ni DELETE, se raviser = insérer une nouvelle décision.
+
 11516 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -461,6 +768,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **CHECK** `match_decision_status_check` : `CHECK ((status = ANY (ARRAY['auto'::text, 'validated'::text, 'rejected'::text, 'needs_review'::text])))`
 
 ### `manga.mi_series`
+
+> Manga Insight, population B (grain série, issu du crawl Manga-News). Rechargée en entier à chaque cycle, comme mi_sorties.
 
 10162 lignes.
 
@@ -510,6 +819,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.mi_sorties`
 
+> Manga Insight, population A (grain sortie/volume). La table EST le snapshot du mois : rechargée en entier à chaque cycle. Historique dans le raw daté.
+
 48900 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -555,6 +866,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **PK** : `CREATE UNIQUE INDEX mi_sorties_pkey ON manga.mi_sorties USING btree (sortie_id)`
 
 ### `manga.ms_formes`
+
+> Cibles de matching Manga Sanctuary : une ligne par titre (principal ou alias). Alimente les étages 1 (exact) et 3 (trigramme) de la cascade.
 
 31904 lignes.
 
@@ -825,6 +1138,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.volume_identity`
 
+> Identité d'un volume. isbn13 n'est pas unique : rééditions et coffrets partagent un EAN.
+
 104107 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -858,6 +1173,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.wd_auteurs_formes`
 
+> Formes des auteurs Wikidata (natif + romanisation + alias), grain auteur. auteur_qid n'est pas un qid d'œuvre : aucune FK vers wd_pivot. Même normalisation et même outillage d'index que wd_formes.
+
 9090 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -875,6 +1192,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **CHECK** `wd_auteurs_formes_forme_type_check` : `CHECK ((forme_type = ANY (ARRAY['label'::text, 'alias'::text])))`
 
 ### `manga.wd_formes`
+
+> Formes Wikidata (label ou alias), langue DÉCLARÉE par la source. forme_norm vient de identity.normaliser(), comme ms_formes.
 
 26103 lignes.
 
@@ -895,6 +1214,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `manga.wd_pivot`
 
+> Pivot Wikidata : le seul référentiel portant mal_id ET anilist_id. Grain unique par qid — fusion de wd_pivot.csv et wd_entities.csv.
+
 8214 lignes.
 
 | Colonne | Type | Null | Defaut |
@@ -914,6 +1235,8 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 - **PK** : `CREATE UNIQUE INDEX wd_pivot_pkey ON manga.wd_pivot USING btree (qid)`
 
 ### `manga.work_identity`
+
+> Identité d'une œuvre et ses identifiants externes. series_id est nullable : une œuvre peut exister sans fiche Manga Sanctuary.
 
 14670 lignes.
 
@@ -941,7 +1264,7 @@ Ce fichier est la **source** des planches de `modele_donnees.drawio` et la **pre
 
 ### `staging.character_descriptions`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -957,7 +1280,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.character_forms`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -973,7 +1296,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.character_work`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -989,7 +1312,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.characters`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1006,7 +1329,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.kitsu_formes`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1022,7 +1345,9 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.kitsu_mappings`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+> Atterrissage des mappings Kitsu (data[] de mappings.ndjson). Tout-TEXT, non filtré : le subtype et le site sont tranchés à la promotion.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1036,7 +1361,9 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.kitsu_staff`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+> Atterrissage du staff Kitsu (data[] × included[] de staff.ndjson). Tout-TEXT, non filtré : le subtype est tranché à la promotion.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1051,7 +1378,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.mi_series`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1096,7 +1423,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.mi_sorties`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1138,7 +1465,9 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.ms_reviews`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+> Atterrissage du fichier critiques MS. TRUNCATE à chaque cycle.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1161,7 +1490,9 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.ms_volumes`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+> Atterrissage du fichier volumes MS. Dénormalisé : source des deux grains (volumes, et séries par DISTINCT ON (series_id)). TRUNCATE à chaque cycle.
+
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1211,7 +1542,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.wd_auteurs`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1223,7 +1554,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.wd_entities`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1241,7 +1572,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.wd_formes`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |
@@ -1256,7 +1587,7 @@ Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema 
 
 ### `staging.wd_pivot`
 
-Nombre de lignes **non lisible** sous `manga_api` (permission denied for schema staging).
+Nombre de lignes **non lisible** sous `verif_lecture` (permission denied for schema staging).
 
 | Colonne | Type | Null | Defaut |
 | --- | --- | --- | --- |

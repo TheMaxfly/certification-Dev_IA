@@ -25,6 +25,13 @@ Les requêtes ci-dessous reproduisent les définitions d'`information_schema`
 Ce qui reste hors de portée du rôle : le **contenu**. `count(*)` sur `staging`
 est refusé, et c'est voulu. Ces comptes sont alors reportés dans
 `comptes_indisponibles` avec leur motif, plutôt que tus.
+
+Depuis la livraison d'E4 (lot 8), trois schémas : `manga`, `staging` et
+`application` (l'application du libraire, migrations 027 et 029) ; plus les
+**fonctions** écrites par les migrations (`manga.normaliser`, 028 — celles des
+extensions exclues), les **droits** par rôle (schémas, tables, vues, séquences,
+fonctions : `aclexplode`, le propriétaire à part) et les **commentaires** de la
+base (`COMMENT ON`), tous lus dans `pg_catalog` comme le reste.
 """
 
 from __future__ import annotations
@@ -35,7 +42,7 @@ import sys
 
 import psycopg
 
-SCHEMAS = ("manga", "staging")
+SCHEMAS = ("manga", "staging", "application")
 
 # Reproduit `information_schema.columns` (mêmes expressions, mêmes fonctions
 # d'assistance) mais sans son filtre de privilège — cf. docstring.
@@ -63,7 +70,8 @@ SELECT nc.nspname AS table_schema,
            information_schema._pg_truetypmod(a.*, t.*)) AS character_maximum_length,
        information_schema._pg_numeric_precision(
            information_schema._pg_truetypid(a.*, t.*),
-           information_schema._pg_truetypmod(a.*, t.*)) AS numeric_precision
+           information_schema._pg_truetypmod(a.*, t.*)) AS numeric_precision,
+       col_description(c.oid, a.attnum) AS commentaire
   FROM pg_attribute a
   LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
   JOIN (pg_class c JOIN pg_namespace nc ON nc.oid = c.relnamespace)
@@ -86,7 +94,8 @@ SELECT n.nspname AS table_schema,
                       WHEN 'p' THEN 'BASE TABLE'
                       WHEN 'v' THEN 'VIEW'
                       WHEN 'f' THEN 'FOREIGN'
-                      WHEN 'm' THEN 'MATERIALIZED VIEW' END AS table_type
+                      WHEN 'm' THEN 'MATERIALIZED VIEW' END AS table_type,
+       obj_description(c.oid, 'pg_class') AS commentaire
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE c.relkind IN ('r', 'p', 'v', 'f', 'm')
@@ -157,6 +166,80 @@ SELECT schemaname AS schema, viewname AS nom, definition
  ORDER BY 1, 2
 """
 
+# Les fonctions écrites par les migrations ; celles des extensions (pg_trgm,
+# unaccent : schéma `public`, mais une extension peut s'installer ailleurs) exclues.
+SANS_EXTENSION = """
+   AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                    WHERE d.classid = 'pg_proc'::regclass
+                      AND d.objid = p.oid AND d.deptype = 'e')"""
+
+SQL_FONCTIONS = (
+    """
+SELECT n.nspname AS schema,
+       p.proname AS nom,
+       pg_get_function_identity_arguments(p.oid) AS arguments,
+       pg_get_function_result(p.oid) AS resultat,
+       l.lanname AS langage,
+       CASE p.provolatile WHEN 'i' THEN 'IMMUTABLE'
+                          WHEN 's' THEN 'STABLE' ELSE 'VOLATILE' END AS volatilite,
+       p.proisstrict AS stricte,
+       CASE p.proparallel WHEN 's' THEN 'SAFE'
+                          WHEN 'r' THEN 'RESTRICTED' ELSE 'UNSAFE' END AS parallele,
+       obj_description(p.oid, 'pg_proc') AS commentaire,
+       pg_get_functiondef(p.oid) AS definition
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  JOIN pg_language l ON l.oid = p.prolang
+ WHERE p.prokind = 'f' AND n.nspname = ANY(%(schemas)s)"""
+    + SANS_EXTENSION
+    + """
+ ORDER BY 1, 2, 3
+"""
+)
+
+# Les droits par rôle : l'ACL de chaque objet, dépliée (`aclexplode`) ; une ACL
+# vide vaut celle par défaut (`acldefault`). Le propriétaire a tous les droits
+# implicitement : il est donné en colonne, pas répété en ligne.
+SQL_DROITS = (
+    """
+WITH objets AS (
+    SELECT n.nspname AS schema, n.nspname AS objet, 'schema' AS type,
+           n.nspacl AS acl, n.nspowner AS proprietaire, 'n'::"char" AS genre
+      FROM pg_namespace n
+     WHERE n.nspname = ANY(%(schemas)s)
+    UNION ALL
+    SELECT n.nspname, c.relname,
+           CASE c.relkind WHEN 'S' THEN 'sequence' WHEN 'v' THEN 'vue'
+                          WHEN 'm' THEN 'vue materialisee' ELSE 'table' END,
+           c.relacl, c.relowner,
+           CASE c.relkind WHEN 'S' THEN 's' ELSE 'r' END::"char"
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+       AND n.nspname = ANY(%(schemas)s)
+    UNION ALL
+    SELECT n.nspname,
+           p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+           'fonction', p.proacl, p.proowner, 'f'::"char"
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE p.prokind = 'f' AND n.nspname = ANY(%(schemas)s)"""
+    + SANS_EXTENSION
+    + """
+)
+SELECT o.schema, o.objet, o.type,
+       pg_get_userbyid(o.proprietaire) AS proprietaire,
+       CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+            ELSE pg_get_userbyid(a.grantee) END AS role,
+       array_agg(a.privilege_type ORDER BY a.privilege_type) AS privileges
+  FROM objets o
+ CROSS JOIN LATERAL aclexplode(COALESCE(o.acl, acldefault(o.genre, o.proprietaire))) a
+ WHERE a.grantee <> o.proprietaire
+ GROUP BY 1, 2, 3, 4, 5
+ ORDER BY 1, 3, 2, 5
+"""
+)
+
 # Volumétrie : une ligne par table, comptée réellement (pas l'estimation
 # reltuples, qui dérive après des chargements en masse).
 SQL_COMPTE = "SELECT count(*) FROM {}.{}"
@@ -191,6 +274,8 @@ def main() -> int:
             "index": lignes(cur, SQL_INDEX),
             "fk": lignes(cur, SQL_FK),
             "vues": lignes(cur, SQL_VUES),
+            "fonctions": lignes(cur, SQL_FONCTIONS, {"schemas": list(SCHEMAS)}),
+            "droits": lignes(cur, SQL_DROITS, {"schemas": list(SCHEMAS)}),
         }
         # La structure est lisible par tous ; le CONTENU ne l'est pas. Sous
         # `manga_api`, `count(*)` sur `staging` est refusé (42501) — c'est le
