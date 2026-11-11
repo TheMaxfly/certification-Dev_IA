@@ -1,0 +1,7 @@
+id = "E4H-07"
+origine = "E4, lot 6, spec 02 (2026-11-10) — le script d'attente rendu en ligne au lieu de vendu : la politique le refuserait, et rien en ligne n'est admis"
+fichier = "12_application/src/application/gabarits/base.html"
+avant = '''<script src="/statique/attente.js" defer></script>'''
+apres = '''<script>document.querySelector("form[action='/question']").addEventListener("submit", function () { document.body.classList.add("en-attente"); });</script>'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_kohai.py", "-k", "seul_script"]

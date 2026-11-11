@@ -1,0 +1,7 @@
+id = "E4P-05"
+origine = "E4, lot 7, spec 01 (2026-11-10) — l'avertissement des couleurs partagées retiré : deux espaces de même couleur sans que l'écran le dise"
+fichier = "12_application/src/application/pages_apparence.py"
+avant = '''            avertissements=avertissements(reglee),'''
+apres = '''            avertissements=[],'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_apparence.py", "-k", "avertissement"]

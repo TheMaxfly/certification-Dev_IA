@@ -1,0 +1,7 @@
+id = "E4Q-06"
+origine = "E4, lot 2b, spec 02 (2026-11-08) — le coût du jour non relu avant l'appel : le budget atteint, la question partirait quand même"
+fichier = "12_application/src/application/app.py"
+avant = '''            cumul = await couts.cumul_du_jour(base, jour)'''
+apres = '''            cumul = Decimal(0)'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_bornes.py", "-k", "budget_du_jour_atteint"]

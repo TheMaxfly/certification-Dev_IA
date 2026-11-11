@@ -1,6 +1,7 @@
 <section>
 <h2>{{ t.question_titre }}</h2>
 <form method="post" action="/question">
+<input type="hidden" name="jeton" value="{{ jeton }}">
 <label for="question">{{ t.question_etiquette }}</label>
 <textarea id="question" name="question" rows="3" maxlength="{{ question_max }}" required aria-describedby="question-aide{% if formulaire.champ_fautif == "question" %} question-erreur{% endif %}"{% if formulaire.champ_fautif == "question" %} aria-invalid="true" autofocus{% endif %}>{{ formulaire.question }}</textarea>
 <small id="question-aide">{{ question_aide }}</small>
@@ -10,6 +11,9 @@
 {% if info_connue and not options %}
 <p>{{ t.aucun_profil }}</p>
 {% endif %}
+{# Les réglages, la case du mode démonstration et la liste des modes selon le rôle (E4,
+   lot 2b) : le HTML servi au public (visiteur, client) n'en porte aucun. #}
+{% if peut_regler %}
 <details{% if formulaire.champ_fautif in ("profil", "temperature") %} open{% endif %}>
 <summary>{{ t.reglages_titre }}</summary>
 {% if options %}
@@ -34,8 +38,10 @@
 </fieldset>
 <label for="reformuler"><input type="checkbox" id="reformuler" name="reformuler" value="1" aria-describedby="reformuler-aide"{% if reformuler %} checked{% endif %}> {{ t.reformuler_etiquette }}</label>
 <small id="reformuler-aide">{{ t.reformuler_aide }}</small>
+{% if peut_demontrer %}
 <label for="mode_demonstration"><input type="checkbox" id="mode_demonstration" name="mode_demonstration" value="1"{% if mode_demonstration %} checked{% endif %}> {{ t.demonstration_etiquette }}</label>
-{% if modes|length > 1 %}
+{% endif %}
+{% if peut_choisir_mode and modes|length > 1 %}
 <label for="mode">{{ t.mode_etiquette }}</label>
 <select id="mode" name="mode">
 {% for mode in modes %}
@@ -44,6 +50,7 @@
 </select>
 {% endif %}
 </details>
+{% endif %}
 <input type="hidden" name="historique" value="{{ formulaire.historique }}">
 <button type="submit"{% if info_connue and not options %} disabled{% endif %}>{{ t.bouton }}</button>
 </form>

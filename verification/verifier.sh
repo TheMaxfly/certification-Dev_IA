@@ -83,9 +83,10 @@ MODULES=(
   "09|09_service_embedding|09_service_embedding|pytest|--extra dev||service_embedding|database"
   "10|10_mesures_recherche|10_mesures_recherche|pytest|--extra dev||mesures_recherche|database"
   "11|11_api_modele|11_api_modele|pytest|--extra dev||api_modele|database|pyright,bandit,pip-audit"
-  "12|12_application|12_application|pytest|--extra dev||application||pyright,bandit,pip-audit"
+  "12|12_application|12_application|pytest|--extra dev||application|database|pyright,bandit,pip-audit"
   "13|13_monitorage|13_monitorage|pytest|--extra dev||monitorage||pyright,bandit,pip-audit"
   "14|14_chaine|14_chaine|pytest|--extra dev||chaine||pyright,bandit,pip-audit"
+  "15|15_livraison|15_livraison|pytest|--extra dev||livraison||pyright,bandit,pip-audit"
   "database|database|database|pytest|--extra dev|tests/|.|"
   "demo|demo|demo|pytest|--extra dev||.|"
   # Toujours, sans filtre : Ruff du 06 et de docs/modeles/, actionlint, shellcheck,
@@ -395,18 +396,25 @@ integration_12() {
   local cmd=(docker compose "${COMPOSE_12[@]}" run --rm -T --build essai) rc
   local fusion publies
   dire "12 — (12_application/) docker compose config : le fichier de fusion sur celui du 11"
-  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null CATALOGUE_PGPASS=/dev/null \
+    docker compose --env-file /dev/null \
     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml config)" || return 1
-  # Seule l'application est publiée, en fusion comme écrit.
+  # L'application et le catalogue (E4, lot 2a) sont publiés, sur le bouclage seul ; l'API
+  # ne l'est pas, en fusion comme écrit.
   publies="$(grep -c 'published:' <<<"$fusion")"
-  [ "$publies" = 1 ] || { echo "fusion : $publies ports publiés, un seul attendu" >&2; return 1; }
+  [ "$publies" = 2 ] || { echo "fusion : $publies ports publiés, deux attendus" >&2; return 1; }
+  [ "$(grep -c 'host_ip: 127.0.0.1' <<<"$fusion")" = "$publies" ] ||
+    { echo "fusion : un port publié hors du bouclage" >&2; return 1; }
   # Le mode démonstration ajoute le port de l'API, et rien d'autre.
   dire "12 — (12_application/) docker compose config : le mode démonstration, en plus"
-  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null docker compose --env-file /dev/null \
+  fusion="$(cd "$RACINE" && "${PROPRE[@]}" API_MODELE_PGPASS=/dev/null CATALOGUE_PGPASS=/dev/null \
+    docker compose --env-file /dev/null \
     -f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml \
     -f 12_application/compose.demo.yaml config)" || return 1
   publies="$(grep -c 'published:' <<<"$fusion")"
-  [ "$publies" = 2 ] || { echo "démonstration : $publies ports publiés, deux attendus" >&2; return 1; }
+  [ "$publies" = 3 ] || { echo "démonstration : $publies ports publiés, trois attendus" >&2; return 1; }
+  [ "$(grep -c 'host_ip: 127.0.0.1' <<<"$fusion")" = "$publies" ] ||
+    { echo "démonstration : un port publié hors du bouclage" >&2; return 1; }
   dire "12 — (12_application/) ${cmd[*]}"
   (cd "$RACINE/12_application" && "${PROPRE[@]}" "${cmd[@]}" </dev/null); rc=$?
   (cd "$RACINE/12_application" && "${PROPRE[@]}" docker compose "${COMPOSE_12[@]}" down -v >/dev/null 2>&1)
@@ -439,6 +447,8 @@ verifier_statique() {
     uv run --no-project python -I verification/rejouer_mutations.py --controler
   controle "essais du contrôle des pseudonymes des passages de l'API" \
     uv run --no-project python -I verification/tester_pseudonymes_passages.py
+  controle "essais des migrations attendues en attente en production" \
+    uv run --no-project python -I verification/tester_migrations_en_attente.py
   controle "actionlint" uvx --from "actionlint-py==$ACTIONLINT" --with "shellcheck-py==$SHELLCHECK" \
     actionlint -no-color
   controle "shellcheck des hooks et de verification/" uvx --from "shellcheck-py==$SHELLCHECK" \

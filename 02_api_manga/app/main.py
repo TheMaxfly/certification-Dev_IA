@@ -8,9 +8,10 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import date as DateISO  # cf. le champ `date` de `Review`
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -19,6 +20,7 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
+    Request,
     Security,
     status,
 )
@@ -27,10 +29,10 @@ from psycopg import Error as PsycopgError
 from psycopg_pool import ConnectionPool, PoolClosed, PoolTimeout
 from pydantic import BaseModel, Field
 
-from . import API_VERSION
+from . import API_VERSION, recherche, resumes
 from .database import create_pool, get_pool
 from .security import api_key_header, require_api_key
-from .settings import Settings
+from .settings import RESUME_MIN_DEFAUT, SEUIL_RESSEMBLANCE_DEFAUT, Settings
 
 LOGGER = logging.getLogger(__name__)
 DATABASE_ERRORS = (PsycopgError, PoolClosed, PoolTimeout)
@@ -99,6 +101,17 @@ class HealthResponse(BaseModel):
     db: str
 
 
+class ReadinessResponse(HealthResponse):
+    normalisation: Literal["fonction", "repli"] | None = Field(
+        default=None,
+        description=(
+            "How the catalogue search normalises text: `fonction` (the database has "
+            "`manga.normaliser`, migration 028: trigram indexes and suggestions) or "
+            "`repli` (the character table, no suggestions)."
+        ),
+    )
+
+
 class KitsuCoreResponse(BaseModel):
     kitsu_id: int
     slug: str | None
@@ -163,6 +176,12 @@ class RagDocumentResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+# Les valeurs de `manga.v_metadonnees_serie` (migration 025), fermées.
+DISPONIBILITE = Literal["edite_en_france", "seulement_au_japon", "inconnue"]
+NB_VOLUMES_SOURCE = Literal["champ", "repli_volumes_distincts", "divergent"]
+STATUT = Literal["termine", "en_cours"]
+
+
 class GenreCode(BaseModel):
     """Un genre normalisé : le code d'abord, le libellé comme commodité.
 
@@ -199,7 +218,13 @@ class SeriesResponse(BaseModel):
     dessinateur: str | None
     scenariste: str | None
     magazine_prepublication: str | None
-    statuses: list[str] = Field(default_factory=list)
+    statuses: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Status badges of the source record, **serialised as collected** "
+            "(Python-formatted strings). The normalised status is `statut`."
+        ),
+    )
 
     genres_source: list[str] = Field(
         default_factory=list,
@@ -221,18 +246,46 @@ class SeriesResponse(BaseModel):
         description="Raw Manga Sanctuary tags. Open vocabulary, not normalised.",
     )
 
-    synopsis: str | None = Field(description="Manga Sanctuary synopsis.")
+    synopsis: str | None = Field(
+        description=(
+            "Manga Sanctuary synopsis, **raw**: it may contain excerpts of members' "
+            "reviews copied by the source. Prefer `synopsis_enriched`."
+        )
+    )
     synopsis_enriched: str | None = Field(
-        description="Manga Sanctuary synopsis, or the Kitsu one when MS has none."
+        description=(
+            "The synopsis to show: the Manga Sanctuary one **cut before the first "
+            "excerpt of a review** of the series (brought back to the end of the "
+            "previous sentence), kept when at least `SYNOPSIS_MIN_CHARS` characters "
+            "remain (100 by default); otherwise the Kitsu synopsis of the series "
+            "(through the identity hub); otherwise `null`. Since 0.6.0."
+        )
+    )
+    synopsis_source: Literal["manga_sanctuary", "kitsu"] | None = Field(
+        default=None,
+        description="Where `synopsis_enriched` comes from; `null` when there is none.",
+    )
+    synopsis_kitsu: str | None = Field(
+        default=None,
+        description=(
+            "The Kitsu synopsis of the series (English), whenever it exists — also "
+            "when the French one is the main one. Since 0.6.0."
+        ),
     )
 
     popularity_rank: int | None
-    members_rating: float | None
-    members_votes: int | None
+    members_rating: float | None = Field(description="Members' rating, **out of 10**.")
+    members_votes: int | None = Field(description="Number of members' votes.")
     experts_rating: float | None
     experts_votes: int | None
 
-    volume_count: int | None
+    volume_count: int | None = Field(
+        description=(
+            "Number of edition rows of the series **as recorded in December 2025** "
+            "(a frozen field of the reference: it may lag behind the catalogue, or "
+            "be missing). For the number of volumes, read `nb_volumes`."
+        )
+    )
     review_count: int | None
     score_mean: float | None
     score_min: float | None
@@ -248,6 +301,127 @@ class SeriesResponse(BaseModel):
             "The identity decision behind this series is flagged for human "
             "review. Method, score and reason live on `/identity/{work_uid}`."
         )
+    )
+
+    # Contrat 0.5.0 : sept champs de `manga.v_metadonnees_serie` (migrations 025, 026),
+    # à leurs noms dans la vue — les noms et les valeurs que l'API du modèle porte sur
+    # ses cartes : un seul vocabulaire, de la base à l'écran.
+    disponibilite: DISPONIBILITE | None = Field(
+        default=None,
+        description=(
+            "`edite_en_france` when a volume carries a French EAN (9782, 97910) or "
+            "the record carries the « français » badge; `seulement_au_japon` for a "
+            "Manga with volumes and none of that; `inconnue` otherwise. **Published "
+            "in France does not mean in stock**: the catalogue knows no stock. The "
+            "value the model API carries on its cards."
+        ),
+    )
+    nb_volumes: int | None = Field(
+        default=None,
+        description=(
+            "The larger of the « volumes published » field and the distinct volume "
+            "numbers (a volume without a number counts as number 1), all editions "
+            "mixed; a number between 1900 and 2100 is a year from the title and does "
+            "not count. Read it with `nb_volumes_source`."
+        ),
+    )
+    nb_volumes_source: NB_VOLUMES_SOURCE | None = Field(
+        default=None,
+        description=(
+            "`divergent` when both counts exist and differ by more than 20 % of the "
+            "larger; `champ` when the field is at least the numbers; "
+            "`repli_volumes_distincts` otherwise. **Any source other than `champ` "
+            "reads as a minimum**: « at least N »."
+        ),
+    )
+    statut: STATUT | None = Field(
+        default=None,
+        description=(
+            "`termine` on the « Complète » badge or Kitsu `finished`; `en_cours` on "
+            "Kitsu `current` without the badge. The catalogue never writes « en "
+            "cours »: no badge does not mean ongoing. `null`: unknown."
+        ),
+    )
+    demographie: str | None = Field(
+        default=None,
+        description=(
+            "`series_category_clean`, or `series_category` when it holds a value "
+            "from the same list (the three Korean categories mapped). The catalogue "
+            "label, as is."
+        ),
+    )
+    auteurs: str | None = Field(
+        default=None,
+        description=(
+            "The writer then the artist, as written, joined by a comma, the same "
+            "name once; a textual « inconnu » counts as absent; COLLECTIF stays."
+        ),
+    )
+    annee_fr: int | None = Field(
+        default=None,
+        description="Year of the first volume with a French EAN.",
+    )
+
+
+class SeriesSearchItem(BaseModel):
+    """Une série trouvée par `GET /series`, et ce qui a répondu à la saisie."""
+
+    series_id: int
+    title: str | None
+    type: str | None
+    year: int | None
+    auteurs: str | None = Field(description="As on `/series/{series_id}`.")
+    members_rating: float | None = Field(description="Members' rating, out of 10.")
+    members_votes: int | None
+    disponibilite: DISPONIBILITE | None = Field(
+        description="As on `/series/{series_id}`."
+    )
+    nb_volumes: int | None = Field(description="As on `/series/{series_id}`.")
+    nb_volumes_source: NB_VOLUMES_SOURCE | None = Field(
+        description="As on `/series/{series_id}`."
+    )
+    correspondance: Literal["titre", "autre_titre", "auteur"] = Field(
+        description=(
+            "What answered the query: the main title, another title, or an author "
+            "(the first of the three that answers)."
+        )
+    )
+    titre_correspondant: str | None = Field(
+        description=(
+            "The other title that answered; `null` when the main title or an author "
+            "answered."
+        )
+    )
+
+
+class SeriesSuggestion(BaseModel):
+    """Une série qui ressemble à la saisie quand rien ne lui correspond."""
+
+    series_id: int
+    title: str | None
+    score: float = Field(
+        description="Trigram similarity of what answered, 0 to 1 (`pg_trgm`)."
+    )
+    correspondance: Literal["titre", "autre_titre", "auteur"] = Field(
+        description="What resembles the query: the title, another title, an author."
+    )
+
+
+class SeriesSearchResponse(BaseModel):
+    query: str = Field(description="The query, stripped.")
+    total: int
+    limit: int
+    offset: int
+    items: list[SeriesSearchItem]
+    suggestions: list[SeriesSuggestion] = Field(
+        default_factory=list,
+        description=(
+            "Proposed when nothing matches (`total` = 0): up to five series whose "
+            "trigram similarity reaches the threshold (`SEARCH_SIMILARITY_THRESHOLD`, "
+            "set on a set of misspelled queries: README). Always empty when the "
+            "database lacks migration 028 (`/health`: `normalisation: repli`). "
+            "Since 0.6.0."
+        ),
     )
 
 
@@ -307,7 +481,14 @@ class Review(BaseModel):
     )
     title: str | None
     score: float | None
-    author: str | None
+    author: None = Field(
+        default=None,
+        description=(
+            "Always `null`: the authors of collected reviews are readers' "
+            "pseudonyms, never served (project rule, E3). The field stays for "
+            "existing clients."
+        ),
+    )
     date: DateISO | None = Field(
         description=(
             "Parsed date, or `null` when the source truncated it to a weekday "
@@ -504,6 +685,67 @@ def decode_cursor(cursor: str) -> str:
     return doc_key
 
 
+# La normalisation de la recherche, détectée (E4, lot 2b) : `/health` la dit, la
+# recherche la suit.
+@dataclass(frozen=True, slots=True)
+class ReglageRecherche:
+    """Ce qui règle la recherche : le chemin de la normalisation, détecté au démarrage
+    (le repli par défaut : un appel direct, en test, n'en a pas d'autre), et le seuil
+    de ressemblance des suggestions (`SEARCH_SIMILARITY_THRESHOLD`)."""
+
+    normalisation: recherche.Normalisation = recherche.REPLI
+    seuil: float = SEUIL_RESSEMBLANCE_DEFAUT
+
+
+def detecter_normalisation(
+    pool: ConnectionPool, delai_s: float | None = None
+) -> recherche.Normalisation | None:
+    """La fonction de la 028 est-elle là ? None : la base n'a pas répondu (on
+    redemandera)."""
+    try:
+        connexion = (
+            pool.connection() if delai_s is None else pool.connection(timeout=delai_s)
+        )
+        with connexion as conn:
+            with conn.cursor() as cur:
+                cur.execute(recherche.DETECTION)
+                ligne = cur.fetchone()
+    except DATABASE_ERRORS:
+        return None
+    return recherche.FONCTION if ligne and ligne[0] else recherche.REPLI
+
+
+def normalisation_de(api: FastAPI, pool: ConnectionPool) -> recherche.Normalisation:
+    """Le chemin connu de l'application ; détecté une fois, au démarrage ou à la
+    première demande qui le trouve inconnu, et journalisé ; base muette : le repli,
+    sans le retenir."""
+    connue: recherche.Normalisation | None = getattr(api.state, "normalisation", None)
+    if connue is None:
+        connue = detecter_normalisation(pool)
+        if connue is None:
+            return recherche.REPLI
+        api.state.normalisation = connue
+        LOGGER.info("normalisation de la recherche : %s", connue)
+    return connue
+
+
+def normalisation_courante(
+    request: Request, pool: PoolDependency
+) -> recherche.Normalisation:
+    return normalisation_de(request.app, pool)
+
+
+def reglage_recherche(request: Request, pool: PoolDependency) -> ReglageRecherche:
+    settings: Settings = request.app.state.settings
+    return ReglageRecherche(
+        normalisation=normalisation_de(request.app, pool),
+        seuil=settings.search_similarity_threshold,
+    )
+
+
+ReglageDependency = Annotated[ReglageRecherche, Depends(reglage_recherche)]
+
+
 @router.get(
     "/live",
     response_model=HealthResponse,
@@ -518,13 +760,21 @@ def live() -> HealthResponse:
 
 @router.get(
     "/health",
-    response_model=HealthResponse,
+    response_model=ReadinessResponse,
     responses={503: {"model": HealthResponse}},
     tags=["probes"],
     summary="Readiness probe",
-    description="Checks the API answers and PostgreSQL accepts a query.",
+    description=(
+        "Checks the API answers and PostgreSQL accepts a query; says how the "
+        "catalogue search normalises text (`normalisation`)."
+    ),
 )
-def health(pool: PoolDependency) -> HealthResponse | JSONResponse:
+def health(
+    pool: PoolDependency,
+    normalisation: Annotated[
+        recherche.Normalisation | None, Depends(normalisation_courante)
+    ] = None,
+) -> ReadinessResponse | JSONResponse:
     """Vérifie que l'API répond et que PostgreSQL accepte une requête."""
     try:
         with pool.connection() as conn:
@@ -537,7 +787,7 @@ def health(pool: PoolDependency) -> HealthResponse | JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"status": "degraded", "db": "error"},
         )
-    return HealthResponse(status="ok", db="ok")
+    return ReadinessResponse(status="ok", db="ok", normalisation=normalisation)
 
 
 @router.get(
@@ -917,6 +1167,269 @@ def _liste(valeur: Any) -> list[str]:
     return [str(element) for element in valeur if element is not None]
 
 
+# ---------------------------------------------------------------------------
+# La recherche du catalogue — `GET /series` (contrat 0.6.0)
+# ---------------------------------------------------------------------------
+# Une forme normalisée par colonne — la fonction de la 028 (`manga.normaliser`), ou la
+# table du repli liée en paramètres (`recherche.colonne`) —, un rang par manière de
+# répondre, le titre principal avant les autres titres à rang égal (E4, lot 2b) : titre
+# exact (1), autre titre exact (2), titre en début (3), autre titre en début (4), titre
+# contenu (5), autre titre contenu (6), auteur (7 : chacun des mots de la saisie dans le
+# scénariste ou le dessinateur, dans n'importe quel ordre). Le rang d'une série est le
+# meilleur des siens. Un préfiltre d'abord : une série ne répond que si son titre ou le
+# texte de ses autres titres CONTIENT la saisie, ou qu'un auteur en porte chaque mot —
+# avec la fonction, ces prédicats portent sur l'expression même des index de trigrammes
+# (la 028). Les métadonnées de la vue ne sont jointes qu'aux lignes de la page : la vue
+# se calcule à la lecture, série par série.
+def _sql_rangs(normalisation: recherche.Normalisation) -> str:
+    def n(expression: str) -> str:
+        return recherche.colonne(expression, normalisation)
+
+    return f"""
+WITH normes AS (
+  SELECT s.series_id, s.series_title, s.series_type, s.series_year,
+         s.series_members_rating, s.series_members_votes, s.series_other_titles,
+         {n("s.series_title")} AS titre,
+         {n("s.series_scenariste")} AS scenariste,
+         {n("s.series_dessinateur")} AS dessinateur,
+         {n("s.series_other_titles::text")} AS autres
+    FROM manga.ms_series_enriched s
+), candidats AS (
+  SELECT *
+    FROM normes
+   WHERE titre LIKE %(contient)s ESCAPE '\\'
+      OR autres LIKE %(contient)s ESCAPE '\\'
+      OR scenariste LIKE ALL (%(mots)s)
+      OR dessinateur LIKE ALL (%(mots)s)
+), rangs AS (
+  SELECT n.*,
+         CASE WHEN n.titre = %(exact)s THEN 1
+              WHEN n.titre LIKE %(debut)s ESCAPE '\\' THEN 3
+              WHEN n.titre LIKE %(contient)s ESCAPE '\\' THEN 5
+         END AS rang_titre,
+         autre.rang AS rang_autre,
+         autre.valeur AS autre_titre,
+         CASE WHEN n.scenariste LIKE ALL (%(mots)s)
+                OR n.dessinateur LIKE ALL (%(mots)s) THEN 7
+         END AS rang_auteur
+    FROM candidats n
+    LEFT JOIN LATERAL (
+      SELECT a.rang, a.valeur
+        FROM (
+          SELECT t.valeur,
+                 CASE WHEN {n("t.valeur")} = %(exact)s THEN 2
+                      WHEN {n("t.valeur")} LIKE %(debut)s ESCAPE '\\' THEN 4
+                      WHEN {n("t.valeur")} LIKE %(contient)s ESCAPE '\\' THEN 6
+                 END AS rang
+            FROM jsonb_array_elements_text(
+                     coalesce(n.series_other_titles, '[]'::jsonb)) AS t(valeur)
+        ) a
+       WHERE a.rang IS NOT NULL
+       ORDER BY a.rang, a.valeur
+       LIMIT 1
+    ) autre ON true
+)
+"""
+
+
+_RECHERCHE_FILTRE = "WHERE coalesce(rang_titre, rang_autre, rang_auteur) IS NOT NULL"
+
+# Les suggestions (« Vouliez-vous dire… ? ») : quand rien ne correspond, les séries dont
+# la ressemblance de trigrammes (`pg_trgm`) atteint le seuil — `similarity` sur le titre
+# et le texte des autres titres, `word_similarity` sur les auteurs (l'ordre des noms n'y
+# compte pas) —, cinq au plus. La fonction seule : en repli, aucune.
+SUGGESTIONS_MAX = 5
+_SQL_SUGGESTIONS = """
+SELECT x.series_id, x.series_title, x.score, x.correspondance
+  FROM (
+    SELECT s.series_id, s.series_title, s.series_members_votes,
+           greatest(m.titre, m.autre, m.auteur) AS score,
+           CASE WHEN m.titre >= greatest(m.autre, m.auteur) THEN 'titre'
+                WHEN m.autre >= m.auteur THEN 'autre_titre'
+                ELSE 'auteur'
+           END AS correspondance
+      FROM manga.ms_series_enriched s
+      CROSS JOIN LATERAL (
+        SELECT coalesce(public.similarity(
+                   manga.normaliser(s.series_title), %(saisie)s), 0) AS titre,
+               coalesce(public.similarity(
+                   manga.normaliser(s.series_other_titles::text), %(saisie)s), 0)
+                   AS autre,
+               greatest(
+                 coalesce(public.word_similarity(
+                     %(saisie)s, manga.normaliser(s.series_scenariste)), 0),
+                 coalesce(public.word_similarity(
+                     %(saisie)s, manga.normaliser(s.series_dessinateur)), 0))
+                   AS auteur
+      ) m
+  ) x
+ WHERE x.score >= %(seuil)s
+ ORDER BY x.score DESC, x.series_members_votes DESC NULLS LAST, x.series_id
+ LIMIT %(nombre)s
+"""
+
+
+@router.get(
+    "/series",
+    response_model=SeriesSearchResponse,
+    dependencies=PROTECTED,
+    responses={401: RESPONSE_401, 503: RESPONSE_503},
+    tags=["catalogue"],
+    summary="Search the catalogue by title, other title or author",
+    description=(
+        "Searches the series title, its other titles (`series_other_titles`) and its "
+        "authors (writer, artist).\n\n"
+        "**Normalisation**: case-insensitive and accent-insensitive — "
+        "`manga.normaliser` (migration 028, trigram indexes) when the database has "
+        "it, otherwise one character table applied to the columns and to the query "
+        "alike (`/health` says which).\n\n"
+        "**Ranking**: exact main title, exact other title, main title starting with "
+        "the query, other title starting with it, main title containing it, other "
+        "title containing it, then author (every word of the query in the writer or "
+        "the artist, in any order); then `members_votes` descending, then "
+        "`series_id`. `correspondance` says what answered, `titre_correspondant` "
+        "which other title did.\n\n"
+        "**Typo tolerance**: when nothing matches, `suggestions` proposes up to five "
+        "series whose trigram similarity reaches a threshold set on a set of "
+        "misspelled queries (README) — empty without migration 028. No result is "
+        "`200` with `items: []`, never 404.\n\n"
+        "`offset` is capped at 1 000: a search returning more than 1 000 series is "
+        "a query that is too short."
+    ),
+)
+def search_series(
+    pool: PoolDependency,
+    q: Annotated[
+        str,
+        Query(
+            min_length=2,
+            max_length=100,
+            description="Title or author, 2 to 100 characters once stripped.",
+        ),
+    ],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    offset: Annotated[int, Query(ge=0, le=1000)] = 0,
+    reglage: ReglageDependency = ReglageRecherche(),  # noqa: B008 (valeur figée)
+) -> SeriesSearchResponse:
+    """Cherche une série par son titre, un autre titre ou un auteur ; rien ne
+    correspond : les suggestions par ressemblance (avec la fonction de la 028)."""
+    saisie = q.strip()
+    if len(saisie) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="q must contain at least 2 non-whitespace characters",
+        )
+    fonction = reglage.normalisation == recherche.FONCTION
+    rangs = _sql_rangs(reglage.normalisation)
+    # Un seul parcours : le total vient de la même requête que la page
+    # (`count(*) OVER ()`, calculé avant la limite). Normaliser les colonnes est le
+    # coût de la recherche (`translate` sur quatre colonnes, 14 670 séries) : le
+    # refaire pour un comptage à part doublerait la latence. Le comptage seul n'est
+    # rejoué que pour une page vide au-delà de la première, qui ne porte aucun total.
+    sql = f"""
+    {rangs}, trouvees AS (
+      SELECT series_id, series_title, series_type, series_year,
+             series_members_rating, series_members_votes,
+             least(rang_titre, rang_autre, rang_auteur) AS rang,
+             CASE WHEN rang_titre IS NOT NULL THEN 'titre'
+                  WHEN rang_autre IS NOT NULL THEN 'autre_titre'
+                  ELSE 'auteur'
+             END AS correspondance,
+             CASE WHEN rang_titre IS NULL THEN autre_titre END AS titre_correspondant,
+             count(*) OVER () AS total
+        FROM rangs
+       {_RECHERCHE_FILTRE}
+    ), page AS (
+      SELECT *
+        FROM trouvees
+       ORDER BY rang, series_members_votes DESC NULLS LAST, series_id
+       LIMIT %(limit)s OFFSET %(offset)s
+    )
+    SELECT p.series_id, p.series_title, p.series_type, p.series_year,
+           m.auteurs, p.series_members_rating, p.series_members_votes,
+           m.disponibilite, m.nb_volumes, m.nb_volumes_source,
+           p.correspondance, p.titre_correspondant, p.total
+      FROM page p
+      LEFT JOIN manga.v_metadonnees_serie m ON m.series_id = p.series_id
+     ORDER BY p.rang, p.series_members_votes DESC NULLS LAST, p.series_id
+    """
+    count_sql = f"{rangs} SELECT count(*) FROM rangs {_RECHERCHE_FILTRE}"
+    suggestions: list[SeriesSuggestion] = []
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                if fonction:
+                    # La saisie normalisée par la même fonction que les colonnes.
+                    cur.execute(
+                        recherche.SAISIE_FONCTION,
+                        {"saisie": saisie, "litterale": recherche.echapper(saisie)},
+                    )
+                    exacte, litterale = cur.fetchone()
+                    parametres = recherche.motifs(exacte, litterale)
+                else:
+                    parametres = recherche.parametres(saisie)
+                cur.execute(sql, {**parametres, "limit": limit, "offset": offset})
+                rows = cur.fetchall()
+                if rows:
+                    total = int(rows[0][12])
+                elif offset == 0:
+                    total = 0
+                else:
+                    cur.execute(count_sql, parametres)
+                    total_row = cur.fetchone()
+                    total = int(total_row[0]) if total_row else 0
+                if total == 0 and fonction:
+                    cur.execute(
+                        _SQL_SUGGESTIONS,
+                        {
+                            "saisie": parametres["exact"],
+                            "seuil": reglage.seuil,
+                            "nombre": SUGGESTIONS_MAX,
+                        },
+                    )
+                    suggestions = [
+                        SeriesSuggestion(
+                            series_id=ligne[0],
+                            title=ligne[1],
+                            score=round(float(ligne[2]), 3),
+                            correspondance=ligne[3],
+                        )
+                        for ligne in cur.fetchall()
+                    ]
+    except DATABASE_ERRORS as exc:
+        _database_unavailable(exc)
+
+    return SeriesSearchResponse(
+        query=saisie,
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[
+            SeriesSearchItem(
+                series_id=row[0],
+                title=row[1],
+                type=row[2],
+                year=row[3],
+                auteurs=row[4],
+                members_rating=row[5],
+                members_votes=row[6],
+                disponibilite=row[7],
+                nb_volumes=row[8],
+                nb_volumes_source=row[9],
+                correspondance=row[10],
+                titre_correspondant=row[11],
+            )
+            for row in rows
+        ],
+        suggestions=suggestions,
+    )
+
+
+def plancher_des_resumes(request: Request) -> int:
+    settings: Settings = request.app.state.settings
+    return settings.synopsis_min_chars
+
+
 @router.get(
     "/series/{series_id}",
     response_model=SeriesResponse,
@@ -939,6 +1452,7 @@ def _liste(valeur: Any) -> list[str]:
 def get_series(
     pool: PoolDependency,
     series_id: Annotated[int, Path(ge=1)],
+    plancher: Annotated[int, Depends(plancher_des_resumes)] = RESUME_MIN_DEFAUT,
 ) -> SeriesResponse:
     """Expose une série du socle catalogue."""
     sql = """
@@ -960,8 +1474,24 @@ def get_series(
                   FROM jsonb_array_elements_text(
                            COALESCE(s.series_genres_enriched, '[]'::jsonb)) g
                   JOIN manga.genre_ref r ON r.code = g),
-               '[]'::jsonb) AS genres_enriched
+               '[]'::jsonb) AS genres_enriched,
+           m.disponibilite, m.nb_volumes, m.nb_volumes_source, m.statut,
+           m.demographie, m.auteurs, m.annee_fr,
+           -- Contrat 0.6.0 : le résumé Kitsu de la série, par le moyeu d'identité, et
+           -- les débuts de ses critiques (60 caractères), que le résumé ne doit pas
+           -- recopier (`resumes`).
+           (SELECT k.synopsis_clean
+              FROM manga.work_identity w
+              JOIN manga.kitsu_series_core k ON k.kitsu_id::text = w.kitsu_id
+             WHERE w.series_id = s.series_id
+             LIMIT 1) AS synopsis_kitsu,
+           (SELECT coalesce(array_agg(DISTINCT left(btrim(r.review_body), 60)),
+                            '{}'::text[])
+              FROM manga.ms_reviews_all r
+             WHERE r.series_id = s.series_id
+               AND length(btrim(coalesce(r.review_body, ''))) >= 60) AS debuts
     FROM manga.ms_series_enriched s
+    LEFT JOIN manga.v_metadonnees_serie m ON m.series_id = s.series_id
     WHERE s.series_id = %s
     """
     try:
@@ -975,6 +1505,7 @@ def get_series(
     if row is None:
         raise HTTPException(status_code=404, detail="series_id not found")
 
+    resume = resumes.resume_servi(row[14], row[38], row[39] or [], plancher)
     return SeriesResponse(
         series_id=row[0],
         work_uid=row[1],
@@ -991,7 +1522,9 @@ def get_series(
         genres_source=_liste(row[12]),
         tags_source=_liste(row[13]),
         synopsis=row[14],
-        synopsis_enriched=row[15],
+        synopsis_enriched=resume.texte,
+        synopsis_source=resume.source,
+        synopsis_kitsu=row[38],
         popularity_rank=row[16],
         members_rating=row[17],
         members_votes=row[18],
@@ -1007,6 +1540,13 @@ def get_series(
         kitsu_id=row[28],
         needs_review=row[29],
         genres_enriched=[GenreCode(**item) for item in (row[30] or [])],
+        disponibilite=row[31],
+        nb_volumes=row[32],
+        nb_volumes_source=row[33],
+        statut=row[34],
+        demographie=row[35],
+        auteurs=row[36],
+        annee_fr=row[37],
     )
 
 
@@ -1122,10 +1662,11 @@ def get_series_reviews(
     ),
     offset: Annotated[int, Query(ge=0, le=COLLECTION_OFFSET_MAX)] = 0,
 ) -> ReviewsResponse:
-    """Expose les critiques d'une série, depuis le référentiel COMPLET."""
+    """Expose les critiques d'une série, depuis le référentiel COMPLET, sans leur
+    auteur (`author` toujours nul : un pseudonyme de lecteur ne sort jamais)."""
     sql = """
     SELECT review_id, volume_number, volume_url, review_url, review_title,
-           review_score, review_author, review_date_iso, review_date_raw,
+           review_score, review_date_iso, review_date_raw,
            review_type, review_grain, review_body
     FROM manga.ms_reviews_all
     WHERE series_id = %s
@@ -1159,12 +1700,15 @@ def get_series_reviews(
                 review_url=row[3],
                 title=row[4],
                 score=row[5],
-                author=row[6],
-                date=row[7],
-                date_raw=row[8],
-                type=row[9],
-                grain=row[10],
-                body=row[11],
+                # Toujours nul : les auteurs des critiques collectées sont des
+                # pseudonymes de lecteurs, jamais servis (`review_author` n'est
+                # pas lu).
+                author=None,
+                date=row[6],
+                date_raw=row[7],
+                type=row[8],
+                grain=row[9],
+                body=row[10],
             )
             for row in rows
         ],
@@ -1330,6 +1874,11 @@ async def lifespan(api: FastAPI) -> AsyncIterator[None]:
     pool = create_pool(api.state.settings)
     pool.open()
     api.state.db_pool = pool
+    # Le chemin de la normalisation, au démarrage si la base répond vite (sinon à la
+    # première demande) : journalisé.
+    api.state.normalisation = detecter_normalisation(pool, delai_s=2.0)
+    if api.state.normalisation is not None:
+        LOGGER.info("normalisation de la recherche : %s", api.state.normalisation)
     try:
         yield
     finally:

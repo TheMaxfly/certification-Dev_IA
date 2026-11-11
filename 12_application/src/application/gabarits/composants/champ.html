@@ -1,0 +1,49 @@
+{# Un champ de formulaire : son étiquette, son aide et son erreur, reliées par aria-describedby. #}
+{% macro champ(nom, etiquette, type="text", autocomplete=none, aide=none, erreur=none, valeur=none, max=none, focus=false) -%}
+{%- set decrit = [] -%}
+{%- if aide %}{% set decrit = decrit + [nom ~ "-aide"] %}{% endif -%}
+{%- if erreur %}{% set decrit = decrit + [nom ~ "-erreur"] %}{% endif -%}
+<label for="{{ nom }}">{{ etiquette }}</label>
+<input id="{{ nom }}" name="{{ nom }}" type="{{ type }}" required{% if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{% if max %} maxlength="{{ max }}"{% endif %}{% if valeur %} value="{{ valeur }}"{% endif %}{% if decrit %} aria-describedby="{{ decrit | join(' ') }}"{% endif %}{% if erreur %} aria-invalid="true"{% endif %}{% if focus %} autofocus{% endif %}>
+{% if aide %}<small id="{{ nom }}-aide">{{ aide }}</small>
+{% endif %}{% if erreur %}<p id="{{ nom }}-erreur">{{ erreur }}</p>
+{% endif %}
+{%- endmacro %}
+
+{# L'avis d'une action : un encart (`article`, une carte pour la feuille de style), son texte
+   annoncé (`role="status"`, sur un bloc intérieur : l'`article` ne l'admet pas) ; le focus y va
+   quand aucune erreur ne le prend ; un lien pour continuer, s'il y a lieu. #}
+{% macro avis(texte, focus=false, lien=none, lien_texte=none) -%}
+<article id="avis"{% if focus %} tabindex="-1" autofocus{% endif %}><div role="status"><p>{{ texte }}</p></div>{% if lien %}
+<p><a href="{{ lien }}">{{ lien_texte }}</a></p>{% endif %}</article>
+{%- endmacro %}
+
+{# Une liste déroulante : ses options (valeur, libellé), la valeur choisie, son étiquette, son
+   aide et son erreur, reliées par aria-describedby ; un lien dans l'erreur, s'il y a lieu. #}
+{% macro liste(nom, etiquette, options, choisie="", aide=none, erreur=none, focus=false, requis=false, lien=none, lien_texte=none) -%}
+{%- set decrit = [] -%}
+{%- if aide %}{% set decrit = decrit + [nom ~ "-aide"] %}{% endif -%}
+{%- if erreur %}{% set decrit = decrit + [nom ~ "-erreur"] %}{% endif -%}
+<label for="{{ nom }}">{{ etiquette }}</label>
+<select id="{{ nom }}" name="{{ nom }}"{% if requis %} required{% endif %}{% if decrit %} aria-describedby="{{ decrit | join(' ') }}"{% endif %}{% if erreur %} aria-invalid="true"{% endif %}{% if focus %} autofocus{% endif %}>
+{% for valeur, libelle in options %}
+<option value="{{ valeur }}"{% if valeur == choisie %} selected{% endif %}>{{ libelle }}</option>
+{% endfor %}
+</select>
+{% if aide %}<small id="{{ nom }}-aide">{{ aide }}</small>
+{% endif %}{% if erreur %}<p id="{{ nom }}-erreur">{{ erreur }}{% if lien %} <a href="{{ lien }}">{{ lien_texte }}</a>{% endif %}</p>
+{% endif %}
+{%- endmacro %}
+
+{# Une zone de texte : son étiquette, la phrase de ses bornes et son erreur, reliées par
+   aria-describedby ; la valeur saisie rendue telle quelle (échappée). #}
+{% macro zone_texte(nom, etiquette, valeur="", aide=none, erreur=none, min=none, max=none, focus=false) -%}
+{%- set decrit = [] -%}
+{%- if aide %}{% set decrit = decrit + [nom ~ "-aide"] %}{% endif -%}
+{%- if erreur %}{% set decrit = decrit + [nom ~ "-erreur"] %}{% endif -%}
+<label for="{{ nom }}">{{ etiquette }}</label>
+<textarea id="{{ nom }}" name="{{ nom }}" rows="10" required{% if min %} minlength="{{ min }}"{% endif %}{% if max %} maxlength="{{ max }}"{% endif %}{% if decrit %} aria-describedby="{{ decrit | join(' ') }}"{% endif %}{% if erreur %} aria-invalid="true"{% endif %}{% if focus %} autofocus{% endif %}>{{ valeur }}</textarea>
+{% if aide %}<small id="{{ nom }}-aide">{{ aide }}</small>
+{% endif %}{% if erreur %}<p id="{{ nom }}-erreur">{{ erreur }}</p>
+{% endif %}
+{%- endmacro %}

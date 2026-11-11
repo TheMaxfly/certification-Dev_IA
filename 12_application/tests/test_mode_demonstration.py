@@ -1,5 +1,10 @@
 """Le mode démonstration : éteint, la production ne change pas ; allumé, la page montre
-ce que l'API a déjà rendu, et rien n'est envoyé de plus."""
+ce que l'API a déjà rendu, et rien n'est envoyé de plus.
+
+E4, lot 2b (A7) : la case est réservée à l'administrateur ; les tests de ce module la
+jouent sous une session admin, sur une base jetable (`navigateur` est redéfini ici). Le
+public et le libraire, qui ne l'ont pas, sont éprouvés dans
+`test_conseiller_roles.py`."""
 
 from __future__ import annotations
 
@@ -10,9 +15,15 @@ from pathlib import Path
 import doublure_api as d
 import pytest
 from bs4 import BeautifulSoup, Tag
-from conftest import ENVIRONNEMENT, application_sur
+from conftest import (
+    CLE_SESSION_ESSAI,
+    ENVIRONNEMENT,
+    Navigateur,
+    application_sur,
+    connecter_essai,
+    creer_compte_essai,
+)
 from ecrans import echanges
-from fastapi.testclient import TestClient
 
 from application.config import FICHIER_REGLAGES, ConfigurationInvalide, charger
 
@@ -30,6 +41,12 @@ SCORES = ("0,83", "0,76", "0,64", "0,52", "0,40", "0,47", "0,61")
 NON_CITES = (12, 31, 41, 51)
 #: Les séries de la recherche que le modèle n'a pas citées.
 TITRES_NON_CITES = ("Série factice C", "Série factice D", "Série factice E")
+
+
+@pytest.fixture
+def navigateur(admin: Navigateur) -> Navigateur:
+    """La case du mode démonstration n'existe que pour l'administrateur."""
+    return admin
 
 
 def soupe(reponse) -> BeautifulSoup:
@@ -61,7 +78,7 @@ def case_cochee(page: BeautifulSoup) -> bool:
 def lignes_du_classement(page: BeautifulSoup) -> list[list[str]]:
     return [
         [plat(cellule) for cellule in ligne.select("td")]
-        for ligne in page.select("#trace ~ table tbody tr")
+        for ligne in page.select("#trace ~ .defilant > table tbody tr")
     ]
 
 
@@ -267,7 +284,7 @@ def test_coche_le_classement_suit_le_rang_pas_l_ordre_recu(navigateur, doublure)
 
 def test_coche_les_citees_ont_une_ancre_vers_leur_carte(navigateur):
     page = soupe(poser(navigateur, coche=True))
-    lignes = page.select("#trace ~ table tbody tr")
+    lignes = page.select("#trace ~ .defilant > table tbody tr")
 
     assert lignes[0].select_one("a")["href"] == "#serie-101"
     assert lignes[1].select_one("a")["href"] == "#serie-102"
@@ -346,7 +363,7 @@ def test_coche_une_serie_citee_sans_passage_reste_citee(navigateur, monkeypatch)
         ["1", "Série factice A", "0,83", "citée", "0"],
         ["2", "Série factice C", "0,64", "non citée", "1"],
     ]
-    assert page.select_one("#trace ~ table a")["href"] == "#serie-101"
+    assert page.select_one("#trace ~ .defilant > table a")["href"] == "#serie-101"
     assert "Aucun passage cité pour cette série." in plat(page)
 
 
@@ -407,7 +424,7 @@ def test_coche_une_serie_sans_identifiant_est_non_citee_et_sans_ancre(
 
     page = soupe(poser(navigateur, coche=True))
 
-    lignes = page.select("#trace ~ table tbody tr")
+    lignes = page.select("#trace ~ .defilant > table tbody tr")
     assert [plat(td) for td in lignes[2].select("td")] == [
         "3",
         "Œuvre factice K",
@@ -592,12 +609,19 @@ def test_une_erreur_de_champ_garde_la_case(navigateur, doublure):
 
 
 def test_le_defaut_vient_de_la_configuration_et_le_libraire_garde_la_main(
-    doublure, reglages
+    doublure, reglages, base_app
 ):
-    allume = replace(reglages, mode_demonstration_defaut=True)
+    allume = replace(
+        reglages,
+        mode_demonstration_defaut=True,
+        base_dsn=base_app,
+        cle_session=CLE_SESSION_ESSAI,
+    )
     application, _ = application_sur(doublure, allume)
 
-    with TestClient(application, client=("127.0.0.1", 50000)) as client:
+    with Navigateur(application, client=("127.0.0.1", 50000)) as client:
+        creer_compte_essai(base_app, "admin_defaut", "admin")
+        connecter_essai(client, "admin_defaut")
         assert case_cochee(soupe(client.get("/")))
         page = soupe(poser(client))
 
@@ -631,7 +655,7 @@ def test_refus_aucun_passage_coche_classement_vide_et_mention(navigateur, doublu
     page = soupe(poser(navigateur, coche=True))
 
     assert page.select_one("h2#trace") is not None
-    assert not page.select("#trace ~ table")
+    assert not page.select("#trace ~ .defilant > table")
     assert "aucune série retrouvée" in plat(page).lower()
     assert "Aucun passage non cité." in plat(page)
     assert "aucun appel au modèle" in [plat(li) for li in page.select("#trace ~ ul li")]
@@ -646,7 +670,7 @@ def test_refus_avec_des_series_le_classement_est_affiche_aucune_citee(
 
     lignes = lignes_du_classement(page)
     assert [ligne[3] for ligne in lignes] == ["non citée"]
-    assert not page.select("#trace ~ table a")
+    assert not page.select("#trace ~ .defilant > table a")
     assert "aucune série retrouvée" not in plat(page).lower()
     assert "Passage factice n° 31." in plat(page)
 
@@ -724,8 +748,8 @@ def test_un_extrait_ou_un_titre_non_cite_pieges_sont_echappes(navigateur, doublu
     r = poser(navigateur, coche=True)
     page = soupe(r)
 
-    assert not page.select("script")
-    assert not page.select("#trace ~ details b, #trace ~ table b")
+    assert not page.select("script:not([src='/statique/attente.js'])")
+    assert not page.select("#trace ~ details b, #trace ~ .defilant > table b")
     assert "&lt;script&gt;alert(2)&lt;/script&gt; Extrait piégé." in r.text
     assert "&lt;b&gt;Titre piégé&lt;/b&gt;" in r.text
 

@@ -1,0 +1,9 @@
+id = "E4R-05"
+origine = "E4, lot 3, spec 02 (2026-11-08) — le lien « Écrire une critique » servi à tout compte connecté : un client le verrait sur la fiche"
+fichier = "12_application/src/application/pages_critiques.py"
+avant = '''            f"/libraire/critiques/nouvelle?series_id={series_id}"
+            if compte is not None and compte.role == "libraire"'''
+apres = '''            f"/libraire/critiques/nouvelle?series_id={series_id}"
+            if compte is not None'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages_critiques.py", "-k", "liens_selon_le_role"]

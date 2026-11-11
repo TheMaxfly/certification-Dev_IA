@@ -48,6 +48,28 @@ INSERT INTO manga.ms_series_enriched (
    'Serie C',
    NULL);
 
+-- 2 bis. La recherche du catalogue (E4, contrats 0.5.0 et 0.6.0) : un auteur, deux autres
+--    titres (dont un accentué) et une note pour 736. Valeurs d'essai.
+UPDATE manga.ms_series_enriched
+   SET series_scenariste = 'Eiichiro ODA',
+       series_other_titles = '["ワンピース", "Wan Pīsu"]'::jsonb,
+       series_members_rating = 8.69,
+       series_members_votes = 6936
+ WHERE series_id = 736;
+
+-- 2 ter. Le résumé de 736 (E4, contrat 0.6.0) : le résumé Manga Sanctuary BRUT, qui
+--    recopie, à sa suite, la première critique de la série (section 7, 72 caractères) —
+--    le défaut de la collecte que le 02 corrige. Attendu à la fiche (`http_smoke.py`) :
+--    `synopsis_enriched` = les deux premières phrases (le début de la critique, ses 60
+--    premiers caractères, est trouvé ; la coupe revient au point qui le précède ;
+--    134 caractères ≥ 100, le plancher), `synopsis_source` = manga_sanctuary,
+--    `synopsis_kitsu` = le résumé Kitsu de la série 38, par le moyeu (section 9).
+UPDATE manga.ms_series_enriched
+   SET series_synopsis = 'Gol D. Roger, roi des pirates, a cache son tresor a Raftel. '
+       || 'Luffy part a sa recherche avec son equipage, d''ile en ile, sur Grand Line. '
+       || 'Avis de lecteur sur le tome 1 : un abordage lisible, un rythme qui tient.'
+ WHERE series_id = 736;
+
 -- 3. Référentiel volumes — cible de rag_reviews_docs.volume_url.
 INSERT INTO manga.ms_volumes_enriched (volume_url, series_id) VALUES (
   'https://www.manga-sanctuary.com/bdd/manga/736-one-piece/tome-1.html',

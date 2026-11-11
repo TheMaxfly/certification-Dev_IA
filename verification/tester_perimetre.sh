@@ -43,9 +43,12 @@ fi
 echo "Essai du périmètre (statique tourne toujours)"
 cas "aucun changement"                 "statique"
 cas "documentation seule"              "statique"                              README.md CONTRIBUTING.md
-cas "hooks seuls"                      "statique"                              .githooks/pre-push .githooks/tester.sh
+cas "hooks seuls"                      "statique"                              .githooks/tester.sh .githooks/mentions-techniques
+cas "les motifs du hook"               "15 statique"                           .githooks/pre-push .githooks/cles-fournisseurs
 cas "le script de sauvegarde"          "database statique"                     sauvegarde/sauvegarder.sh
 cas "un fichier du 01"                 "01 statique"                           01_scraping_manganews/x.py
+cas "un fichier du 02"                 "02 statique"                           02_api_manga/app/x.py
+cas "le contrat du 02"                 "02 12 statique"                        02_api_manga/openapi.json
 cas "un fichier du 05"                 "05 14 demo statique"                    05_nettoyage_agregation_bdd/src/corpus/x.py
 cas "l'atteignabilité du 05"           "05 10 11 14 demo statique"              05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 cas "Bench_embedding du 06"            "05 statique"                           06_benchmark_embeddings_llm/Bench_embedding.py
@@ -56,20 +59,22 @@ cas "le verrou du 10"                  "10 11 14 statique"                      
 cas "un autre fichier du 10"           "10 14 statique"                         10_mesures_recherche/README.md
 cas "un fichier du 11"                 "11 14 statique"                         11_api_modele/src/api_modele/x.py
 cas "le contrat du 11"                 "11 12 13 14 statique"                   11_api_modele/contrat/openapi_v1.json
-cas "le Compose du 11"                 "11 12 13 14 statique"                   11_api_modele/docker-compose.yml
+cas "le Compose du 11"                 "11 12 13 14 15 statique"                11_api_modele/docker-compose.yml
 cas "les métriques du 11"              "11 13 14 statique"                      11_api_modele/src/api_modele/metriques.py
 cas "un fichier du 12"                 "12 statique"                           12_application/src/application/x.py
 cas "les métriques du 12"              "12 13 statique"                        12_application/src/application/metriques.py
-cas "le Compose du 12"                 "12 13 statique"                        12_application/compose.yaml
+cas "le Compose du 12"                 "12 13 15 statique"                     12_application/compose.yaml
 cas "un fichier du 13"                 "13 statique"                           13_monitorage/src/monitorage/x.py
 cas "un fichier du 14"                 "14 statique"                           14_chaine/src/chaine/x.py
-cas "une migration"                    "02 05 08 09 10 11 database demo statique" database/migrations/099_x.sql
-cas "un outil de database"             "05 08 09 10 11 database demo statique" database/outils/x.sh
+cas "un fichier du 15"                 "15 statique"                           15_livraison/src/livraison/x.py
+cas "le fichier d'exemple du 12"       "12 15 statique"                        12_application/.env.example
+cas "une migration"                    "02 05 08 09 10 11 12 database demo statique" database/migrations/099_x.sql
+cas "un outil de database"             "05 08 09 10 11 12 database demo statique" database/outils/x.sh
 cas "un autre workflow"                "14 statique"                            .github/workflows/indicatif.yml
-cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 12 13 14 database demo statique" .github/workflows/verify.yml
-cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 12 13 14 database demo statique" verification/verifier.sh
+cas "verify.yml"                       "01 02 03 04 05 07 08 09 10 11 12 13 14 15 database demo statique" .github/workflows/verify.yml
+cas "le moteur de vérification"        "01 02 03 04 05 07 08 09 10 11 12 13 14 15 database demo statique" verification/verifier.sh
 cas "plusieurs modules"                "01 04 demo statique"                   01_scraping_manganews/a 04_scraping_manga_sanctuary/b
-attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 11 12 13 14 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
+attendu_tout="$(printf '%s\n' 01 02 03 04 05 07 08 09 10 11 12 13 14 15 database demo statique | jq -Rsc 'split("\n") | map(select(length > 0))')"
 obtenu_tout="$(: | TOUT=1 bash "$VERIFIER" perimetre)"
 if [ "$obtenu_tout" = "$attendu_tout" ]; then ok "TOUT=1 → tous les modules"; else ko "TOUT=1 : obtenu $obtenu_tout"; fi
 

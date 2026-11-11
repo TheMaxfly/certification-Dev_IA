@@ -10,8 +10,12 @@
 #   make verify TOUT=1       tous les modules
 #   make verify MODULE=05    un seul module : 01 … 05, 07 … 14, database, demo, statique
 #   make verify-indicatif    Bandit et pip-audit sur les modules existants, jamais exigés
-#   make app-compose         le service d'embedding, l'API et l'application, conteneurisés
+#   make app-compose         le service d'embedding, l'API, l'application et le catalogue
+#                            (l'API data du 02), conteneurisés ; trois fichiers .env
 #   make app-compose-arret   les arrête
+#   make app-admin-creer     le premier administrateur de l'application (mot de passe au
+#                            clavier, sans écho) ; APPLICATION_ENVIRONNEMENT et
+#                            APPLICATION_BASE_DSN (sans mot de passe) viennent de l'environnement
 #   make demo-direct         la démonstration en direct : l'application, le Swagger de
 #                            l'API et MLflow (CONSTRUIRE=1 reconstruit les images d'abord) ;
 #                            demo-direct-etat dit ce qui répond, demo-direct-arret arrête
@@ -31,6 +35,11 @@
 #                            lancer) ; chaine-promouvoir LIVRAISON=… MOTIF="…" et
 #                            chaine-revenir MOTIF="…" sont les gestes de Max ; chaine-etat
 #                            lit le journal de la préproduction
+#   make livrer ACTION=… CIBLE=…  la livraison continue (module 15) : ACTION=construire
+#                            (RECONSTRUIRE=1), deployer, sante, arreter, retour (VERS=…
+#                            MOTIF="…") ; CIBLE=staging ou production ; A_BLANC=1 :
+#                            ce qui serait fait, sans rien lever ; livrer-etat : les
+#                            deux cibles
 #   make verify-mutations    les mutations versionnées (verification/mutations/),
 #                            rejouées dans un arbre jetable : chacune doit faire
 #                            rougir son test (poste, avant une demande vers main ;
@@ -49,12 +58,16 @@ CANDIDAT ?=
 A_BLANC ?=
 LIVRAISON ?=
 MOTIF ?=
+ACTION ?=
+CIBLE ?=
+VERS ?=
+RECONSTRUIRE ?=
 # Les fichiers suivent la base : la préproduction écrit ses échantillons dans le sien.
 EQUIVALENCE_DOSSIER ?= $(CURDIR)/09_service_embedding/mesures/equivalence_preprod
 
-.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret \
+.PHONY: verify verify-indicatif verify-poste verify-mutations app-compose app-compose-arret app-admin-creer \
 	demo-direct demo-direct-etat demo-direct-arret monitorage monitorage-etat monitorage-arret \
-	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat
+	preprod-creer chaine chaine-promouvoir chaine-revenir chaine-etat livrer livrer-etat
 
 verify:
 	@TOUT=$(TOUT) bash verification/verifier.sh verify $(MODULE)
@@ -65,8 +78,11 @@ verify-indicatif:
 verify-poste:
 	@FORCER=$(FORCER) bash verification/verifier.sh poste
 
-# Le Compose du 11, inchangé, et le fichier de fusion du 12 ; les deux `.env`, nommés.
+# Le Compose du 11, inchangé, et le fichier de fusion du 12 (l'application et le
+# catalogue, l'API data du 02) ; les trois `.env`, nommés — sans celui du 02, Compose
+# refuse : il nomme le fichier absent.
 APP_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	--env-file 02_api_manga/.env \
 	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml
 
 app-compose:
@@ -74,6 +90,11 @@ app-compose:
 
 app-compose-arret:
 	@$(APP_COMPOSE) down
+
+# Le premier administrateur : la commande du module 12, dans son environnement. Le mot de
+# passe est demandé au clavier, deux fois, sans écho ; jamais en argument ni en variable.
+app-admin-creer:
+	@cd 12_application && uv run --quiet --locked python -m application.admin creer-admin
 
 # Le même Compose, plus le fichier du mode démonstration, et MLflow à côté.
 DEMO_COMPOSE = $(APP_COMPOSE) -f 12_application/compose.demo.yaml
@@ -90,6 +111,7 @@ demo-direct-arret:
 # Le monitorage, un fichier de fusion de plus. APP_COMPOSE et DEMO_COMPOSE ne le lisent pas.
 # Le fichier d'environnement du 13 est facultatif : sans lui, le canal d'essai.
 MONITORAGE_COMPOSE = docker compose --env-file 11_api_modele/.env --env-file 12_application/.env \
+	--env-file 02_api_manga/.env \
 	$(if $(wildcard 13_monitorage/.env),--env-file 13_monitorage/.env) \
 	-f 11_api_modele/docker-compose.yml -f 12_application/compose.yaml -f 13_monitorage/compose.yaml
 
@@ -128,3 +150,15 @@ chaine-revenir:
 
 chaine-etat:
 	@$(CHAINE) etat
+
+# La livraison continue (module 15) : construire à l'étiquette, déployer par cible, santé,
+# retour arrière, arrêt. Depuis main, à l'étiquette annotée ; une cible à la fois.
+LIVRER = cd 15_livraison && uv run --quiet --locked --no-env-file livrer
+
+livrer:
+	@$(LIVRER) $(ACTION) $(if $(CIBLE),--cible $(CIBLE)) $(if $(VERS),--vers "$(VERS)") \
+		$(if $(MOTIF),--motif "$(MOTIF)") $(if $(RECONSTRUIRE),--reconstruire) \
+		$(if $(A_BLANC),--a-blanc)
+
+livrer-etat:
+	@$(LIVRER) etat

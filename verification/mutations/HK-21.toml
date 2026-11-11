@@ -1,0 +1,7 @@
+id = "HK-21"
+origine = "E4, lot 2a, spec 02 (2026-11-08) — le trousseau de l'API data n'est plus découpé : une clé du poste en second élément passerait"
+fichier = ".githooks/cles-fournisseurs"
+avant = '''    if [ "$1" = API_MODELE_CLES ] || [ "$1" = API_KEYS ]; then'''
+apres = '''    if [ "$1" = API_MODELE_CLES ]; then'''
+dossier = "."
+commande = ["bash", ".githooks/tester.sh"]

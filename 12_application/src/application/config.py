@@ -4,11 +4,28 @@ Tout est lu et validé au démarrage ; un écart empêche de démarrer, et le me
 la variable ou le réglage, jamais une valeur. La clé de l'API n'est jamais dans un
 fichier suivi, et son `repr` ne la montre pas (même forme que `Cle` du module 11,
 réécrite : ce module ne connaît le 11 que par HTTP).
+
+E4, lot 1 — la base et les sessions :
+- `APPLICATION_ENVIRONNEMENT` : `developpement` (défaut), `preproduction`,
+  `production` ;
+- `APPLICATION_BASE_DSN` : facultatif, SANS mot de passe (`~/.pgpass` sur le poste, un
+  fichier monté dans un conteneur) ; absent, le conseiller fonctionne et les comptes
+  attendent (décision 11) ;
+- `APPLICATION_CLE_SESSION` : 32 octets au moins ; obligatoire en préproduction et en
+  production ; absente en développement, une clé éphémère est tirée au démarrage (les
+  sessions se perdent au redémarrage ; journal d'avertissement) ;
+- **la garde d'environnement** (décision 10) : la base nommée par le DSN doit être celle
+  de l'environnement — `preproduction` ↔ `apimanga_preprod`, `production` ↔ `apimanga` ;
+  en développement, `apimanga` est refusée. Le message nomme la base attendue, jamais
+  le DSN.
+Ni le DSN ni la clé de session n'entrent dans un `repr` ni dans le journal.
 """
 
 from __future__ import annotations
 
 import ipaddress
+import re
+import secrets
 import string
 import tomllib
 from collections.abc import Mapping
@@ -17,9 +34,30 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import urlsplit
 
+from psycopg import ProgrammingError, conninfo
+
 RACINE_MODULE = Path(__file__).resolve().parents[2]
 FICHIER_REGLAGES = RACINE_MODULE / "config" / "reglages.toml"
 VARIABLE_CLE = "APPLICATION_CLE_API"
+#: La clé des comptes connectés (E4, lot 2b, décision 5) ; facultative : absente, la
+#: clé publique sert aux deux.
+VARIABLE_CLE_COMPTES = "APPLICATION_CLE_API_COMPTES"
+VARIABLE_ENVIRONNEMENT = "APPLICATION_ENVIRONNEMENT"
+VARIABLE_BASE = "APPLICATION_BASE_DSN"
+VARIABLE_CLE_SESSION = "APPLICATION_CLE_SESSION"
+VARIABLE_CLE_CATALOGUE = "APPLICATION_CLE_CATALOGUE"
+VARIABLE_ADRESSE_CATALOGUE = "CATALOGUE_ADRESSE"
+ENVIRONNEMENTS = ("developpement", "preproduction", "production")
+#: L'environnement → la seule base qu'il admet ; le développement admet toute base,
+#: sauf celle de la production.
+BASES_EXIGEES = {"preproduction": "apimanga_preprod", "production": "apimanga"}
+BASE_PRODUCTION = "apimanga"
+CLE_SESSION_OCTETS_MIN = 32
+#: Les bornes du texte d'une critique dans la base (migration 027,
+#: `critiques_texte_longueur`) : celles de l'application doivent y tenir.
+TEXTE_CRITIQUE_BASE = (1, 10000)
+#: La forme d'un code de label dans la base (027, `critiques_label_forme`).
+FORME_LABEL = re.compile(r"[a-z_]{1,40}")
 
 type Reseau = ipaddress.IPv4Network | ipaddress.IPv6Network
 type Table = dict[str, object]
@@ -43,7 +81,7 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " statut_termine statut_en_cours dispo_france dispo_japon dispo_inconnue"
             " passage_critique passage_resume passage_synopsis carte_sans_passage"
             " mention_carte mention_dispo details_titre details_estimes"
-            " role_appel_reformulation role_appel_reponse non_verifie"
+            " role_appel_reformulation role_appel_reponse complement_etiquette"
             " non_verifie_titres encart_titre degrade_injoignable degrade_delai"
             " degrade_recherche conversation_invalide conversation_longueur"
             " sortie_schema sortie_serie_inconnue sortie_fragment_inconnu"
@@ -54,8 +92,111 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " apropos_colonne_hebergement apropos_liste_inconnue"
             " apropos_conserve_titre apropos_conserve apropos_registre_titre"
             " apropos_registre apropos_licences_titre apropos_licences"
+            " apropos_identite_titre apropos_identite kohai_attente"
+            " effacement_quoi_titre"
             " erreur_400_titre erreur_400_texte erreur_404_titre erreur_404_texte"
-            " erreur_405_titre erreur_405_texte"
+            " erreur_405_titre erreur_405_texte erreur_401_titre erreur_401_texte"
+            " erreur_403_titre erreur_403_texte erreur_csrf_titre erreur_csrf_texte"
+            " erreur_comptes_titre erreur_comptes_texte"
+            " menu_etiquette compte_etiquette menu_conseiller menu_mon_compte"
+            " menu_critiques"
+            " menu_administration"
+            " menu_connexion menu_inscription menu_deconnexion champ_pseudo"
+            " champ_mot_de_passe champ_confirmation champ_ancien champ_nouveau"
+            " champ_nom_affiche champ_role champ_mot_de_passe_initial"
+            " inscription_titre inscription_collecte inscription_collecte_lien"
+            " inscription_bouton inscription_deja erreur_pseudo_pris"
+            " erreur_confirmation connexion_titre connexion_bouton connexion_refus"
+            " connexion_pas_de_compte mdp_titre mdp_bouton mdp_ancien_faux mdp_change"
+            " mdp_a_changer admin_titre admin_creer_titre admin_creer_bouton"
+            " admin_liste_titre admin_colonne_pseudo admin_colonne_nom"
+            " admin_colonne_role admin_colonne_etat admin_colonne_cree"
+            " admin_colonne_action admin_filtre_etiquette admin_filtre_tous"
+            " admin_filtre_bouton compte_role_client compte_role_libraire"
+            " compte_role_admin admin_actif admin_inactif admin_desactiver"
+            " admin_reactiver admin_cree admin_desactive admin_reactive admin_soi"
+            " admin_aucun admin_inconnu admin_precedente admin_suivante"
+            " critiques_titre apropos_comptes_titre"
+            " apropos_deconnexion apropos_suppression erreur_role admin_inchange"
+            " mdp_continuer"
+            # E4, lot 2a : le catalogue.
+            " menu_catalogue catalogue_titre catalogue_encart_titre"
+            " catalogue_encart catalogue_vers_conseiller catalogue_champ"
+            " catalogue_bouton catalogue_resultats_titre catalogue_pagination"
+            " catalogue_precedente catalogue_suivante catalogue_aucun_conseiller"
+            " catalogue_vouliez_vous_dire catalogue_trouve_par_auteur"
+            " serie_metadonnees serie_type serie_annee serie_note_etiquette"
+            " serie_sans_note serie_reseau_titre serie_reseau_vide"
+            " serie_listes_titre serie_synopsis_titre"
+            " serie_sans_synopsis serie_genres_titre serie_lien_catalogue"
+            " serie_retour_catalogue"
+            # E4, lot 5 : l'administration — onglets, profil actif.
+            " onglet_comptes onglet_moderation onglet_reglages onglet_cles"
+            " onglet_couts onglet_services admin_reglages_titre admin_reglages_intro"
+            " admin_reglages_legende admin_reglages_bouton admin_reglages_defaut"
+            " admin_reglages_statut_stable admin_reglages_statut_apercu"
+            " admin_reglages_indisponibles_titre admin_reglages_indisponibles_aide"
+            " admin_reglages_api_absente_titre admin_reglages_api_absente"
+            " admin_reglages_actuel_aucun admin_reglages_erreur"
+            " profil_actif_indisponible_titre profil_actif_indisponible_lien"
+            " admin_cles_titre admin_cles_intro admin_cles_api_absente"
+            " admin_cles_tableau"
+            " admin_cles_colonne_profil admin_cles_colonne_fournisseur"
+            " admin_cles_colonne_modele admin_cles_colonne_variable"
+            " admin_cles_colonne_demarrage admin_cles_colonne_test"
+            " admin_cles_configuree admin_cles_absente admin_cles_non_teste"
+            " admin_cles_valide admin_cles_modele admin_cles_test_absente"
+            " admin_cles_injoignable admin_cles_illisible admin_cles_test_titre"
+            " admin_cles_test_aucun admin_cles_test_aide admin_cles_bouton"
+            " admin_cles_avis_teste admin_cles_trop_tot_sans admin_cles_indisponible"
+            " admin_cles_procedure_avant admin_cles_procedure"
+            " admin_couts_titre admin_couts_intro admin_couts_jour_titre"
+            " admin_couts_jauge_jour admin_couts_projet_titre admin_couts_jauge_projet"
+            " admin_couts_tableau admin_couts_colonne_jour admin_couts_colonne_profil"
+            " admin_couts_colonne_mode admin_couts_colonne_appels"
+            " admin_couts_colonne_cout admin_couts_total_jour admin_couts_vide"
+            " admin_couts_sans_texte admin_couts_repartition_titre"
+            " admin_couts_par_profil admin_couts_par_mode admin_couts_atteint"
+            " admin_couts_ok admin_couts_sans_table admin_couts_table_vide"
+            " admin_services_titre admin_services_encart_titre admin_services_intro"
+            " admin_services_lu_a admin_services_relire admin_services_tableau"
+            " admin_services_colonne_service admin_services_colonne_etat"
+            " admin_services_colonne_delai admin_services_colonne_details"
+            " admin_services_grafana admin_services_grafana_lien admin_services_api"
+            " admin_services_catalogue admin_services_base admin_services_cles"
+            " admin_services_etat_joignable admin_services_etat_injoignable"
+            " admin_services_etat_non_configure admin_services_sans_delai"
+            " admin_services_profil_indisponible admin_services_profil_regle"
+            " admin_services_profil_defaut admin_services_catalogue_degrade"
+            " admin_services_cles_deux admin_services_cles_une"
+            " admin_services_cles_repli"
+            # E4, lot 3 : les critiques signées.
+            " critiques_l5 critiques_vide critiques_vers_catalogue"
+            " critiques_colonne_serie critiques_colonne_tome critiques_colonne_note"
+            " critiques_colonne_label critiques_colonne_statut"
+            " critiques_colonne_dates critiques_colonne_action critiques_serie_entiere"
+            " critiques_statut_publiee critiques_statut_retiree"
+            " critiques_titre_indisponible critiques_filtre_etiquette"
+            " critiques_filtre_toutes critiques_filtre_bouton critiques_modifier"
+            " critiques_retirer critiques_avis_publiee critiques_avis_modifiee"
+            " critiques_avis_retiree critiques_avis_deja_retiree critiques_precedente"
+            " critiques_suivante critique_nouvelle_titre critique_modifier_titre"
+            " critique_serie_rappel critique_champ_tome critique_tome_serie"
+            " critique_champ_texte critique_champ_note critique_note_choisir"
+            " critique_champ_label critique_label_aucun critique_publier"
+            " critique_enregistrer critique_annuler critique_tome_fixe"
+            " critique_erreur_note critique_erreur_label critique_erreur_tome"
+            " critique_erreur_controle critique_erreur_base critique_deja_publiee"
+            " critique_deja_lien"
+            " critique_serie_inconnue_titre critique_serie_inconnue"
+            " critique_retiree_titre critique_retiree_texte critique_retirer_titre"
+            " critique_retirer_texte critique_retirer_bouton critique_ecrire"
+            " critique_moderer serie_reseau_indisponible serie_reseau_sans_avis"
+            " admin_critiques_titre admin_critiques_vide admin_critiques_filtre"
+            " admin_critiques_tous admin_critiques_colonne_libraire"
+            " admin_critiques_colonne_debut admin_critiques_colonne_date"
+            " admin_critique_retirer_titre admin_critique_retirer_texte"
+            " admin_critiques_inactif"
             " erreur_413_titre erreur_413_texte erreur_500_titre erreur_500_texte"
             " erreur_retour demonstration_etiquette demo_rang demo_score"
             " demo_infobulle demo_absent trace_titre trace_phrase"
@@ -71,6 +212,42 @@ TEXTES: Mapping[str, frozenset[str]] = {
             " trace_temperature trace_longueur trace_cout trace_latence_recherche"
             " trace_latence_reformulation trace_latence_modele trace_latence_totale"
             " trace_identifiant trace_appels_titre"
+            # E4, lot 2b : le conseiller public, le pont fiche ↔ conseiller, les bornes.
+            " conseiller_aide_public pont_vers_catalogue pont_vers_conseiller"
+            " quota_titre debit_titre debit_public budget_titre budget_atteint"
+            " inscription_bornee_titre apropos_quotas_titre"
+            " serie_resume_kitsu_source serie_resume_kitsu_voir"
+            # E4, lot 4 : les listes du client, l'effacement du compte.
+            " menu_listes liste_favori liste_a_lire liste_a_commander"
+            " liste_bouton_favori liste_bouton_a_lire liste_bouton_a_commander"
+            " liste_dans_favori liste_dans_a_lire liste_dans_a_commander"
+            " liste_section_favori liste_section_a_lire liste_section_a_commander"
+            " liste_vide_favori liste_vide_a_lire liste_vide_a_commander"
+            " liste_retirer liste_retirer_court liste_avis_retiree liste_avis_absente"
+            " liste_avis_indisponible liste_etat_inconnu_titre liste_etat_inconnu"
+            " liste_pleine_titre serie_listes_connexion serie_listes_inscription"
+            " serie_listes_aucune serie_listes_indisponible serie_listes_groupe"
+            " listes_titre listes_aide listes_catalogue_encart"
+            " listes_titre_indisponible apropos_listes_titre apropos_listes"
+            " effacement_lien effacement_titre effacement_supprime effacement_reste"
+            " effacement_irreversible effacement_bouton effacement_annuler"
+            " effacement_refus effacement_reseau_titre effacement_reseau"
+            " effacement_avis effacement_impossible_titre effacement_impossible"
+            " apropos_effacement_titre apropos_effacement"
+            # E4, lot 7 : l'apparence.
+            " onglet_apparence admin_apparence_titre admin_apparence_intro"
+            " admin_apparence_origine_jamais espace_menthe espace_ciel espace_sakura"
+            " espace_yuzu espace_glycine espace_brume couleur_menthe couleur_ciel"
+            " couleur_sakura couleur_yuzu couleur_glycine couleur_brume"
+            " admin_apparence_intensite_legende admin_apparence_matiere_legende"
+            " matiere_aquarelle matiere_aplat admin_apparence_nombre_2"
+            " admin_apparence_nombre_3 admin_apparence_nombre_4"
+            " admin_apparence_nombre_5 admin_apparence_nombre_6"
+            " admin_apparence_bouton admin_apparence_erreur"
+            " admin_apparence_origine_titre admin_apparence_origine_aide"
+            " admin_apparence_origine_bouton admin_apparence_avis_appliquee"
+            " admin_apparence_avis_inchangee admin_apparence_avis_origine"
+            " apropos_apparence"
         ).split()
     },
     "etat_ok": frozenset({"profil", "modele"}),
@@ -103,6 +280,81 @@ TEXTES: Mapping[str, frozenset[str]] = {
     "erreur_identifiant": frozenset({"identifiant"}),
     "trace_non_cites_resume": frozenset({"titre", "n"}),
     "trace_cout_valeur": frozenset({"cout"}),
+    "aide_pseudo": frozenset({"min", "max"}),
+    "aide_mot_de_passe": frozenset({"min", "max"}),
+    "erreur_pseudo_forme": frozenset({"min", "max"}),
+    "erreur_mdp_longueur": frozenset({"min", "max"}),
+    "erreur_nom_longueur": frozenset({"max"}),
+    "admin_page": frozenset({"n", "total"}),
+    "mdp_verrou": frozenset({"minutes"}),
+    "connexion_refus_regles": frozenset({"seuil", "minutes"}),
+    "catalogue_aide": frozenset({"min", "max"}),
+    "catalogue_note": frozenset({"note"}),
+    "catalogue_trouve_par": frozenset({"titre"}),
+    "catalogue_aucun": frozenset({"q"}),
+    "catalogue_page": frozenset({"n", "total"}),
+    "catalogue_erreur_saisie": frozenset({"min", "max"}),
+    "serie_note": frozenset({"note", "votes"}),
+    "apropos_comptes": frozenset({"seuil", "minutes"}),
+    "critique_bornes": frozenset({"min", "max"}),
+    "critique_erreur_longueur": frozenset({"min", "max", "n"}),
+    "critique_note": frozenset({"note"}),
+    "critique_date": frozenset({"date"}),
+    "critique_modifiee_le": frozenset({"date"}),
+    "critiques_page": frozenset({"n", "total"}),
+    "serie_reseau_moyenne": frozenset({"note", "n"}),
+    "serie_reseau_moyenne_une": frozenset({"note"}),
+    "critique_lien_modifier": frozenset({"serie"}),
+    "critique_lien_retirer": frozenset({"serie"}),
+    "critique_lien_moderer": frozenset({"nom"}),
+    "question_pre_remplie": frozenset({"titre"}),
+    "quota_visiteur": frozenset({"n", "heure", "client"}),
+    "quota_client": frozenset({"n", "heure"}),
+    "inscription_bornee": frozenset({"n", "heure"}),
+    "apropos_quotas": frozenset({"visiteur", "client"}),
+    "liste_bouton_actuelle": frozenset({"libelle"}),
+    "liste_avis_ajoutee": frozenset({"liste"}),
+    "liste_avis_changee": frozenset({"liste"}),
+    "liste_avis_inchangee": frozenset({"liste"}),
+    "liste_avis_pleine": frozenset({"n"}),
+    "liste_retirer_etiquette": frozenset({"titre"}),
+    "liste_section_compte": frozenset({"titre", "n"}),
+    "liste_ajoutee_le": frozenset({"date"}),
+    "serie_listes_etat": frozenset({"liste"}),
+    "carte_listes_groupe": frozenset({"titre"}),
+    "admin_reglages_option": frozenset(
+        {"nom", "fournisseur", "hebergement", "modele", "statut"}
+    ),
+    "admin_reglages_choisi": frozenset({"nom", "date"}),
+    "admin_reglages_choisi_anonyme": frozenset({"date"}),
+    "admin_reglages_aucun": frozenset({"profil"}),
+    "admin_reglages_exclus": frozenset({"n"}),
+    "admin_reglages_actuel": frozenset({"profil"}),
+    "admin_reglages_avis_applique": frozenset({"profil"}),
+    "admin_reglages_avis_inchange": frozenset({"profil"}),
+    "profil_actif_indisponible": frozenset({"profil", "defaut"}),
+    "admin_cles_refusee": frozenset({"code"}),
+    "admin_cles_teste_le": frozenset({"date"}),
+    "admin_cles_repli": frozenset({"version"}),
+    "admin_cles_trop_tot": frozenset({"n"}),
+    "admin_couts_dollars": frozenset({"cout"}),
+    "admin_couts_repartition": frozenset({"nom", "appels", "cout"}),
+    "admin_couts_jour": frozenset({"cout", "plafond", "etat"}),
+    "admin_couts_projet": frozenset({"total", "budget"}),
+    "admin_couts_termes": frozenset({"anterieur", "table", "appels", "avant"}),
+    "admin_couts_avant_le": frozenset({"date"}),
+    "admin_couts_premier_jour": frozenset({"date"}),
+    "admin_couts_historique_titre": frozenset({"n"}),
+    "admin_services_encart": frozenset({"services"}),
+    "admin_services_heure": frozenset({"heure"}),
+    "admin_services_delai": frozenset({"ms"}),
+    "admin_services_version": frozenset({"version"}),
+    "admin_services_corpus": frozenset({"corpus", "encodage", "modele"}),
+    "admin_services_modele_langage": frozenset({"profil"}),
+    "admin_services_profil_actif": frozenset({"profil", "etat"}),
+    "admin_services_normalisation": frozenset({"normalisation"}),
+    "admin_apparence_intensite": frozenset({"n"}),
+    "admin_apparence_partage": frozenset({"nombre", "couleur", "espaces"}),
 }
 
 
@@ -122,6 +374,8 @@ class Delais:
     reponse_s: float
     info_s: float
     sante_s: float
+    #: Le test des clés (E4, lot 5) : l'API interroge chaque fournisseur, en parallèle.
+    verification_s: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +397,110 @@ class Limites:
 
 
 @dataclass(frozen=True, slots=True)
+class Comptes:
+    """Les réglages des comptes et des sessions (`[comptes]`)."""
+
+    duree_session_s: int
+    echecs_avant_verrou: int
+    duree_verrou_s: int
+    pseudo_min: int
+    pseudo_max: int
+    mot_de_passe_min: int
+    mot_de_passe_max: int
+    nom_affiche_max: int
+    delai_base_s: float
+    par_page: int
+    #: La borne d'une liste du client (E4, lot 4) : un ajout au-delà est refusé.
+    listes_max_par_etat: int
+
+
+@dataclass(frozen=True, slots=True)
+class DelaisCatalogue:
+    connexion_s: float
+    reponse_s: float
+
+
+@dataclass(frozen=True, slots=True)
+class Catalogue:
+    """L'API data du module 02 (`[catalogue]`) : son adresse, la clé de l'application
+    (None : non configuré — développement seulement), ses délais, ses bornes."""
+
+    adresse: str
+    cle: str | None = field(repr=False)
+    delais: DelaisCatalogue
+    par_page: int
+    q_min: int
+    q_max: int
+
+
+@dataclass(frozen=True, slots=True)
+class Label:
+    """Un label de critique : son code (gardé en base) et son libellé (affiché)."""
+
+    code: str
+    libelle: str
+
+
+@dataclass(frozen=True, slots=True)
+class Critiques:
+    """Les règles des critiques signées (`[critiques]`) : bornes du texte, liste fixe
+    des labels, taille d'une page de liste."""
+
+    texte_min: int
+    texte_max: int
+    par_page: int
+    labels: tuple[Label, ...]
+
+    @property
+    def codes(self) -> frozenset[str]:
+        return frozenset(label.code for label in self.labels)
+
+    def libelle(self, code: str | None) -> str | None:
+        """Le libellé d'un code de la liste ; None pour un code absent ou inconnu."""
+        return next((lab.libelle for lab in self.labels if lab.code == code), None)
+
+
+@dataclass(frozen=True, slots=True)
+class Bornes:
+    """Les bornes du conseiller (`[conseiller.limites]`, E4, lot 2b) : quota journalier
+    des visiteurs (par session) et des comptes clients (par compte), plafond de débit de
+    la clé publique, plafond de coût du jour, inscriptions par session."""
+
+    quota_visiteur_questions_jour: int
+    quota_client_questions_jour: int
+    debit_public_par_minute: int
+    cout_jour_max_usd: float
+    inscriptions_session_max: int
+    inscriptions_fenetre_min: int
+
+
+@dataclass(frozen=True, slots=True)
+class Couts:
+    """Le budget du projet (`[couts]`, E4, lot 5) : le budget en dollars, la dépense
+    antérieure à la table `couts_jour` (E3), la profondeur de l'historique affiché."""
+
+    budget_projet_usd: float
+    cout_anterieur_usd: float
+    historique_jours: int
+
+
+@dataclass(frozen=True, slots=True)
+class Monitorage:
+    """`[monitorage]` (E4, lot 5) : l'adresse du tableau de bord Grafana, facultative —
+    vide, la page des services n'en fait pas de lien."""
+
+    adresse_grafana: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Administration:
+    """Les pages de l'administration (`[administration]`, E4, lot 5) : le lien vers la
+    procédure de pose et de rotation des clés (un document du dépôt)."""
+
+    procedure_cles: str
+
+
+@dataclass(frozen=True, slots=True)
 class Fournisseur:
     nom: str
     hebergement: str
@@ -151,6 +509,8 @@ class Fournisseur:
 @dataclass(frozen=True, slots=True)
 class Reglages:
     cle_api: str = field(repr=False)
+    #: None : la clé publique sert aussi aux comptes (repli, journalisé au démarrage).
+    cle_api_comptes: str | None = field(repr=False)
     adresse_api: str
     identite: str
     delais: Delais
@@ -168,6 +528,17 @@ class Reglages:
     metriques_reseaux: tuple[Reseau, ...]
     fournisseurs: Mapping[str, Fournisseur]
     textes: Mapping[str, str]
+    environnement: str
+    base_dsn: str | None = field(repr=False)
+    cle_session: str = field(repr=False)
+    cle_session_ephemere: bool
+    comptes: Comptes
+    catalogue: Catalogue
+    critiques: Critiques
+    bornes: Bornes
+    administration: Administration
+    couts: Couts
+    monitorage: Monitorage
 
 
 class _Lecteur:
@@ -211,6 +582,14 @@ class _Lecteur:
         valeur = source.get(cle)
         if not isinstance(valeur, str) or not valeur.strip():
             self._ecart(f"{chemin}.{cle}", "texte attendu")
+            return ""
+        return valeur
+
+    def texte_facultatif(self, source: Table, cle: str, chemin: str) -> str:
+        """Un texte qui peut être vide ; présent, et un texte."""
+        valeur = source.get(cle)
+        if not isinstance(valeur, str):
+            self._ecart(f"{chemin}.{cle}", "texte attendu (vide admis)")
             return ""
         return valeur
 
@@ -287,6 +666,268 @@ def lire_ecoute(valeur: str, ecarts: list[str]) -> tuple[str, int] | None:
     return hote, int(port)
 
 
+def lire_environnement(environ: Mapping[str, str], ecarts: list[str]) -> str:
+    valeur = environ.get(VARIABLE_ENVIRONNEMENT, "").strip() or "developpement"
+    if valeur not in ENVIRONNEMENTS:
+        ecarts.append(f"{VARIABLE_ENVIRONNEMENT} : attendu {', '.join(ENVIRONNEMENTS)}")
+    return valeur
+
+
+def garder_base(environnement: str, dsn: str | None, ecarts: list[str]) -> None:
+    """La garde d'environnement : la base du DSN est celle de l'environnement."""
+    if dsn is None:
+        return
+    try:
+        parametres = conninfo.conninfo_to_dict(dsn)
+    except ProgrammingError:
+        ecarts.append(f"{VARIABLE_BASE} : illisible")
+        return
+    if parametres.get("password"):
+        ecarts.append(
+            f"{VARIABLE_BASE} : porte un mot de passe — il se range dans ~/.pgpass"
+            " (ou un fichier monté), jamais dans le DSN"
+        )
+    nom = parametres.get("dbname")
+    exigee = BASES_EXIGEES.get(environnement)
+    if not nom:
+        ecarts.append(f"{VARIABLE_BASE} : la base n'est pas nommée")
+    elif exigee is not None and nom != exigee:
+        ecarts.append(f"garde d'environnement : {environnement} exige la base {exigee}")
+    elif exigee is None and nom == BASE_PRODUCTION:
+        ecarts.append(
+            "garde d'environnement : la base de production est refusée en développement"
+        )
+
+
+def lire_cle_session(
+    environ: Mapping[str, str], environnement: str, ecarts: list[str]
+) -> tuple[str, bool]:
+    """La clé de signature des sessions, et si elle est éphémère."""
+    cle = environ.get(VARIABLE_CLE_SESSION, "").strip()
+    if not cle:
+        if environnement in BASES_EXIGEES:
+            ecarts.append(
+                f"{VARIABLE_CLE_SESSION} : absente — obligatoire en {environnement}"
+            )
+        return secrets.token_urlsafe(48), True
+    if len(cle.encode()) < CLE_SESSION_OCTETS_MIN:
+        ecarts.append(
+            f"{VARIABLE_CLE_SESSION} : trop courte"
+            f" ({CLE_SESSION_OCTETS_MIN} octets au moins)"
+        )
+    return cle, False
+
+
+#: La borne de `limit` de `GET /series` (contrat 0.5.0 du 02).
+CATALOGUE_PAR_PAGE_MAX = 50
+
+
+def lire_catalogue(
+    lecteur: _Lecteur,
+    donnees: Table,
+    environ: Mapping[str, str],
+    environnement: str,
+    ecarts: list[str],
+) -> Catalogue:
+    """L'API data du 02. Sa clé est exigée si l'adresse est posée par l'environnement
+    ou hors du développement ; absente en développement, le catalogue est « non
+    configuré » : l'encart le dit, tout le reste fonctionne."""
+    table = lecteur.table(donnees, "catalogue")
+    delais = lecteur.table(table, "delais", "catalogue.")
+    adresse_env = environ.get(VARIABLE_ADRESSE_CATALOGUE, "").strip()
+    adresse = adresse_env or lecteur.texte(table, "adresse", "catalogue")
+    decoupee = urlsplit(adresse)
+    if decoupee.scheme not in ("http", "https") or not decoupee.hostname:
+        ecarts.append("adresse du catalogue : attendu http(s)://hôte[:port]")
+    cle: str | None = environ.get(VARIABLE_CLE_CATALOGUE, "").strip() or None
+    if cle is None and (adresse_env or environnement in BASES_EXIGEES):
+        ecarts.append(
+            f"{VARIABLE_CLE_CATALOGUE} : absente — obligatoire"
+            + (
+                f" en {environnement}"
+                if environnement in BASES_EXIGEES
+                else f" quand {VARIABLE_ADRESSE_CATALOGUE} est posée"
+            )
+        )
+    elif cle is not None and not cle.isascii():
+        ecarts.append(
+            f"{VARIABLE_CLE_CATALOGUE} : caractères hors ASCII — clé illisible"
+        )
+    par_page = lecteur.entier(table, "par_page", "catalogue")
+    if par_page > CATALOGUE_PAR_PAGE_MAX:
+        ecarts.append(
+            f"reglages.toml : [catalogue.par_page] {CATALOGUE_PAR_PAGE_MAX} au plus"
+            " (la borne de l'API data)"
+        )
+    q_min = lecteur.entier(table, "q_min", "catalogue")
+    q_max = lecteur.entier(table, "q_max", "catalogue")
+    if q_min > q_max:
+        ecarts.append("reglages.toml : [catalogue] q_min au plus q_max")
+    return Catalogue(
+        adresse=adresse,
+        cle=cle,
+        delais=DelaisCatalogue(
+            connexion_s=lecteur.positif(delais, "connexion_s", "catalogue.delais"),
+            reponse_s=lecteur.positif(delais, "reponse_s", "catalogue.delais"),
+        ),
+        par_page=par_page,
+        q_min=q_min,
+        q_max=q_max,
+    )
+
+
+def lire_comptes(lecteur: _Lecteur, donnees: Table) -> Comptes:
+    comptes = lecteur.table(donnees, "comptes")
+    return Comptes(
+        duree_session_s=lecteur.entier(comptes, "duree_session_s", "comptes"),
+        echecs_avant_verrou=lecteur.entier(comptes, "echecs_avant_verrou", "comptes"),
+        duree_verrou_s=lecteur.entier(comptes, "duree_verrou_s", "comptes"),
+        pseudo_min=lecteur.entier(comptes, "pseudo_min", "comptes"),
+        pseudo_max=lecteur.entier(comptes, "pseudo_max", "comptes"),
+        mot_de_passe_min=lecteur.entier(comptes, "mot_de_passe_min", "comptes"),
+        mot_de_passe_max=lecteur.entier(comptes, "mot_de_passe_max", "comptes"),
+        nom_affiche_max=lecteur.entier(comptes, "nom_affiche_max", "comptes"),
+        delai_base_s=lecteur.positif(comptes, "delai_base_s", "comptes"),
+        par_page=lecteur.entier(comptes, "par_page", "comptes"),
+        listes_max_par_etat=lecteur.entier(comptes, "listes_max_par_etat", "comptes"),
+    )
+
+
+def lire_critiques(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Critiques:
+    """Les bornes dans celles de la base (027), les labels conformes à sa forme, uniques
+    et libellés ; une liste vide est refusée."""
+    table = lecteur.table(donnees, "critiques")
+    texte_min = lecteur.entier(table, "texte_min", "critiques")
+    texte_max = lecteur.entier(table, "texte_max", "critiques")
+    base_min, base_max = TEXTE_CRITIQUE_BASE
+    if not base_min <= texte_min <= texte_max <= base_max:
+        ecarts.append(
+            "reglages.toml : [critiques] texte_min ≤ texte_max, entre"
+            f" {base_min} et {base_max} (les bornes de la migration 027)"
+        )
+    labels: list[Label] = []
+    brutes = table.get("labels")
+    if not isinstance(brutes, list) or not brutes:
+        ecarts.append("reglages.toml : [critiques.labels] liste non vide attendue")
+        brutes = []
+    for brute in cast(list[object], brutes):
+        if not isinstance(brute, dict):
+            ecarts.append("reglages.toml : [critiques.labels] table attendue")
+            continue
+        entree = cast(Table, brute)
+        code = lecteur.texte(entree, "code", "critiques.labels")
+        libelle = lecteur.texte(entree, "libelle", "critiques.labels")
+        if code and not FORME_LABEL.fullmatch(code):
+            ecarts.append(
+                "reglages.toml : [critiques.labels] code hors forme"
+                " (^[a-z_]{1,40}$, la forme de la migration 027)"
+            )
+        labels.append(Label(code, libelle))
+    codes = [label.code for label in labels]
+    if len(set(codes)) != len(codes):
+        ecarts.append("reglages.toml : [critiques.labels] code en double")
+    return Critiques(
+        texte_min=texte_min,
+        texte_max=texte_max,
+        par_page=lecteur.entier(table, "par_page", "critiques"),
+        labels=tuple(labels),
+    )
+
+
+def lire_bornes(lecteur: _Lecteur, donnees: Table) -> Bornes:
+    """Des valeurs positives ; le coût en dollars, les autres en entiers."""
+    table = lecteur.table(
+        lecteur.table(donnees, "conseiller"), "limites", "conseiller."
+    )
+    chemin = "conseiller.limites"
+    return Bornes(
+        quota_visiteur_questions_jour=lecteur.entier(
+            table, "quota_visiteur_questions_jour", chemin
+        ),
+        quota_client_questions_jour=lecteur.entier(
+            table, "quota_client_questions_jour", chemin
+        ),
+        debit_public_par_minute=lecteur.entier(
+            table, "debit_public_par_minute", chemin
+        ),
+        cout_jour_max_usd=lecteur.positif(table, "cout_jour_max_usd", chemin),
+        inscriptions_session_max=lecteur.entier(
+            table, "inscriptions_session_max", chemin
+        ),
+        inscriptions_fenetre_min=lecteur.entier(
+            table, "inscriptions_fenetre_min", chemin
+        ),
+    )
+
+
+def lire_administration(
+    lecteur: _Lecteur, donnees: Table, ecarts: list[str]
+) -> Administration:
+    """Le lien de la procédure des clés : une adresse `https://`, un document public."""
+    table = lecteur.table(donnees, "administration")
+    procedure = lecteur.texte(table, "procedure_cles", "administration")
+    if not procedure.startswith("https://"):
+        ecarts.append(
+            "reglages.toml : [administration] procedure_cles : https:// attendu"
+        )
+    return Administration(procedure_cles=procedure)
+
+
+def lire_couts(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Couts:
+    """Le budget et l'historique positifs ; la dépense antérieure peut valoir 0."""
+    table = lecteur.table(donnees, "couts")
+    anterieur = lecteur.nombre(table, "cout_anterieur_usd", "couts")
+    if anterieur < 0:
+        ecarts.append(
+            "reglages.toml : [couts] cout_anterieur_usd : positif ou nul attendu"
+        )
+    return Couts(
+        budget_projet_usd=lecteur.positif(table, "budget_projet_usd", "couts"),
+        cout_anterieur_usd=anterieur,
+        historique_jours=lecteur.entier(table, "historique_jours", "couts"),
+    )
+
+
+def lire_monitorage(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Monitorage:
+    """L'adresse de Grafana : vide, aucune ; sinon `http(s)://hôte[:port]`."""
+    table = lecteur.table(donnees, "monitorage")
+    adresse = lecteur.texte_facultatif(table, "adresse_grafana", "monitorage").strip()
+    if adresse:
+        decoupee = urlsplit(adresse)
+        if decoupee.scheme not in ("http", "https") or not decoupee.hostname:
+            ecarts.append(
+                "reglages.toml : [monitorage] adresse_grafana : http(s)://hôte attendu"
+            )
+    return Monitorage(adresse_grafana=adresse or None)
+
+
+def lire_cle_comptes(environ: Mapping[str, str], ecarts: list[str]) -> str | None:
+    cle = environ.get(VARIABLE_CLE_COMPTES, "").strip() or None
+    if cle is not None and not cle.isascii():
+        ecarts.append(f"{VARIABLE_CLE_COMPTES} : caractères hors ASCII — clé illisible")
+    return cle
+
+
+def charger_comptes(
+    environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES
+) -> tuple[str, str, Comptes]:
+    """Ce qu'il faut à la commande du premier administrateur, et rien d'autre (ni la
+    clé de l'API ni celle des sessions) : l'environnement, le DSN — obligatoire ici —
+    sous la garde d'environnement, et les règles des comptes."""
+    ecarts: list[str] = []
+    lecteur = _Lecteur(ecarts)
+    donnees = cast(Table, tomllib.loads(fichier.read_text(encoding="utf-8")))
+    environnement = lire_environnement(environ, ecarts)
+    dsn = environ.get(VARIABLE_BASE, "").strip()
+    if not dsn:
+        ecarts.append(f"{VARIABLE_BASE} : absente — la commande écrit dans la base")
+    garder_base(environnement, dsn or None, ecarts)
+    comptes = lire_comptes(lecteur, donnees)
+    if ecarts:
+        raise ConfigurationInvalide(ecarts)
+    return environnement, dsn, comptes
+
+
 def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reglages:
     """Le fichier et l'environnement, validés ; au moindre écart, une exception."""
     ecarts: list[str] = []
@@ -353,6 +994,11 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         )
     )
 
+    environnement = lire_environnement(environ, ecarts)
+    base_dsn = environ.get(VARIABLE_BASE, "").strip() or None
+    garder_base(environnement, base_dsn, ecarts)
+    cle_session, ephemere = lire_cle_session(environ, environnement, ecarts)
+
     fournisseurs: dict[str, Fournisseur] = {}
     for nom, brut in lecteur.table(donnees, "fournisseurs").items():
         table = cast(Table, brut) if isinstance(brut, dict) else {}
@@ -363,6 +1009,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
 
     resultat = Reglages(
         cle_api=cle,
+        cle_api_comptes=lire_cle_comptes(environ, ecarts),
         adresse_api=adresse,
         identite=lecteur.texte(api, "identite", "api"),
         delais=Delais(
@@ -370,6 +1017,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
             reponse_s=lecteur.positif(delais, "reponse_s", "api.delais"),
             info_s=lecteur.positif(delais, "info_s", "api.delais"),
             sante_s=lecteur.positif(delais, "sante_s", "api.delais"),
+            verification_s=lecteur.positif(delais, "verification_s", "api.delais"),
         ),
         attente_debit_defaut_s=lecteur.entier(
             attentes, "debit_defaut_s", "api.attentes"
@@ -407,6 +1055,17 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         metriques_reseaux=tuple(reseaux),
         fournisseurs=fournisseurs,
         textes=lire_textes(lecteur.table(donnees, "textes"), ecarts),
+        environnement=environnement,
+        base_dsn=base_dsn,
+        cle_session=cle_session,
+        cle_session_ephemere=ephemere,
+        comptes=lire_comptes(lecteur, donnees),
+        catalogue=lire_catalogue(lecteur, donnees, environ, environnement, ecarts),
+        critiques=lire_critiques(lecteur, donnees, ecarts),
+        bornes=lire_bornes(lecteur, donnees),
+        administration=lire_administration(lecteur, donnees, ecarts),
+        couts=lire_couts(lecteur, donnees, ecarts),
+        monitorage=lire_monitorage(lecteur, donnees, ecarts),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

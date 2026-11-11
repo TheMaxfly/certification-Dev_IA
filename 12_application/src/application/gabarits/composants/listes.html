@@ -1,0 +1,16 @@
+{# Le geste sur les listes (E4, lot 4) : un formulaire `POST`, sans JavaScript — trois
+   boutons `etat` (l'état courant marqué `aria-pressed="true"` et dit « (actuelle) ») et,
+   quand un état existe et que la zone le permet, « Retirer de mes listes ». Le nom du
+   formulaire distingue deux cartes d'une même réponse. #}
+{% macro formulaire(zone, t, jeton, avec_retirer=true) -%}
+<form method="post" action="{{ zone.action }}" aria-label="{{ zone.groupe }}">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<input type="hidden" name="retour" value="{{ zone.retour }}">
+{% for bouton in zone.boutons %}
+<button type="submit" name="etat" value="{{ bouton.valeur }}" aria-pressed="{{ 'true' if bouton.actuel else 'false' }}">{{ bouton.libelle }}</button>
+{% endfor %}
+{% if avec_retirer and zone.retirer %}
+<button type="submit" name="etat" value="retirer">{{ t.liste_retirer }}</button>
+{% endif %}
+</form>
+{%- endmacro %}

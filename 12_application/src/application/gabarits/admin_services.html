@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block espace %}brume{% endblock %}
+{% block titre %}{{ t.admin_services_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1>{{ t.admin_services_titre }}</h1>
+{% if manquants %}
+<article class="zone-services-encart">
+<div role="status">
+<h2>{{ t.admin_services_encart_titre }}</h2>
+<p>{{ manquants }}</p>
+</div>
+</article>
+{% endif %}
+<section class="zone-services">
+<p>{{ t.admin_services_intro }}</p>
+<p>{{ t.admin_services_lu_a }} <time datetime="{{ lu_iso }}">{{ lu_a }}</time> — <a href="/admin/services">{{ t.admin_services_relire }}</a></p>
+<div class="defilant" tabindex="0" role="region" aria-labelledby="tableau-services">
+<table>
+<caption id="tableau-services">{{ t.admin_services_tableau }}</caption>
+<thead>
+<tr><th scope="col">{{ t.admin_services_colonne_service }}</th><th scope="col">{{ t.admin_services_colonne_etat }}</th><th scope="col">{{ t.admin_services_colonne_delai }}</th><th scope="col">{{ t.admin_services_colonne_details }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr class="service-{{ ligne.cle }}">
+<th scope="row">{{ ligne.nom }}</th>
+<td><span aria-hidden="true">{{ ligne.icone }}</span> {{ ligne.etat }}</td>
+<td>{{ ligne.delai }}</td>
+<td>{% if ligne.details %}<ul>{% for detail in ligne.details %}<li>{{ detail }}</li>{% endfor %}</ul>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p>{{ t.admin_services_grafana }}{% if grafana %} <a href="{{ grafana }}">{{ t.admin_services_grafana_lien }}</a>{% endif %}</p>
+</section>
+{% endblock %}

@@ -44,8 +44,20 @@ n'en contient aucune. **Exporter uniquement `API_KEYS` ne suffit pas** : sans le
 mot de passe de `manga_api` dans `DB_PASSWORD`, le processus peut vivre mais
 `/health` répond en état dégradé.
 
-API : `http://localhost:8000`  
+API : `http://localhost:8000` — publiée sur le **bouclage seulement**
+(`127.0.0.1:8000:8000` dans `docker-compose.yml`, E4) : un déploiement qui veut
+autre chose le dit dans son propre fichier de fusion.  
 Swagger UI : `http://localhost:8000/docs` — ouvert, sans clé.
+
+### Dans la pile
+
+Dans la pile de l'application (E4, lot 2a), ce module est le service `catalogue` du
+fichier de fusion du module 12 (`12_application/compose.yaml`), image `api-catalogue:0.7.0`,
+lu par l'application sur un réseau interne et publié sur `127.0.0.1:8000` seulement ; il
+lit la base de l'hôte par un sous-réseau fixe, le mot de passe de `manga_api` dans un pgpass
+monté. Formes et gestes : [`../12_application/README.md`](../12_application/README.md),
+« Par Compose ». Le `docker-compose.yml` de ce dossier sert au module **seul**, publié sur
+le bouclage ; un déploiement qui veut autre chose le dit dans son propre fichier de fusion.
 
 ## Prérequis
 
@@ -73,6 +85,8 @@ L’API lit les variables suivantes (avec valeurs par défaut si non définies) 
 | `DB_POOL_TIMEOUT` | `5` | Attente maximale d'une connexion du pool |
 | `DB_POOL_MIN_SIZE` | `1` | Nombre minimal de connexions du pool |
 | `DB_POOL_MAX_SIZE` | `5` | Nombre maximal de connexions du pool |
+| `SEARCH_SIMILARITY_THRESHOLD` | `0.4` | Seuil de ressemblance des suggestions de `GET /series` (0 à 1), choisi sur la seconde mesure du 2026-11-09 (« Les suggestions ») |
+| `SYNOPSIS_MIN_CHARS` | `100` | Plancher d'un résumé coupé avant ses extraits de critiques, choisi sur la mesure du 2026-11-08 (« Le résumé servi ») |
 
 Exemple de `.env` :
 
@@ -80,7 +94,7 @@ Exemple de `.env` :
 APP_ENV=development
 APP_NAME=API Manga
 
-API_KEYS=app_backend:une-cle-de-32-caracteres-minimum-ici
+API_KEYS=app_backend:<une clé de 32 caractères au moins>
 
 DB_HOST=host.docker.internal
 DB_PORT=5432
@@ -101,7 +115,7 @@ exception ni variante par famille de ressource :
 | `/docs` · `/redoc` · `/openapi.json` | **non** | contrat : un contrat qu'on ne peut pas lire ne s'intègre pas |
 | `/kitsu/{kitsu_id}` · `/search` | **oui** | données |
 | `/rag/preview` · `/rag/export` · `/rag/export/composition` · `/rag/doc/{doc_key}` | **oui** | données |
-| `/series/{series_id}` · `/series/{series_id}/volumes` · `/series/{series_id}/reviews` | **oui** | données |
+| `/series` · `/series/{series_id}` · `/series/{series_id}/volumes` · `/series/{series_id}/reviews` | **oui** | données |
 | `/identity/{work_uid}` · `/coverage` | **oui** | données |
 
 **C'est une règle, pas une omission : la documentation est ouverte, les données
@@ -299,25 +313,202 @@ Trois sources cohabitent donc dans le corpus servi par `/rag/export` et `/search
 
 ### 7) Catalogue, identité et couverture
 
-Cinq endpoints exposent ce que le projet a construit : le socle catalogue Manga
-Sanctuary, le référentiel d'identité et le référentiel complet des critiques.
-Tous sont protégés par `X-API-Key`, comme le reste des routes de données.
+Six endpoints exposent ce que le projet a construit : le socle catalogue Manga
+Sanctuary, sa recherche, le référentiel d'identité et le référentiel complet des
+critiques. Tous sont protégés par `X-API-Key`, comme le reste des routes de données.
 
 | Endpoint | Source | Sa raison d'être |
 |---|---|---|
-| `GET /series/{series_id}` | `ms_series_enriched` | sans elle, une application sait quoi conseiller mais pas quoi afficher |
+| `GET /series?q=` | `ms_series_enriched` (titres, auteurs) ⟕ `v_metadonnees_serie` | trouver une série par son titre ou un auteur (contrat 0.6.0 : suggestions, résumé servi) |
+| `GET /series/{series_id}` | `ms_series_enriched` ⟕ `v_metadonnees_serie` | sans elle, une application sait quoi conseiller mais pas quoi afficher |
 | `GET /series/{series_id}/volumes` | `ms_volumes_enriched` | tomaison, EAN, format — ce qu'un libraire vend |
 | `GET /series/{series_id}/reviews` | **`ms_reviews_all`** | le référentiel complet, 11 074 critiques |
 | `GET /identity/{work_uid}` | `work_identity` ⨝ `v_match_current` | les identifiants croisés **et la provenance de chaque lien** |
 | `GET /coverage` | agrégats | ce que le corpus contient, et ce qu'il ne contient pas |
 
 ```bash
+curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series?q=naruto&limit=5"
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/series/8514
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/volumes?limit=20"
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/series/8514/reviews?limit=20"
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/identity/14689
 curl -s -H "X-API-Key: $API_KEY" http://localhost:8000/coverage
 ```
+
+**La recherche — `GET /series` (contrat 0.6.0).** Paramètres : `q` (2 à 100
+caractères une fois les espaces des bords retirés, sinon 422), `limit` (1 à 50,
+20 par défaut), `offset` (0 à 1 000 : une recherche qui rend plus de 1 000 séries
+est une saisie trop courte). Elle cherche dans le titre, les autres titres
+(`series_other_titles`) et les auteurs (scénariste, dessinateur), **sans casse ni
+accents**, par **deux chemins** (`app/recherche.py`) :
+
+- **la fonction** de la migration `028`, `manga.normaliser(text)` (`lower` et
+  `unaccent`, immuable), appliquée aux colonnes — l'expression même des quatre index
+  GIN de trigrammes — et à la saisie, normalisée en base par la même fonction avant
+  d'être liée ;
+- **le repli** (le lot 2a), quand la base n'a pas la `028` — la production, jusqu'au lot
+  de livraison continue : une table de correspondance appliquée aux colonnes
+  (`translate(lower(…))`, ses deux chaînes liées en paramètres) et à la saisie
+  (minuscules, puis la table). Gardée jusqu'à la `028` en production.
+
+Le chemin est **détecté au démarrage** (`to_regprocedure('manga.normaliser(text)')`,
+redemandé à la première requête si la base ne répondait pas), écrit au journal et dit à
+`/health` (`"normalisation": "fonction" | "repli"`) ; une `028` appliquée pendant que
+l'API tourne demande un redémarrage. Les jokers `%`, `_` et `\` de la saisie sont
+échappés (`ESCAPE '\'`).
+
+**Classement** (le titre principal avant les autres titres à rang égal, E4, lot 2b) :
+titre exact (1), autre titre exact (2), titre qui commence par la saisie (3), autre
+titre qui commence par elle (4), titre qui la contient (5), autre titre qui la contient
+(6), auteur (7 : **chacun des mots de la saisie** dans le scénariste ou le dessinateur,
+**dans n'importe quel ordre** — « Urasawa Naoki » trouve « Naoki URASAWA ») ; puis
+`members_votes` décroissant, puis `series_id`. Chaque résultat dit **ce qui a répondu**
+(`correspondance` : `titre`, `autre_titre`, `auteur`) et quel autre titre
+(`titre_correspondant`). Aucun résultat : `200` et `items: []`, jamais 404.
+
+**Les suggestions — « Vouliez-vous dire… ? » (contrat 0.6.0).** Quand rien ne correspond
+(`total` = 0), la réponse porte `suggestions` : les séries dont la ressemblance de
+trigrammes (`pg_trgm`) atteint le **seuil** — `similarity` sur le titre et le texte des
+autres titres, `word_similarity` sur les auteurs (l'ordre des noms n'y compte pas) —,
+**cinq au plus**, la plus ressemblante d'abord (puis les votes), chacune avec son
+`score` (0 à 1) et ce qui lui ressemble (`correspondance`). Le seuil est lié en
+paramètre (`SEARCH_SIMILARITY_THRESHOLD`, **0,4** par défaut depuis la seconde mesure du
+2026-11-09). **En repli,
+`suggestions` est toujours vide** : la ressemblance demande la fonction.
+
+**Le seuil, choisi sur la mesure du 2026-11-08** (préproduction, lecture seule). Un jeu de
+**30 saisies fautives**, écrit avant le réglage (`tests/fixtures/saisies_fautives.tsv`),
+dérivé mécaniquement des 30 séries les plus votées — la règle en tête du fichier : 10
+transpositions, 10 lettres manquantes, 5 romanisations fautives, 5 auteurs inversés.
+
+| Seuil | Rappel : l'attendue dans les 5 suggestions (sur 20 fautes de frappe) | Trouvée, directement ou en suggestion (sur 20) | Suggestions rendues | Hors sujet | Précision |
+|---|---:|---:|---:|---:|---:|
+| 0,2 | 16 | 17 | 85 | 69 | 0,19 |
+| **0,3** | **16** | **17** | 74 | 58 | 0,22 |
+| 0,4 | 16 | 17 | 62 | 46 | 0,26 |
+| 0,5 | 15 | 16 | 34 | 19 | 0,44 |
+
+- Les **10 autres** (romanisations, auteurs inversés) : **10 / 10 en correspondance
+  directe**, aucune suggestion — comme attendu.
+- **Aucun seuil ne garde 90 % de rappel** sur les 20 fautes de frappe : 80 % de 0,2 à
+  0,4. La règle (spec du lot) dit alors **0,3**, la mesure à côté. Les quatre manques :
+  « got » (*GTO*) et « dout » (*Doubt*) trouvent d'autres séries **directement** (95 et
+  9 résultats : aucune suggestion n'est cherchée) ; « naruot » (*Naruto* : 0,40, sous
+  cinq séries à 0,57) ; « ubel blat » trouve *Ubel Blatt* directement (compté trouvé,
+  pas en suggestion). 0,4 garderait le même rappel avec une meilleure précision : à
+  décider sur une seconde mesure.
+- Une liste « Vouliez-vous dire » est courte et lue d'un coup d'œil : quatre suggestions
+  hors sujet sur cinq coûtent peu ; une suggestion juste manquée coûte la recherche.
+- Latence sur le poste : recherche directe **65 ms** de médiane (97 ms au plus), une
+  suggestion **129 ms** (157 ms), sur les 30 saisies.
+
+**Seconde mesure du 2026-11-09 — les saisies sans espace ; le seuil passe à 0,4.** En
+recette, « onepice » ne suggérait pas *One Piece* (0,29 sous 0,3 : une espace retirée **et**
+une lettre manquante). Le jeu est complété, avant la mesure, de **10 saisies « espace
+retirée »** (règle mécanique en tête du fichier : les 10 premières séries du jeu dont le
+titre a une espace, privé de sa première espace — « onepiece »), soit **40 saisies**. Quatre
+variantes, la règle de décision écrite avant : rappel ≥ 16 / 20 sur les fautes de frappe et
+≥ 8 / 10 sur les espaces, puis la meilleure précision, puis la plus simple ; latence
+médiane > 300 ms écartée. Le cinquième terme compare titre et saisie **sans leurs espaces**
+(`similarity(replace(…, ' ', ''), replace(…, ' ', ''))`).
+
+| Variante | Seuil | Cinquième terme | Rappel fautes (/20) | Rappel espaces (/10) | Contrôle direct (/10) | Rendues | Hors sujet | Précision | Latence médiane / max |
+|---|---:|:---:|---:|---:|---:|---:|---:|---:|---:|
+| A | 0,3 | — | 16 | 10 | 10 | 120 | 94 | 0,22 | 121 / 164 ms |
+| **B** | **0,4** | — | **16** | **10** | **10** | **91** | **65** | **0,29** | **127 / 162 ms** |
+| C | 0,3 | oui | 16 | 10 | 10 | 122 | 96 | 0,21 | 154 / 200 ms |
+| D | 0,4 | oui | 16 | 10 | 10 | 94 | 68 | 0,28 | 154 / 195 ms |
+
+- **Retenue : B**, le seuil à **0,4** — un chiffre de configuration, aucune ligne de code.
+  Les quatre tiennent les deux rappels ; B a la meilleure précision. Une espace retirée
+  seule ne fait pas tomber la ressemblance sous le seuil (*One Piece* à 0,58 pour
+  « onepiece ») : le cinquième terme n'apporte rien sur ce jeu et coûte ~30 ms.
+- **« onepice » reste sans *One Piece*** (deux fautes : 0,29 < 0,4) ; le cinquième terme le
+  rattraperait (0,55) — un cas que le jeu à une faute ne mesure pas.
+
+**Le résumé servi (contrat 0.6.0 ; seconde coupe en 0.7.0).** La collecte du référentiel a recopié, dans des
+résumés Manga Sanctuary, des critiques de lecteurs à la suite du résumé : **1 844
+séries** (requête du lot 2a, rejouée le 2026-11-08 : 14 670 séries, 10 870 résumés non
+vides ; les mêmes 1 844 en production et en préproduction ; *Naruto* touché). Les données
+du schéma `manga` ne changent pas (le vrai nettoyage appartient à la collecte) : la
+fiche sert le résumé corrigé (`app/resumes.py`, décision du 8 novembre) —
+
+1. les **débuts** des critiques de la série (`ms_reviews_all`, 60 premiers caractères,
+   bords retirés, 60 au moins) cherchés dans le résumé Manga Sanctuary (`synopsis`),
+   les deux normalisés **à longueur égale** (la table du repli, un caractère pour un :
+   `unaccent` change la longueur, « œ » → « oe ») ;
+2. la coupe à la position la plus basse, **ramenée à la fin de la phrase précédente**
+   (`.`, `!`, `?` ou saut de ligne), bords retirés ;
+3. au moins **`SYNOPSIS_MIN_CHARS`** caractères (**100**) : le résumé coupé reste le
+   principal (`synopsis_source: manga_sanctuary`) ; sinon le résumé **Kitsu** de la série,
+   par le moyeu d'identité (`work_identity` → `kitsu_series_core.synopsis_clean`)
+   (`kitsu`) ; sinon `null`. Un résumé sans extrait reste tel quel, quelle que soit sa
+   longueur.
+
+`synopsis_kitsu` porte le résumé Kitsu **dès qu'il existe**, même quand le français est
+principal ; `synopsis` reste le brut (sa description dit de préférer
+`synopsis_enriched`).
+
+**Le plancher, choisi sur la mesure du 2026-11-08.** Sur les 1 844 résumés touchés, la
+longueur après coupe : déciles 250, 332, 393, 445, 503, 555, 635, 743, 907 caractères ;
+**57 coupés en tête** (la critique commence le résumé) ; sous 60 : 64, sous 80 : 68, sous
+100 : 72, sous 150 : 88, sous 200 : 121. La distribution a un **creux de 20 à 120
+caractères** (3, 3, 4, 4, 4 séries par tranche de 20) : **100** y tombe — la valeur de la
+décision. Résultat : **1 772 résumés coupés** gardés, **32 passés à Kitsu**, **40
+indisponibles** ; la requête du 2a rejouée sur le champ servi : **0** ; *Naruto* :
+résumé français coupé, 850 caractères. Sur les 14 670 séries : 8 927 résumés Manga
+Sanctuary, 1 762 Kitsu, 3 981 sans résumé.
+
+**Marques de critique mesurées le 2026-11-09 : 128 résumés servis** (1,43 % des 8 927)
+portent au moins deux des cinq familles de marques (tomes lus, première personne, note
+chiffrée, adresse au lecteur, appréciation), 1 492 au moins une ; un tirage de 10 relus :
+10 vrais extraits de critiques ou de chroniques, **absents des tables de critiques** — la
+règle ci-dessus ne peut pas les voir (*Naruto* en garde un). **Décision : aucune coupe de
+plus dans ce lot** ; une seconde coupe à la première marque (120 résumés coupés en plus,
+2 passés à Kitsu, 6 indisponibles) est soumise ; le vrai remède est la collecte.
+**Décision du 9 novembre : seconde coupe, lot 6** (ci-dessous).
+
+**La seconde coupe (contrat 0.7.0, E4, lot 6).** Après la première coupe et avant le
+plancher, le résumé est cherché par les **cinq familles de marques** (`MARQUES_CRITIQUE`
+dans `app/resumes.py`, les motifs mesurés au lot 4 : tomes lus, première personne, note
+chiffrée, adresse au lecteur, appréciation), sur le texte normalisé comme ci-dessus,
+l'apostrophe typographique ramenée. **Deux familles au moins** : coupe à la **première
+marque**, toutes familles confondues, ramenée à la fin de la phrase précédente ; puis le
+plancher (100), sinon Kitsu, sinon `null`. **Une seule famille ne coupe rien** : la
+première personne seule apparaît dans des résumés d'éditeur (relecture du lot 4). Le
+contrat ne change pas (`synopsis_source` garde ses valeurs) ; seule la version monte.
+
+**Mesure après, le 2026-11-10** (préproduction, lecture seule, les 14 670 séries) : les
+**128** résumés servis touchés par deux familles deviennent **120 coupés et gardés, 2
+passés à Kitsu, 6 indisponibles** (la proposition du lot 4, à l'unité) ; **0** résumé servi
+touché par deux familles après la coupe ; **aucun autre résumé ne change**. Sources
+servies : 8 919 Manga Sanctuary (8 927 avant), 1 764 Kitsu (1 762), 3 987 sans résumé
+(3 981). *Naruto* (745) : servi en français, 850 → **456 caractères**, sans l'extrait
+« Tome 1 à 13 ».
+
+**Le moyeu, pas l'ancien appariement.** Parmi les 5 671 séries sans résumé Manga
+Sanctuary, l'ancien champ `series_synopsis_enriched` portait un résumé Kitsu pour 1 871
+(l'appariement historique) ; le moyeu en donne 1 730 : 371 séries perdent un résumé
+Kitsu que le moyeu n'a pas retenu, 230 en gagnent un.
+
+**La fiche porte les métadonnées de l'API du modèle (contrat 0.5.0).** Sept champs
+de la vue `manga.v_metadonnees_serie` (migrations 025, 026), à leurs noms dans la
+vue — `disponibilite`, `nb_volumes`, `nb_volumes_source`, `statut`, `demographie`,
+`auteurs`, `annee_fr` — : **les valeurs que l'API du modèle porte sur ses cartes**,
+un seul vocabulaire de la base à l'écran. Leurs règles sont dans leurs descriptions
+OpenAPI (« édité en France ne veut pas dire en stock » ; toute source autre que
+`champ` se lit « au moins N »). `members_rating` est une note **sur 10**.
+`volume_count` et `statuses` restent tels quels : `volume_count` est le nombre de
+lignes d'éditions **relevé en décembre 2025**, champ figé du référentiel —
+constaté le 2026-11-08 sur 14 670 séries : 12 194 égaux au compte actuel des lignes
+de volumes, 1 012 inférieurs, 2 supérieurs, 1 462 absents ; pour le nombre de
+tomes, lire `nb_volumes`. `statuses` porte les badges tels que collectés (chaînes
+au format Python) ; le statut normalisé est `statut`.
+
+**`author` des critiques collectées : toujours `null`.** Les auteurs des critiques
+de `ms_reviews_all` sont des pseudonymes de lecteurs : ils ne sortent jamais (règle
+du projet, E3) — la requête ne lit même pas `review_author`. Le champ reste au
+contrat, pour qu'un client existant ne casse pas.
 
 **Les genres viennent en deux champs, et aucun ne remplace l'autre.**
 `genres_source` porte les libellés bruts de Manga Sanctuary (français, casse
@@ -361,6 +552,18 @@ se transmet.
 codées en dur : 1 694 séries sans genre dans aucune source, 525 séries sur le
 seul code générique `lgbt` faute d'appariement Kitsu fiable. Une limite mesurée
 et affichée est une force ; découverte par un tiers, c'est une faute.
+
+## Consommateurs
+
+- **L'application du libraire (module 12, E4)** lit le catalogue par `/series` (la
+  recherche) et `/series/{series_id}` (la fiche), sous sa propre clé (consommateur
+  `conseiller`) ; **elle n'appelle pas `/reviews`**.
+- Le corpus RAG historique (`/rag/*`) et la recherche plein texte (`/search`)
+  restent servis tels quels ; l'API du modèle (module 11) lit, elle, la base
+  directement, sous son propre rôle.
+
+C'est la réponse à « qui consomme votre API ? » : une application réelle, nommée
+par sa clé dans le journal d'autorisation.
 
 ## Architecture
 
@@ -519,15 +722,15 @@ curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=one%20piece&lim
 curl -s -H "X-API-Key: $API_KEY" "http://localhost:8000/search?q=shounen%20fantasy&limit=5" | head
 ```
 
-> **La section 7) est ailleurs, à dessein.** Les cinq routes de catalogue —
-> `/series/{series_id}`, `/series/{series_id}/volumes`,
+> **La section 7) est ailleurs, à dessein.** Les six routes de catalogue —
+> `/series`, `/series/{series_id}`, `/series/{series_id}/volumes`,
 > `/series/{series_id}/reviews`, `/identity/{work_uid}`, `/coverage` — sont
 > documentées avec leurs sources sous
 > [« 7) Catalogue, identité et couverture »](#7-catalogue-identité-et-couverture),
 > parce que ce qu'elles exposent ne se lit qu'avec le périmètre en main. Elles
 > sont protégées comme les autres routes de données.
 >
-> **Les 13 routes de l'API sont ainsi couvertes** : `/live`, `/health`, puis
+> **Les 14 routes de l'API sont ainsi couvertes** : `/live`, `/health`, puis
 > 1) à 7). Le contrat complet, machine-lisible, est dans
 > [`openapi.json`](openapi.json), régénéré par
 > `uv run python outils/exporter_openapi.py` et tenu à jour par la suite de

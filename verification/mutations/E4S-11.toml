@@ -1,0 +1,7 @@
+id = "E4S-11"
+origine = "E4, lot 1, spec 02 (2026-11-08) — le chemin de retour accepterait « /\\hôte », que les navigateurs suivent vers un autre site : redirection ouverte"
+fichier = "12_application/src/application/sessions.py"
+avant = '''    if valeur.startswith("//") or "\\" in valeur or any(ord(c) < 32 for c in valeur):'''
+apres = '''    if valeur.startswith("//") or any(ord(c) < 32 for c in valeur):'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sessions.py", "-k", "retour"]

@@ -1,0 +1,19 @@
+id = "E4P-02"
+origine = "E4, lot 7, spec 01 (2026-11-10) — la classe et le chemin de la touche composés depuis la valeur au lieu du dictionnaire de constantes : une valeur piégée atteindrait le HTML"
+fichier = "12_application/src/application/apparence.py"
+avant = '''    return CLASSE_COULEUR.get(couleur, CLASSE_COULEUR[repli])
+
+
+def touche(couleur: str) -> str:
+    """Le chemin de la touche d'une couleur (la pastille de l'écran « Apparence »), par
+    le dictionnaire ; hors liste, celle de l'espace de repli."""
+    return TOUCHE_COULEUR.get(couleur, TOUCHE_COULEUR[ESPACE_DE_REPLI])'''
+apres = '''    return f"esp-{couleur}"
+
+
+def touche(couleur: str) -> str:
+    """Le chemin de la touche d'une couleur (la pastille de l'écran « Apparence »), par
+    le dictionnaire ; hors liste, celle de l'espace de repli."""
+    return f"/statique/touches/touche-{couleur}.webp"'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_apparence.py", "-k", "hostile"]

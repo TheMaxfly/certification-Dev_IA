@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block espace %}glycine{% endblock %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.critiques_titre }}{% endblock %}
+{% block contenu %}
+<h1 id="critiques-titre">{{ t.critiques_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, focus == "avis") }}
+{% endif %}
+<p>{{ t.critiques_l5 }}</p>
+{% if indisponible %}
+<article>
+<h2>{{ t.catalogue_encart_titre }}</h2>
+<p>{{ t.catalogue_encart }}</p>
+</article>
+{% endif %}
+<form method="get" action="/libraire/critiques">
+<label for="filtre-statut">{{ t.critiques_filtre_etiquette }}</label>
+<select id="filtre-statut" name="statut">
+<option value=""{% if not filtre %} selected{% endif %}>{{ t.critiques_filtre_toutes }}</option>
+{% for valeur, libelle in statuts.items() %}
+<option value="{{ valeur }}"{% if filtre == valeur %} selected{% endif %}>{{ libelle }}</option>
+{% endfor %}
+</select>
+<button type="submit">{{ t.critiques_filtre_bouton }}</button>
+</form>
+{% if lignes %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="critiques-titre">
+<table>
+<thead>
+<tr><th scope="col">{{ t.critiques_colonne_serie }}</th><th scope="col">{{ t.critiques_colonne_tome }}</th><th scope="col">{{ t.critiques_colonne_note }}</th><th scope="col">{{ t.critiques_colonne_label }}</th><th scope="col">{{ t.critiques_colonne_statut }}</th><th scope="col">{{ t.critiques_colonne_dates }}</th><th scope="col">{{ t.critiques_colonne_action }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr>
+<td><a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a></td>
+<td>{{ ligne.tome }}</td>
+<td>{{ ligne.note }}</td>
+<td>{{ ligne.label }}</td>
+<td>{{ ligne.statut }}</td>
+<td>{{ ligne.date }}{% if ligne.modifiee %}<br>{{ ligne.modifiee }}{% endif %}</td>
+<td>{% if ligne.publiee %}<a href="/libraire/critiques/{{ ligne.id }}/modifier" aria-label="{{ t.critiques_modifier }} : {{ ligne.titre }}, {{ ligne.tome }}">{{ t.critiques_modifier }}</a> <a href="/libraire/critiques/{{ ligne.id }}/retirer" aria-label="{{ t.critiques_retirer }} : {{ ligne.titre }}, {{ ligne.tome }}">{{ t.critiques_retirer }}</a>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>{{ t.critiques_vide }}</p>
+<p><a href="/catalogue">{{ t.critiques_vers_catalogue }}</a></p>
+{% endif %}
+{% if pagination %}
+<nav aria-label="{{ pagination.texte }}">
+<p aria-current="page">{{ pagination.texte }}</p>
+{% if pagination.precedente %}<a href="{{ pagination.precedente }}">{{ t.critiques_precedente }}</a>{% endif %}
+{% if pagination.suivante %}<a href="{{ pagination.suivante }}">{{ t.critiques_suivante }}</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

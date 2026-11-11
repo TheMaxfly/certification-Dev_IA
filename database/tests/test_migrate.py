@@ -1069,6 +1069,15 @@ def test_wd_formes_refuse_un_qid_inexistant(base_migree):
 # en 009) est couverte par la dérivation ci-dessous sans retoucher ce test ;
 # une table qui la QUITTE doit faire échouer, d'où la liste explicite.
 TABLES_DU_RAPPROCHEMENT = {"ms_formes", "wd_formes", "kitsu_formes"}
+#: Les tables dont les trigrammes ne servent pas le rapprochement, avec leur motif :
+#: elles ne comparent pas une colonne normalisée à celle d'une autre table, la règle du
+#: btree jumeau ne les concerne pas. Une entrée est une décision, écrite ici.
+TRIGRAMMES_HORS_RAPPROCHEMENT = {
+    "ms_series_enriched": (
+        "028 (E4, lot 2b) : les index de la recherche de l'API data — « contient » et"
+        " ressemblance (LIKE, similarity) ; l'égalité exacte n'y filtre rien"
+    ),
+}
 
 
 def test_006_pose_les_index_trigram_des_deux_cotes(base_migree):
@@ -1101,7 +1110,8 @@ def test_006_pose_les_index_trigram_des_deux_cotes(base_migree):
     # Dérivé : toute table indexée en trigramme doit aussi l'être en btree —
     # l'égalité exacte passe par le btree, le flou par le GIN. En avoir un seul
     # des deux est une demi-mesure silencieuse.
-    sans_btree = trigramme - btree
+    sans_btree = trigramme - btree - set(TRIGRAMMES_HORS_RAPPROCHEMENT)
+    assert TRIGRAMMES_HORS_RAPPROCHEMENT.keys() <= trigramme, "exemption périmée"
     assert not sans_btree, (
         f"{sorted(sans_btree)} portent un index trigramme sans btree sur la "
         "colonne normalisée"

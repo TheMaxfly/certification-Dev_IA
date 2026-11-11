@@ -150,6 +150,14 @@ def reponse(**champs: object) -> Scenario:
     return lambda banc: poster(banc, "/v1/reponse", **champs)
 
 
+def verification(cle: bool = True) -> Scenario:
+    return lambda b: b.api.post("/v1/verification", headers=entetes() if cle else None)
+
+
+def verification_faite(banc: Banc) -> None:
+    assert banc.api.post("/v1/verification", headers=entetes()).status_code == 200
+
+
 def sans_cle(route: str) -> Scenario:
     return lambda b: b.api.post(route, json={"question": QUESTION})
 
@@ -174,6 +182,13 @@ SCENARIOS: dict[Case, list[Scenario]] = {
     ("/v1/info", "GET", 200, ""): [obtenir("/v1/info")],
     ("/v1/info", "GET", 401, ""): [obtenir("/v1/info", cle=False)],
     ("/v1/info", "GET", 429, ""): [apres(debit_epuise, obtenir("/v1/info"))],
+    # Le test des clés (1.5.0) : sur l'API à profils factices, leurs doublures.
+    ("/v1/verification", "POST", 200, ""): [verification()],
+    ("/v1/verification", "POST", 401, ""): [verification(cle=False)],
+    ("/v1/verification", "POST", 429, ""): [
+        apres(verification_faite, verification()),
+        apres(debit_epuise, verification()),
+    ],
     ("/v1/recherche", "POST", 200, ""): [recherche()],
     ("/v1/recherche", "POST", 401, ""): [sans_cle("/v1/recherche")],
     ("/v1/recherche", "POST", 413, ""): [lambda b: trop_gros(b.api, "/v1/recherche")],
@@ -251,6 +266,7 @@ def test_la_matrice_est_celle_du_contrat():
         ("/v1/info", "GET"),
         ("/v1/recherche", "POST"),
         ("/v1/reponse", "POST"),
+        ("/v1/verification", "POST"),
     }
     cases = [(s, code) for c, _, s, code in DECLARES if c == "/v1/reponse"]
     assert sorted({s for s, _ in cases}) == [200, 401, 413, 422, 429, 503]
@@ -286,7 +302,7 @@ def test_chaque_case_declaree_est_produite_dans_sa_forme(
 ):
     chemin, methode, statut, code = case
     # La route de réponse sur les profils factices ; les autres, sur l'API versionnée.
-    de_reponse = chemin == "/v1/reponse"
+    de_reponse = chemin in ("/v1/reponse", "/v1/verification")
     banc = Banc(
         api=request.getfixturevalue("api_reponse" if de_reponse else "api"),
         service=service_doublure,

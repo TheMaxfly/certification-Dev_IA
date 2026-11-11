@@ -1,0 +1,7 @@
+id = "E4Q-03"
+origine = "E4, lot 2b, spec 01 (2026-11-08) — un mode=enrichi forgé par un visiteur accepté : le public doit rester en strict"
+fichier = "12_application/src/application/app.py"
+avant = '''            mode=(champ(donnees, "mode") or None) if droits.choisir_mode else None,'''
+apres = '''            mode=(champ(donnees, "mode") or None),'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_conseiller_roles.py", "-k", "post_force_par_le_public"]

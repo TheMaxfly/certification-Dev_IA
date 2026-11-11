@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block espace %}brume{% endblock %}
+{% import "composants/critique.html" as k %}
+{% block titre %}{{ t.admin_critique_retirer_titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ t.admin_critique_retirer_titre }}</h1>
+<dl>
+<dt>{{ t.critiques_colonne_serie }}</dt><dd><a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a></dd>
+<dt>{{ t.critiques_colonne_tome }}</dt><dd>{{ ligne.tome }}</dd>
+</dl>
+{{ k.critique(critique, t, 2) }}
+<p>{{ t.admin_critique_retirer_texte }}</p>
+<form method="post" action="{{ action }}">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+<button type="submit">{{ t.critique_retirer_bouton }}</button>
+</form>
+<p><a href="/admin/critiques">{{ t.critique_annuler }}</a></p>
+{% endblock %}

@@ -136,7 +136,7 @@ def test_les_images_sont_epinglees_par_empreinte(service: str):
     assert re.fullmatch(r"[a-z/-]+:[v0-9.]+@sha256:[0-9a-f]{64}", image), image
 
 
-def test_seuls_trois_ports_sont_publies_tous_sur_l_adresse_locale():
+def test_quatre_ports_sont_publies_tous_sur_l_adresse_locale():
     publies = {
         nom: [(p["host_ip"], p["published"]) for p in service["ports"]]
         for nom, service in fusion()["services"].items()
@@ -144,6 +144,8 @@ def test_seuls_trois_ports_sont_publies_tous_sur_l_adresse_locale():
     }
     assert publies == {
         "application": [("127.0.0.1", "8020")],
+        # Le catalogue (l'API data du 02, E4 lot 2a), du fichier de fusion du 12.
+        "catalogue": [("127.0.0.1", "8000")],
         "prometheus": [("127.0.0.1", "9090")],
         "grafana": [("127.0.0.1", "3000")],
     }

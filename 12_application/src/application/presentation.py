@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlencode
 
 from application import __version__
 from application.client_api import (
@@ -34,6 +35,43 @@ def dire(textes: Mapping[str, str], cle: str, **valeurs: object) -> str:
     return textes[cle].format(**valeurs)
 
 
+#: Les entrées du menu (E4, lot 6) : leur cible, et les chemins qui sont leur page. La
+#: page du conseiller se rend aussi après l'envoi d'une question (`POST /question`).
+ENTREES_DU_MENU: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("/", ("/", "/question")),
+    ("/catalogue", ("/catalogue",)),
+    ("/compte/listes", ("/compte/listes",)),
+    ("/compte/mot-de-passe", ("/compte/mot-de-passe",)),
+    ("/libraire/critiques", ("/libraire/critiques",)),
+)
+#: L'administration : toutes ses pages sont sous un préfixe, une seule entrée du menu.
+PREFIXE_ADMINISTRATION = "/admin/"
+
+
+def entree_du_menu(chemin: str) -> str | None:
+    """La cible du lien du menu qui porte `aria-current="page"` sur ce chemin ; None :
+    aucune (une fiche, une page d'erreur, la connexion…)."""
+    if chemin.startswith(PREFIXE_ADMINISTRATION):
+        return "/admin/comptes"
+    return next((cible for cible, pages in ENTREES_DU_MENU if chemin in pages), None)
+
+
+type PoseKohai = Literal["arrivee", "trouve", "perdu"]
+
+
+def pose_de_kohai(affichage: Affichage | None, encart: Encart | None) -> PoseKohai:
+    """La pose de Kōhai sur la page du conseiller (E4, lot 6) : « perdu » sur un encart
+    ou un refus, « trouvé » quand la réponse cite au moins une série, l'arrivée sinon —
+    à chaque chargement de l'accueil, comme la phase 1 : rien n'est gardé dans la
+    session. La réflexion n'est jamais choisie ici : le script de l'attente la montre,
+    à l'envoi de la question."""
+    if encart is not None or (affichage is not None and affichage.refus):
+        return "perdu"
+    if affichage is not None and affichage.cartes:
+        return "trouve"
+    return "arrivee"
+
+
 def fournisseur_de(reglages: Reglages, nom: str) -> Fournisseur:
     """Le nom et l'hébergement d'un fournisseur, s'ils sont connus de la configuration :
     `/v1/info` ne dit pas l'hébergement."""
@@ -52,13 +90,30 @@ def profils_proposes(info: Info, reglages: Reglages) -> list[ProfilDecrit]:
     ]
 
 
-def profil_par_defaut(info: Info, reglages: Reglages) -> str | None:
-    """Le profil actif s'il est proposé, sinon le premier proposé, sinon aucun."""
+def profil_par_defaut(
+    info: Info, reglages: Reglages, regle: str | None = None
+) -> str | None:
+    """Le profil qui part quand personne n'en choisit (E4, lot 5, D12) : celui que
+    l'administrateur a réglé (`regle`), s'il est proposé ; sinon le défaut de l'API —
+    son profil actif s'il est proposé, sinon le premier proposé ; sinon aucun."""
     proposes = [p.nom for p in profils_proposes(info, reglages)]
+    if regle is not None and regle in proposes:
+        return regle
     actif = info.modele_langage.profil_actif
     if actif in proposes:
         return actif
     return proposes[0] if proposes else None
+
+
+def regle_indisponible(
+    info: Info | None, reglages: Reglages, regle: str | None
+) -> bool:
+    """Le profil réglé n'est plus proposé (indisponible, retiré ou exclu) : la question
+    part avec le défaut de l'API, l'administrateur en est averti. Sans `/v1/info`, rien
+    ne se dit."""
+    if regle is None or info is None:
+        return False
+    return regle not in [p.nom for p in profils_proposes(info, reglages)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,13 +124,15 @@ class OptionProfil:
 
 
 def options_profils(
-    info: Info, reglages: Reglages, choisi: str | None
+    info: Info, reglages: Reglages, choisi: str | None, regle: str | None = None
 ) -> list[OptionProfil]:
     """Chaque option dit son fournisseur et son hébergement : ils se lisent au moment du
-    choix."""
+    choix. Le profil actif de l'application (`regle` s'il est proposé, E4, lot 5) est
+    présélectionné et dit « actif »."""
     proposes = profils_proposes(info, reglages)
     noms = [p.nom for p in proposes]
-    retenu = choisi if choisi in noms else profil_par_defaut(info, reglages)
+    actif = profil_par_defaut(info, reglages, regle)
+    retenu = choisi if choisi in noms else actif
     t = reglages.textes
     options: list[OptionProfil] = []
     for profil in proposes:
@@ -87,7 +144,7 @@ def options_profils(
             fournisseur=fournisseur.nom,
             hebergement=fournisseur.hebergement,
         )
-        if profil.nom == info.modele_langage.profil_actif:
+        if profil.nom == actif:
             etiquette += f" {t['suffixe_actif']}"
         if profil.statut == "apercu":
             etiquette += f" {t['suffixe_apercu']}"
@@ -119,13 +176,16 @@ def reformuler_par_defaut(info: Info | None, reglages: Reglages) -> bool:
     return info.modele_langage.reglages_reponse.reformuler.defaut
 
 
-def etat_du_service(etat: EtatApi, info: Info | None, reglages: Reglages) -> str:
+def etat_du_service(
+    etat: EtatApi, info: Info | None, reglages: Reglages, regle: str | None = None
+) -> str:
+    """L'état, et le profil qui sert : l'actif de l'application (E4, lot 5)."""
     t = reglages.textes
     if etat == "cle":
         return t["etat_cle"]
     if etat == "ko" or info is None:
         return t["etat_ko"]
-    actif = info.modele_langage.profil_actif
+    actif = profil_par_defaut(info, reglages, regle) or info.modele_langage.profil_actif
     modele = next(
         (p.modele for p in info.modele_langage.profils if p.nom == actif),
         t["valeur_inconnue"],
@@ -150,11 +210,14 @@ class LigneProfil:
     actif: bool
 
 
-def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
+def lignes_a_propos(
+    info: Info | None, reglages: Reglages, regle: str | None = None
+) -> list[LigneProfil]:
     """Tous les profils du sélecteur, avec leur hébergement : la page ne dit pas
     seulement celui du profil actif, qui mentirait dès qu'on en choisit un autre."""
     if info is None:
         return []
+    actif = profil_par_defaut(info, reglages, regle)
     lignes: list[LigneProfil] = []
     for profil in profils_proposes(info, reglages):
         fournisseur = fournisseur_de(reglages, profil.fournisseur)
@@ -163,7 +226,7 @@ def lignes_a_propos(info: Info | None, reglages: Reglages) -> list[LigneProfil]:
                 nom=profil.nom,
                 fournisseur=fournisseur.nom,
                 hebergement=fournisseur.hebergement,
-                actif=profil.nom == info.modele_langage.profil_actif,
+                actif=profil.nom == actif,
             )
         )
     return lignes
@@ -378,8 +441,13 @@ class Affichage:
     sans_carte: str | None
     complement: str | None
     complement_titres: tuple[str, ...]
+    #: L'étiquette du complément : celle de l'API (D9), le texte du 12 en repli.
+    complement_etiquette: str = ""
     #: None hors du mode démonstration : la section n'existe pas.
     trace: Trace | None = None
+    #: Le pont vers le catalogue (E4, lot 2b, décision 6) : une réponse qui refuse ou
+    #: ne cite aucune série propose de chercher la question dans le catalogue.
+    lien_catalogue: str | None = None
 
 
 def tomes_de(m: Metadonnees, t: Mapping[str, str]) -> str:
@@ -686,15 +754,28 @@ def appels_de(corps: Reponse, t: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(lignes)
 
 
+def lien_vers_catalogue(question: str, reglages: Reglages) -> str | None:
+    """`/catalogue?q=` : la question coupée à la borne du catalogue, sans les espaces
+    des bords ; trop courte pour une recherche, pas de lien."""
+    regles = reglages.catalogue
+    q = question[: regles.q_max].strip()
+    if len(q) < regles.q_min:
+        return None
+    return "/catalogue?" + urlencode({"q": q})
+
+
 def affichage_de(
     question: str,
     corps: Reponse,
     reglages: Reglages,
     *,
     demonstration: bool = False,
+    complement: bool = False,
 ) -> Affichage:
     """La zone de réponse ; le mode démonstration n'ajoute que ce que l'API a déjà
-    rendu, et, éteint, rien de cela n'atteint le gabarit."""
+    rendu, et, éteint, rien de cela n'atteint le gabarit. Le complément du mode enrichi
+    n'atteint le gabarit que pour un rôle qui choisit le mode (`complement`) : le
+    public est en strict, et son HTML n'en porte jamais le bloc."""
     t = reglages.textes
     motifs = {
         "aucun_passage": t["motif_aucun_passage"],
@@ -734,9 +815,15 @@ def affichage_de(
             if sans_carte
             else None
         ),
-        complement=corps.complement,
-        complement_titres=tuple(corps.complement_titres or ()),
+        complement=corps.complement if complement else None,
+        complement_titres=tuple(corps.complement_titres or ()) if complement else (),
+        complement_etiquette=corps.complement_etiquette or t["complement_etiquette"],
         trace=trace_de(question, corps, t) if demonstration else None,
+        lien_catalogue=(
+            lien_vers_catalogue(question, reglages)
+            if corps.refus or not cartes
+            else None
+        ),
     )
 
 
@@ -754,6 +841,9 @@ class Encart:
     profil_a_revoir: bool = False
     #: La conversation s'arrête là : le lien vers une nouvelle est proposé.
     nouvelle_conversation: bool = False
+    #: Le titre de l'encart, s'il en a un à lui (les bornes, E4, lot 2b) ; None : le
+    #: titre commun.
+    titre: str | None = None
 
 
 CODES_RECHERCHE = frozenset(
@@ -827,3 +917,29 @@ def encart_erreur(
         ),
         erreur.statut if erreur.statut == 422 else 502,
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Les critiques signées (E4, lot 3)
+# --------------------------------------------------------------------------- #
+MOIS = (
+    "janvier février mars avril mai juin juillet août septembre octobre novembre"
+    " décembre"
+).split()
+
+
+def date_en_lettres(moment: datetime) -> str:
+    """« 12 novembre 2026 », « 1er décembre 2026 » : la date d'une critique, dans le
+    fuseau de la base (celui de la session)."""
+    jour = "1er" if moment.day == 1 else str(moment.day)
+    return f"{jour} {MOIS[moment.month - 1]} {moment.year}"
+
+
+def paragraphes_critique(texte: str) -> list[list[str]]:
+    """Le texte d'une critique en paragraphes (sur les lignes vides), chacun en lignes :
+    le gabarit les sépare, échappées ; rien n'est jamais marqué « sûr »."""
+    return [
+        [ligne.strip() for ligne in bloc.split("\n") if ligne.strip()]
+        for bloc in re.split(r"\n\s*\n", texte)
+        if bloc.strip()
+    ]

@@ -4,12 +4,16 @@ Livrable documentaire du bloc C4. Les planches sont **derivees du schema reel**
 de la base `apimanga` : aucune table, aucune colonne, aucune cle etrangere n'y
 est saisie a la main.
 
-**Dette connue** : les planches et `schema_reel.md` sont au niveau de la
-migration `014`. Les migrations `015` a `026` (personnages multi-sources, jeu
-d'evaluation, vecteurs pgvector, cohabitation des corpus, roles `verif_ro` et
-`modele_ro`, vues `manga.v_pseudonymes` et `manga.v_metadonnees_serie`) n'y figurent
-pas encore ; la
-regeneration est reportee a une etape a part, apres E3.
+**Regenere le 2026-11-08** (E4, lot 2b) sur la **preproduction** (`apimanga_preprod`,
+30 migrations, `028` et `029` comprises), la dette des migrations `015` a `026` levee
+du meme coup (personnages multi-sources, vues `manga.v_pseudonymes` et
+`manga.v_metadonnees_serie`, decisions du moyeu) : 51 tables, 735 colonnes, 23 FK,
+123 index, dont les quatre index de trigrammes de la `028`. L'extraction couvre les
+schemas `manga` et `staging` : ni les fonctions (`manga.normaliser`, `028`), ni le
+schema `application` de l'application du libraire (`027`, `029` : decrit par
+`12_application/schema/README.md`) n'y figurent. La production (`apimanga`) recevra
+`027` a `029` au lot de livraison continue : jusque-la, le livrable decrit la
+preproduction, en avance de trois migrations.
 
 ## Fichiers
 
@@ -18,7 +22,7 @@ regeneration est reportee a une etape a part, apres E3.
 | `modele_donnees.drawio` | **La reference.** 3 onglets, editable dans draw.io / diagrams.net / l'extension VS Code. |
 | `mpd_coeur.png` · `mpd_staging.png` · `mcd.png` | Exports pour insertion directe au rapport (2800 x 1980, A3 paysage). |
 | `mpd_coeur.svg` · `mpd_staging.svg` · `mcd.svg` | Sources vectorielles des PNG. |
-| `schema_reel.md` | **La preuve de fidelite** : inventaire complet extrait de la base (43 tables, 659 colonnes, 20 FK), plus la confrontation avec les migrations. |
+| `schema_reel.md` | **La preuve de fidelite** : inventaire complet extrait de la base (51 tables, 735 colonnes, 23 FK, 2026-11-08), plus la confrontation avec les migrations. |
 | `modele_donnees.mmd` | Version Mermaid du MPD coeur (secondaire, rendu automatique sur GitHub). |
 | `schema.json` | Extraction brute, source des generateurs. |
 | `extraire_schema.py` · `generer_schema_reel.py` · `generer_diagrammes.py` · `layout.py` | La chaine de production, rejouable. |
@@ -27,7 +31,10 @@ regeneration est reportee a une etape a part, apres E3.
 
 L'extraction est jouee sous le **role de consultation** `manga_api`, en session
 `default_transaction_read_only = on` : le livrable se produit avec les droits
-les plus faibles, pas avec ceux du proprietaire.
+les plus faibles, pas avec ceux du proprietaire. Le 2026-11-08, sur la preproduction,
+sous `verif_lecture` (`verif_ro`, lecture seule lui aussi, sans droit sur `staging` :
+memes comptes indisponibles) ; la base et le role lus sont ecrits dans `schema.json`
+(`source`) et en tete de `schema_reel.md`.
 
 ```bash
 export DATABASE_URL='postgresql://manga_api@localhost:5432/apimanga?options=-c%20default_transaction_read_only%3Don'

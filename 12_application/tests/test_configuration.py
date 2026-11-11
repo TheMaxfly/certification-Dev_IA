@@ -44,6 +44,29 @@ def test_une_cle_hors_ascii_empeche_de_demarrer_sans_la_montrer():
     assert ecarts == ["APPLICATION_CLE_API : caractères hors ASCII — clé illisible"]
 
 
+def test_la_cle_des_comptes_est_facultative_et_jamais_montree():
+    assert charger(ENV).cle_api_comptes is None
+    avec = charger({**ENV, "APPLICATION_CLE_API_COMPTES": "k" * 40})
+    assert avec.cle_api_comptes == "k" * 40
+    assert "k" * 40 not in repr(avec)
+    ecarts = ecarts_de({**ENV, "APPLICATION_CLE_API_COMPTES": "clé-é" * 8})
+    assert ecarts == [
+        "APPLICATION_CLE_API_COMPTES : caractères hors ASCII — clé illisible"
+    ]
+
+
+def test_les_bornes_du_conseiller_sont_celles_decidees():
+    bornes = charger(ENV).bornes
+    assert (
+        bornes.quota_visiteur_questions_jour,
+        bornes.quota_client_questions_jour,
+        bornes.debit_public_par_minute,
+        bornes.cout_jour_max_usd,
+        bornes.inscriptions_session_max,
+        bornes.inscriptions_fenetre_min,
+    ) == (5, 20, 10, 0.50, 3, 60)
+
+
 def test_le_lancement_sans_cle_nomme_la_variable_et_rend_2(monkeypatch, capsys):
     monkeypatch.setattr("application.__main__.journal.configurer", lambda: None)
     monkeypatch.delenv("APPLICATION_CLE_API", raising=False)
@@ -111,7 +134,7 @@ def test_les_valeurs_par_defaut_sont_celles_decidees():
     assert r.temperature_defaut == 0.0 and r.reformuler_defaut is True
     assert r.delais.reponse_s == 75.0 and r.delais.connexion_s == 5.0
     assert r.limites.echanges == 5 and r.corps_octets_max == 16384
-    assert r.textes["nom_librairie"] == "Librairie de démonstration"
+    assert r.textes["nom_librairie"] == "Senpai"
     assert r.fournisseurs["mistral"].hebergement == "Union européenne"
 
 
@@ -189,6 +212,23 @@ def fichier_modifie(tmp_path: Path, avant: str, apres: str) -> Path:
         ('bouton = "Demander"', "bouton = 3", "bouton : texte attendu"),
         ('bouton = "Demander"', 'bouton = "{variable}"', "variable inconnue"),
         ('bouton = "Demander"', 'bouton = "{"', "accolades invalides"),
+        # E4, lot 2b : les bornes du conseiller, positives.
+        (
+            "quota_visiteur_questions_jour = 5",
+            "quota_visiteur_questions_jour = 0",
+            "conseiller.limites.quota_visiteur_questions_jour",
+        ),
+        (
+            "quota_client_questions_jour = 20",
+            "quota_client_questions_jour = 2.5",
+            "conseiller.limites.quota_client_questions_jour",
+        ),
+        (
+            "cout_jour_max_usd = 0.50",
+            "cout_jour_max_usd = 0",
+            "conseiller.limites.cout_jour_max_usd",
+        ),
+        ("[conseiller.limites]", "[conseiller.autres]", "conseiller.limites"),
     ],
 )
 def test_un_fichier_fautif_empeche_de_demarrer(tmp_path, avant, apres, attendu):
@@ -228,10 +268,12 @@ def test_la_mention_ia_est_le_texte_decide():
     textes = charger(ENV).textes
 
     assert textes["mention_courte"] == "Vous parlez à une IA."
+    # E4, lot 6 : la mention décidée, inchangée, puis le crédit du réseau fictif.
     assert textes["mention_complete"] == (
         "Vous parlez à une IA. Les réponses sont rédigées par un modèle de langage à"
         " partir de critiques et de résumés du catalogue ; elles peuvent être"
-        " incomplètes."
+        " incomplètes. Senpai est un réseau fictif de librairies : projet de"
+        " certification Développeur en intelligence artificielle (formation Simplon)."
     )
 
 
@@ -263,6 +305,15 @@ def test_le_fichier_d_exemple_ne_porte_que_des_noms():
         "API_MODELE_ADRESSE",
         "APPLICATION_ECOUTE",
         "APPLICATION_METRIQUES_RESEAUX",
+        # E4, lot 1 : l'environnement, la base, la clé des sessions.
+        "APPLICATION_ENVIRONNEMENT",
+        "APPLICATION_BASE_DSN",
+        "APPLICATION_CLE_SESSION",
+        # E4, lot 2a : le catalogue (l'API data du 02).
+        "APPLICATION_CLE_CATALOGUE",
+        "CATALOGUE_ADRESSE",
+        # E4, lot 2b : la clé des comptes connectés (facultative).
+        "APPLICATION_CLE_API_COMPTES",
     }
     assert all(valeur == "" for _, valeur in affectations)
 

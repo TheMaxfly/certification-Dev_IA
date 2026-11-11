@@ -1,0 +1,16 @@
+{# Une critique de libraire : un `article` — le nom affiché (jamais le pseudo), la date, le
+   tome, la note en texte, le badge du label, la date de modification ; puis le texte, en
+   paragraphes et en lignes, ÉCHAPPÉ : il n'est jamais marqué « sûr ». Partagé par la fiche,
+   la confirmation de retrait et la modération. #}
+{% macro critique(c, t, niveau=3) -%}
+<article>
+<h{{ niveau }}>{{ c.nom }}</h{{ niveau }}>
+<p><small>{{ c.date }}{% if c.tome %} · <span>{{ c.tome }}</span>{% if c.tome_detail %} ({{ c.tome_detail }}){% endif %}{% endif %} · <strong>{{ c.note }}</strong>{% if c.label %} · <span class="badge-label">{{ c.label }}</span>{% endif %}{% if c.modifiee %} · {{ c.modifiee }}{% endif %}</small></p>
+{% for paragraphe in c.paragraphes %}
+<p>{% for ligne in paragraphe %}{{ ligne }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+{% endfor %}
+{% if c.lien_modifier %}<p><a href="{{ c.lien_modifier }}" aria-label="{{ c.etiquette_modifier }}">{{ t.critiques_modifier }}</a></p>
+{% endif %}{% if c.lien_moderer %}<p><a href="{{ c.lien_moderer }}" aria-label="{{ c.etiquette_moderer }}">{{ t.critique_moderer }}</a></p>
+{% endif %}
+</article>
+{%- endmacro %}

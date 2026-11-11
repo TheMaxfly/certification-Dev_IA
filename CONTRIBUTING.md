@@ -46,7 +46,8 @@ commande sur le poste et sur GitHub.
   périmètre (`verification/tester_perimetre.sh`), du moteur de vérification
   (`verification/tester_verifier.sh` : environnement vidé, arrêt, plafond, volumes…),
   du contrôle des pseudonymes des passages de l'API
-  (`verification/tester_pseudonymes_passages.py`) et de la sauvegarde
+  (`verification/tester_pseudonymes_passages.py`), des migrations attendues en attente
+  (`verification/tester_migrations_en_attente.py`) et de la sauvegarde
   (`sauvegarde/tester_sauvegarde.sh`), la cohérence `MODULES` ↔
   graphe ↔ matrice de `verify.yml` ↔ modules à base jetable, et les règles des
   workflows (`verification/controler_workflows.sh` : actions épinglées par empreinte,
@@ -116,6 +117,14 @@ La seule étape qui lit la base réelle : `verification/etat_apimanga.sh`, dans
   service ; les migrations appliquées, égales aux fichiers. Puis le contrôle du module
   09, et les tests qui ne peuvent tourner que sur la base réelle (05, 08, `demo`) :
   ils doivent passer, aucun ne doit sauter.
+- **Les migrations attendues en attente** : une migration appliquée d'abord en
+  préproduction et livrée plus tard est déclarée dans
+  `verification/migrations_en_attente.tsv` (version, motif, lot qui l'appliquera).
+  Dans la référence, `migrations_egales_aux_fichiers` à `oui` signifie « égales aux
+  fichiers, hors attentes déclarées » : les migrations appliquées en production sont les
+  fichiers du dépôt moins la liste, avec les mêmes sommes de contrôle. Une migration
+  absente de la production sans être listée, ou listée mais appliquée (liste périmée),
+  est un échec. La liste se vide quand le déploiement applique les migrations en attente.
 - **Les pseudonymes des passages rendus par l'API du modèle** : l'étape d'équivalence,
   jouée juste avant, écrit les identifiants des fragments que l'API a rendus ;
   `verification/pseudonymes_passages.py` relit leur texte et y cherche les
@@ -211,7 +220,7 @@ répare, le réactive, et le note au journal.
 ```bash
 ln -sf ../../.githooks/pre-push .git/hooks/pre-push
 ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
-bash .githooks/tester.sh   # 75 scénarios sur 75 ; joués aussi par la tâche statique
+bash .githooks/tester.sh   # 97 scénarios sur 97 ; joués aussi par la tâche statique
 ```
 
 - `pre-commit`, avant que le commit existe : mentions interdites, fichiers sous
@@ -247,6 +256,12 @@ chaîne qui a l'aspect d'un secret. Le refus nomme le fournisseur et le fichier.
 | trousseau de l'API du modèle | `API_MODELE_CLES`, `nom:secret,nom:secret`, dans le `.env` du module de l'API | `pre-commit` et `pre-push` : la valeur de chaque secret ; une affectation littérale d'un secret de 32 caractères au moins, à toute place |
 | clé de l'application | `APPLICATION_CLE_API`, le secret seul, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` n'en est pas une) |
 | mot de passe du canal d'alerte | le fichier `13_monitorage/.secrets/smtp_mot_de_passe`, hors dépôt, lu par `GF_SMTP_PASSWORD__FILE` | `pre-commit` et `pre-push` : sa valeur, avec et sans ses espaces ; une affectation littérale à `GF_SMTP_PASSWORD` ; le chemin passe |
+| clé de session de l'application | `APPLICATION_CLE_SESSION`, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` passe) |
+| mot de passe du rôle de connexion de l'application | une ligne `app_conseiller` du fichier de mots de passe de PostgreSQL (`PGPASSFILE`, sinon `~/.pgpass`) | `pre-commit` et `pre-push` : sa valeur (12 caractères au moins), lue sur les seules lignes de ce rôle ; une telle ligne recopiée (la forme documentée, `<mot de passe>`, passe) |
+| clé du catalogue de l'application | `APPLICATION_CLE_CATALOGUE`, dans le `.env` du module de l'application | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` ou une forme entre chevrons passe) |
+| clé des comptes de l'application | `APPLICATION_CLE_API_COMPTES`, facultative, dans le `.env` du module de l'application (absente : la clé de l'application sert aussi aux comptes) | `pre-commit` et `pre-push` : sa valeur ; une affectation littérale de 32 caractères au moins (une référence `${…}` ou une forme entre chevrons passe) |
+| trousseau de l'API data | `API_KEYS`, `nom:clé,nom:clé`, dans le `.env` du module 02 | `pre-commit` et `pre-push` : la valeur de chaque clé ; une affectation littérale dont une entrée porte une clé de 32 caractères au moins, à toute place (la forme entre chevrons passe ; la clé jetable du harnais du 02 passe tant que sa ligne ne change pas) |
+| tout mot de passe dans un DSN | — | `pre-commit` et `pre-push` : un DSN de forme d'adresse qui porte un mot de passe (`rôle:valeur@`) ; une valeur entre chevrons ou une référence (`${…}`, `$…`) passe. Un DSN d'essai (base jetable) s'écrit donc sans mot de passe ou par référence ; ceux d'avant cette règle passent tant que leur ligne ne change pas |
 
 - Les `.env` lus sont ceux de la racine et des dossiers jusqu'à deux niveaux sous
   elle. Une variable absente ou vide ne compare rien.

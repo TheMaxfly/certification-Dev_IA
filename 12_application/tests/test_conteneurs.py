@@ -12,6 +12,9 @@ DOCKERFILE = (RACINE / "Dockerfile").read_text(encoding="utf-8")
 FUSION = (RACINE / "compose.yaml").read_text(encoding="utf-8")
 ESSAI = (RACINE / "compose.integration.yml").read_text(encoding="utf-8")
 DEMO = (RACINE / "compose.demo.yaml").read_text(encoding="utf-8")
+MONITORAGE = (RACINE.parent / "13_monitorage" / "compose.yaml").read_text(
+    encoding="utf-8"
+)
 IGNORE = (RACINE / "Dockerfile.dockerignore").read_text(encoding="utf-8")
 
 
@@ -38,10 +41,57 @@ def test_le_contexte_est_une_liste_blanche_sans_secret():
     assert "!12_application/src/" in lignes
 
 
+def bloc_du_service(nom: str) -> str:
+    """Le texte d'un service du fichier de fusion, jusqu'au service suivant."""
+    return FUSION.split(f"\n  {nom}:\n")[1].split("\n\n")[0]
+
+
 def test_le_compose_ne_publie_que_sur_le_bouclage_et_ne_porte_aucune_cle():
     assert '"127.0.0.1:${APPLICATION_PORT_PUBLIE:-8020}:8020"' in FUSION
+    assert '"127.0.0.1:${CATALOGUE_PORT_PUBLIE:-8000}:8000"' in FUSION
     assert "APPLICATION_CLE_API: ${APPLICATION_CLE_API:-}" in FUSION
-    assert FUSION.count("ports:") == 2 and "ports: !reset []" in FUSION
+    assert "APPLICATION_CLE_CATALOGUE: ${APPLICATION_CLE_CATALOGUE:-}" in FUSION
+    assert "API_KEYS: ${API_KEYS:-}" in FUSION
+    # Trois « ports: » : l'application et le catalogue sur le bouclage, l'API sans port.
+    assert FUSION.count("ports:") == 3 and "ports: !reset []" in FUSION
+    publications = re.findall(r'^ +- "([^"]+:\d+)"$', FUSION, re.M)
+    assert publications and all(p.startswith("127.0.0.1:") for p in publications)
+
+
+def test_le_catalogue_lit_la_base_par_un_pgpass_monte_jamais_par_un_mot_de_passe():
+    catalogue = bloc_du_service("catalogue")
+
+    assert 'DB_PASSWORD: ""' in catalogue
+    assert "PGPASSFILE: /run/secrets/pgpass_catalogue" in catalogue
+    assert "secrets: [pgpass_catalogue]" in catalogue
+    assert "DB_USER: manga_api" in catalogue
+    assert 'user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"' in catalogue
+    # Le secret désigne un fichier hors dépôt, nommé par une variable surchargeable.
+    assert "file: ${CATALOGUE_PGPASS:-../02_api_manga/.pgpass.conteneur}" in FUSION
+    assert "image: api-catalogue:0.7.0" in catalogue
+
+
+def test_le_catalogue_sort_vers_la_base_par_un_sous_reseau_fixe():
+    reseaux = FUSION.split("\nnetworks:\n")[-1]
+
+    assert "networks: [applicatif, catalogue_sortie]" in bloc_du_service("catalogue")
+    assert (
+        "catalogue_sortie:\n    ipam:\n      config:\n        - subnet: 172.30.2.0/24"
+        in (reseaux)
+    )
+
+
+def test_l_application_attend_le_catalogue_et_le_joint_par_son_nom():
+    application = bloc_du_service("application")
+
+    assert "catalogue:\n        condition: service_healthy" in application
+    assert "CATALOGUE_ADRESSE: http://catalogue:8000" in application
+
+
+def test_le_catalogue_n_entre_pas_dans_le_monitorage():
+    """Le fichier du 13 ne touche que l'embedding, l'API et l'application : le catalogue
+    n'expose pas de métriques."""
+    assert "catalogue" not in MONITORAGE
 
 
 def test_le_mode_demonstration_ne_publie_l_api_que_sur_le_bouclage():
@@ -59,11 +109,48 @@ def test_le_mode_demonstration_ne_porte_aucune_cle():
 
 
 def test_l_application_ne_joint_que_l_api():
+    application = bloc_du_service("application")
+
     assert "API_MODELE_ADRESSE: http://api:8010" in FUSION
-    assert "networks: [applicatif, publication]" in FUSION
+    attaches = application.split("    networks:\n")[1]
+    reseaux = re.findall(r"^      (\w+):", attaches, re.M)
+    assert reseaux == ["applicatif", "publication", "application_sortie"]
     assert "networks: [interne, sortie, applicatif]" in FUSION
-    bloc = FUSION.split("networks:\n")[-1]
+    bloc = FUSION.split("\nnetworks:\n")[-1]
     assert "applicatif:\n    internal: true" in bloc
+
+
+def test_l_application_lit_la_base_par_un_pgpass_monte_et_un_sous_reseau_fixe():
+    """E4, lot 8 : les comptes servis par la pile. Le DSN vient d'une variable du
+    conteneur, sans mot de passe ; le pgpass est monté ; la route par défaut sort par
+    172.30.12.0/24, le sous-réseau que pg_hba.conf admet."""
+    application = bloc_du_service("application")
+    reseaux = FUSION.split("\nnetworks:\n")[-1]
+
+    for ligne in (
+        "APPLICATION_ENVIRONNEMENT: ${APPLICATION_ENVIRONNEMENT:-}",
+        "APPLICATION_BASE_DSN: ${APPLICATION_BASE_DSN_CONTENEUR:-}",
+        "APPLICATION_CLE_SESSION: ${APPLICATION_CLE_SESSION:-}",
+        "APPLICATION_CLE_API_COMPTES: ${APPLICATION_CLE_API_COMPTES:-}",
+        "PGPASSFILE: /run/secrets/pgpass_application",
+        "secrets: [pgpass_application]",
+        'user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"',
+        '- "host.docker.internal:host-gateway"',
+        "application_sortie:\n        gw_priority: 1",
+    ):
+        assert ligne in application, ligne
+    sous_reseau = "ipam:\n      config:\n        - subnet: 172.30.12.0/24"
+    assert f"application_sortie:\n    {sous_reseau}" in reseaux
+    assert "file: ${APPLICATION_PGPASS:-../12_application/.pgpass.conteneur}" in FUSION
+    # Aucune valeur : ni DSN écrit, ni mot de passe.
+    assert "postgresql://" not in application
+    assert "image: application-conseiller:0.9.1" in application
+
+
+def test_le_pgpass_et_les_fichiers_d_environnement_du_module_sont_ignores():
+    ignore = (RACINE / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    assert {".env", ".env.*", "!.env.example", ".pgpass.conteneur"} <= set(ignore)
 
 
 def test_l_essai_tourne_sans_sortie_et_sans_port_publie():

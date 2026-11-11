@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block espace %}sakura{% endblock %}
+{% import "composants/champ.html" as c %}
+{% import "composants/critique.html" as k %}
+{% import "composants/listes.html" as l %}
+{% block titre %}{{ titre }}{% endblock %}
+{% block contenu %}
+<h1>{{ titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
+<section class="zone-titre" aria-label="{{ t.serie_metadonnees }}">
+<dl>
+{% for nom, valeur in metadonnees %}
+<dt>{{ nom }}</dt>
+<dd>{{ valeur }}</dd>
+{% endfor %}
+</dl>
+<p><small>{{ t.serie_type }} : {{ fiche.type or t.valeur_inconnue }} · {{ t.serie_annee }} : {{ fiche.year or t.valeur_inconnue }}</small></p>
+</section>
+<p class="zone-pont-conseiller"><a href="/?serie={{ fiche.series_id }}">{{ t.pont_vers_conseiller }}</a></p>
+{# La note du réseau d'abord, puis celle des lecteurs : c'est l'argument (deux `p`, la
+   feuille de style du lot 6 en fera un vis-à-vis). #}
+<section class="zone-note" aria-label="{{ t.serie_note_etiquette }}">
+{% if reseau.moyenne %}<p>{{ reseau.moyenne }}</p>
+{% endif %}<p>{% if note %}{{ note }}{% else %}{{ t.serie_sans_note }}{% endif %}</p>
+</section>
+<section class="zone-critiques-reseau" aria-labelledby="reseau-titre">
+<h2 id="reseau-titre">{{ t.serie_reseau_titre }}</h2>
+{% if reseau.indisponible %}
+<article><p>{{ t.serie_reseau_indisponible }}</p></article>
+{% else %}
+{% if reseau.ecrire %}<p><a href="{{ reseau.ecrire }}">{{ t.critique_ecrire }}</a></p>
+{% endif %}
+{% if reseau.critiques %}
+<ul>
+{% for critique in reseau.critiques %}
+<li>{{ k.critique(critique, t) }}</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>{{ t.serie_reseau_vide }}</p>
+{% endif %}
+{% endif %}
+</section>
+{# Les listes du client (E4, lot 4) : l'invitation pour un visiteur, l'état et le geste
+   pour un client ; ni titre ni texte pour un libraire ou un administrateur. #}
+{% if zone_listes %}
+<section class="zone-listes" aria-labelledby="listes-titre">
+<h2 id="listes-titre">{{ t.serie_listes_titre }}</h2>
+{% if zone_listes.visiteur %}
+<p><a href="{{ zone_listes.connexion }}">{{ t.serie_listes_connexion }}</a></p>
+<p><a href="{{ zone_listes.inscription }}">{{ t.serie_listes_inscription }}</a></p>
+{% elif zone_listes.indisponible %}
+<p>{{ t.serie_listes_indisponible }}</p>
+{% else %}
+<p>{{ zone_listes.phrase or t.serie_listes_aucune }}</p>
+{{ l.formulaire(zone_listes, t, jeton) }}
+{% endif %}
+</section>
+{% endif %}
+<section class="zone-synopsis" aria-labelledby="synopsis-titre">
+<h2 id="synopsis-titre">{{ t.serie_synopsis_titre }}</h2>
+{# Contrat 0.6.0 : le résumé servi et sa source ; le résumé Kitsu, en anglais, replié
+   sous le français quand les deux existent. #}
+{% if fiche.synopsis_enriched and fiche.synopsis_source == "kitsu" %}
+<p lang="en">{{ fiche.synopsis_enriched }}</p>
+<p><small>{{ t.serie_resume_kitsu_source }}</small></p>
+{% elif fiche.synopsis_enriched %}
+<p>{{ fiche.synopsis_enriched }}</p>
+{% if fiche.synopsis_kitsu %}
+<details>
+<summary>{{ t.serie_resume_kitsu_voir }}</summary>
+<p lang="en">{{ fiche.synopsis_kitsu }}</p>
+</details>
+{% endif %}
+{% else %}
+<p>{{ t.serie_sans_synopsis }}</p>
+{% endif %}
+{% if fiche.genres_source %}
+<h3>{{ t.serie_genres_titre }}</h3>
+<ul>
+{% for genre in fiche.genres_source %}
+<li>{{ genre }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</section>
+{% if lien_catalogue %}
+<p><a href="{{ lien_catalogue }}" rel="noopener noreferrer">{{ t.serie_lien_catalogue }}</a></p>
+{% endif %}
+<p><a href="/catalogue">{{ t.serie_retour_catalogue }}</a></p>
+{% endblock %}

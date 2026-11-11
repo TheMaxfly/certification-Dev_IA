@@ -26,7 +26,13 @@ from application.metriques import Metriques
 CONTRAT = Path(__file__).resolve().parents[2] / "11_api_modele/contrat/openapi_v1.json"
 #: Nommé par le contrat entre accents graves, sans être un code : un motif de `details`.
 NON_CODES = {"refus_debit"}
-DELAIS = Delais(connexion_s=1.0, reponse_s=5.0, info_s=5.0, sante_s=5.0)
+DELAIS = Delais(
+    connexion_s=1.0,
+    reponse_s=5.0,
+    info_s=5.0,
+    sante_s=5.0,
+    verification_s=5.0,
+)
 ADRESSE = "http://127.0.0.1:8010"
 
 
@@ -154,7 +160,13 @@ def test_un_port_ferme_est_injoignable_et_sante_le_dit(port_ferme):
 
 def test_un_delai_depasse_est_nomme(doublure, doublure_sur_port):
     doublure.choisir(reponse="delai")
-    delais = Delais(connexion_s=0.2, reponse_s=0.2, info_s=0.2, sante_s=0.2)
+    delais = Delais(
+        connexion_s=0.2,
+        reponse_s=0.2,
+        info_s=0.2,
+        sante_s=0.2,
+        verification_s=0.2,
+    )
 
     with pytest.raises(ApiDelai) as exc:
         jouer(
@@ -168,7 +180,13 @@ def test_un_delai_depasse_est_nomme(doublure, doublure_sur_port):
 
 def test_le_delai_borne_aussi_le_transport_en_memoire(doublure):
     doublure.choisir(info="delai")
-    delais = Delais(connexion_s=0.05, reponse_s=0.05, info_s=0.05, sante_s=0.05)
+    delais = Delais(
+        connexion_s=0.05,
+        reponse_s=0.05,
+        info_s=0.05,
+        sante_s=0.05,
+        verification_s=0.05,
+    )
 
     with pytest.raises(ApiDelai):
         jouer(client_sur(doublure, delais).info())

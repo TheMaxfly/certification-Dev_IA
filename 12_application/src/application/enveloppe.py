@@ -27,11 +27,14 @@ ROUTE_INCONNUE = "inconnue"
 #: Les feuilles de style : un `Mount`, qui ne pose pas de route dans le scope.
 ROUTE_STATIQUE = "statique"
 PREFIXE_STATIQUE = "/statique/"
-#: Aucun script, aucune ressource externe : les deux choses que la politique protège.
-#: `data:` pour les images seules : Pico dessine ses coches et ses chevrons ainsi (14
-#: occurrences, toutes `image/svg+xml`), et une image n'exécute rien.
+#: Aucune ressource externe, rien en ligne : ce que la politique protège. `data:` pour
+#: les images seules : Pico dessine ses coches et ses chevrons ainsi (14 occurrences,
+#: toutes `image/svg+xml`), et une image n'exécute rien. E4, lot 6 : `font-src 'self'`
+#: pour les polices vendues de l'habillage ; `script-src 'self'` pour le seul script
+#: vendu (`statique/attente.js`, la pose d'attente de la mascotte) — jamais en ligne.
 POLITIQUE = (
     "default-src 'none'; style-src 'self'; img-src 'self' data:; "
+    "font-src 'self'; script-src 'self'; "
     "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 )
 ENTETES_SECURITE = {
@@ -39,8 +42,26 @@ ENTETES_SECURITE = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
 }
-#: Les pages qui portent une question ou une conversation : jamais en cache.
-SANS_CACHE = ("/", "/question")
+#: Les pages qui portent une question ou une conversation : jamais en cache ; de même
+#: les pages de compte et d'administration (E4, lot 1), sous leurs préfixes.
+SANS_CACHE = (
+    "/",
+    "/question",
+    "/connexion",
+    "/inscription",
+    "/deconnexion",
+    "/compte",
+    "/admin",
+    "/libraire",
+)
+PREFIXES_SANS_CACHE = ("/compte/", "/admin/", "/libraire/")
+
+
+def sans_cache(chemin: object) -> bool:
+    return isinstance(chemin, str) and (
+        chemin in SANS_CACHE or chemin.startswith(PREFIXES_SANS_CACHE)
+    )
+
 
 type PageErreur = Callable[[int, str], Response]
 
@@ -65,6 +86,7 @@ class Enveloppe:
         ident = str(uuid.uuid4())
         etat: dict[str, Any] = scope.setdefault("state", {})
         etat["identifiant_requete"] = ident
+        jeton_contexte = journal.IDENTIFIANT_REQUETE.set(ident)
         debut = time.perf_counter()
         reponse: dict[str, Any] = {"statut": 500, "commencee": False}
 
@@ -76,7 +98,7 @@ class Enveloppe:
                 entetes[ENTETE_IDENTIFIANT] = ident
                 for nom, valeur in ENTETES_SECURITE.items():
                     entetes[nom] = valeur
-                if scope.get("path") in SANS_CACHE:
+                if sans_cache(scope.get("path")):
                     entetes["Cache-Control"] = "no-store"
             await send(message)
 
@@ -97,6 +119,7 @@ class Enveloppe:
             await self.page_erreur(500, ident)(scope, receive, envoyer)
         finally:
             self._consigner(scope, etat, reponse["statut"], time.perf_counter() - debut)
+            journal.IDENTIFIANT_REQUETE.reset(jeton_contexte)
 
     async def _lire_corps(self, scope: Scope, receive: Receive) -> tuple[bytes, bool]:
         """Le corps entier, ou (b"", True) dès qu'il dépasse le maximum."""
@@ -147,6 +170,10 @@ class Enveloppe:
         for cle in ("identifiant_api", "nb_tours_historique", "taille_historique"):
             if cle in etat:
                 champs[cle] = etat[cle]
+        # Le compte courant : son identifiant interne seul, jamais son pseudo.
+        compte: object = etat.get("compte")
+        if compte is not None:
+            champs["compte_id"] = getattr(compte, "id", None)
         journal.requete(champs)
 
 

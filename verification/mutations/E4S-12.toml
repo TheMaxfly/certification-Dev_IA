@@ -1,0 +1,8 @@
+id = "E4S-12"
+origine = "E4, lot 1, spec 03 (2026-11-08) — le jeton retiré des actions d'administration : un formulaire venu d'un autre site désactiverait ou réactiverait un compte"
+fichier = "12_application/src/application/pages_comptes.py"
+avant = '''        # formulaire forgé n'apprend rien de la forme attendue.
+        await formulaire(request)'''
+apres = '''        # formulaire forgé n'apprend rien de la forme attendue.'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_pages_comptes.py", "-k", "sans_jeton_aucune_action"]

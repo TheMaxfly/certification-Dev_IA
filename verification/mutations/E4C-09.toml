@@ -1,0 +1,7 @@
+id = "E4C-09"
+origine = "E4, lot 2a, spec 03 (2026-11-08) — le mot de passe de manga_api passé par une variable au lieu du seul pgpass monté"
+fichier = "12_application/compose.yaml"
+avant = '''      DB_PASSWORD: ""'''
+apres = '''      DB_PASSWORD: ${DB_PASSWORD:-}'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_conteneurs.py", "-k", "pgpass_monte"]

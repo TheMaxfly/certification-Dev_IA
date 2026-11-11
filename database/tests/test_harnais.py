@@ -2,9 +2,9 @@
 
 Deux promesses, vérifiées ici :
   - une base copiée du gabarit VAUT une base migrée de zéro : mêmes migrations
-    enregistrées, mêmes relations, mêmes droits de niveau base (les `GRANT CONNECT`
-    de 012 et 022, que `CREATE DATABASE … TEMPLATE` ne recopie pas), mêmes données
-    de référence ;
+    enregistrées, mêmes relations (schéma `application` de 027 compris), mêmes droits
+    de niveau base (les `GRANT CONNECT` de 012, 022, 023 et 027, que
+    `CREATE DATABASE … TEMPLATE` ne recopie pas), mêmes données de référence ;
   - l'empreinte de l'image PostgreSQL n'est écrite qu'une fois : aucun conftest ne
     la redéfinit, et la seule autre copie (le Compose du 02, qui ne peut pas importer
     de Python) est la même.
@@ -24,6 +24,8 @@ CONFTESTS = [
     DEPOT / "08_enrichissement_personnages" / "tests" / "conftest.py",
     DEPOT / "09_service_embedding" / "tests" / "conftest.py",
     DEPOT / "10_mesures_recherche" / "tests" / "conftest.py",
+    DEPOT / "11_api_modele" / "tests" / "conftest.py",
+    DEPOT / "12_application" / "tests" / "conftest.py",
 ]
 
 
@@ -37,7 +39,8 @@ def portrait(dsn: str) -> dict:
             "relations": cx.execute(
                 "SELECT n.nspname, c.relname, c.relkind::text FROM pg_class c"
                 " JOIN pg_namespace n ON n.oid = c.relnamespace"
-                " WHERE n.nspname IN ('manga', 'bench', 'staging', 'public')"
+                " WHERE n.nspname IN"
+                " ('manga', 'bench', 'staging', 'public', 'application')"
                 " ORDER BY 1, 2"
             ).fetchall(),
             "droits_de_la_base": sorted(
@@ -67,6 +70,8 @@ def test_la_copie_du_gabarit_vaut_une_base_migree(conteneur_postgres, gabarit):
     assert attendu_copie["migrations"], "aucune migration : le test ne prouverait rien"
     assert ("manga_ro", "CONNECT") in attendu_copie["droits_de_la_base"]
     assert ("verif_ro", "CONNECT") in attendu_copie["droits_de_la_base"]
+    assert ("app_rw", "CONNECT") in attendu_copie["droits_de_la_base"]
+    assert any(r[0] == "application" for r in attendu_copie["relations"])
     assert attendu_copie == attendu_neuve
 
 

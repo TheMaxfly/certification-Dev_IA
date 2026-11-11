@@ -1,0 +1,7 @@
+id = "E4V-01"
+origine = "E4, lot 8, spec 01 (2026-11-11) — la santé passe avec un service manquant"
+fichier = "15_livraison/src/livraison/sante.py"
+avant = '''    return bool(controles) and all(c.tenu for c in controles)'''
+apres = '''    return bool(controles)'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sante.py", "-k", "chaque_manque"]

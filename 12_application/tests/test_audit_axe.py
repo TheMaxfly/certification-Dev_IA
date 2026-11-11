@@ -7,8 +7,28 @@ navigateur, toute violation lue en console est un échec. Les `<details>` sont o
 sinon leur contenu n'est pas audité ; le formulaire est soumis, sinon une page issue
 d'un `POST` n'existe pas.
 
-Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.json`
-et `rapport_axe.md` ; un diff après un passage signale un changement à commiter.
+Verdict : aucune violation `serious` ou `critical`. Le test réécrit `rapport_axe.md`
+(versionné ; un diff après un passage signale un changement à commiter) et
+`rapport_axe.json`, sa sortie brute, ignorée par git et gardée sur le poste (E4, lot 6).
+
+E4, lot 1 : les écrans des comptes (inscription, connexion, mot de passe,
+administration, critiques) et leurs refus, et les pages neuves d'erreur (403 de rôle,
+formulaire expiré, comptes indisponibles), sur une base jetable ; les connexions se font
+dans le navigateur, par les formulaires eux-mêmes.
+
+E4, lot 2b : les écrans du conseiller d'un rôle connecté (`Ecran.role`) passent par
+l'application à base, chaque rôle dans son contexte.
+
+E4, lot 4 : les listes du client (« Mes listes » vide, garnie, sans catalogue ; la
+fiche avec un état ; la zone de la fiche d'un visiteur et d'un client ; les cartes d'un
+client) et la suppression du compte (confirmation, refus, interdite à un libraire,
+l'accueil après).
+
+E4, lot 3 : les écrans des critiques (« Mes critiques » pleine, vide, sans catalogue ;
+écrire, refus, modifier, retirer, accès refusé ; la fiche avec critiques ; la
+modération, sa liste vide, sa confirmation), sur la même base, où trois critiques
+factices sont posées ; le catalogue y est servi par la doublure, son scénario choisi
+écran par écran.
 """
 
 from __future__ import annotations
@@ -16,16 +36,26 @@ from __future__ import annotations
 import json
 import os
 import socket
-from dataclasses import replace
+from contextlib import ExitStack
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
-from conftest import ServeurLocal
-from doublure_api import Doublure
-from ecrans import ECRANS, Ecran
+from conftest import HACHEUR_RAPIDE, ServeurLocal
+from doublure_api import CLE_CATALOGUE_ATTENDUE, Doublure
+from ecrans import (
+    BORNES_SERREES,
+    COUTS_ECRANS,
+    ECRANS,
+    MDP_INSCRIPTION,
+    REGLAGE_ECRANS,
+    Ecran,
+    poser_apparence,
+)
 
 from application.app import creer_application
 
@@ -36,15 +66,27 @@ GRAVES = ("serious", "critical")
 INSCRITS: dict[str, str] = {}
 #: Ce qu'axe ne sait pas juger, avec ce qui le règle : écrit au rapport.
 A_REVOIR = {
-    "color-contrast": "le chevron d'une liste déroulante ou l'icône d'un champ invalide"
-    " est une image de fond : axe ne déduit pas la couleur du fond. Le couple de ces"
-    " champs est fixé par `theme.css`, et son contraste calculé par un test"
-    " (`test_wcag_1_4_3_…`). À relire à l'œil.",
+    "color-contrast": "le texte est posé sur une image de fond — le lavis d'aquarelle"
+    " de la page, la touche d'aquarelle d'une surface pâle (habillage Senpai, E4, lot"
+    " 6), le chevron d'une liste déroulante ou l'icône d'un champ invalide : axe ne"
+    " déduit pas la couleur du fond. Les couples du thème sont calculés par un test"
+    " (`test_wcag_1_4_3_…`) ; l'encre sur les lavis et les touches est mesurée au pire"
+    " pixel par les scripts du paquet d'habillage (au moins 7:1 sur le lavis à 100 %,"
+    " 10,1:1 sur les touches). À relire à l'œil, sur les captures de la recette.",
 }
 #: L'élément qui devrait avoir le focus l'a-t-il, une fois la page chargée ?
 FOCUS = """() => {
   const attendu = document.querySelector("[autofocus]");
   return attendu === null ? null : attendu === document.activeElement;
+}"""
+#: E4, lot 6 : avec la transition de vue entre pages (`@view-transition` de
+#: l'habillage), le navigateur pose le focus d'`autofocus` à la fin de la transition,
+#: après `load` ; sans elle (mouvement réduit), aussitôt. Le contrôle attend donc le
+#: focus, deux secondes au plus, puis le lit : un focus qui n'arrive jamais reste un
+#: échec.
+FOCUS_POSE = """() => {
+  const attendu = document.querySelector("[autofocus]");
+  return attendu === null || attendu === document.activeElement;
 }"""
 PREPARER = """(valeurs) => {
   const form = document.querySelector("main form");
@@ -66,11 +108,32 @@ PREPARER = """(valeurs) => {
     document.querySelector("#mode_demonstration").checked = true;
   }
 }"""
+#: E4, lot 7 (écart 1) : Kōhai suit la page, plus la couleur — le titre du conseiller
+#: reste une boîte flexible dans toute couleur, une autre page n'a pas de Kōhai.
+KOHAI_SUIT_LA_PAGE = """() => {
+  const titre = document.querySelector("main > h1");
+  return {
+    apres: getComputedStyle(titre, "::after").content,
+    affichage: getComputedStyle(titre).display,
+    principal: titre.querySelector(".kohai-principal") !== null,
+  };
+}"""
 OUVRIR = "() => document.querySelectorAll('details').forEach((d) => { d.open = true; })"
 LANCER = """(etiquettes) => axe.run(document, {
   runOnly: {type: "tag", values: etiquettes},
   resultTypes: ["violations", "incomplete"],
 })"""
+
+
+def focus_tenu(page: Any) -> bool | None:
+    """Le focus est-il sur l'élément `autofocus`, la transition de vue finie ?"""
+    from playwright.sync_api import TimeoutError as DelaiDepasse
+
+    try:
+        page.wait_for_function(FOCUS_POSE, timeout=2000)
+    except DelaiDepasse:
+        pass
+    return page.evaluate(FOCUS)
 
 
 def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
@@ -90,6 +153,28 @@ def ouvrir_ecran(page: Any, adresse: str, ecran: Ecran) -> None:
     )
     with page.expect_navigation():
         page.click("button[type=submit]")
+
+
+def inscrire_dans(page: Any, adresse: str, pseudo: str) -> None:
+    page.goto(adresse + "/inscription")
+    page.fill("#pseudo", pseudo)
+    page.fill("#mot_de_passe", MDP_INSCRIPTION)
+    page.fill("#confirmation", MDP_INSCRIPTION)
+    with page.expect_navigation():
+        page.click("main form button[type=submit]")
+
+
+def ouvrir_borne(page: Any, adresse: str, ecran: Ecran) -> None:
+    """Un écran borné (E4, lot 2b) : un premier passage, puis la page qui dépasse la
+    borne de son application (serrée à une unité)."""
+    if ecran.borne == "inscription":
+        inscrire_dans(page, adresse, "inscrit_borne_audit_1")
+        with page.expect_navigation():
+            page.click('header form[action="/deconnexion"] button')
+        inscrire_dans(page, adresse, "inscrit_borne_audit_2")
+        return
+    ouvrir_ecran(page, adresse, ecran)
+    ouvrir_ecran(page, adresse, ecran)
 
 
 def resume(brut: dict[str, Any], adresse: str) -> dict[str, Any]:
@@ -211,8 +296,53 @@ def ecrire_rapport(
     os.environ.get("AUDIT_AXE") != "1",
     reason="audit d'accessibilité : navigateur, poste seulement (make verify-poste)",
 )
-def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
+def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages, base_app, base):
     from playwright.sync_api import sync_playwright
+
+    with psycopg.connect(base) as cx:
+        for pseudo, role, a_changer in COMPTES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.comptes"
+                " (pseudo, nom_affiche, role, hachage, doit_changer_mdp)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                (pseudo, f"Nom {pseudo}", role, HACHEUR_RAPIDE.hacher(MDP), a_changer),
+            )
+        # Les critiques de l'audit (identifiants 1 à 3, base neuve) : la série entière,
+        # modifiée ; un tome ; une retirée, d'une autre série.
+        for tome, libelle, note, label, statut, serie in CRITIQUES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.critiques (compte_id, series_id, volume_url,"
+                " volume_libelle, texte, note, label, statut, modifie_le) VALUES ("
+                " (SELECT id FROM application.comptes WHERE pseudo = 'libraire_audit'),"
+                " %s, %s, %s, %s, %s, %s, %s,"
+                " now() + CASE WHEN %s THEN interval '1 day' ELSE interval '0' END)",
+                (
+                    serie,
+                    tome,
+                    libelle,
+                    TEXTE_AUDIT,
+                    note,
+                    label,
+                    statut,
+                    label is not None,
+                ),
+            )
+        cx.execute(
+            "INSERT INTO application.reglages (cle, valeur) VALUES (%s, %s)",
+            REGLAGE_ECRANS,
+        )
+        cx.execute(
+            "INSERT INTO application.couts_jour (jour, profil, mode, appels, cout_usd)"
+            " VALUES ((now() AT TIME ZONE 'UTC')::date, %s, %s, %s, %s)",
+            COUTS_ECRANS,
+        )
+        for serie, etat in LISTES_AUDIT:
+            cx.execute(
+                "INSERT INTO application.listes (compte_id, series_id, etat) VALUES ("
+                " (SELECT id FROM application.comptes WHERE pseudo = 'listes_audit'),"
+                " %s, %s)",
+                (serie, etat),
+            )
 
     source = (ACCESSIBILITE / "axe.min.js").read_text(encoding="utf-8")
     doublure = Doublure()
@@ -224,10 +354,18 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
     sans_focus: list[str] = []
     #: La case cochée dans le navigateur doit produire la section, et elle seule.
     ecarts_de_trace: list[str] = []
+    #: Les écrans d'une apparence réglée (E4, lot 7) : Kōhai suit la page.
+    ecarts_apparence: list[str] = []
 
     def adresse_de(reglee: str, **delais: float) -> Any:
         reduits = replace(reglages.delais, **delais)
-        return creer_application(replace(reglages, adresse_api=reglee, delais=reduits))
+        # Le catalogue (E4, lot 2a) : servi par la même doublure, sous sa clé.
+        catalogue = replace(
+            reglages.catalogue, adresse=adresse_doublure, cle=CLE_CATALOGUE_ATTENDUE
+        )
+        return creer_application(
+            replace(reglages, adresse_api=reglee, delais=reduits, catalogue=catalogue)
+        )
 
     with (
         ServeurLocal(doublure.app) as adresse_doublure,
@@ -235,16 +373,74 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
         ServeurLocal(adresse_de(fermee)) as adresse_sans_api,
         ServeurLocal(adresse_de(adresse_doublure)) as adresse_neuve,
         ServeurLocal(adresse_de(adresse_doublure, reponse_s=0.2)) as adresse_pressee,
+        ServeurLocal(
+            creer_application(
+                replace(
+                    reglages,
+                    adresse_api=adresse_doublure,
+                    base_dsn=base_app,
+                    cle_session="a" * 48,
+                    catalogue=replace(
+                        reglages.catalogue,
+                        adresse=adresse_doublure,
+                        cle=CLE_CATALOGUE_ATTENDUE,
+                    ),
+                ),
+                hacheur=HACHEUR_RAPIDE,
+            )
+        ) as adresse_comptes,
         sync_playwright() as playwright,
     ):
         navigateur = playwright.chromium.launch(headless=True)
         contexte = navigateur.new_context()
+        # E4, lot 2b : l'écran du conseiller selon le rôle, sur l'application à base,
+        # chaque rôle dans son contexte, connecté par le formulaire.
+        par_role: dict[str, Any] = {}
+        for role in sorted({e.role for e in ECRANS if e.role is not None}):
+            par_role[role] = navigateur.new_context()
+            connecter_dans(par_role[role], adresse_comptes, f"conseiller_{role}_audit")
+        reglages_comptes = replace(
+            reglages,
+            adresse_api=adresse_doublure,
+            base_dsn=base_app,
+            cle_session="a" * 48,
+            catalogue=replace(
+                reglages.catalogue, adresse=adresse_doublure, cle=CLE_CATALOGUE_ATTENDUE
+            ),
+        )
         for ecran in ECRANS:
             httpx.post(
                 f"{adresse_doublure}/_essai/scenario",
-                json={"info": ecran.info, "reponse": ecran.reponse},
+                json={
+                    "info": ecran.info,
+                    "reponse": ecran.reponse,
+                    "catalogue": ecran.catalogue,
+                },
             ).raise_for_status()
-            page = contexte.new_page()
+            pile = ExitStack()
+            if ecran.borne is not None:
+                # Son application, sa borne serrée, un contexte neuf (les cookies ne
+                # séparent pas les ports).
+                serree = replace(
+                    reglages_comptes,
+                    bornes=replace(
+                        reglages_comptes.bornes, **BORNES_SERREES[ecran.borne]
+                    ),
+                )
+                adresse_borne = pile.enter_context(
+                    ServeurLocal(creer_application(serree, hacheur=HACHEUR_RAPIDE))
+                )
+                contexte_page = navigateur.new_context()
+                pile.callback(contexte_page.close)
+                if ecran.role is not None:
+                    connecter_dans(
+                        contexte_page, adresse_borne, f"conseiller_{ecran.role}_audit"
+                    )
+            elif ecran.role is not None:
+                contexte_page = par_role[ecran.role]
+            else:
+                contexte_page = contexte
+            page = contexte_page.new_page()
             page.on(
                 "console",
                 lambda m, nom=ecran.nom: (
@@ -254,14 +450,33 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
                 ),
             )
             base = adresse
-            if ecran.api_fermee:
+            if ecran.borne is not None:
+                base = adresse_borne
+            elif ecran.role is not None:
+                base = adresse_comptes
+            elif ecran.api_fermee:
                 base = adresse_sans_api
             elif ecran.neuve:
                 base = adresse_neuve
             elif ecran.delai_court:
                 base = adresse_pressee
-            ouvrir_ecran(page, base, ecran)
-            if page.evaluate(FOCUS) is False:
+            if ecran.apparence:
+                poser_apparence(base_app, ecran.apparence)
+            if ecran.borne is not None:
+                ouvrir_borne(page, base, ecran)
+            else:
+                ouvrir_ecran(page, base, ecran)
+            if ecran.apparence:
+                poser_apparence(base_app, ())
+                titre = page.evaluate(KOHAI_SUIT_LA_PAGE)
+                tenu = (
+                    titre["affichage"] == "flex"
+                    if titre["principal"]
+                    else titre["apres"] == "none"
+                )
+                if not tenu:
+                    ecarts_apparence.append(f"{ecran.nom} : {titre}")
+            if focus_tenu(page) is False:
                 sans_focus.append(ecran.nom)
             if (page.query_selector("#trace") is not None) != ecran.demonstration:
                 ecarts_de_trace.append(ecran.nom)
@@ -269,9 +484,24 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
             page.evaluate(source)
             pages[ecran.nom] = resume(page.evaluate(LANCER, ETIQUETTES), base)
             page.close()
+            pile.close()
+        des_kohai, ecarts_kohai = auditer_kohai(
+            navigateur, source, adresse, adresse_sans_api, adresse_doublure, console
+        )
+        pages |= des_kohai
+        des_etroits, ecarts_etroits = auditer_etroit(
+            navigateur, source, adresse_comptes, console
+        )
+        pages |= des_etroits
         version_axe = page_version(contexte, source)
         version_navigateur = navigateur.version
         navigateur.close()
+        des_comptes, console_comptes, sans_focus_comptes = auditer_les_comptes(
+            playwright, source, adresse_comptes, adresse, adresse_doublure
+        )
+        pages |= des_comptes
+        console += console_comptes
+        sans_focus += sans_focus_comptes
 
     assert not doublure.ecarts, doublure.ecarts
     ecrire_rapport(pages, version_axe, version_navigateur, console)
@@ -285,7 +515,601 @@ def test_audit_axe_sur_chaque_ecran_et_chaque_cas(reglages):
     assert not console, console
     assert not sans_focus, sans_focus
     assert not ecarts_de_trace, ecarts_de_trace
-    assert len(pages) == len(ECRANS)
+    assert not ecarts_apparence, ecarts_apparence
+    assert not ecarts_kohai, ecarts_kohai
+    assert not ecarts_etroits, ecarts_etroits
+    # + la page sans base des comptes, + les cinq écrans de Kōhai (E4, lot 6).
+    assert len(pages) == (
+        len(ECRANS) + len(ECRANS_COMPTES) + 1 + len(ECRANS_KOHAI) + 2
+    ), "+ admin_couts_etroit, entete_360"
+
+
+@dataclass(frozen=True)
+class EcranCompte:
+    """Un écran des comptes : `compte`, qui est connecté avant (None : un visiteur) ;
+    `titre`, le titre de niveau 1 attendu — l'écran audité est bien celui qu'on croit ;
+    `saisies` et `bouton`, le formulaire rempli puis envoyé ; `action`, l'adresse où
+    l'envoyer à la place de la sienne (une page qu'aucun lien n'atteint) ; `catalogue`,
+    le scénario du catalogue dans la doublure (E4, lot 3)."""
+
+    nom: str
+    compte: str | None
+    chemin: str
+    titre: str
+    saisies: dict[str, str] = field(default_factory=dict)
+    bouton: str | None = None
+    action: str | None = None
+    catalogue: str = "nominal"
+    #: Le scénario du test des clés dans la doublure (E4, lot 5).
+    verification: str = "nominale"
+
+
+MDP = "mot de passe factice de l'audit"
+NOUVEAU = "nouveau mot de passe factice de l'audit"
+ENVOYER = "main form button[type=submit]"
+#: Les comptes de l'audit : (pseudo, rôle, mot de passe à changer) ; et assez de
+#: clients pour que la liste de l'administration ait une seconde page.
+COMPTES_AUDIT = (
+    ("admin_audit", "admin", False),
+    ("client_audit", "client", False),
+    ("libraire_audit", "libraire", False),
+    ("initial_audit", "libraire", True),
+    *((f"lecteur_audit_{i:02d}", "client", False) for i in range(26)),
+    ("libraire_tiers_audit", "libraire", False),
+    ("libraire_vide_audit", "libraire", False),
+    # E4, lot 2b : les écrans du conseiller selon le rôle (`Ecran.role`).
+    ("conseiller_client_audit", "client", False),
+    ("conseiller_libraire_audit", "libraire", False),
+    ("conseiller_admin_audit", "admin", False),
+    # E4, lot 4 : les listes du client (`LISTES_AUDIT`), une liste vide.
+    ("listes_audit", "client", False),
+    ("listes_vide_audit", "client", False),
+    # E4, lot 4 : la suppression du compte (la page et son refus ; rien n'est supprimé).
+    ("effacement_audit", "client", False),
+)
+#: Les listes de `listes_audit` : (series_id, état) — une série par liste.
+LISTES_AUDIT = ((101, "favori"), (102, "a_lire"), (103, "a_commander"))
+TEXTE_AUDIT = (
+    "Texte factice d'une critique d'audit, assez long pour tenir dans les bornes.\n\n"
+    "Un second paragraphe factice, avec <b>du balisage</b> rendu littéralement."
+)
+#: (volume_url, volume_libelle, note, label, statut, series_id) : les critiques 1 à 3.
+CRITIQUES_AUDIT = (
+    (None, None, 8, "coup_de_coeur", "publiee", 101),
+    (
+        "https://catalogue.invalid/serie/101/volume/1",
+        "Tome 1 — Premier tome factice (2001)",
+        6,
+        None,
+        "publiee",
+        101,
+    ),
+    (None, None, 4, None, "retiree", 102),
+)
+ECRANS_COMPTES: tuple[EcranCompte, ...] = (
+    EcranCompte("inscription", None, "/inscription", "Créer un compte"),
+    EcranCompte(
+        "inscription_refusee",
+        None,
+        "/inscription",
+        "Créer un compte",
+        {"#pseudo": "ab", "#mot_de_passe": MDP, "#confirmation": MDP},
+        ENVOYER,
+    ),
+    EcranCompte("connexion", None, "/connexion", "Connexion"),
+    EcranCompte(
+        "connexion_refusee",
+        None,
+        "/connexion",
+        "Connexion",
+        {"#pseudo": "inconnu_audit", "#mot_de_passe": MDP},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "formulaire_expire",
+        None,
+        "/connexion",
+        "Formulaire expiré",
+        {"input[name=jeton]": "faux"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "connexion_requise",
+        None,
+        "/connexion",
+        "Connexion requise",
+        {"#pseudo": "inconnu_audit", "#mot_de_passe": MDP},
+        ENVOYER,
+        action="/compte/mot-de-passe",
+    ),
+    EcranCompte(
+        "mot_de_passe", "admin_audit", "/compte/mot-de-passe", "Changer le mot de passe"
+    ),
+    EcranCompte(
+        "mot_de_passe_refuse",
+        "admin_audit",
+        "/compte/mot-de-passe",
+        "Changer le mot de passe",
+        {"#ancien": "faux faux faux", "#nouveau": MDP, "#confirmation": MDP},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "mot_de_passe_change",
+        "libraire_audit",
+        "/compte/mot-de-passe",
+        "Changer le mot de passe",
+        {"#ancien": MDP, "#nouveau": NOUVEAU, "#confirmation": NOUVEAU},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "mot_de_passe_initial",
+        "initial_audit",
+        "/",
+        "Changer le mot de passe",
+    ),
+    EcranCompte("admin_comptes", "admin_audit", "/admin/comptes", "Comptes"),
+    EcranCompte(
+        "admin_refuse",
+        "admin_audit",
+        "/admin/comptes",
+        "Comptes",
+        {
+            "#pseudo": "ab",
+            "#nom_affiche": "Nom",
+            "#mot_de_passe": MDP,
+            "#confirmation": MDP,
+        },
+        'form[action="/admin/comptes"][method=post] button[type=submit]',
+    ),
+    EcranCompte(
+        "admin_seconde_page_et_avis",
+        "admin_audit",
+        "/admin/comptes?page=2&etat=desactive",
+        "Comptes",
+    ),
+    # E4, lot 3 : les critiques.
+    EcranCompte(
+        "critiques_liste", "libraire_audit", "/libraire/critiques", "Mes critiques"
+    ),
+    EcranCompte(
+        "critiques_vide", "libraire_vide_audit", "/libraire/critiques", "Mes critiques"
+    ),
+    EcranCompte(
+        "critiques_catalogue_indisponible",
+        "libraire_audit",
+        "/libraire/critiques",
+        "Mes critiques",
+        catalogue="indisponible",
+    ),
+    EcranCompte(
+        "critique_nouvelle",
+        "libraire_audit",
+        "/libraire/critiques/nouvelle?series_id=102",
+        "Écrire une critique",
+    ),
+    EcranCompte(
+        "critique_nouvelle_refusee",
+        "libraire_audit",
+        "/libraire/critiques/nouvelle?series_id=102",
+        "Écrire une critique",
+        {"#texte": "court"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "critique_modifier",
+        "libraire_audit",
+        "/libraire/critiques/1/modifier",
+        "Modifier ma critique",
+    ),
+    EcranCompte(
+        "critique_retirer",
+        "libraire_audit",
+        "/libraire/critiques/1/retirer",
+        "Retirer ma critique",
+    ),
+    EcranCompte(
+        "critique_acces_refuse",
+        "libraire_tiers_audit",
+        "/libraire/critiques/1/modifier",
+        "Accès refusé",
+    ),
+    EcranCompte(
+        "serie_avec_critiques",
+        "libraire_audit",
+        "/series/101?etat=critique_publiee",
+        "Série factice A",
+    ),
+    EcranCompte(
+        "admin_critiques", "admin_audit", "/admin/critiques", "Modération des critiques"
+    ),
+    EcranCompte(
+        "admin_critiques_vide",
+        "admin_audit",
+        "/admin/critiques?libraire=2",
+        "Modération des critiques",
+    ),
+    EcranCompte(
+        "admin_critique_retirer",
+        "admin_audit",
+        "/admin/critiques/2/retirer",
+        "Retirer une critique (modération)",
+    ),
+    # E4, lot 4 : les listes du client.
+    EcranCompte(
+        "serie_listes_client_etat",
+        "listes_audit",
+        "/series/101?etat=ajoutee",
+        "Série factice A",
+    ),
+    EcranCompte(
+        "mes_listes_vides", "listes_vide_audit", "/compte/listes", "Mes listes"
+    ),
+    EcranCompte(
+        "mes_listes_garnies",
+        "listes_audit",
+        "/compte/listes?etat=retiree",
+        "Mes listes",
+    ),
+    EcranCompte(
+        "mes_listes_catalogue_indisponible",
+        "listes_audit",
+        "/compte/listes",
+        "Mes listes",
+        catalogue="indisponible",
+    ),
+    # E4, lot 4 : la suppression du compte par son titulaire (CL5).
+    EcranCompte(
+        "compte_supprimer",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+    ),
+    EcranCompte(
+        "compte_supprimer_refuse",
+        "effacement_audit",
+        "/compte/supprimer",
+        "Supprimer mon compte",
+        {"#mot_de_passe": "faux faux faux"},
+        ENVOYER,
+    ),
+    EcranCompte(
+        "compte_supprimer_interdit",
+        "libraire_audit",
+        "/compte/supprimer",
+        "Suppression impossible",
+    ),
+    EcranCompte(
+        "accueil_apres_suppression",
+        None,
+        "/?etat=compte_supprime",
+        "Conseiller de lecture",
+    ),
+    # E4, lot 5 : le test des clés envoyé — son résultat, puis le repli (API 1.4.0).
+    EcranCompte(
+        "admin_cles_testees",
+        "admin_audit",
+        "/admin/cles",
+        "Clés des fournisseurs",
+        bouton='form[action="/admin/cles/tester"] button[type=submit]',
+    ),
+    EcranCompte(
+        "admin_cles_route_absente",
+        "admin_audit",
+        "/admin/cles",
+        "Clés des fournisseurs",
+        bouton='form[action="/admin/cles/tester"] button[type=submit]',
+        verification="route_absente",
+    ),
+    EcranCompte("acces_refuse", "client_audit", "/admin/comptes", "Accès refusé"),
+    EcranCompte(
+        "introuvable_connecte", "client_audit", "/nimporte", "Page introuvable"
+    ),
+)
+REMPLIR = """([saisies, action]) => {
+  if (action !== null) { document.querySelector("main form").action = action; }
+  for (const [selecteur, valeur] of Object.entries(saisies)) {
+    const champ = document.querySelector(selecteur);
+    champ.removeAttribute("maxlength");
+    champ.value = valeur;
+  }
+  document.querySelectorAll("form").forEach((f) => { f.noValidate = true; });
+}"""
+
+
+#: Ce que la page montre de Kōhai : la pose du principal, sa visibilité, la phrase de
+#: l'attente, la classe du corps, les animations en cours.
+ETAT_KOHAI = """() => {
+  const p = document.querySelector(".kohai-principal");
+  const a = document.querySelector(".kohai-attente");
+  const h = document.querySelector("main > h1");
+  return {
+    pose: p ? [...p.classList].find((c) => c.startsWith("k-anim-")) : null,
+    principal_visible: p ? p.getBoundingClientRect().width > 0 : false,
+    attente_visible: a ? getComputedStyle(a).display !== "none" : false,
+    image_phase_1: h ? getComputedStyle(h, "::after").content : null,
+    corps: document.body.className,
+    animations: document.getAnimations().length,
+  };
+}"""
+
+
+#: Les écrans de Kōhai audités par `auditer_kohai` (E4, lot 6).
+ECRANS_KOHAI = (
+    "conseiller_accueil_kohai",
+    "conseiller_reponse_kohai",
+    "conseiller_attente",
+    "conseiller_perdu_kohai",
+    "conseiller_mouvement_reduit",
+)
+SANS_TRANSITION = """() => !document.getAnimations().some(
+  (a) => (a.effect?.pseudoElement || "").startsWith("::view-transition"))"""
+GARDER_LA_PAGE = """() => document.querySelector("form[action='/question']")
+  .addEventListener("submit", (evenement) => evenement.preventDefault())"""
+
+
+def kohai_de(page: Any) -> dict[str, Any]:
+    return page.evaluate(ETAT_KOHAI)
+
+
+def envoyer_question(page: Any) -> None:
+    page.fill("#question", "Un manga factice pour débuter ?")
+    page.click("main form button[type=submit]")
+
+
+def auditer_kohai(
+    navigateur: Any,
+    source: str,
+    adresse: str,
+    adresse_sans_api: str,
+    adresse_doublure: str,
+    console: list[str],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Kōhai dans Chromium (E4, lot 6) : chaque pose, l'attente montrée par le seul
+    script, le mouvement réduit ; et, JavaScript coupé, la page sans changement et la
+    question qui part. Chaque écran est audité ; les captures, si `CAPTURES_KOHAI` nomme
+    un dossier (hors dépôt), y sont écrites."""
+    pages: dict[str, dict[str, Any]] = {}
+    ecarts: list[str] = []
+    captures = os.environ.get("CAPTURES_KOHAI")
+
+    def scenario(reponse: str) -> None:
+        httpx.post(
+            f"{adresse_doublure}/_essai/scenario",
+            json={"info": "nominale", "reponse": reponse, "catalogue": "nominal"},
+        ).raise_for_status()
+
+    def attendre(nom: str, etat: dict[str, Any], **attendu: object) -> None:
+        for cle, valeur in attendu.items():
+            if etat[cle] != valeur:
+                ecarts.append(f"{nom} : {cle} = {etat[cle]!r}, attendu {valeur!r}")
+
+    def noter(nom: str, page: Any, base: str) -> None:
+        # La transition de vue entre pages finie : la capture montre la page arrivée.
+        page.wait_for_function(SANS_TRANSITION, timeout=5000)
+        if captures:
+            page.screenshot(path=f"{captures}/{nom}.png", full_page=True)
+        pages[nom] = auditer(page, source, base)
+
+    def ecouter(page: Any, nom: str) -> None:
+        page.on(
+            "console",
+            lambda m: (
+                console.append(f"{nom} : {m.text}")
+                if "Content Security Policy" in m.text
+                else None
+            ),
+        )
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_accueil_kohai")
+    page.goto(adresse + "/")
+    attendre(
+        "arrivée",
+        kohai_de(page),
+        pose="k-anim-arrivee",
+        principal_visible=True,
+        image_phase_1="none",
+    )
+    page.goto(adresse + "/")
+    # Écart 16 : l'arrivée à chaque chargement de l'accueil, rien dans la session.
+    attendre("accueil", kohai_de(page), pose="k-anim-arrivee", attente_visible=False)
+    noter("conseiller_accueil_kohai", page, adresse)
+    scenario("nominale")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("réponse", kohai_de(page), pose="k-anim-trouve", image_phase_1="none")
+    noter("conseiller_reponse_kohai", page, adresse)
+    # L'attente : pendant une navigation, la page d'avant ne se lit plus. Un écouteur
+    # ajouté après celui du script (chargé avant `load`) arrête la seule navigation : le
+    # script a réagi au vrai envoi, la page reste à lire. Que la question parte, avec ou
+    # sans script, est vérifié ailleurs.
+    page.goto(adresse + "/")
+    page.evaluate(GARDER_LA_PAGE)
+    envoyer_question(page)
+    page.wait_for_selector("body.en-attente", state="attached", timeout=3000)
+    attendre(
+        "attente",
+        kohai_de(page),
+        attente_visible=True,
+        principal_visible=False,
+        corps="esp-menthe en-attente",
+    )
+    noter("conseiller_attente", page, adresse)
+    page.close()
+    contexte.close()
+
+    contexte = navigateur.new_context()
+    page = contexte.new_page()
+    ecouter(page, "conseiller_perdu_kohai")
+    page.goto(adresse_sans_api + "/")
+    with page.expect_navigation():
+        envoyer_question(page)
+    attendre("perdu", kohai_de(page), pose="k-anim-perdu", image_phase_1="none")
+    noter("conseiller_perdu_kohai", page, adresse_sans_api)
+    contexte.close()
+
+    contexte = navigateur.new_context(reduced_motion="reduce")
+    page = contexte.new_page()
+    ecouter(page, "conseiller_mouvement_reduit")
+    page.goto(adresse + "/")
+    attendre("mouvement réduit", kohai_de(page), pose="k-anim-arrivee", animations=0)
+    noter("conseiller_mouvement_reduit", page, adresse)
+    contexte.close()
+
+    # JavaScript coupé : rien ne change, la question part, pas de pose d'attente.
+    contexte = navigateur.new_context(java_script_enabled=False)
+    page = contexte.new_page()
+    page.goto(adresse + "/")
+    brut = page.request.get(adresse + "/").text()
+    if 'class="esp-menthe"' not in brut or "en-attente" in page.content():
+        ecarts.append("sans JavaScript : la page diffère de celle du serveur")
+    with page.expect_navigation():
+        envoyer_question(page)
+    if page.inner_text("section[aria-live] h2") != "Réponse":
+        ecarts.append("sans JavaScript : la question n'est pas partie")
+    if "en-attente" in (page.get_attribute("body", "class") or ""):
+        ecarts.append("sans JavaScript : la pose d'attente est apparue")
+    contexte.close()
+    assert sorted(pages) == sorted(ECRANS_KOHAI)
+    return pages, ecarts
+
+
+#: La page tient dans la largeur ; chaque tableau, dans son conteneur défilant.
+LARGEURS = """() => ({
+  page: document.documentElement.scrollWidth,
+  fenetre: window.innerWidth,
+  tableaux: [...document.querySelectorAll("table")].map((t) => ({
+    conteneur: t.parentElement.classList.contains("defilant"),
+    defile: t.parentElement.scrollWidth > t.parentElement.clientWidth,
+    deborde: t.parentElement.getBoundingClientRect().right > window.innerWidth + 1,
+  })),
+})"""
+
+
+ZONES_DE_L_EN_TETE = """() => {
+  const [pages, compte] = document.querySelectorAll("header nav");
+  return {
+    pages_bas: pages.getBoundingClientRect().bottom,
+    compte_haut: compte.getBoundingClientRect().top,
+    page: document.documentElement.scrollWidth,
+    fenetre: window.innerWidth,
+  };
+}"""
+
+
+def auditer_etroit(
+    navigateur: Any, source: str, adresse: str, console: list[str]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Les coûts de l'administration sur un écran de 360 px (E4, lot 6, guide § 8) : la
+    page ne déborde pas, le tableau défile dans son conteneur."""
+    ecarts: list[str] = []
+    contexte = navigateur.new_context(viewport={"width": 360, "height": 740})
+    connecter_dans(contexte, adresse, "conseiller_admin_audit")
+    page = contexte.new_page()
+    page.on(
+        "console",
+        lambda m: (
+            console.append(f"admin_couts_etroit : {m.text}")
+            if "Content Security Policy" in m.text
+            else None
+        ),
+    )
+    page.goto(adresse + "/admin/couts")
+    largeurs = page.evaluate(LARGEURS)
+    if largeurs["page"] > largeurs["fenetre"]:
+        ecarts.append(f"360 px : la page déborde ({largeurs['page']} px)")
+    if not largeurs["tableaux"]:
+        ecarts.append("360 px : aucun tableau sur la page des coûts")
+    for tableau in largeurs["tableaux"]:
+        if not tableau["conteneur"] or tableau["deborde"]:
+            ecarts.append(f"360 px : tableau hors de son conteneur {tableau}")
+    captures = os.environ.get("CAPTURES_KOHAI")
+    if captures:
+        page.screenshot(path=f"{captures}/admin_couts_etroit.png", full_page=True)
+    pages = {"admin_couts_etroit": auditer(page, source, adresse)}
+    # E4, lot 7 (spec 02) : à 360 px, la zone du compte passe sous les pages.
+    page.goto(adresse + "/catalogue")
+    zones = page.evaluate(ZONES_DE_L_EN_TETE)
+    if zones["compte_haut"] < zones["pages_bas"] - 1:
+        ecarts.append(f"360 px : la zone du compte n'est pas sous les pages {zones}")
+    if zones["page"] > zones["fenetre"]:
+        ecarts.append(f"360 px : l'en-tête déborde ({zones['page']} px)")
+    if captures:
+        page.screenshot(path=f"{captures}/entete_360.png", full_page=False)
+    pages["entete_360"] = auditer(page, source, adresse)
+    contexte.close()
+    return pages, ecarts
+
+
+def auditer(page: Any, source: str, base: str) -> dict[str, Any]:
+    page.evaluate(OUVRIR)
+    page.evaluate(source)
+    return resume(page.evaluate(LANCER, ETIQUETTES), base)
+
+
+def connecter_dans(contexte: Any, adresse: str, pseudo: str) -> None:
+    """Ouvre la session du compte dans ce contexte, et s'assure qu'elle l'est : sans
+    quoi l'audit passerait sur la page de connexion refusée, sous le nom d'un autre."""
+    page = contexte.new_page()
+    page.goto(adresse + "/connexion")
+    page.fill("#pseudo", pseudo)
+    page.fill("#mot_de_passe", MDP)
+    with page.expect_navigation():
+        page.click(ENVOYER)
+    menu = page.inner_text("header nav.compte-zone")
+    assert "/connexion" not in page.url and "Mon compte" in menu, pseudo
+    page.close()
+
+
+def auditer_les_comptes(
+    playwright: Any,
+    source: str,
+    adresse: str,
+    adresse_sans_base: str,
+    adresse_doublure: str,
+) -> tuple[dict[str, dict[str, Any]], list[str], list[str]]:
+    """Les écrans des comptes, chacun dans le contexte de son visiteur."""
+    pages: dict[str, dict[str, Any]] = {}
+    console: list[str] = []
+    sans_focus: list[str] = []
+    navigateur = playwright.chromium.launch(headless=True)
+    contextes: dict[str | None, Any] = {}
+    for ecran in ECRANS_COMPTES:
+        nom, compte = ecran.nom, ecran.compte
+        httpx.post(
+            f"{adresse_doublure}/_essai/scenario",
+            json={"catalogue": ecran.catalogue, "verification": ecran.verification},
+        ).raise_for_status()
+        if compte not in contextes:
+            contextes[compte] = navigateur.new_context()
+            if compte is not None:
+                connecter_dans(contextes[compte], adresse, compte)
+        page = contextes[compte].new_page()
+        page.on(
+            "console",
+            lambda m, nom=nom: (
+                console.append(f"{nom} : {m.text}")
+                if "Content Security Policy" in m.text
+                else None
+            ),
+        )
+        page.goto(adresse + ecran.chemin)
+        if ecran.bouton is not None:
+            page.evaluate(REMPLIR, [ecran.saisies, ecran.action])
+            with page.expect_navigation():
+                page.click(ecran.bouton)
+        titre = page.inner_text("main h1")
+        assert titre == ecran.titre, (nom, titre)
+        if focus_tenu(page) is False:
+            sans_focus.append(nom)
+        pages[nom] = auditer(page, source, adresse)
+        page.close()
+    page = navigateur.new_context().new_page()
+    page.goto(adresse_sans_base + "/connexion")
+    pages["comptes_indisponibles"] = auditer(page, source, adresse_sans_base)
+    navigateur.close()
+    return pages, console, sans_focus
 
 
 def page_version(contexte: Any, source: str) -> str:

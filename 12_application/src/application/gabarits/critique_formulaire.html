@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block espace %}glycine{% endblock %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ titre_page }}{% endblock %}
+{% block contenu %}
+<h1>{{ titre_page }}</h1>
+<section class="zone-formulaire-critique" aria-labelledby="critique-serie">
+<p id="critique-serie">{{ t.critique_serie_rappel }} : <strong>{{ titre_serie }}</strong></p>
+{% if existante %}
+<p>{{ t.critique_deja_publiee }} <a href="/libraire/critiques/{{ existante }}/modifier">{{ t.critique_deja_lien }}</a></p>
+{% endif %}
+<form method="post" action="{{ action }}">
+<input type="hidden" name="jeton" value="{{ jeton }}">
+{% if modification %}
+<p>{{ t.critique_champ_tome }} : {{ tome_fixe }}</p>
+<p><small>{{ t.critique_tome_fixe }}</small></p>
+{% else %}
+<input type="hidden" name="series_id" value="{{ series_id }}">
+{{ c.liste("volume_url", t.critique_champ_tome, [("", t.critique_tome_serie)] + volumes, valeurs.get("volume_url", ""), erreur=erreurs.get("volume_url"), focus=focus == "volume_url", lien=("/libraire/critiques/" ~ deja ~ "/modifier") if deja else none, lien_texte=t.critique_deja_lien) }}
+{% endif %}
+{{ c.zone_texte("texte", t.critique_champ_texte, valeurs.get("texte", ""), aide=bornes, erreur=erreurs.get("texte"), min=regles.texte_min, max=regles.texte_max, focus=focus == "texte") }}
+{{ c.liste("note", t.critique_champ_note, [("", t.critique_note_choisir)] + notes, valeurs.get("note", ""), erreur=erreurs.get("note"), focus=focus == "note", requis=true) }}
+{{ c.liste("label", t.critique_champ_label, [("", t.critique_label_aucun)] + labels, valeurs.get("label", ""), erreur=erreurs.get("label"), focus=focus == "label") }}
+<button type="submit">{% if modification %}{{ t.critique_enregistrer }}{% else %}{{ t.critique_publier }}{% endif %}</button>
+</form>
+<p><a href="{% if modification %}/libraire/critiques{% else %}/series/{{ series_id }}{% endif %}">{{ t.critique_annuler }}</a></p>
+</section>
+{% endblock %}

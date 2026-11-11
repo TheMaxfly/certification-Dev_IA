@@ -1,29 +1,52 @@
-"""Harnais du module 12 : la doublure de l'API, en mémoire et sur un port du bouclage.
+"""Harnais du module 12 : la doublure de l'API, en mémoire et sur un port du bouclage ;
+la base de l'application, jetable.
 
-Pas de base, donc pas de harnais de bases jetables. La garde réseau, sur toute la
-suite : une requête de httpx vers un hôte hors du bouclage n'est pas envoyée et fait
-échouer le test ; aucun test n'atteint l'API réelle ni un fournisseur.
+La garde réseau, sur toute la suite : une requête de httpx vers un hôte hors du bouclage
+n'est pas envoyée et fait échouer le test ; aucun test n'atteint l'API réelle ni un
+fournisseur.
+
+La base (E4, lot 1) : le harnais partagé des bases jetables (`database/harnais_tests/`),
+chargé par son chemin comme dans les modules 05, 08, 09, 10 et 11. Le DSN est fabriqué
+par lui, à partir du conteneur qu'il lance ; aucune variable d'environnement n'est lue,
+et l'absence de Docker fait sauter les tests à base — jamais de repli sur `apimanga`.
+Les fixtures sont paresseuses : un test qui n'en demande aucune ne démarre pas de
+conteneur. L'application y tourne sous un rôle de connexion de test, membre de `app_rw`
+seul (migration 027), sans mot de passe dans le DSN (un `.pgpass` jetable) — jamais
+sous `postgres`.
 """
 
 from __future__ import annotations
 
+import base64
+import importlib.util
+import itertools
+import json
+import secrets
 import socket
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import replace
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
 import uvicorn
-from doublure_api import CLE_ATTENDUE, Doublure
+from argon2 import PasswordHasher
+from doublure_api import CLE_ATTENDUE, CLE_CATALOGUE_ATTENDUE, Doublure
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from psycopg import conninfo, sql
 
 from application.app import creer_application
 from application.config import Reglages, charger
 from application.journal import FormatJson
+from application.motdepasse import Hacheur
+from application.sessions import NOM_COOKIE
 
 BOUCLAGE = ("127.0.0.1", "localhost", "::1")
 ADRESSE_MEMOIRE = "http://127.0.0.1:8010"
@@ -56,9 +79,23 @@ def journal_complet(caplog: pytest.LogCaptureFixture) -> str:
     return "\n".join(forme.format(r) for r in caplog.records)
 
 
+def bornes_larges(reglages: Reglages) -> Reglages:
+    """Les bornes du conseiller (E4, lot 2b) écartées : un test qui pose des dizaines
+    de questions d'une même session n'éprouve pas les quotas. Ceux qui les éprouvent
+    (`test_bornes.py`) reprennent les valeurs de la configuration."""
+    larges = replace(
+        reglages.bornes,
+        quota_visiteur_questions_jour=10_000,
+        quota_client_questions_jour=10_000,
+        debit_public_par_minute=10_000,
+        inscriptions_session_max=10_000,
+    )
+    return replace(reglages, bornes=larges)
+
+
 @pytest.fixture
 def reglages() -> Reglages:
-    return replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE)
+    return bornes_larges(replace(charger(ENVIRONNEMENT), adresse_api=ADRESSE_MEMOIRE))
 
 
 @pytest.fixture
@@ -69,18 +106,54 @@ def doublure() -> Iterator[Doublure]:
     assert not instance.ecarts, instance.ecarts
 
 
+#: Argon2id aux paramètres réduits : les tests hachent vite ; la production prend les
+#: défauts de la bibliothèque (`Hacheur()`, éprouvé par `test_motdepasse.py`).
+HACHEUR_RAPIDE = Hacheur(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
+
+
+def jeton_du_cookie(client: TestClient) -> str | None:
+    """Le jeton CSRF de la session du client, lu dans son cookie (signé, en clair)."""
+    valeur = client.cookies.get(NOM_COOKIE)
+    if not valeur:
+        return None
+    contenu = json.loads(base64.b64decode(valeur.split(".")[0]))
+    jeton = contenu.get("csrf")
+    return jeton if isinstance(jeton, str) else None
+
+
+class Navigateur(TestClient):
+    """Un client qui se comporte comme un navigateur pour le jeton CSRF : un formulaire
+    envoyé porte le jeton de sa session, tiré à la première page s'il le faut. Les
+    tests du jeton lui-même passent `avec_jeton=False`, ou un `jeton` explicite."""
+
+    avec_jeton = True
+
+    def post(  # type: ignore[override]
+        self, url: Any, *args: Any, **kwargs: Any
+    ) -> httpx.Response:
+        donnees = kwargs.get("data")
+        if self.avec_jeton and isinstance(donnees, dict) and "jeton" not in donnees:
+            if jeton_du_cookie(self) is None:
+                self.get("/")
+            kwargs["data"] = {**donnees, "jeton": jeton_du_cookie(self) or ""}
+        return super().post(url, *args, **kwargs)
+
+
 def application_sur(
     doublure: Doublure, reglages: Reglages
 ) -> tuple[FastAPI, httpx.ASGITransport]:
     transport = httpx.ASGITransport(app=doublure.app)
-    return creer_application(reglages, transport=transport), transport
+    return (
+        creer_application(reglages, transport=transport, hacheur=HACHEUR_RAPIDE),
+        transport,
+    )
 
 
 @pytest.fixture
 def navigateur(doublure: Doublure, reglages: Reglages) -> Iterator[TestClient]:
     """L'application contre la doublure en mémoire, vue du bouclage, démarrée."""
     application, _ = application_sur(doublure, reglages)
-    with TestClient(
+    with Navigateur(
         application, client=("127.0.0.1", 50000), raise_server_exceptions=False
     ) as client:
         yield client
@@ -138,9 +211,10 @@ def demarrer(
     def lancer(adresse: str, **delais: float) -> TestClient:
         reduits = replace(reglages.delais, **delais) if delais else reglages.delais
         application = creer_application(
-            replace(reglages, adresse_api=adresse, delais=reduits)
+            replace(reglages, adresse_api=adresse, delais=reduits),
+            hacheur=HACHEUR_RAPIDE,
         )
-        client = TestClient(
+        client = Navigateur(
             application, client=("127.0.0.1", 50000), raise_server_exceptions=False
         )
         client.__enter__()
@@ -150,3 +224,171 @@ def demarrer(
     yield lancer
     for client in ouverts:
         client.__exit__(None, None, None)
+
+
+# --------------------------------------------------------------------------- #
+#  La base de l'application : jetable, migrée par le runner du dépôt
+# --------------------------------------------------------------------------- #
+RACINE_DEPOT = Path(__file__).resolve().parents[2]
+ROLE_APPLICATION = "essai_app_conseiller"
+
+
+def _charger_harnais() -> ModuleType:
+    """Le harnais partagé des bases jetables (`database/harnais_tests/`), par chemin."""
+    spec = importlib.util.spec_from_file_location(
+        "harnais_tests", RACINE_DEPOT / "database" / "harnais_tests" / "__init__.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["harnais_tests"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+harnais = _charger_harnais()
+
+
+@pytest.fixture(scope="session")
+def conteneur() -> Iterator[str]:
+    """Un PostgreSQL jetable pour la session, lancé au premier test qui le demande."""
+    raison = harnais.raison_de_sauter()
+    if raison:
+        pytest.skip(raison)
+    with harnais.conteneur("application-test") as dsn:
+        yield dsn
+
+
+@pytest.fixture(scope="session")
+def gabarit(conteneur: str) -> str:
+    """La base gabarit, migrée une fois par session par le runner du dépôt."""
+    return harnais.creer_gabarit(conteneur)
+
+
+@pytest.fixture
+def base(conteneur: str, gabarit: str) -> Iterator[str]:
+    """Une base neuve par test, copiée du gabarit migré (DSN d'administration)."""
+    with harnais.base_depuis_gabarit(conteneur, gabarit) as dsn:
+        yield dsn
+
+
+@pytest.fixture(scope="session")
+def fichier_pgpass(
+    conteneur: str, gabarit: str, tmp_path_factory: pytest.TempPathFactory
+) -> Path:
+    """Le rôle de connexion de test, membre de app_rw seul, et son `.pgpass` jetable."""
+    del gabarit  # app_rw existe dès que le gabarit est migré
+    mot_de_passe = secrets.token_urlsafe(24)
+    with psycopg.connect(conteneur, autocommit=True) as cx:
+        cx.execute(
+            sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE app_rw").format(
+                sql.Identifier(ROLE_APPLICATION), sql.Literal(mot_de_passe)
+            )
+        )
+    chemin = tmp_path_factory.mktemp("pgpass") / "pgpass"
+    chemin.write_text(f"*:*:*:{ROLE_APPLICATION}:{mot_de_passe}\n", encoding="utf-8")
+    chemin.chmod(0o600)
+    return chemin
+
+
+@pytest.fixture
+def pgpass(fichier_pgpass: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setenv("PGPASSFILE", str(fichier_pgpass))
+    return fichier_pgpass
+
+
+def dsn_du_role(dsn_admin: str) -> str:
+    """Le DSN de la base du test, sous le rôle de l'application, sans mot de passe."""
+    parametres = conninfo.conninfo_to_dict(dsn_admin)
+    parametres.pop("password", None)
+    parametres["user"] = ROLE_APPLICATION
+    return conninfo.make_conninfo(**parametres)
+
+
+@pytest.fixture
+def base_app(base: str, pgpass: Path) -> str:
+    """La base du test vue par l'application : son rôle, sans mot de passe au DSN."""
+    del pgpass
+    return dsn_du_role(base)
+
+
+# --------------------------------------------------------------------------- #
+#  Un navigateur connecté, par rôle (E4, lot 2b : l'écran du conseiller selon le rôle)
+# --------------------------------------------------------------------------- #
+MDP_ESSAI = "mot de passe factice de connexion"
+CLE_SESSION_ESSAI = "s" * 48
+
+
+def creer_compte_essai(dsn: str, pseudo: str, role: str) -> int:
+    """Un compte actif du rôle, au mot de passe factice (hacheur réduit)."""
+    with psycopg.connect(dsn) as cx:
+        ligne = cx.execute(
+            "INSERT INTO application.comptes (pseudo, nom_affiche, role, hachage)"
+            " VALUES (%s, %s, %s, %s) RETURNING id",
+            (pseudo, f"Nom {pseudo}", role, HACHEUR_RAPIDE.hacher(MDP_ESSAI)),
+        ).fetchone()
+    assert ligne is not None
+    return int(ligne[0])
+
+
+def connecter_essai(client: TestClient, pseudo: str) -> None:
+    r = client.post(
+        "/connexion",
+        data={"pseudo": pseudo, "mot_de_passe": MDP_ESSAI},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303, pseudo
+
+
+@pytest.fixture
+def application_comptes(
+    doublure: Doublure, reglages: Reglages, base_app: str
+) -> Iterator[FastAPI]:
+    """L'application sur une base jetable, contre la doublure (l'API du modèle et le
+    catalogue) ; démarrée (son cycle de vie tourne une fois, sous le premier
+    navigateur)."""
+    application = creer_application(
+        replace(
+            reglages,
+            base_dsn=base_app,
+            cle_session=CLE_SESSION_ESSAI,
+            catalogue=replace(reglages.catalogue, cle=CLE_CATALOGUE_ATTENDUE),
+        ),
+        transport=httpx.ASGITransport(app=doublure.app),
+        hacheur=HACHEUR_RAPIDE,
+    )
+    with Navigateur(application, client=("127.0.0.1", 50000)):
+        yield application
+
+
+@pytest.fixture
+def connecter(
+    application_comptes: FastAPI, base_app: str
+) -> Callable[[str | None], Navigateur]:
+    """Un navigateur neuf sur `application_comptes`, connecté sous un compte du rôle
+    donné, créé pour lui (None : un visiteur)."""
+    ports = itertools.count(50001)
+
+    def ouvrir(role: str | None) -> Navigateur:
+        port = next(ports)
+        client = Navigateur(
+            application_comptes,
+            client=("127.0.0.1", port),
+            raise_server_exceptions=False,
+        )
+        if role is not None:
+            pseudo = f"{role}_essai_{port}"
+            creer_compte_essai(base_app, pseudo, role)
+            connecter_essai(client, pseudo)
+        return client
+
+    return ouvrir
+
+
+@pytest.fixture
+def libraire(connecter: Callable[[str | None], Navigateur]) -> Navigateur:
+    return connecter("libraire")
+
+
+@pytest.fixture
+def admin(connecter: Callable[[str | None], Navigateur]) -> Navigateur:
+    return connecter("admin")

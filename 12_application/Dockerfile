@@ -1,6 +1,6 @@
 # L'image de l'application — construite depuis la RACINE du dépôt :
 #
-#   docker build -f 12_application/Dockerfile --target application -t application-conseiller:0.1.0 .
+#   docker build -f 12_application/Dockerfile --target application -t application-conseiller:0.9.1 .
 #
 # La racine, à cause de la seule cible `doublure`, qui lit le contrat du module 11. Seuls
 # les fichiers nommés entrent dans le contexte (`Dockerfile.dockerignore`, liste blanche) :
@@ -28,6 +28,8 @@ RUN uv sync --locked
 FROM construction AS construction-doublure
 RUN uv sync --locked --extra dev
 COPY 11_api_modele/contrat/openapi_v1.json /app/11_api_modele/contrat/openapi_v1.json
+# Le contrat du catalogue (l'API data du 02), que la doublure sert aussi (E4, lot 2a).
+COPY 02_api_manga/openapi.json /app/02_api_manga/openapi.json
 COPY 12_application/tests/doublure_api.py tests/doublure_api.py
 
 FROM python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30 AS doublure

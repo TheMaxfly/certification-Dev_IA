@@ -1,0 +1,7 @@
+id = "E4S-10"
+origine = "E4, lot 1, spec 02 (2026-11-08) — la garde d'environnement inopérante : la préproduction démarrerait sur la base de production"
+fichier = "12_application/src/application/config.py"
+avant = '''    elif exigee is not None and nom != exigee:'''
+apres = '''    elif False:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_environnement.py", "-k", "garde"]

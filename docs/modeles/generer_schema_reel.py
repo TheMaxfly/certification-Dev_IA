@@ -78,9 +78,12 @@ def main() -> int:
     a = out.append
     a("# Schema reel — inventaire extrait de la base")
     a("")
+    # La base et le role de l'extraction, tels qu'elle les a lus (absents d'une
+    # extraction anterieure au lot 2b d'E4 : ceux de la procedure d'origine).
+    source = brut.get("source", {"base": "apimanga", "role": "manga_api"})
     a(
-        f"> Extrait de `apimanga` le {date.today().isoformat()} par "
-        "`extraire_schema.py`, sous le role de consultation `manga_api` en "
+        f"> Extrait de `{source['base']}` le {date.today().isoformat()} par "
+        f"`extraire_schema.py`, sous le role `{source['role']}` en "
         "session `default_transaction_read_only = on` (lecture seule : "
         "uniquement des SELECT sur `pg_catalog`)."
     )

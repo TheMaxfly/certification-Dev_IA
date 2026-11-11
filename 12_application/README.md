@@ -8,15 +8,22 @@ et les passages cités.
 ## Ce qu'elle fait, et ce qu'elle ne fait pas
 
 - **Elle fait** : une page question → réponse ; une conversation de cinq échanges au plus ;
-  le choix du profil et deux réglages de démonstration ; un mode démonstration, éteint par
-  défaut, qui montre les scores et la trace de la recherche ; un écran nommé par cas dégradé ;
+  pour les libraires et l'administrateur, le choix du profil, deux réglages et le mode de
+  réponse ; pour l'administrateur seul, un mode démonstration, éteint par défaut, qui
+  montre les scores et la trace de la recherche ; le public (visiteur, client) n'a aucun
+  réglage, en mode strict (E4, lot 2b) ; un écran nommé par cas dégradé ;
   la mention « Vous parlez à une IA » sur chaque écran ; un audit d'accessibilité outillé.
-- **Elle ne fait pas** : pas de compte, pas de mémoire côté serveur, aucune écriture, en
-  base ou en fichier ; mode strict seul tant que l'API n'en expose pas d'autre ; aucune
-  bascule automatique de profil : le repli reste un geste humain.
+- **Elle ne fait pas** : aucune écriture en fichier ; aucun mode autre que le strict pour
+  le public ; aucune bascule automatique de profil : le repli reste un geste humain.
+- **E4, lot 1 (le socle)** : une base à elle (schéma `application`, migration `027`, rôle
+  `app_rw` seul) ; mots de passe hachés par Argon2id ; sessions signées, le compte relu en
+  base à chaque requête ; jeton CSRF sur chaque formulaire `POST` ; verrou après des
+  échecs ; garde par rôle ; garde d'environnement. Sans base configurée, ou base
+  injoignable, le conseiller fonctionne comme avant.
 
 C'est le tronc de l'application de l'épreuve E4 : même module, même pile. Le dossier
-`schema/` garde la place de son schéma de données, vide à ce stade.
+`schema/` décrit son modèle de données, le schéma `application` de la base (migration
+`027`, E4, lot 1) : `schema/README.md`.
 
 ## Architecture
 
@@ -62,19 +69,25 @@ administrateur.
 
 Un seul écran, `/`, dans l'ordre de lecture :
 
-1. le lien d'évitement ; le nom de la librairie, fictive ; la mention courte ; le bouton
-   **Nouvelle conversation**, sur chaque écran : un formulaire `GET /` sans champ, donc sans
-   script, et l'historique ne le suit pas ;
+1. le lien d'évitement ; l'en-tête : le nom de la librairie, fictive ; la mention courte ;
+   les deux navigations (« L'en-tête », ci-dessous) ;
 2. l'état du service : le profil actif et son modèle, ou « ne répond pas » ;
 3. la conversation : les tours précédents, sans leurs marques `[S:…]` ;
-4. le formulaire : la question ; les **Réglages**, repliés ; le champ caché de l'historique ;
+4. le formulaire : la question ; les **Réglages**, repliés, pour un libraire ou
+   l'administrateur seulement (« Le conseiller selon le rôle ») ; le champ caché de
+   l'historique ; puis, **quand une conversation existe** (une réponse, un encart, ou un
+   historique porté par la page), le bouton **Nouvelle conversation** : un formulaire
+   `GET /` sans champ, donc sans script, et l'historique ne le suit pas ;
 5. la réponse ou le refus ; la ligne discrète (profil, fournisseur, modèle, date de l'appel,
    reformulation, coût estimé, latence) ; une carte par série citée, ses métadonnées et ses
    seuls passages cités ; les détails techniques, repliés ;
 6. le pied de page : la mention complète, « À propos et données », les versions.
 
 `/a-propos` : ce qui est transmis, tous les profils proposés et leur hébergement, ce qui
-n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API.
+n'est pas conservé. `/sante` : du JSON, toujours 200 : l'application sert sans l'API ; il
+porte `api`, `base` et `catalogue` (`ok`, `indisponible`, `non_configure` : un `GET /live`
+du catalogue, sans clé, délai court), et `cles_api` (`une`, `deux` : la clé des comptes
+posée ou non, E4, lot 2b).
 `/metrics` : Prometheus, sur le bouclage, ou le réseau de collecte déclaré
 (`APPLICATION_METRIQUES_RESEAUX`). `application_requetes_total{route, statut}` : `route` est
 le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour le reste.
@@ -82,16 +95,116 @@ le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour l
 **Deux jauges pour l'état de l'API** : `application_api_info_etat{etat}` (`ok`, `ko`, `cle` : la
 clé est refusée), lue au démarrage et à chaque page ; `application_api_sante_ok`, lue au
 démarrage et à chaque `/sante`. Aucune ne se relit seule : une panne de l'API se lit sur la
-cible de Prometheus.
+cible de Prometheus. **Le catalogue** (E4, lot 2a) :
+`application_catalogue_appels_total{route_catalogue, statut}` (routes `series`, `serie` ;
+issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
+`application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
+chaque appel.
+
+### L'en-tête (E4, lot 7)
+
+- **Deux navigations nommées** : « Pages » (Conseiller, Catalogue, puis selon le rôle Mes
+  listes, Mes critiques ou Administration) et « Votre compte » (un visiteur : Connexion,
+  Créer un compte ; connecté : la pastille du nom affiché, Mon compte, Déconnexion — un
+  formulaire `POST` avec jeton). Le lecteur d'écran les nomme ; `aria-current="page"` reste
+  sur la page courante, dans l'une ou l'autre. « Mon compte » est dans la zone du compte :
+  c'est le compte, pas une page du réseau.
+- **Placement par la feuille, pas par le balisage** : deux règles en section 16 de
+  `senpai.css` — les pages à la taille de leur contenu, à gauche ; la zone du compte poussée
+  à droite ; sur un écran étroit (360 px), elle passe à la ligne sous les pages (l'audit le
+  vérifie).
+- **« Nouvelle conversation » quitte l'en-tête** : c'est une action du conseiller, pas une
+  page ; elle est rendue dans `index.html` seulement, à côté du formulaire de question, et
+  seulement quand une conversation existe — à l'accueil vierge, elle n'apparaît pas. Même
+  action `GET /`, même texte.
+- Aucune route, aucun comportement ne change : le pont depuis la fiche, le quota, le cookie,
+  les renvois (303) sont intacts. Pas de page d'accueil séparée : le conseiller **est**
+  l'accueil.
+
+### Le conseiller selon le rôle (E4, lot 2b)
+
+| Rôle | Réglages (profil, température, reformulation) | Case « mode démonstration » | Liste des modes | Mode envoyé |
+|---|---|---|---|---|
+| visiteur, client | **absents du HTML** | absente | absente | `strict`, le défaut du contrat |
+| libraire | présents, repliés | absente | si `/v1/info` déclare plus d'un mode ; `strict` choisi | celui de la liste ; hors liste, le défaut |
+| administrateur | présents | **présente** | même règle | idem |
+
+- **Un champ forgé est ignoré, pas refusé** : pour le public, `profil`, `temperature`,
+  `reformuler`, `mode` et `mode_demonstration` n'existent pas ; un `POST` qui les porte part
+  avec les défauts (profil par défaut, température par défaut, reformulation par défaut de
+  l'API, `strict`) — 200, jamais 422. Un libraire n'a pas le mode démonstration.
+- **Le complément du mode enrichi** n'est rendu que pour un rôle qui choisit le mode ; son
+  étiquette est `complement_etiquette` de l'API (contrat 1.4.0), le texte du 12 si elle
+  manque (`[textes] complement_etiquette`).
+- **Le public** lit, sous le titre, « Le conseiller répond à partir des critiques des
+  libraires du réseau » ; la mention IA reste sur chaque écran.
+- **Le pont, dans les deux sens** : la fiche d'une série porte « Demander au conseiller »
+  (`/?serie=<id>`), qui pré-remplit la question avec le **titre exact lu dans le 02**
+  (« Que pensent les libraires de *titre* ? », `[textes] question_pre_remplie`) — jamais un
+  texte de l'adresse ; un identifiant illisible, une série inconnue, un catalogue absent ou
+  en panne : la page sans pré-remplissage, sans erreur. Une réponse qui **refuse** ou ne
+  **cite aucune série** porte « Chercher ce titre dans le catalogue »
+  (`/catalogue?q=<question coupée à 100 caractères>`, absent sous 2 caractères).
+
+Tests : `tests/test_conseiller_roles.py` (un test par critère de V1, A7, L6, fin de V3) ;
+mutations `E4Q-01` (réglages servis au public), `E4Q-02` (case servie à un libraire),
+`E4Q-03` (`mode=enrichi` forgé par un visiteur accepté).
+
+### Les bornes du conseiller (E4, lot 2b)
+
+Le conseiller public appelle un modèle payant : quatre bornes le tiennent, toutes en
+configuration (`[conseiller.limites]`), vérifiées **avant** l'appel, dans cet ordre, et un
+refus n'appelle jamais l'API.
+
+Les chiffres des deux quotas sont ceux de la décision de Max du 2026-11-09 : **5 questions par
+jour pour un visiteur, 20 pour un client**. Ils remplacent 10 par heure et 10 par jour, qui
+donnaient à un visiteur plus de questions sur une journée qu'à un compte. Les deux se
+comptent par jour civil UTC et se remettent à zéro à minuit UTC.
+
+| Borne | Qui | Valeur, et son repère | Mécanisme | Dépassement |
+|---|---|---|---|---|
+| Quota par session | visiteurs | **5 questions / jour civil UTC** — de quoi essayer le conseiller | les horodatages des questions du jour dans le cookie signé (`quota`), purgés et **bornés** à 5 à chaque lecture (un cookie forgé ne fait rien enfler) ; compté après une réponse 200 seulement | 429, `Retry-After` jusqu'à minuit UTC, « Vous avez posé vos 5 questions du jour ; le conseiller vous revient demain à HH:MM (fuseau du serveur). Un compte gratuit en donne 20 par jour. » ; la question reste au formulaire |
+| Quota par compte client | clients connectés (ni libraires, ni administrateur) | **20 questions / jour civil UTC** — un compte donne plus de questions qu'aucun compte | `application.questions_jour` (migration `029`), relu avant, incrémenté après une réponse 200 ; il **suit le compte**, pas le cookie | 429, `Retry-After` jusqu'à minuit UTC, « … vos 20 questions du jour ; le conseiller vous revient demain à HH:MM » |
+| Plafond de débit | les appels partis avec la **clé publique** | **10 / minute**, fenêtre glissante — la marge de 5 / min laissée aux comptes sous le plafond Mistral de 15 / min | en mémoire du processus : **valable avec un processus** ; plusieurs demanderaient un compteur partagé | 429, `Retry-After`, « Le conseiller est très sollicité ; réessayez dans une minute » |
+| Plafond de coût du jour | tout le monde, strict et enrichi | **0,50 $ / jour** — environ 250 questions au coût mesuré | `application.couts_jour` (027) : la somme du jour, relue avant chaque appel ; après chaque réponse, le `cout_estime_usd` reçu (0 s'il manque, journalisé `cout_absent`) sous le profil et le mode **rendus par l'API** ; base indisponible : le plafond n'est **pas vérifiable**, le conseiller répond quand même (`plafond_non_verifiable`, état `inconnu`) | 503, `Retry-After` jusqu'à minuit UTC, « Le conseiller a atteint son budget du jour ; il reprend demain » |
+
+- **Les deux clés** (décision 5) : `APPLICATION_CLE_API` (publique, visiteurs) et
+  `APPLICATION_CLE_API_COMPTES` (facultative : client, libraire, administrateur), prises
+  **par appel** par le même client HTTP. Sans clé des comptes, la publique sert aux deux
+  (`cle_comptes_absente` au démarrage, `/sante` : `"cles_api": "une"`, sinon `"deux"`) :
+  les comptes passent alors sous le plafond de débit des visiteurs — la protection de D7
+  (une rafale de visiteurs ne bloque pas un libraire) suppose la seconde clé, posée au
+  trousseau de l'API au lot de livraison continue.
+- **L'inscription bornée** : 3 comptes par heure et par session (`inscriptions` dans le
+  cookie, même mécanisme, gardé à l'ouverture et à la fermeture d'une session) ; au-delà,
+  429, `Retry-After`, un encart au formulaire, aucune ligne en base.
+- **Limites assumées** : un cookie effacé remet à zéro le quota de session et le compteur
+  d'inscriptions (le quota d'un compte, lui, suit le compte) ; deux questions simultanées
+  peuvent passer ensemble le plafond de coût (relu, pas réservé) ; une réponse en erreur de
+  l'API (503) ne porte pas son coût : il n'est pas compté.
+- **Métriques** : `application_questions_total{mode, issue}` (`reponse`, `refus`, `quota`,
+  `debit`, `plafond_cout`, `api_erreur`, `api_indisponible`),
+  `application_quota_refus_total{motif}` (`session`, `client`, `debit`, `cout`,
+  `inscription`), `application_cout_jour_usd` (lu avant chaque question),
+  `application_plafond_cout_etat{etat}` (`ok`, `atteint`, `inconnu`) ; la latence du
+  conseiller est `application_latence_secondes{route="/question"}` (histogramme existant,
+  borné). Toutes déclarées à zéro dès le démarrage.
+
+Tests : `tests/test_bornes.py` (horloge injectée : la fenêtre glisse, minuit passe, sans
+attendre) ; mutations `E4Q-04` (quota de session jamais incrémenté), `E4Q-05` (plafond de
+débit retiré), `E4Q-06` (coût non relu avant l'appel), `E4Q-07` (clé des comptes retirée),
+`E4Q-08` (inscription sans borne), `E4Q-12` (quota du compte client jamais relu).
 
 ### Les réglages
 
+Pour un libraire ou l'administrateur (« Le conseiller selon le rôle »).
+
 | Réglage | Valeurs | Défaut |
 |---|---|---|
-| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le profil actif ; exclu ou indisponible : le premier proposé |
+| Profil | les profils disponibles de `/v1/info`, sauf `mistral-large-4` : en aperçu, à remesurer. Chaque option dit son fournisseur et son hébergement | le **profil actif de l'application**, choisi par l'administration (E4, lot 5) ; sans réglage, ou réglé sur un profil qui n'est plus proposé : le profil actif de l'API ; exclu ou indisponible : le premier proposé |
 | Température | 0 « stable », seule valeur mesurée ; 0,3 « modérée », candidate pour la production, **à mesurer avant de devenir défaut** ; 0,7 « variée », pour la démonstration | 0 |
 | Reformulation | cochée ou non ; sans effet à la première question | cochée |
-| Mode démonstration | coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
+| Mode démonstration | administrateur seul ; coché ou non ; ne change que ce que la page affiche, voir plus bas | décoché |
 | Mode | affiché seulement si l'API en déclare plus d'un | `strict` |
 
 Le reste (`longueur_max`, `nombre_series`, `passages_par_serie`, `catalogue_seul`) reste aux
@@ -99,9 +212,10 @@ défauts de l'API.
 
 ### Le mode démonstration
 
-Une case des réglages, **décochée par défaut** (`[reglages] mode_demonstration_defaut =
-false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
-« Nouvelle conversation » la remet au défaut. Ni cookie, ni variable d'environnement.
+Une case des réglages, **à l'administrateur seul** (E4, lot 2b, A7), **décochée par
+défaut** (`[reglages] mode_demonstration_defaut = false`). Portée par le formulaire comme les autres réglages, elle suit la conversation ;
+« Nouvelle conversation » la remet au défaut. Ni variable d'environnement, ni cookie à
+elle (le seul cookie est celui de la session, « Sécurité et données »).
 
 **Ce qu'il montre**, coché, tout venant de la même réponse de `/v1/reponse` :
 
@@ -180,15 +294,459 @@ avant l'appel de réponse et reste facturée si celui-ci est refusé (0,0004 $ a
 prix du profil actif, mesuré le 2026-11-02), et chaque clic consomme une requête sur les 15
 par minute du compte (2026-11-03).
 
+### Le catalogue (E4, lot 2a)
+
+Deux pages publiques, servies par l'API data du module 02 (contrat 0.6.0 depuis le lot 2b ; un 02 en 0.5.0 reste lu, sans suggestions ni source du résumé), sous la clé
+de l'application (`APPLICATION_CLE_CATALOGUE`, consommateur `conseiller`) ; le menu porte
+« Catalogue » sur chaque page ; elles gardent le menu du compte connecté.
+
+| Page | Ce qu'elle fait |
+|---|---|
+| `/catalogue` | la recherche (`<form role="search">`, un champ étiqueté) : titre, autres titres et auteurs, sans casse ni accents, au classement du catalogue (titre exact, début, contenu, auteur) ; chaque résultat mène à sa fiche et dit type, année, auteurs, note des lecteurs /10, disponibilité, et « trouvé par » quand c'est un autre titre ou un auteur ; 20 par page, page courante dite (`aria-current`) ; une saisie hors de 2 à 100 caractères est dite au champ, sans appel ; aucun résultat : un écran nommé ; quand le 02 rend des `suggestions` (contrat 0.6.0, la ressemblance de trigrammes au-dessus d'un seuil mesuré), **« Vouliez-vous dire… ? »** et un lien par fiche suggérée (non préchargée), puis le lien vers le conseiller ; sans suggestion, le renvoi au conseiller seul (E4, lot 2b) |
+| `/series/{series_id}` | la fiche : la ligne de titre par `metadonnees_de`, **les mêmes valeurs que les cartes du conseiller** (auteurs, tomes, statut, public, disponibilité), plus type et année ; la note des lecteurs /10 et ses votes, précédée de celle des libraires du réseau ; « Les libraires du réseau » (leurs critiques, lot 3, ci-dessous ; état vide nommé) ; « Vos listes » (lot 4, « Les listes du client ») ; le résumé servi par le 02 (contrat 0.6.0 : coupé avant les critiques de lecteurs que la source y avait recopiées) et sa source — un résumé Kitsu dit « Résumé fourni par Kitsu (en anglais) », `lang="en"` ; le français principal, le résumé Kitsu replié dessous dans un `<details>` (`lang="en"`) ; sans résumé, « Résumé indisponible » — ; « Demander au conseiller » (`zone-pont-conseiller`) ; les genres, le lien vers le site du catalogue (dit externe, `noopener`) ; des zones nommées (`zone-titre`, `zone-note`, `zone-critiques-reseau`, `zone-listes`, `zone-synopsis`) pour l'habillage |
+
+**Cas dégradés** : catalogue injoignable, en délai, qui refuse la clé, hors contrat, ou non
+configuré (pas de clé, en développement) → l'encart « Le catalogue ne répond pas ; le
+conseiller reste accessible », **503**, sur les deux pages ; une série inconnue ou un
+identifiant hors forme → la page introuvable (404). L'application **n'appelle jamais**
+`/series/{id}/reviews` : les critiques collectées portent des pseudonymes de lecteurs (la
+doublure compte ses appels, zéro sur cette route).
+
+**Ce que le lot 2a ne fait pas** : la tolérance aux fautes de frappe et « Vouliez-vous
+dire ? », le pont de la fiche vers le conseiller (lot 2b) ; les listes (lot 4).
+
+### Les critiques signées (E4, lot 3)
+
+C'est l'argument du projet : un libraire publie une critique signée, notée sur 10, sur une
+série ou sur un tome ; elle paraît **à l'instant** sur la fiche de la série, face à la note
+des lecteurs. Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`,
+avec son jeton ; `Cache-Control: no-store`.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/series/{series_id}` | tous | « Les libraires du réseau » : les critiques **publiées**, les plus récentes d'abord — le nom affiché du libraire (jamais son pseudo), la date, « Tome N » s'il y a lieu, la note « 8/10 » en texte, le badge du label, « modifiée le … », le texte en entier, en paragraphes, **échappé** ; dans la zone de la note, « Vos libraires : 8,5/10 (3 critiques) » **avant** « Note des lecteurs : … » ; un libraire connecté y voit « Écrire une critique » et « Modifier » sur les siennes, un administrateur « Retirer (modération) » sur chacune, les autres aucun de ces liens ; la base perdue : la fiche s'affiche avec l'encart « Les critiques du réseau sont momentanément indisponibles » (200) |
+| `/libraire/critiques/nouvelle?series_id=…` | libraire | le formulaire : la série rappelée ; le tome, facultatif (« La série entière », puis les volumes lus dans le 02, libellés « Tome N — titre ») ; le texte, ses bornes affichées (50 à 2 000 caractères) ; la note de 0 à 10, obligatoire, aucune présélectionnée ; le label, facultatif, dans la liste fixe ; « vous en avez déjà une » avec le lien « Modifier » ; succès : **303 vers la fiche**, où la critique est déjà là, avec l'avis du délai d'intégration ; une saisie refusée : le formulaire, les valeurs saisies (texte compris), l'erreur au champ et le focus sur le premier champ fautif (422) ; série inconnue du catalogue : page nommée (404) ; catalogue injoignable : 503 nommé |
+| `/libraire/critiques/{id}/modifier` | l'auteur | texte, note, label — la série et le tome affichés, non modifiables ; une retirée : page nommée (404) ; celle d'un autre : **403**, base inchangée |
+| `/libraire/critiques/{id}/retirer` | l'auteur | une page de confirmation (rappel, « le retrait est définitif ») puis le `POST` ; celle d'un autre : **403** |
+| `/libraire/critiques` | libraire | « Mes critiques » : la phrase du délai en tête ; toutes ses critiques, publiées et retirées (filtre sans JavaScript), 25 par page — titre de la série lu dans le 02 (« titre indisponible » et l'encart si le catalogue manque, la page reste à 200), tome ou « série entière », note, label, statut, dates, liens « Modifier » et « Retirer » sur les publiées ; état vide nommé, qui mène au catalogue |
+| `/admin/critiques` | administrateur | toutes les critiques publiées, 25 par page, filtre par libraire (actifs et inactifs) : libraire, série, tome, note, label, date, début du texte (120 caractères, échappé), « Retirer » |
+| `/admin/critiques/{id}/retirer` | administrateur | la critique **en entier** (l'administrateur lit avant de retirer), « le retrait est tracé au journal à votre nom », puis le `POST` |
+
+**Les règles** (`config/reglages.toml`, `[critiques]` : modifiables sans code, validées au
+démarrage, comparées à la migration 027 par un test) : texte de 50 à 2 000 caractères
+(espaces des bords retirés, sauts de ligne normalisés, aucun caractère de contrôle hors du
+saut de ligne ; gardé tel que saisi, jamais reformulé) ; note entière de 0 à 10,
+obligatoire ; un label au plus, facultatif : Coup de cœur, Découverte du mois, À offrir,
+Pour débuter, Valeur sûre. **Une critique publiée par libraire, série et tome** (l'index de
+la base le garantit ; deux envois croisés rendent le même refus nommé, jamais une erreur
+500) ; plusieurs tomes d'une même série sont possibles. La série est validée par le 02 ; le
+tome doit être l'un de ses volumes, et son libellé est **copié** à l'écriture (l'éditeur ne
+l'est pas : défaut de source connu du 02).
+
+**Les droits** : un libraire écrit, modifie et retire **les siennes** ; un administrateur
+retire **n'importe laquelle** et n'en écrit ni n'en modifie aucune — un administrateur qui
+veut écrire se crée un compte libraire ; un client ou un visiteur n'a aucun bouton, et 403
+ou la page de connexion sur toute route de critique. Le jeton d'abord, puis le rôle, puis
+l'identifiant du chemin (hors forme : 404).
+
+**Ce que fait un retrait** : le statut `retiree` et la date de modification, **jamais une
+suppression** (le rôle `app_rw` n'a pas le droit de supprimer une critique) ; la critique
+disparaît de tous les écrans publics et de la moyenne ; elle reste dans « Mes critiques »
+avec son statut ; une nouvelle critique sur le même couple redevient possible. Retirer une
+critique déjà retirée ne change rien et ne laisse aucune trace.
+
+**Le journal** : chaque publication, modification, retrait écrit, **dans la même
+transaction**, sa ligne au journal des actions (`critique_publiee`, `critique_modifiee`,
+`critique_retiree`, au nom de qui agit, `details` : la série, s'il s'agit d'un tome, `par`
+auteur ou administrateur) ; le journal applicatif dit l'événement et les identifiants.
+**Jamais le texte d'une critique**, ni à l'un ni à l'autre (tests sur le journal complet et
+sur la table). Métrique : `application_critiques_total{action}`.
+
+**Le délai d'intégration** : « Votre critique est visible sur la fiche ; elle sera intégrée
+aux recommandations du conseiller à la prochaine mise à jour du corpus » — après la
+publication et en tête de « Mes critiques ». Les critiques collectées (celles des lecteurs)
+ne sont toujours pas affichées : aucun appel à `/series/{id}/reviews`.
+
+### Les listes du client (E4, lot 4)
+
+Un compte **client** tient trois listes — **favori**, **à lire**, **à commander** —, un
+état par série, le dernier geste gagne. Sans JavaScript : un formulaire `POST`, des
+boutons ; `Cache-Control: no-store`.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/series/{series_id}`, zone « Vos listes » (`zone-listes`) | visiteur | « Connectez-vous pour tenir vos listes » (`/connexion?retour=/series/{id}`) et « Créer un compte » ; aucun bouton |
+| | client | « Dans votre liste : à lire » ou « Cette série n'est dans aucune de vos listes » ; **un** formulaire, trois boutons (`etat`), l'état courant `aria-pressed="true"` et dit « (actuelle) », et « Retirer de mes listes » quand un état existe ; après le geste, l'avis en tête de la fiche |
+| | libraire, administrateur | la zone **n'est pas rendue** (les listes sont celles des clients ; un libraire a ses critiques, l'administrateur ses outils) |
+| `POST /listes/{series_id}` | client | `jeton`, `etat` (`favori`, `a_lire`, `a_commander`, `retirer`), `retour` (chemin local seul ; défaut : la fiche) ; **303 vers `retour`**, `?etat=` : `ajoutee`, `changee`, `inchangee` (« Déjà dans vos favoris »), `retiree`, `absente`, `pleine`, `indisponible` ; libraire, administrateur : **403** ; visiteur : 303 vers la connexion, retour compris ; un état hors liste : 422 nommé ; un identifiant hors de 1 … 2 147 483 647 : 404 |
+| `/compte/listes` | client | « Mes listes » : trois sections (`zone-liste-favori`, `zone-liste-a_lire`, `zone-liste-a_commander`), « À lire (3) », la plus récente d'abord ; chaque entrée : le titre **lu dans le 02** (lien vers la fiche), la date d'ajout (`<time>`), « Retirer » ; état vide nommé par section ; base absente : 503 « comptes indisponibles » |
+| carte du conseiller (`zone-carte-listes`) | client | sous chaque carte citée, « Dans votre liste : favori » s'il y a lieu et les trois boutons ; `retour` = la fiche de la série ; pas de retrait (la fiche et la page le font) ; **aucun formulaire dans le HTML d'un visiteur, d'un libraire ou d'un administrateur** |
+
+- **La revalidation** : la série d'un **ajout** (ou d'un changement) est relue dans le 02
+  avant l'écriture — inconnue : 404, rien d'écrit ; catalogue injoignable ou non
+  configuré : rien d'écrit, l'avis « le catalogue ne répond pas ». Un **retrait** ne la
+  demande pas : une série que le 02 ne connaît plus doit pouvoir sortir d'une liste.
+- **La borne** : `[comptes] listes_max_par_etat` (**50**) ; une 51e série, ou un changement
+  vers une liste pleine, est refusé (`?etat=pleine`, avis nommé), vérifié dans la même
+  transaction que l'écriture, la ligne du compte tenue : deux gestes simultanés ne la
+  dépassent pas. Pas de pagination : la borne suffit.
+- **Les titres en parallèle** : la page demande au 02 les fiches de ses entrées ensemble
+  (`asyncio.gather`, 150 au plus) ; une série inconnue : « Titre indisponible », l'entrée
+  et son lien restent ; le catalogue muet : toutes en « Titre indisponible » et l'encart
+  « Le catalogue ne répond pas ; vos listes sont intactes ». Le titre n'est jamais gardé
+  en base (`application.listes` : compte, série, état, date).
+- **Rien n'est tracé au journal des actions** : une liste est la donnée du client, pas un
+  contenu publié ; retirer supprime la ligne. Métrique : `application_listes_total{action}`
+  (`ajout`, `changement`, `retrait` ; un geste sans effet n'est pas compté).
+- **Limite (CL4)** : le geste depuis une carte mène à la **fiche** de la série, où l'état et
+  l'avis se lisent : la réponse du conseiller n'est pas conservée par un `POST` sans
+  JavaScript (« rien n'est gardé des conversations »).
+
+### L'effacement du compte (E4, lot 4)
+
+**Le droit à l'effacement** : un client supprime son compte lui-même, à tout moment,
+physiquement et immédiatement.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/compte/mot-de-passe`, en bas (`zone-effacement`) | client | le lien « Supprimer mon compte » — pas dans le menu : un geste irréversible n'est pas à un clic du menu |
+| `/compte/supprimer` | client | la page de confirmation : ce qui sera supprimé (le compte, le pseudo, l'empreinte du mot de passe, les listes, les compteurs de questions), ce qui reste (une ligne de journal sans identité), « irréversible » ; le mot de passe (`autocomplete="current-password"`), « Supprimer définitivement mon compte », « Annuler » |
+| `POST /compte/supprimer` | client | le mot de passe vérifié par **`comptes.authentifier`**, le chemin même de la connexion — même coût, même compteur d'échecs, même verrou : un mauvais mot de passe compte comme un échec de connexion ; refus : la page, 422, « Mot de passe incorrect. », rien d'écrit ; succès : **303 vers l'accueil**, l'avis « Votre compte a été supprimé », la session fermée |
+| `/compte/supprimer` | libraire, administrateur | **403** et la phrase : « Les comptes du réseau sont désactivés par l'administrateur ; ils ne se suppriment pas, leurs critiques signées doivent rester attribuables » (l'asymétrie est voulue) |
+
+- **Une transaction** : la ligne du compte tenue (`FOR UPDATE`), la ligne `compte_supprime`
+  au journal des actions (par le compte, sur le compte), puis `DELETE FROM
+  application.comptes` — la cascade emporte `listes` et `questions_jour` ; la contrainte
+  met `par_compte_id` à `NULL` : il reste « un compte n° n a été supprimé, par lui-même », et
+  ce numéro ne nomme plus personne. Supprimé entre-temps par une autre session : même
+  sortie, rien au journal. Un compte qui a des critiques signées (un libraire, jamais un
+  client) : la base refuse (`ON DELETE RESTRICT`), la page « Ce compte ne peut pas être
+  supprimé » (409).
+- **Après** : un cookie copié avant ne vaut plus rien (le compte n'existe plus) ; **le
+  pseudo redevient libre** ; le compteur des inscriptions de la session, lui, survit (un
+  compte supprimé n'est pas une inscription de plus). Métrique :
+  `application_comptes_supprimes_total`.
+
+### L'administration (E4, lot 5)
+
+Toutes les pages `/admin/*` exigent le rôle **administrateur** : un autre rôle reçoit 403,
+un visiteur la page de connexion (`GET`) ou 401 (`POST`) ; chaque `POST` porte son jeton.
+Elles partagent une **barre d'onglets** (`nav.onglets`, `aria-label` « Administration »),
+dans cet ordre : Comptes · Modération · Réglages · Clés · Coûts · Services · Apparence
+(lot 7). La barre est
+construite à partir des **routes enregistrées** (`pages_admin.ONGLETS`, filtrée) : un onglet
+n'apparaît que si sa page existe ; la page courante porte `aria-current="page"`. Le menu
+principal n'a qu'une entrée, « Administration », vers `/admin/comptes`.
+
+**Le profil IA actif** (`/admin/reglages`, story A2, décision D12) :
+
+- **où il est gardé** : la clé `profil_actif` de la table `application.reglages` (027), une
+  ligne, sa valeur, son auteur (`modifie_par`) et sa date. Un réglage se **remplace**, il ne
+  s'efface pas (`app_rw` n'a pas `DELETE`) ; les clés écrites forment une liste fermée dans
+  le code (`reglages_app.CLES`), jamais une clé venue d'un formulaire ;
+- **ce que la page propose** : les profils de `/v1/info` **disponibles et non exclus**
+  (fournisseur, hébergement, modèle, statut `stable` / `aperçu`), un bouton radio chacun ;
+  l'actif coché — sans réglage, le défaut, dit « défaut de l'application » ; qui l'a choisi
+  (nom affiché) et quand ; les indisponibles **à part, sans bouton** ; les exclus **comptés,
+  jamais nommés** (l'exclusion est une décision du dépôt, `[reglages] profils_exclus`).
+  Le choix est **validé contre cette liste** avant toute écriture (hors liste : 422, rien
+  d'écrit) ; l'API injoignable : un encart et la valeur enregistrée, sans formulaire ;
+- **quand il est lu** : **à chaque question** (une lecture par requête, aucun cache au-delà),
+  et à chaque page du conseiller ; il part avec **toute** question — celle du public, qui n'a
+  pas de réglages, et, présélectionné, celle d'un libraire ou de l'administration, qui
+  **gardent leur liste** : le choix par question reste un geste de démonstration (lot 2b) et
+  ne modifie jamais le réglage. L'état du service, la page « à propos » et `/sante`
+  (`profil_actif: <nom> | defaut`) nomment le profil actif de l'application ;
+- **s'il devient indisponible** (l'API le dit à `/v1/info`) : la question part avec le
+  **défaut de l'API** ; un encart nommé paraît sur `/admin/reglages` et sur la page du
+  conseiller **d'une session administrateur seulement** ; l'événement
+  `profil_actif_indisponible` entre au journal applicatif ; le réglage **n'est pas effacé** :
+  il s'applique de nouveau quand le profil revient. Base injoignable pendant une question :
+  le défaut, l'événement `profil_actif_non_lu`, et le conseiller répond (décision 11) ;
+- **le journal** : chaque changement écrit, dans la même transaction, une ligne
+  `profil_actif_change` (`objet_type = 'reglage'`, `details = {"profil": "<nom>"}` — un nom
+  de profil, ni texte libre ni secret) ; la même valeur qu'avant n'écrit rien ;
+- **la métrique** : `application_profil_actif_info{profil}`, 1 sur le profil actif, 0 sur les
+  autres profils de `/v1/info`, rafraîchie à chaque lecture.
+
+**L'état des clés et leur test** (`/admin/cles`, story A3, décision D10) :
+
+- **le tableau** : par profil de `/v1/info`, le fournisseur, le modèle, le **nom** de la
+  variable de sa clé (`variable_cle` — un nom, jamais une valeur) et son état **au démarrage
+  de l'API** : `disponible` dans `/v1/info` veut dire « clé posée au démarrage » (et, si le
+  contrôle d'exploitation a tourné, « modèle présent ») — dit tel quel ;
+- **« Tester les clés maintenant »** (`POST /admin/cles/tester`, jeton, administrateur) :
+  l'application appelle `POST /v1/verification` de l'API du modèle (contrat 1.5.0), qui
+  demande à chaque fournisseur la liste de ses modèles — **non facturée**, **un test par
+  minute et par clé** (429 : « réessayez dans n s ») ; le résultat, daté, par profil (valide,
+  modèle absent de la liste, refusée avec son code, fournisseur injoignable, clé absente),
+  est gardé **dans la session** (le cookie signé) : il survit au rechargement de la page, pas
+  à une autre session, et n'est jamais écrit en base — un test est un geste de l'instant ;
+- **le repli** : l'API en 1.4.0 ne connaît pas la route (404) — l'écran dit « le test n'existe
+  pas sur cette version de l'API (1.4.0) ; l'état affiché est celui du démarrage ». C'est le
+  comportement réel tant que l'image 1.5.0 n'est pas déployée ; l'API injoignable : un encart ;
+- **le lien** vers la procédure de pose et de rotation des clés (`[administration]
+  procedure_cles` : le README du module 11, « Poser ou changer une clé ») ; aucune procédure
+  dans l'écran ;
+- métrique `application_verifications_cles_total{issue}` (`teste`, `route_absente`,
+  `trop_tot`, `indisponible`), événement `verification_cles` au journal (l'issue seule).
+
+**Les coûts** (`/admin/couts`, story A4) :
+
+- **la source unique** : la table `application.couts_jour` (027), garnie après chaque réponse
+  depuis le lot 2b (le coût estimé par l'API, sous le profil et le mode qu'elle a appliqués)
+  — jamais le texte d'une question : la table n'a que jour, profil, mode, appels et coût
+  (la garantie C20, éprouvée par un test sur la forme des lignes lues) ;
+- **le jour** (UTC) : « Aujourd'hui : x $ sur 0,50 $ — plafond : ok / atteint », le plafond
+  du conseiller (`[conseiller.limites] cout_jour_max_usd`, atteint dès qu'il est égalé), une
+  jauge `<progress>` et son **pourcentage en texte à côté** ; atteint : l'encart que le
+  conseiller affiche aussi ;
+- **le projet** : le total = la table **+ `[couts] cout_anterieur_usd`** — la dépense d'E3,
+  avant la table, **0,709557 $** (somme des clôtures des étapes 3 à 6 d'E3, relevée dans
+  l'inspection du point 0 d'E4, arrêtée par Max le 2026-11-09 ; avant E3 : non établie) —,
+  **les deux termes affichés**, contre `[couts] budget_projet_usd` (20 $) ; jauge et
+  pourcentage ; le premier jour de la table ;
+- **l'historique** : jour × profil × mode (appels, coût) sur `[couts] historique_jours`
+  (30) jours civils UTC, un total par jour ; un état vide nommé ; la répartition par profil et
+  par mode sur toute la table (l'argument « le mode enrichi coûte davantage » s'y lit) ;
+- sans base : 503 « comptes indisponibles », comme toute page d'administration.
+
+**L'état des services** (`/admin/services`, story A6) : l'API du modèle (`/v1/sante` et
+`/v1/info` : version du contrat, corpus et encodage, profil actif de l'API, **profil actif de
+l'application** et sa disponibilité), le catalogue (`/health` du 02 : sa base, sa
+`normalisation`), la base de l'application (`SELECT 1`), les clés d'API du 12 (`deux` /
+`une`). Chacun **joignable / injoignable / non configuré** — un mot, et une icône
+décorative —, avec le délai mesuré ; un encart nommé si un service manque ; « lu à HH:MM:SS
+UTC » et un lien « Relire ». **Lu à la demande de la page** (les quatre lectures en
+parallèle, 5 s chacune) : aucune sonde de fond, aucun stockage — **Grafana reste l'outil de
+fond** (E5) ; un lien vers lui si `[monitorage] adresse_grafana` est posée (vide par défaut).
+Comme toute page d'administration, elle exige le rôle admin : **sans base, 503 « comptes
+indisponibles »** — le contrôle de rôle ne souffre aucune exception sous `/admin/` (l'état de
+la base, sans session, se lit à `/sante`).
+
+**Jamais une valeur de secret** à l'écran, au journal, aux métriques : un test pose des
+valeurs factices reconnaissables pour les quatre secrets de l'application
+(`APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`, `APPLICATION_CLE_CATALOGUE`,
+`APPLICATION_CLE_SESSION`) et les cherche — entières et par morceau — dans le HTML de
+**toutes** les pages de l'administration (chaque onglet présent, les états après un test),
+dans `/sante` et dans `/metrics` (`tests/test_admin_secrets.py`, mutation E4A-04).
+
+### Les comptes (E4, lot 1)
+
+Pages rendues côté serveur, sans JavaScript ; chaque formulaire en `POST`, avec son jeton.
+
+| Page | Qui | Ce qu'elle fait |
+|---|---|---|
+| `/inscription` | visiteur | pseudo, mot de passe, confirmation ; les règles affichées ; « ce que nous gardons » et le renvoi vers « à propos » ; succès : compte client, session ouverte, retour à la page d'origine (chemin local seul) |
+| `/connexion` | visiteur | un seul refus, « Pseudo ou mot de passe incorrect », quel que soit le cas (inconnu, mauvais mot de passe, verrouillé, désactivé), même statut (401), suivi d'une phrase fixe, la même dans tous les cas : le seuil et la durée de la suspension (lus aux réglages), et qu'un compte désactivé s'adresse à l'administrateur — les règles, rien sur le compte ; succès : retour à la page demandée, ou au changement d'un mot de passe initial |
+| `/deconnexion` (`POST`) | connecté | la génération + 1 (toute copie du cookie tombe, et les autres sessions du compte avec), la session vidée ; retour à l'accueil |
+| `/compte/mot-de-passe` | connecté | ancien, nouveau, confirmation ; succès : génération + 1 (les autres sessions tombent), la session courante rouverte, le mot de passe initial levé, une ligne au journal des actions ; la page ne montre plus le formulaire mais un encart « Mot de passe changé et enregistré » et un lien « Continuer » ; un mauvais ancien compte un échec, sous le même compteur et le même verrou que la connexion |
+| `/admin/comptes` | administrateur | la liste (pseudo, nom affiché, rôle, état, date), filtrée par rôle, par pages de 25 (une page hors bornes rend la plus proche) ; créer un compte libraire ou administrateur (un rôle hors liste est refusé, nommé), au mot de passe initial saisi deux fois, à changer ; désactiver (ses sessions tombent) ou réactiver un compte — jamais le sien ; un changement sans effet ne laisse aucune trace ; aucune suppression |
+| `/libraire/critiques` | libraire | « Mes critiques » (E4, lot 3, ci-dessous) |
+| `/admin/critiques` | administrateur | la modération des critiques (E4, lot 3, ci-dessous) |
+
+**Le menu**, dans chaque page (`<nav>`), pages d'erreur comprises : visiteur — Conseiller,
+Connexion, Créer un compte (ces deux liens ramènent à la page affichée) ;
+client — Conseiller, Mes listes (E4, lot 4), Mon compte, son nom, Déconnexion (un bouton de formulaire) ; libraire —
+en plus, Mes critiques ; administrateur — en plus, **une seule entrée « Administration »**
+(`/admin/comptes`, E4, lot 5 : elle remplace « Comptes » et « Critiques » ; les pages de
+l'administration ont leur barre d'onglets ; pas « Mes critiques » : il n'écrit pas, E4, lot 3). Sans base, chaque page de compte
+dit « Les comptes sont momentanément indisponibles ; le conseiller reste accessible » (503).
+
+**Le premier administrateur**, par une commande : `make app-admin-creer`, avec
+`APPLICATION_ENVIRONNEMENT` et `APPLICATION_BASE_DSN` (sans mot de passe) dans
+l'environnement. Elle applique la garde d'environnement, demande le pseudo, le nom affiché,
+puis le mot de passe deux fois, sans écho (`getpass`) — sans terminal, ou si le terminal
+ne coupe pas l'écho, elle refuse (code 2) ; elle crée le compte `admin`, sans mot de passe
+à changer, et sa ligne de journal sans auteur ; un refus de la base est nommé par sa
+classe, sans son message. Jamais de mot de passe en argument, en variable ni dans une
+sortie.
+
+```bash
+APPLICATION_ENVIRONNEMENT=preproduction \
+APPLICATION_BASE_DSN='postgresql://app_conseiller@localhost:5432/apimanga_preprod' \
+  make app-admin-creer
+```
+
+## L'identité Senpai (E4, lot 6)
+
+**Senpai** est le nom de travail du réseau fictif (`nom_librairie`, `config/reglages.toml`,
+modifiable) ; le pied de page le dit, après la mention de l'IA : « Senpai est un réseau
+fictif de librairies : projet de certification Développeur en intelligence artificielle
+(formation Simplon). » Le logo est une image qui porte le nom : si le nom change, les
+scripts du paquet d'habillage (hors dépôt) régénèrent le logo, et le crédit du pied de page
+(`mention_complete`) se réécrit à la main.
+
+- **Le paquet** : remis par la session design du 9 novembre 2026, versé **tel quel** dans
+  `src/application/statique/` — `theme.css` (remplacé), `senpai.css` (nouveau), `polices/`,
+  `lavis/`, `touches/`, `images/`, `icones/`, leurs licences ; ses empreintes ajoutées à
+  `statique/EMPREINTES`, commentaires de provenance compris. Ses pages d'aperçu et ses
+  scripts de génération restent hors dépôt. Tout écart au paquet est relevé au rapport du lot.
+- **`base.html`, trois retouches** : `senpai.css` après `theme.css` ; la classe d'espace
+  sur `<body>`, chaque gabarit déclarant la sienne (`{% block espace %}…{% endblock %}` ;
+  depuis le lot 7, la classe est calculée par le serveur d'après ce bloc, voir
+  « L'apparence ») ; `aria-current="page"` sur le lien du menu de la page courante (toute
+  l'administration sous « Administration » ; la page du conseiller aussi après une
+  question). Le logo est une image de fond du premier paragraphe de l'en-tête : aucune
+  balise ajoutée.
+- **Les espaces** (une page, une couleur) :
+
+| Espace | Gabarits |
+|---|---|
+| `menthe` | `index.html` (le conseiller) |
+| `ciel` (défaut) | `catalogue.html`, `connexion.html`, `inscription.html`, `a_propos.html`, `erreur.html` (et la page d'erreur de l'enveloppe, 413 et 500) |
+| `sakura` | `serie.html` |
+| `yuzu` | `mot_de_passe.html`, `listes.html`, `compte_supprimer.html` |
+| `glycine` | `critiques.html`, `critique_formulaire.html`, `critique_retirer.html` |
+| `brume` | les huit pages `admin_*.html` |
+
+  Un test lit le dossier des gabarits et compare chaque déclaration à cette table ; depuis
+  le lot 7, chaque gabarit de page en déclare exactement une (un gabarit sans déclaration
+  ne se rend pas).
+- **Les règles du design** : une page, une couleur (lavis, survol, onglets, étiquettes,
+  jauge) ; un seul bouton, blanc, trait d'encre et ombre décalée ; le bleu nuit pour ce qui
+  est choisi ou la page courante, la framboise pour les erreurs et les liens posés sur le
+  papier ; sur le lavis, l'encre seule. Le sens n'est jamais porté par la couleur seule.
+  Cibles de 44 px, focus visible de 3 px.
+- **Ressources vendues et licences** : polices Mochiy Pop One, Zen Maru Gothic (500, 700),
+  Yusei Magic, sous-ensembles latins en woff2, **SIL Open Font License 1.1**
+  (`polices/LICENCE-OFL`) ; 33 icônes **Phosphor Icons**, **MIT** (`icones/LICENCE-phosphor`) ;
+  lavis, touches, logo et poses de la mascotte créés pour le projet. Rien n'est chargé
+  d'ailleurs : toutes les `url()` de `senpai.css` visent `/statique/` (test).
+- **Politique de sécurité du contenu** : `font-src 'self'` ajouté pour les polices vendues,
+  et `script-src 'self'` pour le seul script vendu (la pose d'attente de la mascotte) ;
+  `default-src 'none'`, `style-src 'self'`, `img-src 'self' data:` inchangés ; aucun style
+  ni script en ligne, nulle part (test sur chaque écran).
+- **Pas de mode sombre** : `base.html` force `data-theme="light"`, et le thème n'a pas de
+  variante sombre.
+- **Le poids** : `statique/` passe de 73 477 à 349 896 octets (≈ 72 à 342 Ko) : polices
+  58 880, lavis 112 828, touches 9 084, images 28 845, icônes 15 346, `senpai.css` 29 857 ;
+  l'image Docker grossit d'autant.
+
+### L'apparence (E4, lot 7)
+
+L'administrateur choisit, à `/admin/apparence` (septième onglet), **la couleur de chacun
+des six espaces** parmi les six pigments du paquet, et pour toute l'application
+**l'intensité du lavis** (60, 70, 85, 100 %) et **la matière** (aquarelle ou aplat). Story
+AP1 ; la préférence par libraire est hors périmètre (elle demanderait une migration).
+
+- **Les clés** : `application.reglages` (migration 027, aucune migration neuve) —
+  `apparence_menthe`, `apparence_ciel`, `apparence_sakura`, `apparence_yuzu`,
+  `apparence_glycine`, `apparence_brume` (la couleur posée sur l'espace qui porte ce nom
+  d'origine), `apparence_intensite`, `apparence_matiere` ; ajoutées à `reglages_app.CLES`.
+- **Liste blanche côté serveur, puis dictionnaire de constantes** (`apparence.py`) :
+  couleurs ∈ {menthe, ciel, sakura, yuzu, glycine, brume}, intensité ∈ {60, 70, 85, 100},
+  matière ∈ {aquarelle, aplat} ; toute valeur hors liste → **422**, rien d'écrit, le groupe
+  fautif désigné (`aria-describedby`). La classe de `<body>` et le chemin de la pastille
+  sont traduits par des dictionnaires écrits dans le code, **jamais composés depuis une
+  valeur lue** ; une valeur piégée en base vaut le défaut de sa clé et se journalise par
+  sa clé (`apparence_valeur_ignoree`), jamais par sa valeur. Pas de sélecteur de couleur
+  libre, pas de style en ligne : la politique de sécurité du contenu ne change pas.
+- **Les espaces restent des espaces** : chaque gabarit déclare toujours son espace
+  d'origine ; `base.html` porte `<body class="{{ classes_body(self.espace()) }}">` — le
+  serveur lit le bloc du gabarit, le traduit en la couleur réglée (`esp-<couleur>`) et
+  ajoute `intensite-<n>` et `matiere-aplat` s'il y a lieu. **Sans réglage : la couleur
+  d'origine, 85 %, aquarelle — le rendu du lot 6 à l'identique** (un test compare les
+  classes de `<body>` de chaque écran à la liste relevée au lot 6).
+- **La lecture au rendu** : une dépendance de l'application, après la garde de session (le
+  compte relu, une session refusée vidée), lit les huit clés **en une requête**
+  (`cle = ANY(%s)`), une fois par requête (`request.state`), sans cache au-delà ; sauf
+  `/sante` et `/metrics`. Base non configurée ou injoignable : les défauts, sans erreur ni
+  événement propre à l'apparence (le journal de la base garde son `base_indisponible`
+  habituel) ; le conseiller d'un visiteur ne dépend jamais de la base pour s'afficher.
+- **La page d'erreur de l'enveloppe** (413, 500), rendue sans requête, ne lit pas la base :
+  elle garde `esp-ciel` et le défaut. Les autres pages d'erreur suivent l'espace de leur
+  gabarit (« catalogue et comptes »).
+- **Pas de ligne au journal des actions** : la contrainte de `journal_actions` n'a pas
+  d'action pour l'apparence et l'ajouter serait une migration ; `modifie_par` et
+  `modifie_le` disent qui et quand, et l'écran l'affiche (« Choisi par … le … »).
+  L'apparence n'est ni une donnée ni un droit.
+- **L'avertissement, pas l'interdiction** : quand plusieurs espaces reçoivent la même
+  couleur, l'écran le dit (« Deux espaces partagent la couleur sakura … : le repère de page
+  s'affaiblit ») et applique quand même — une règle du design, pas de sécurité.
+- **L'aperçu** : la page « Apparence » est dans l'espace « administration » et se rend avec
+  l'apparence réglée ; chaque couleur y est montrée par une **pastille** — la touche du
+  pigment du paquet, découpée en carré par le `viewBox` d'un SVG, à la taille d'une
+  étiquette (`.badge`) ; décorative, le nom de la couleur est toujours écrit. Pas
+  d'aperçu en direct sans JavaScript : « Appliquer », la page se recharge.
+- **Revenir à l'apparence d'origine** : un bouton (`POST`, jeton) écrit les valeurs par
+  défaut (pas de `DELETE` : `app_rw` n'en a pas sur la table).
+- **Kōhai suit la page** (écart au paquet, décidé par Max le 10 novembre) : la feuille se
+  servait de `esp-menthe` pour reconnaître le conseiller ; une page réglée en menthe
+  aurait reçu Kōhai à côté de son titre, et le conseiller dans une autre couleur aurait
+  perdu la mise en page du sien. Trois règles à la fin de la section 16 de `senpai.css`
+  reconnaissent le conseiller à son Kōhai principal (`.kohai-principal`), sans classe
+  neuve ; l'audit le vérifie dans Chromium sur les écrans réglés.
+- **La métrique** : `application_apparence_info{espace, couleur}`, 1 sur la couleur réglée
+  de chaque espace, rafraîchie à chaque lecture.
+
+### Kōhai, la mascotte
+
+- **Phase 1** (le paquet, sans gabarit) : Kōhai en image, choisi par la feuille selon ce
+  que la page affiche (`:has()`) ; sur la fiche, le petit Kōhai du bouton « Demander au
+  conseiller ».
+- **Phase 2** (SVG en ligne) : `composants/kohai.html` inclut un des cinq dessins de
+  `gabarits/kohai/` (tels que remis) dans un cadre `aria-hidden` qui choisit l'animation
+  (`k-anim-*`). Sur le conseiller, dans le titre, la pose vient du serveur : **arrivée** à
+  chaque chargement de l'accueil (comme la phase 1 : rien n'est gardé dans la session, le
+  cookie ne porte que le strict nécessaire), **trouvé** quand la réponse cite au moins une
+  série, **perdu** sur un refus ou un encart. Kōhai est décoratif : le texte de la page dit
+  toujours l'état.
+- **Transitions entre pages** : `@view-transition` (Chrome et Edge 126+, Safari 18.2+ ;
+  Firefox change de page normalement) ; Kōhai passe du conseiller à la fiche (nom de
+  transition `kohai`). `:has()` : Chrome 105, Safari 15.4, Firefox 121 ; sans lui, la pose
+  « bonjour » reste.
+- **Mouvement réduit** : sous `prefers-reduced-motion: reduce`, aucune animation ni
+  transition (test sur le texte de la feuille ; écran de l'audit émulé).
+- **Compléments de la feuille** : une section 16 ajoutée à la fin de `senpai.css`, une
+  règle par manque relevé (l'image de la phase 1 retirée quand le SVG est là, un refus en
+  pose « perdu », le Kōhai principal caché pendant l'attente, le nom de transition sur le
+  Kōhai de la fiche) ; aucune règle du paquet modifiée (un test garde l'empreinte de ce qui
+  précède). Au lot 7, trois règles de plus rattachent Kōhai **à la page** et non plus à la
+  couleur `menthe` (voir « L'apparence »), et deux placent l'en-tête (« L'en-tête »).
+
+### Le seul script
+
+- **Ce qu'il fait** : `statique/attente.js`, neuf lignes, sans dépendance, en mode strict :
+  à l'envoi du formulaire de question, il pose la classe `en-attente` sur `<body>` ; la
+  feuille montre alors Kōhai qui lit et la phrase « Kōhai lit les critiques… » (zone
+  `aria-live`), déjà dans la page et cachée.
+- **Ce qu'il ne fait pas** : il ne lit aucune donnée, n'envoie rien, ne touche ni cookie ni
+  stockage ; hors du conseiller, il ne trouve pas le formulaire et s'arrête.
+- **Pourquoi une exception** : la page suivante arrive avec la réponse ; la pose d'attente ne
+  peut donc pas venir du serveur.
+- **La politique** : `script-src 'self'`, une seule balise, dans `<head>`, `defer`, le fichier
+  empreinté dans `EMPREINTES` ; jamais en ligne.
+- **L'application est identique sans lui** : les tests rendent les pages sans exécuter de
+  script ; l'audit vérifie dans Chromium, JavaScript actif, que l'envoi pose la classe et
+  montre la phrase, et, JavaScript coupé, que la page ne change pas et que la question part.
+
+### Ressources
+
+`statique/EMPREINTES` liste chaque fichier vendu et son empreinte SHA-256 : Pico, puis les
+59 fichiers du paquet Senpai, puis le seul script (`attente.js`). Un test exige que **chaque** fichier de `statique/` qui n'est
+pas écrit pour l'application (`theme.css`, `senpai.css`) ou une licence y figure, avec
+l'empreinte exacte.
+
 ## Accessibilité
 
 - **Niveau visé** : WCAG 2.1 AA (le RGAA 4 s'appuie dessus).
 - **Outil** : axe-core, vendu avec son empreinte et sa licence, lancé par Playwright dans
-  Chromium sur chaque écran et chaque cas, dans `make verify-poste`. Politique de sécurité
-  active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
+  Chromium sur chaque écran et chaque cas, dans `make verify-poste` — **100 pages** au
+  2026-11-08, dont les seize du lot 1 d'E4 (écrans des comptes, leurs refus, leurs
+  avis, les pages 401, 403, « formulaire expiré », 404 sous un compte et 503), les huit
+  du lot 2a (la recherche, ses résultats paginés, son état vide, sa saisie fautive, le
+  catalogue indisponible, la fiche, la fiche sans note, la série introuvable) et les
+  treize du lot 3 (« Mes critiques » pleine, vide, sans catalogue ; écrire, son refus,
+  modifier, retirer, l'accès refusé ; la fiche avec critiques, et sans base ; la
+  modération, sa liste vide, sa confirmation), sur une base jetable, les connexions faites dans le navigateur et vérifiées, chaque page
+  reconnue à son titre. Politique de sécurité active, `<details>` ouverts, formulaire soumis. **Règle** : aucune violation `serious` ou
   `critical`, et aucune violation de la politique de sécurité en console.
-- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md), et sa
-  sortie, `rapport_axe.json` : versionnés, réécrits par le test si le résultat change.
+- **Le rapport** : [`accessibilite/rapport_axe.md`](accessibilite/rapport_axe.md),
+  versionné, réécrit par le test si le résultat change. Sa sortie brute,
+  `rapport_axe.json`, reste sur le poste (ignorée par git, régénérée à chaque audit) :
+  avec l'habillage, chaque texte posé sur une image de fond y figure avec son nœud (plus
+  de 4 Mo).
   **Défauts inscrits : aucun.** Une règle reste à relire à l'œil, dite au rapport.
 - **Sans navigateur, sur le poste et sur GitHub** : des tests de balisage par critère
   (`-k wcag`) : langue, titres, étiquettes, lien d'évitement, focus, zone annoncée, contraste
@@ -214,30 +772,123 @@ par minute du compte (2026-11-03).
   module (`APPLICATION_CLE_API`, le secret seul). Jamais dans un fichier suivi, une page, un
   journal : un test le vérifie, et les hooks la refusent par valeur et par aspect. Pour la
   révoquer : la retirer du trousseau, redémarrer l'API.
-- **En-têtes** : politique de sécurité du contenu stricte (aucun script, aucune ressource
-  externe ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14 occurrences,
-  toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
+- **En-têtes** : politique de sécurité du contenu stricte (aucune ressource externe, rien
+  en ligne ; `font-src 'self'` et `script-src 'self'` pour les polices et le seul script
+  vendus, E4, lot 6 ; `data:` pour les images seules : Pico dessine ses coches ainsi, 14
+  occurrences, toutes des images SVG, et une image n'exécute rien), `X-Content-Type-Options`,
   `Referrer-Policy`, `Cache-Control: no-store` sur les pages de conversation.
 - **Formulaire** : en `POST`, corps borné, gabarits échappés, aucun marquage « sûr » d'un
-  texte venu de l'API.
+  texte venu de l'API ; **un jeton CSRF** dans chaque formulaire `POST` (celui du conseiller
+  compris), comparé en temps constant au jeton de la session : absent ou faux, un 403 et la
+  page « Ce formulaire a expiré, rechargez la page », avant tout appel à l'API.
+- **La base de l'application** (E4, lot 1) : le schéma `application` d'`apimanga`
+  (`schema/README.md`), par le rôle de connexion `app_conseiller`, membre de `app_rw` seul
+  — rien hors du schéma, pas même en lecture ; requêtes paramétrées seules ; une
+  connexion par opération, refermée aussitôt, pas de pool (quelques requêtes par minute,
+  10 connexions au plus pour le rôle) ; délai borné (`[comptes] delai_base_s`) pour se
+  connecter, pour une instruction et pour attendre un verrou. DSN **sans mot de passe**
+  (`~/.pgpass` sur le poste, un fichier monté dans un conteneur) : un DSN qui en porte un
+  empêche de démarrer. Base absente ou injoignable : les pages de compte disent 503,
+  le conseiller fonctionne ; `/sante` et la métrique `application_base_etat` disent son
+  état, sans détail.
+- **Les mots de passe** : **Argon2id**, par `argon2-cffi` directement, aux paramètres par
+  défaut de la bibliothèque, relevés le 2026-11-08 (argon2-cffi 25.1.0) : **temps 3, mémoire
+  65 536 Kio (64 Mio), parallélisme 4**, empreinte de 32 octets, sel de 16 octets ; un
+  nouveau hachage à la connexion si les paramètres changent. Le hachage tourne hors de la
+  boucle d'événements, **quatre calculs au plus à la fois** (la mémoire reste bornée). Un
+  pseudo inconnu passe par une **vérification factice** (empreinte de référence calculée
+  au démarrage).
+- **Les sessions** : `SessionMiddleware` de Starlette, cookie signé (`itsdangerous`,
+  expiration vérifiée côté serveur), `HttpOnly`, `SameSite=Lax`, `Secure` hors
+  développement, durée `[comptes] duree_session_s` **après la dernière page** (le jeton
+  réécrit à chaque page renvoie le cookie). **Un cookie par environnement** :
+  `conseiller_session` en développement, `conseiller_session_preproduction`,
+  `conseiller_session_production`, et une signature liée à l'environnement — avec la
+  même clé, une session de préproduction ne vaudrait pas en production ; **une clé par
+  environnement** reste la règle. Il ne porte que l'identifiant du
+  compte, un **numéro de génération** et le jeton CSRF — ni rôle, ni pseudo. Le rôle, l'état
+  et la génération sont **relus en base à chaque requête** ; une génération différente ou
+  un compte inactif vident la session. Changer son mot de passe ou être désactivé
+  incrémente la génération : toutes les sessions du compte tombent ; la déconnexion aussi
+  (choix du lot : une copie du cookie ne survit pas à la déconnexion, au prix de fermer
+  les autres sessions du compte). Une connexion réussie
+  rouvre une session neuve, au jeton neuf (pas de fixation). Les visiteurs anonymes
+  reçoivent aussi le cookie : il porte leur jeton (cookie strictement nécessaire).
+- **Le verrou** : 5 échecs consécutifs (`[comptes] echecs_avant_verrou`) posent un verrou de
+  15 minutes (`duree_verrou_s`) ; un compte verrouillé, inactif, un mauvais mot de passe
+  ou un pseudo inconnu rendent le même refus, par **le même travail** : une lecture sans
+  verrou de ligne, une vérification hors transaction (rien n'est tenu pendant le calcul,
+  des essais simultanés ne s'attendent pas), une écriture — le compteur, en une
+  instruction atomique, ou une écriture vide ; un succès remet le compteur à zéro. Un
+  pseudo hors forme (octet nul, trop long) n'atteint pas la base : il suit le chemin d'un
+  pseudo inconnu ; un nom affiché ne garde que des caractères imprimables.
+- **La garde par rôle** : une page réservée renvoie un anonyme vers la connexion (le chemin
+  de retour n'accepte qu'un chemin local : ni « // », ni barre inverse, ni caractère de
+  contrôle) — un formulaire réservé envoyé sans session reçoit la page 401 —, et répond
+  403 à un compte sans le rôle. `Cache-Control: no-store` sur les
+  pages de compte et d'administration.
+- **Le 401 sans `WWW-Authenticate`** : écart déclaré à la RFC 9110 (§ 11.6.1), qui veut cet
+  en-tête avec tout 401. L'authentification se fait par formulaire, aucun schéma n'est
+  normalisé pour elle, et l'en-tête n'aurait aucun sens pour un navigateur ; même règle
+  pour le 401 de la connexion refusée.
+- **La garde d'environnement** : `APPLICATION_ENVIRONNEMENT` ; la base du DSN doit être celle
+  de l'environnement (`preproduction` ↔ `apimanga_preprod`, `production` ↔ `apimanga`) ; en
+  développement, `apimanga` est refusée. Un écart empêche de démarrer, sans montrer le DSN.
 - **Ce qui est transmis, et par qui** : l'API envoie au fournisseur du profil utilisé la
   question, l'historique et les passages. L'application ne parle jamais à un fournisseur.
-- **Ce qui est conservé par l'application : rien.** Son journal porte route, statut, durée,
-  identifiants, code d'erreur, nombre de tours et taille de l'historique ; jamais la
-  question, l'historique, la réponse ni la clé.
+- **Ce qui est conservé par l'application** : rien des conversations. Les comptes, en
+  base (pseudo, empreinte du mot de passe, rôle, dates, compteur d'échecs ; aucun courriel),
+  et les listes d'un client — jusqu'à ce qu'il supprime son compte (« Registre des
+  traitements » ci-dessous).
+  Son journal, une ligne JSON par requête et par événement, porte route, statut, durée,
+  identifiants (de la requête, du compte), code d'erreur, nombre de tours et taille de
+  l'historique ; **jamais** la question, l'historique, la réponse, la clé, un mot de passe,
+  une empreinte, un pseudo, le cookie ni le jeton. Tout événement pendant une requête porte
+  son identifiant. Événements des mécanismes : `session_refusee`, `csrf_refuse`,
+  `acces_refuse` (gabarit de la route), `base_indisponible`, `cle_session_ephemere` ; des
+  écrans de compte (E4, lot 1, spec 03) : `inscription`, `connexion_reussie`,
+  `connexion_refusee` (motif borné), `verrou_pose`, `deconnexion`, `mot_de_passe_change`,
+  `mot_de_passe_refuse` (motif borné) ; de l'effacement (E4, lot 4) : `compte_supprime`,
+  `suppression_refusee` (motif borné).
+
+### Registre des traitements : les données du client
+
+| Données | Finalité | Durée | Suppression | Ce qui subsiste |
+|---|---|---|---|---|
+| pseudo, nom affiché (le pseudo), empreinte Argon2id du mot de passe, rôle, dates, compteur d'échecs et verrou | se connecter, tenir ses listes | jusqu'à la suppression par l'intéressé | **immédiate**, par lui-même (`/compte/supprimer`), sans délai de rétention | une ligne `compte_supprime` du journal des actions, sans identité (`par_compte_id` nul, le numéro de l'ancien compte, la date) |
+| listes (identifiant de série, état, date d'ajout) | favori, à lire, à commander | jusqu'au retrait de la série ou à la suppression du compte | le retrait supprime la ligne ; la suppression du compte, toutes (cascade) | rien |
+| compteurs de questions du jour (`questions_jour`, un nombre, aucun texte) | le quota d'un client | jusqu'à la suppression du compte | cascade | rien |
+| coûts du jour (`couts_jour`) | le budget du conseiller | — | — | des agrégats par jour, profil et mode, **sans compte** |
+
+Les comptes du réseau (libraires, administrateurs) ne se suppriment pas : ils se
+désactivent (leurs critiques signées restent attribuables).
 
 ### OWASP Top 10, mis en regard
 
 | Risque | Ici |
 |---|---|
-| Injection | aucun accès à la base ; l'API seule, par son contrat |
-| XSS | échappement des gabarits, politique de sécurité du contenu sans script |
+| Injection | requêtes paramétrées seules, sur le schéma `application` ; le rôle n'a rien ailleurs (refus `42501` éprouvés) ; l'API par son contrat |
+| XSS (A03), mauvaise configuration (A05) : la politique | échappement des gabarits ; politique de sécurité du contenu sans rien en ligne : `script-src 'self'` pour **le seul script vendu**, empreinté (`attente.js`, E4, lot 6), aucun `<script>` en ligne ni attribut `on*` (test sur chaque écran ; mutations **E4H-02**, **E4H-07**) ; `font-src 'self'` (**E4H-01**) |
 | Mauvaise configuration | en-têtes, hors ligne, image non root épinglée par empreinte ; configuration validée au démarrage |
 | Composants vulnérables | verrou, `pip-audit --strict` bloquant ; ressources vendues sous empreinte |
 | Secrets | hors dépôt, hooks, `repr` sans valeur |
-| Authentification, sessions, contrôle d'accès, journalisation des accès | **relèvent de l'épreuve E4** : pas de comptes ici |
+| Secrets (A02, A05) : l'administration | **jamais une valeur de clé** dans une page `/admin/*`, `/sante`, `/metrics` : le nom des variables seul ; prouvé par des valeurs factices reconnaissables, cherchées entières et par morceau ; mutation **E4A-04** |
+| Clé du catalogue | dans l'environnement, jamais en page ni au journal (prouvé par test, sur le journal complet) ; gardée dans le seul client HTTP ; un refus (401) journalisé sans elle |
+| Authentification | Argon2id aux paramètres de la bibliothèque ; vérification factice d'un pseudo inconnu ; verrou après 5 échecs ; même refus en tout cas (E4, lot 1) |
+| Sessions | cookie signé à expiration, `HttpOnly`, `SameSite=Lax`, `Secure` hors développement ; génération relue en base à chaque requête ; session neuve à la connexion |
+| Sessions : la déconnexion | déconnexion = révocation côté serveur de toutes les sessions du compte (génération + 1) : une copie du cookie ne survit pas, sur un poste partagé comme ailleurs |
+| Contrôle d'accès | garde par rôle (403), renvoi vers la connexion par un chemin local seul ; mutations versionnées sur la garde, la génération, le verrou, le retour |
+| Contrôle d'accès (A01) : l'administration | **toute page `/admin/*` exige le rôle admin** (`sessions.exiger_role("admin")`, en `GET` comme en `POST`) : un client, un libraire reçoivent 403, un visiteur la connexion ; le profil choisi est validé contre la liste de `/v1/info` avant d'être écrit ; mutations E4A-02 (profil hors liste), **E4A-03** (garde de rôle retirée) |
+| Injection (A03), contrôle d'accès (A01) : l'apparence | **aucune valeur de l'utilisateur n'atteint le CSS** : liste blanche côté serveur puis dictionnaire de constantes, pour la classe de `<body>` comme pour le chemin de la pastille ; aucun style en ligne, politique inchangée ; `/admin/apparence` exige le rôle admin ; mutations **E4P-01** (valeur hors liste acceptée), **E4P-02** (classe composée depuis la valeur), **E4P-03** (garde de rôle retirée) |
+| Contrôle d'accès (A01) : les critiques | un libraire n'agit que sur les siennes (garde d'auteur dans la requête même, `WHERE compte_id`), l'administrateur retire sans jamais modifier ; agir sur celle d'un autre : 403, base inchangée (tests en `GET` et en `POST`) ; aucune suppression possible (droits de `app_rw`) ; mutations E4R-01, 02, 05, 06, 08 |
+| Contrôle d'accès (A01) : l'effacement | la suppression exige **la session et le mot de passe** (vérifié par le chemin de la connexion : même compteur, même verrou) ; elle ne vise que le compte de la session ; un libraire, un administrateur : 403 ; mutations E4L-05 (sans le mot de passe), E4L-06 (sans la ligne de journal) |
+| Contrôle d'accès (A01) : les listes | les listes ne sont lisibles et modifiables que par **leur compte** : chaque requête porte l'identifiant de la session, jamais un identifiant venu du formulaire ; un client ne voit ni ne change celles d'un autre ; un libraire, un administrateur : 403 au geste et à la page ; tests par rôle et à deux comptes ; mutations E4L-01 à 04, 07 |
+| Injection (A03) : le texte des critiques | requêtes paramétrées ; le texte rendu **échappé** par les gabarits, jamais marqué « sûr » (test avec `<script>`, `<b>`, `<img onerror>` : rendus littéralement, aucun élément créé ; mutation E4R-07) ; politique de sécurité du contenu sans script |
+| Journalisation des accès | événements de compte en JSON, identifiants seuls ; aucun secret, aucun pseudo |
 | Désérialisation | sans objet : aucun format binaire ; l'historique est du JSON revalidé |
-| Requêtes intersites | **non contrôlées à ce stade** : `POST /question` ne lit ni `Origin` ni `Sec-Fetch-Site`. Sans compte ni cookie, il n'y a rien à voler, mais un site tiers ouvert sur le poste du libraire pourrait déclencher un appel facturé. Limite déclarée, à traiter avec les sessions de l'épreuve E4 |
+| Requêtes intersites | jeton CSRF par session dans chaque formulaire `POST`, comparé en temps constant, et `SameSite=Lax` (E4, lot 1) : un site tiers ne peut plus déclencher un appel facturé |
+| Consommation de ressources non bornée (A04) : le conseiller | **couvert** (E4, lot 2b) : quatre bornes vérifiées avant l'appel — quota par session, quota par compte client, débit de la clé publique, budget du jour persisté (« Les bornes du conseiller ») ; un refus n'appelle jamais l'API ; mutations E4Q-04 à 07, E4Q-12 |
+| Authentification (A07) : l'inscription | **couvert, par session** (E4, lot 2b) : 3 comptes par heure et par navigateur, aucune ligne au-delà ; limite assumée : un cookie effacé remet le compteur à zéro ; mutation E4Q-08 |
 
 ## Configuration
 
@@ -248,20 +899,30 @@ validé au démarrage : un écart empêche de démarrer, et le message nomme le 
 |---|---|---|
 | `[api] adresse` | `http://127.0.0.1:8010` | l'API du modèle sur le poste |
 | `[api] identite` | `libraire-demo` | fixe tant qu'il n'y a pas de comptes |
-| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
+| `[api.delais]` | connexion 5 s, réponse 75 s, `/v1/info` et `/v1/sante` 5 s, test des clés 15 s (E4, lot 5) | 75 s couvre largement le mesuré (p95 de 2,1 à 9,5 s, 2026-10-30 à 11-03), pas le pire cas théorique de l'API (90 à 240 s) |
 | `[api.attentes]` | 60 s, 2 s | l'attente annoncée sans `Retry-After` lisible |
 | `[reglages]` | température 0, reformulation cochée, mode démonstration éteint, `mistral-large-4` exclu ; trois positions | voir « Les réglages » |
 | `[conversation]` | 500 caractères par question, 5 échanges, 10 tours, 4 000 caractères, 2 000 par tour | les bornes de l'API ; celles que `/v1/info` publie l'emportent, un écart est journalisé ; la longueur d'un tour est comparée au contrat par un test |
 | `[corps]` | 16 Kio | un historique plein en français tient en 6,5 Kio environ (estimation) |
 | `[ecoute]` | `127.0.0.1:8020` | 8000 est au module 02 |
 | `[metriques]` | le bouclage | `/metrics` ; 404 ailleurs |
+| `[couts]` | budget 20 $ ; antérieur 0,709557 $ (E3) ; 30 jours | E4, lot 5 : le total du projet = la table + l'antérieur |
+| `[monitorage]` | `adresse_grafana` vide | le lien vers Grafana, s'il est posé |
+| `[administration]` | le lien de la procédure des clés (README du 11, sur `main`) | E4, lot 5 : un document du dépôt, pas une procédure dans l'écran |
 | `[fournisseurs]` | Mistral : Union européenne ; OpenAI : hors Union européenne par défaut | `/v1/info` ne dit pas l'hébergement |
+| `[catalogue]` | `http://127.0.0.1:8000` ; 20 par page (50 au plus) ; saisie de 2 à 100 ; connexion 3 s, réponse 5 s | l'API data du 02 sur le poste ; ses bornes, recopiées et comparées au contrat par un test ; la recherche répond en 116 ms de médiane (2026-11-08) |
+| `[comptes]` | session 8 h après la dernière page ; verrou après 5 échecs, 15 min ; pseudo 3 à 30, nom affiché 60 au plus (les bornes de la migration `027`, comparées par un test) ; mot de passe 12 à 128 (décision 7) ; base 3 s ; 25 comptes par page | voir « Sécurité et données » |
 | `[textes]` | tous les textes des écrans | une seule source ; un texte absent empêche de démarrer |
 
-| Variable (`.env.example`) | Rôle |
+| Variable | Rôle |
 |---|---|
 | `APPLICATION_CLE_API` | la clé de l'application, obligatoire |
+| `APPLICATION_ENVIRONNEMENT` | `developpement` (défaut), `preproduction`, `production` : la garde d'environnement |
+| `APPLICATION_BASE_DSN` | le DSN de la base des comptes, **sans mot de passe** ; facultatif : sans lui, le conseiller seul |
+| `APPLICATION_CLE_SESSION` | la clé de signature des sessions, 32 octets au moins, **une par environnement** ; obligatoire en préproduction et en production ; absente en développement, une clé éphémère est tirée au démarrage (avertissement au journal, sessions perdues au redémarrage) |
 | `API_MODELE_ADRESSE` | l'adresse de l'API |
+| `APPLICATION_CLE_CATALOGUE` | la clé de l'application auprès du catalogue (l'API data du 02, consommateur `conseiller`) ; obligatoire si `CATALOGUE_ADRESSE` est posée et en préproduction et production ; absente en développement : catalogue non configuré, l'encart le dit, le reste fonctionne |
+| `CATALOGUE_ADRESSE` | l'adresse du catalogue ; défaut `[catalogue] adresse`, `http://catalogue:8000` dans la pile |
 | `APPLICATION_ECOUTE` | `hôte:port` |
 | `APPLICATION_METRIQUES_RESEAUX` | les réseaux admis à lire `/metrics`, séparés par des virgules |
 | `APPLICATION_PORT_PUBLIE` | le port publié par le Compose ; défaut 8020 |
@@ -280,22 +941,84 @@ uv run --env-file .env python -m application
 
 Sans clé, l'application refuse de démarrer. Sans API, elle démarre et le dit à l'écran.
 
-### Par Compose : le service d'embedding, l'API, l'application
+### Par Compose : le service d'embedding, l'API, l'application, le catalogue
 
 ```bash
 make app-compose         # depuis la racine du dépôt
 make app-compose-arret
 ```
 
-Il faut les deux `.env`, celui de ce module et celui de l'API. Dans le second, ajouter à la
-ligne `API_MODELE_CLES`, séparé par une virgule, `application:<secret>` : une seconde ligne
-remplacerait la première.
+Il faut **trois** `.env` : celui de ce module, celui de l'API et celui du module 02 (le
+catalogue) ; sans l'un d'eux, Compose refuse et nomme le fichier absent. Dans celui de
+l'API, ajouter à la ligne `API_MODELE_CLES`, séparé par une virgule,
+`application:<secret>` : une seconde ligne remplacerait la première.
 
-Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **Seule
-l'application est publiée**, sur l'adresse locale ; on atteint l'API par elle. Il ajoute deux
-réseaux : `applicatif`, l'application et l'API, rien d'autre ; `publication`, pour le port :
-Docker ne publie pas sur un réseau interne, celui-ci a donc une route vers l'extérieur, que
-l'application n'emploie pas.
+**Le catalogue dans la pile** (E4, lot 2a) — le service `catalogue`, l'image
+`api-catalogue:0.6.0` du module 02 :
+
+- dans `02_api_manga/.env` : `API_KEYS=conseiller:<clé>` (le consommateur de
+  l'application) et `DB_NAME` (`apimanga`, lu seulement) ; dans le `.env` de ce module,
+  `APPLICATION_CLE_CATALOGUE=<la même clé>`, posée **avant** tout lancement de la pile — la
+  pile pose `CATALOGUE_ADRESSE` : sans `APPLICATION_CLE_CATALOGUE`, l'application ne démarre
+  pas : c'est voulu (une clé absente est une erreur de déploiement, pas un mode ; « non
+  configuré » reste le cas du poste en développement, sans adresse posée) ;
+- le mot de passe de `manga_api` : dans `02_api_manga/.pgpass.conteneur`, hors dépôt, mode
+  600, une ligne `host.docker.internal:5432:<base>:manga_api:<mot de passe>`, monté comme
+  secret (`PGPASSFILE`) — jamais dans le DSN, jamais dans un `.env` ; le service tourne sous
+  l'utilisateur de l'hôte (`HOTE_UID`, `HOTE_GID`), seul lecteur du fichier ;
+- le serveur PostgreSQL admet `manga_api` depuis le seul sous-réseau du catalogue, une
+  ligne de `pg_hba.conf` par base : `host  <base>  manga_api  172.30.2.0/24  scram-sha-256` ;
+- le catalogue est publié sur `127.0.0.1:8000` (`CATALOGUE_PORT_PUBLIE`), joint par
+  l'application sur `applicatif` (`http://catalogue:8000`), et sort vers la base par
+  `catalogue_sortie` (`172.30.2.0/24`, fixe) ; il n'entre pas dans le monitorage (pas de
+  métriques).
+
+**Les comptes dans la pile** (E4, lot 8, 0.9.1) — jusqu'à la 0.9.0, le conteneur de
+l'application ne recevait ni la base ni les clés des comptes : il servait le conseiller
+seul, et les comptes ne tournaient que sur l'hôte. Le service `application` reçoit
+maintenant, toutes vides par défaut (`${…:-}`) :
+
+| Variable du conteneur | Lue depuis | Posée par |
+|---|---|---|
+| `APPLICATION_ENVIRONNEMENT` | `APPLICATION_ENVIRONNEMENT` | le fichier de cible (`15_livraison/cibles/`) |
+| `APPLICATION_BASE_DSN` | `APPLICATION_BASE_DSN_CONTENEUR` — `postgresql://app_conseiller@host.docker.internal:5432/<base>`, **sans mot de passe** | le fichier de cible |
+| `APPLICATION_CLE_SESSION` | `APPLICATION_CLE_SESSION` | `12_application/.env` (production) ; `12_application/.env.staging` (staging) — une clé par environnement |
+| `APPLICATION_CLE_API_COMPTES` | `APPLICATION_CLE_API_COMPTES` | `12_application/.env` (la même valeur dans `API_MODELE_CLES` du 11) |
+| `PGPASSFILE` | `/run/secrets/pgpass_application` | le Compose |
+
+- **Sans ces variables**, rien ne change : `developpement`, `base: non_configuree`, le
+  conseiller seul (le défaut du DSN est vide : en développement, la base de production est
+  refusée) ;
+- le mot de passe de `app_conseiller` : dans `12_application/.pgpass.conteneur` (secret
+  `pgpass_application`, chemin surchargeable par `APPLICATION_PGPASS`), hors dépôt, ignoré
+  par git, mode 600, une ligne par base :
+  `host.docker.internal:5432:<base>:app_conseiller:<mot de passe>` ; le service tourne sous
+  l'utilisateur de l'hôte (`HOTE_UID`, `HOTE_GID`), seul lecteur du fichier ;
+- le serveur PostgreSQL admet `app_conseiller` depuis le seul sous-réseau de l'application,
+  une ligne de `pg_hba.conf` par base, puis un rechargement du serveur :
+  `host  <base>  app_conseiller  172.30.12.0/24  scram-sha-256` ;
+- l'application sort vers la base par `application_sortie` (`172.30.12.0/24`, fixe), sa
+  **route par défaut** (`gw_priority: 1` : elle est aussi sur `publication`, l'autre
+  réseau non interne) ; `host.docker.internal` désigne l'hôte (`host-gateway`) ;
+- l'ordre des fichiers d'environnement : ceux des modules (11, 12, 02, et 13 s'il existe),
+  puis `12_application/.env.<cible>` s'il existe, puis le fichier de cible — le dernier
+  l'emporte. C'est l'ordre de `make livrer` (`15_livraison/`) ; `make app-compose` et
+  `make monitorage` ne lisent que ceux des modules.
+
+Les variables de l'application, telles que `src/application/config.py` les lit — la liste
+contre laquelle relire `.env.example` : `APPLICATION_CLE_API`, `APPLICATION_CLE_API_COMPTES`,
+`APPLICATION_ENVIRONNEMENT`, `APPLICATION_BASE_DSN`, `APPLICATION_CLE_SESSION`,
+`APPLICATION_CLE_CATALOGUE`, `CATALOGUE_ADRESSE`, `API_MODELE_ADRESSE`,
+`APPLICATION_ECOUTE`, `APPLICATION_METRIQUES_RESEAUX` ; le Compose lit en plus
+`APPLICATION_PORT_PUBLIE`, `CATALOGUE_PORT_PUBLIE`, `APPLICATION_BASE_DSN_CONTENEUR`,
+`APPLICATION_PGPASS`, `CATALOGUE_PGPASS`.
+
+Le Compose du module de l'API ne change pas : `compose.yaml` s'y ajoute par fusion. **L'API
+n'est pas publiée** : on l'atteint par l'application ; l'application et le catalogue le
+sont, sur l'adresse locale seule. Il ajoute trois réseaux : `applicatif`, l'application,
+l'API et le catalogue, rien d'autre ; `publication`, pour le port : Docker ne publie pas sur
+un réseau interne, celui-ci a donc une route vers l'extérieur, que l'application n'emploie
+pas ; `catalogue_sortie`, du catalogue vers la base de l'hôte.
 
 Pour montrer aussi le Swagger de l'API et MLflow : `make demo-direct`, qui ajoute
 `compose.demo.yaml` et publie alors le port de l'API sur l'adresse locale. Voir
@@ -321,16 +1044,25 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 ## Limites déclarées
 
+- **Tolérance aux fautes du conseiller** : mesurée le 2026-11-08 (E4, lot 2b, D14 a) — douze
+  questions du jeu gelé, une faute mécanique chacune (auteur inversé, transposition, lettre
+  manquante, lettre doublée), posées en strict à l'API réelle depuis la préproduction :
+  **11 / 12** citent une série attendue ; résultat et méthode au rapport du lot 2b ; la
+  résolution des titres dans l'API (D14 c) reste une décision de Max.
+
 - **Une instance**, aucune mémoire partagée.
 - **Pas de file d'attente** : le plafond du compte Mistral, 15 requêtes par minute
   (2026-11-03), est rendu à l'écran, pas absorbé ; soit environ 7 tours de conversation par minute. File d'attente et
   quota par poste : épreuve E4.
-- **Aucune personnalisation** : pas de compte.
+- **Aucune personnalisation du conseiller** : il ne lit ni les listes ni l'historique du
+  compte.
 - **Un seul écran.**
 - **Un clic trop tôt après un refus** peut coûter une reformulation (« Les cas dégradés »).
 - **Au-delà de 75 s**, l'écran dit « délai dépassé » pendant que l'API peut continuer, et
   l'appel peut être facturé.
 - **Un texte presque tout en japonais** peut dépasser les 16 Kio du corps : page d'erreur.
+  De même une critique de 2 000 caractères presque toute en japonais (environ 18 Kio
+  encodée) : la page 413, dont le texte parle de la conversation.
 - **Le texte du modèle** : `*x*` et `**x**` sont rendus en emphase, et un titre repéré avant
   ou après sa marque ; une emphase qui ouvre avant le titre et le ferme après lui
   (`*Un : Titre* [S:1]`) laisse ses astérisques ; un saut de ligne simple ne coupe pas le
@@ -358,7 +1090,20 @@ AUDIT_AXE=1 uv run --locked --extra dev --extra audit pytest tests/test_audit_ax
 
 ## Ce que l'épreuve E4 ajoute
 
-Comptes avec mot de passe haché et sessions signées à expiration ; trois rôles (client,
-libraire, administrateur) ; page de série ; critique de libraire signée, entrant dans le
-corpus ; masquage à l'affichage des mentions de membres connues du corpus ; administrateur (profil actif, comptes, état des services) ; serveur avec préproduction
-et production ; identité visuelle, sur `theme.css`.
+**Lot 1 (le socle)** : la base, Argon2id, les sessions signées, le jeton CSRF, le verrou,
+la garde par rôle et d'environnement, les écrans des comptes et leurs trois rôles (client,
+libraire, administrateur), la commande du premier administrateur (ci-dessus). **Lot 2a
+(le catalogue)** : la recherche et la page de série, par l'API data du 02. **Lot 3 (les
+critiques signées)** : publier, modifier, retirer, modérer, afficher face à la note des
+lecteurs (ci-dessus). **Lot 4 (les listes du client)** : favori, à lire, à commander, depuis
+la fiche, les cartes du conseiller et « Mes listes » ; la suppression du compte par son
+titulaire, le droit à l'effacement (ci-dessus). **Lot 5 (l'administration)** : le profil
+actif, l'état et le test des clés, les coûts et la jauge du budget, l'état des services
+(ci-dessus). **Lot 6 (l'habillage, 0.8.0)** : l'identité Senpai, Kōhai animé, le seul
+script, les tableaux défilants (ci-dessus). **Lot 7 (l'apparence, 0.9.0)** : la couleur des
+six espaces, l'intensité et la matière réglées par l'administrateur ; l'en-tête en deux
+navigations (ci-dessus). **Lot 8 (la livraison, 0.9.1)** : les comptes servis par la pile
+Compose — la base, la clé de session, la clé des comptes, un pgpass monté, un sous-réseau
+fixe vers la base (« Par Compose », ci-dessus). À venir : l'entrée des critiques de libraires dans le corpus ; le masquage à
+l'affichage des mentions de membres connues du corpus ; le serveur avec préproduction et
+production.

@@ -1,0 +1,7 @@
+{# Kōhai, la mascotte (E4, lot 6) : un SVG en ligne du dossier `kohai/`, tel que remis par
+   la session design, dans un cadre qui choisit son animation. Décoratif : masqué aux aides
+   techniques, le texte de la page dit toujours l'état. #}
+{% macro kohai(pose, principal=false) -%}
+{%- set dessins = {"arrivee": "bonjour", "salut": "bonjour", "reflexion": "cherche", "trouve": "trouve", "perdu": "perdu", "pause": "pause"} -%}
+<span class="kohai k-anim-{{ pose }}{% if principal %} kohai-principal{% endif %}" aria-hidden="true">{% include "kohai/" ~ dessins[pose] ~ ".svg" %}</span>
+{%- endmacro %}

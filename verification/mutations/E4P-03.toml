@@ -1,0 +1,7 @@
+id = "E4P-03"
+origine = "E4, lot 7, spec 01 (2026-11-10) — la garde de rôle de la page « Apparence » retirée : un client ou un libraire l'ouvrirait"
+fichier = "12_application/src/application/pages_apparence.py"
+avant = '''    async def admin_apparence(request: Request, admin: Admin) -> Response:'''
+apres = '''    async def admin_apparence(request: Request) -> Response:'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_apparence.py", "-k", "autre_role"]

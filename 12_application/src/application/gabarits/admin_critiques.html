@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block espace %}brume{% endblock %}
+{% import "composants/champ.html" as c %}
+{% block titre %}{{ t.admin_critiques_titre }}{% endblock %}
+{% block contenu %}
+{% include "composants/onglets_admin.html" %}
+<h1 id="moderation-titre">{{ t.admin_critiques_titre }}</h1>
+{% if avis %}
+{{ c.avis(avis, focus == "avis") }}
+{% endif %}
+{% if indisponible %}
+<article>
+<h2>{{ t.catalogue_encart_titre }}</h2>
+<p>{{ t.catalogue_encart }}</p>
+</article>
+{% endif %}
+<form method="get" action="/admin/critiques">
+<label for="filtre-libraire">{{ t.admin_critiques_filtre }}</label>
+<select id="filtre-libraire" name="libraire">
+<option value=""{% if filtre is none %} selected{% endif %}>{{ t.admin_critiques_tous }}</option>
+{% for libraire in libraires %}
+<option value="{{ libraire.id }}"{% if filtre == libraire.id %} selected{% endif %}>{{ libraire.nom_affiche }}{% if not libraire.actif %} {{ t.admin_critiques_inactif }}{% endif %}</option>
+{% endfor %}
+</select>
+<button type="submit">{{ t.critiques_filtre_bouton }}</button>
+</form>
+{% if lignes %}
+<div class="defilant" tabindex="0" role="region" aria-labelledby="moderation-titre">
+<table>
+<thead>
+<tr><th scope="col">{{ t.admin_critiques_colonne_libraire }}</th><th scope="col">{{ t.critiques_colonne_serie }}</th><th scope="col">{{ t.critiques_colonne_tome }}</th><th scope="col">{{ t.critiques_colonne_note }}</th><th scope="col">{{ t.critiques_colonne_label }}</th><th scope="col">{{ t.admin_critiques_colonne_date }}</th><th scope="col">{{ t.admin_critiques_colonne_debut }}</th><th scope="col">{{ t.critiques_colonne_action }}</th></tr>
+</thead>
+<tbody>
+{% for ligne in lignes %}
+<tr>
+<td>{{ ligne.libraire }}</td>
+<td><a href="/series/{{ ligne.series_id }}">{{ ligne.titre }}</a></td>
+<td>{{ ligne.tome }}</td>
+<td>{{ ligne.note }}</td>
+<td>{{ ligne.label }}</td>
+<td>{{ ligne.date }}</td>
+<td>{{ ligne.debut }}</td>
+<td><a href="/admin/critiques/{{ ligne.id }}/retirer" aria-label="{{ t.critiques_retirer }} : {{ ligne.libraire }}, {{ ligne.titre }}, {{ ligne.tome }}">{{ t.critiques_retirer }}</a></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>{{ t.admin_critiques_vide }}</p>
+{% endif %}
+{% if pagination %}
+<nav aria-label="{{ pagination.texte }}">
+<p aria-current="page">{{ pagination.texte }}</p>
+{% if pagination.precedente %}<a href="{{ pagination.precedente }}">{{ t.critiques_precedente }}</a>{% endif %}
+{% if pagination.suivante %}<a href="{{ pagination.suivante }}">{{ t.critiques_suivante }}</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,7 @@
+id = "E4A-01"
+origine = "E4, lot 5, spec 01 (2026-11-09) — le profil actif de l'application n'est pas envoyé à l'API : la question part avec le défaut"
+fichier = "12_application/src/application/app.py"
+avant = '''                or presentation.profil_par_defaut(vue.info, reglages, regle)'''
+apres = '''                or presentation.profil_par_defaut(vue.info, reglages)'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_admin_reglages.py", "-k", "part_avec_la_question_d_un_visiteur"]

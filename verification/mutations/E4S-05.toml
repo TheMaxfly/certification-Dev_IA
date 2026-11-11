@@ -1,0 +1,7 @@
+id = "E4S-05"
+origine = "E4, lot 1, spec 01 (2026-11-08) — le refus nommé d'un app_conseiller existant disparaîtrait : seul resterait l'échec brut de CREATE ROLE, sans dire que le rôle existe ni qu'il suffit d'une ligne ~/.pgpass"
+fichier = "database/outils/creer_role_application.sh"
+avant = '''rolname = '$ROLE')")" != "f" ]; then'''
+apres = '''rolname = '$ROLE')")" = "x" ]; then'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_role_application.py", "-k", "role_existant"]

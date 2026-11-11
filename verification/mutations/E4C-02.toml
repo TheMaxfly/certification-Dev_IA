@@ -1,0 +1,7 @@
+id = "E4C-02"
+origine = "E4, lot 2a, spec 01 (2026-11-08) — l'auteur des critiques collectées lu de nouveau : un pseudonyme de lecteur sortirait par /series/{id}/reviews"
+fichier = "02_api_manga/app/main.py"
+avant = '''           review_score, review_date_iso, review_date_raw,'''
+apres = '''           review_score, review_author, review_date_iso, review_date_raw,'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_api.py", "-k", "ne_rend_jamais_l_auteur"]

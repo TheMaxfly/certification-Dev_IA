@@ -7,6 +7,9 @@
 <p>{{ affichage.motif }}</p>
 {% endif %}
 <p><small>{{ affichage.ligne }}</small></p>
+{% if affichage.lien_catalogue %}
+<p class="zone-pont-catalogue"><a href="{{ affichage.lien_catalogue }}">{{ t.pont_vers_catalogue }}</a></p>
+{% endif %}
 {% if cloture %}
 <article>
 <div role="alert">
@@ -17,7 +20,7 @@
 {% endif %}
 {% if affichage.complement %}
 <article>
-<p><strong>{{ t.non_verifie }}</strong></p>
+<p><strong>{{ affichage.complement_etiquette }}</strong></p>
 <p>{{ affichage.complement }}</p>
 {% if affichage.complement_titres %}
 <p>{{ t.non_verifie_titres }}</p>
@@ -49,6 +52,15 @@
 {% else %}
 <p>{{ t.carte_sans_passage }}</p>
 {% endfor %}
+{# Les listes depuis une carte (E4, lot 4, CL4) : un client connecté seulement ; le
+   retour est la fiche de la série. #}
+{% if carte.serie_id in zones_cartes %}
+{% set zone = zones_cartes[carte.serie_id] %}
+<div class="zone-carte-listes">
+{% if zone.phrase %}<p><small>{{ zone.phrase }}</small></p>
+{% endif %}{{ l.formulaire(zone, t, jeton, false) }}
+</div>
+{% endif %}
 <p><small>{{ t.mention_carte }} {{ t.mention_dispo }}</small></p>
 </article>
 {% endfor %}

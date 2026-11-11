@@ -1,7 +1,25 @@
 {% extends "base.html" %}
+{% block espace %}menthe{% endblock %}
 {% import "composants/texte.html" as texte %}
+{% import "composants/champ.html" as c %}
+{% import "composants/listes.html" as l %}
+{% import "composants/kohai.html" as k %}
 {% block contenu %}
-<h1>{{ t.titre_application }}</h1>
+<h1>{{ t.titre_application }}{{ k.kohai(pose_kohai, true) }}</h1>
+{% if profil_actif_indisponible %}
+<article class="zone-profil-actif-indisponible">
+<div role="status">
+<h2>{{ t.profil_actif_indisponible_titre }}</h2>
+<p>{{ profil_actif_indisponible }} <a href="/admin/reglages">{{ t.profil_actif_indisponible_lien }}</a></p>
+</div>
+</article>
+{% endif %}
+{% if avis %}
+{{ c.avis(avis, true) }}
+{% endif %}
+{% if not peut_regler %}
+<p>{{ t.conseiller_aide_public }}</p>
+{% endif %}
 <p>{{ etat }}</p>
 {% if tours %}
 <section>
@@ -14,11 +32,19 @@
 </section>
 {% endif %}
 {% include "composants/formulaire.html" %}
+{# « Nouvelle conversation » (E4, lot 7) : une action du conseiller, quand une
+   conversation existe — une réponse, un encart, ou un historique porté par la page. #}
+{% if conversation_en_cours %}
+<form method="get" action="/" class="zone-nouvelle-conversation"><button>{{ t.nouvelle_conversation }}</button></form>
+{% endif %}
+{# La pose d'attente (E4, lot 6) : cachée par la feuille ; le seul script la montre à
+   l'envoi de la question. Sans script, elle n'apparaît jamais. #}
+<div class="kohai-attente" aria-live="polite">{{ k.kohai("reflexion") }}<p>{{ t.kohai_attente }}</p></div>
 <section aria-live="polite">
 {% if encart %}
 <article>
 <div role="alert">
-<h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ t.encart_titre }}</h2>
+<h2 tabindex="-1" autofocus aria-describedby="encart-texte">{{ encart.titre or t.encart_titre }}</h2>
 <p id="encart-texte">{{ encart.texte }}</p>
 {% if encart.nouvelle_conversation %}
 <p><a href="/">{{ t.nouvelle_conversation }}</a></p>

@@ -1,0 +1,7 @@
+id = "E4H-06"
+origine = "E4, lot 6, spec 03 (2026-11-10) — la seconde coupe ne coupe pas : un résumé portant deux familles de marques de critique serait servi avec son extrait"
+fichier = "02_api_manga/app/resumes.py"
+avant = '''        if marque is not None and len(familles_touchees(texte)) >= FAMILLES_MIN:'''
+apres = '''        if False:'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_resumes.py", "-k", "deux_familles or seconde or aux_marques"]

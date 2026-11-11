@@ -17,7 +17,8 @@ CO="Co-Author$(printf e)d-By"
 # vraies variables du poste n'entrent pas dans l'essai : un HOME jetable porte un
 # jeton Hugging Face factice, que les hooks lisent sans jamais l'afficher.
 unset MISTRAL_API_KEY OPENAI_API_KEY HF_TOKEN HF_HOME API_MODELE_CLES APPLICATION_CLE_API
-unset GRAFANA_SMTP_MOT_DE_PASSE
+unset GRAFANA_SMTP_MOT_DE_PASSE APPLICATION_CLE_SESSION APP_CONSEILLER_MOT_DE_PASSE PGPASSFILE
+unset APPLICATION_CLE_CATALOGUE API_KEYS APPLICATION_CLE_API_COMPTES
 export HOME="$TRAVAIL/maison"
 mkdir -p "$HOME/.cache/huggingface"
 JETON_POSTE="jeton-du-poste-pour-l-essai-0042"
@@ -30,6 +31,12 @@ HORS_MOTIF_O="autre-valeur-factice-hors-motif-0043"
 HORS_MOTIF_A="valeur-factice-de-l-application-0044"
 HORS_MOTIF_T="valeur-factice-du-trousseau-0045"
 CLE_ACCES_FACTICE="$(printf 'a1B2c3%.0s' $(seq 1 7))"  # 42 caractères
+HORS_MOTIF_S="valeur-factice-de-la-session-0046"
+HORS_MOTIF_C="valeur-factice-du-catalogue-0047"
+HORS_MOTIF_D="valeur-factice-de-l-api-data-0048"
+HORS_MOTIF_K="valeur-factice-des-comptes-0049"
+MDP_ROLE="mot-de-passe-factice-du-role-0047"
+ROLE_PG="app_conseiller"  # par variable : ce fichier ne tombe pas sous le motif d'une ligne recopiée
 echecs=0
 
 git init -q --bare -b main "$TRAVAIL/distant.git"
@@ -125,6 +132,10 @@ message() { # message <libellé> <motif attendu> <motif interdit> <commande…> 
 scenario refuse "clé Mistral factice dans un fichier suivi" eval 'ecrire cle_m.py "MISTRAL_API_KEY = \"$MISTRAL_FACTICE\"" && git commit -q -m cle_m'
 scenario refuse "jeton Hugging Face du poste en clair" eval 'ecrire j_pp.txt "jeton : $JETON_POSTE" && git commit -q -m j_pp'
 scenario refuse "chaîne d'aspect jeton Hugging Face" eval 'ecrire j_pp2.env "TOKEN=$ASPECT" && git commit -q -m j_pp2'
+scenario refuse "aspect : clé de session de l'application" eval 'ecrire s_pp.env "APPLICATION_CLE_SESSION=$CLE_ACCES_FACTICE" && git commit -q -m s_pp'
+scenario refuse "aspect : clé du catalogue de l'application" eval 'ecrire c_pp.env "APPLICATION_CLE_CATALOGUE=$CLE_ACCES_FACTICE" && git commit -q -m c_pp'
+scenario refuse "aspect : clé des comptes de l'application" eval 'ecrire k_pp.env "APPLICATION_CLE_API_COMPTES=$CLE_ACCES_FACTICE" && git commit -q -m k_pp'
+scenario refuse "aspect : DSN qui porte un mot de passe" eval 'ecrire d_pp.txt "postgresql://app_conseiller:$HORS_MOTIF_S@localhost:5432/apimanga" && git commit -q -m d_pp'
 # Sans -a, grep tait la ligne qui porte un octet hors UTF-8 : la mention passerait.
 scenario refuse "mention dans un texte non UTF-8" eval '
     export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >nu.txt &&
@@ -315,6 +326,78 @@ essai refuse "aspect : mot de passe du canal d'alerte en clair" eval '
     ecrire pc_ks3.yml "GF_SMTP_PASSWORD: $HORS_MOTIF_A" && git commit -q -m ks3'
 essai passe  "le chemin du mot de passe, pas sa valeur" eval '
     ecrire pc_ks4.yml "GF_SMTP_PASSWORD__FILE: /run/secrets/smtp_mot_de_passe" && git commit -q -m ks4'
+# La clé de session de l'application (E4, lot 1) : sa valeur dans le .env d'un module, et
+# une affectation littérale ; une référence passe.
+essai refuse "clé de session du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_SESSION=%s\n" "$HORS_MOTIF_S" >mod/.env &&
+    ecrire pc_kss.txt "note : $HORS_MOTIF_S" && git commit -q -m kss'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : clé de session" eval '
+    ecrire pc_kss2.env "APPLICATION_CLE_SESSION=$CLE_ACCES_FACTICE" && git commit -q -m kss2'
+essai passe  "référence à la clé de session" eval '
+    ecrire pc_kss3.yml "APPLICATION_CLE_SESSION: \${APPLICATION_CLE_SESSION:-}" && git commit -q -m kss3'
+# Les clés du catalogue (E4, lot 2a) : la clé de l'application dans le .env du 12, le
+# trousseau de l'API data dans celui du 02 (découpé : une clé en second élément) ; par
+# aspect ; une référence et la forme documentée entre chevrons passent.
+essai refuse "clé du catalogue du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_CATALOGUE=%s\n" "$HORS_MOTIF_C" >mod/.env &&
+    ecrire pc_kcat.txt "note : $HORS_MOTIF_C" && git commit -q -m kcat'
+essai refuse "clé du trousseau de l'API data du poste, en second élément" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "API_KEYS=app_backend:%s,conseiller:%s\n" "$HORS_MOTIF_O" "$HORS_MOTIF_D" >mod/.env &&
+    ecrire pc_kdat.txt "note : $HORS_MOTIF_D" && git commit -q -m kdat'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : clé du catalogue" eval '
+    ecrire pc_kcat2.env "APPLICATION_CLE_CATALOGUE=$CLE_ACCES_FACTICE" && git commit -q -m kcat2'
+essai refuse "aspect : trousseau de l'API data à deux entrées" eval '
+    ecrire pc_kdat2.env "API_KEYS=app_backend:court,conseiller:$CLE_ACCES_FACTICE" && git commit -q -m kdat2'
+essai passe  "références et forme documentée des clés du catalogue" eval '
+    ecrire pc_kcat3.yml "APPLICATION_CLE_CATALOGUE: \${APPLICATION_CLE_CATALOGUE:-}" &&
+    ecrire pc_kdat3.yml "API_KEYS: \${API_KEYS:-}" &&
+    ecrire pc_kdat4.md "API_KEYS=conseiller:<clé-de-trente-deux-caractères-au-moins>" && git commit -q -m kdat3'
+# La clé « comptes » de l'application (E4, lot 2b) : elle n'existe pas encore sur le
+# poste ; le scénario « valeur du poste » en pose une factice dans le .env d'un module ;
+# par aspect ; une référence et la forme entre chevrons passent.
+essai refuse "clé des comptes du poste, hors motif" eval '
+    printf ".env\n" >.gitignore && git add .gitignore && mkdir -p mod &&
+    printf "APPLICATION_CLE_API_COMPTES=%s\n" "$HORS_MOTIF_K" >mod/.env &&
+    ecrire pc_kcpt.txt "note : $HORS_MOTIF_K" && git commit -q -m kcpt'
+rm -rf mod # ignoré : git clean ne l'ôte pas
+essai refuse "aspect : clé des comptes" eval '
+    ecrire pc_kcpt2.env "APPLICATION_CLE_API_COMPTES=$CLE_ACCES_FACTICE" && git commit -q -m kcpt2'
+essai passe  "référence et forme documentée de la clé des comptes" eval '
+    ecrire pc_kcpt3.yml "APPLICATION_CLE_API_COMPTES: \${APPLICATION_CLE_API_COMPTES:-}" &&
+    ecrire pc_kcpt4.md "APPLICATION_CLE_API_COMPTES=<clé-de-trente-deux-caractères-au-moins>" &&
+    git commit -q -m kcpt3'
+# Le mot de passe du rôle de connexion : sa valeur dans le fichier de mots de passe de
+# PostgreSQL du poste (ici celui du HOME jetable, puis PGPASSFILE), lignes du rôle seules ;
+# une ligne recopiée ; la forme documentée passe.
+essai refuse "mot de passe du rôle de connexion du poste (~/.pgpass)" eval '
+    printf "localhost:5432:apimanga_preprod:%s:%s\n" "$ROLE_PG" "$MDP_ROLE" >"$HOME/.pgpass" &&
+    ecrire pc_kr1.txt "note : $MDP_ROLE" && git commit -q -m kr1'
+essai passe  "le mot de passe d'un autre rôle n'est pas lu" eval '
+    printf "localhost:5432:apimanga:autre_role:%s\n" "$MDP_ROLE" >"$HOME/.pgpass" &&
+    ecrire pc_kr2.txt "note : $MDP_ROLE" && git commit -q -m kr2'
+essai refuse "mot de passe du rôle, fichier désigné par PGPASSFILE, deux-points échappé" eval '
+    printf "*:*:*:%s:%s\\:suite\n" "$ROLE_PG" "$MDP_ROLE" >"$TRAVAIL/pgpass_designe" &&
+    export PGPASSFILE="$TRAVAIL/pgpass_designe" &&
+    ecrire pc_kr3.txt "note : $MDP_ROLE:suite" && git commit -q -m kr3'
+unset PGPASSFILE
+rm -f "$HOME/.pgpass"
+essai refuse "aspect : ligne de mots de passe du rôle recopiée" eval '
+    ecrire pc_kr4.txt "localhost:5432:apimanga:app_conseiller:$HORS_MOTIF_S" && git commit -q -m kr4'
+essai passe  "forme documentée de la ligne, sans valeur" eval '
+    ecrire pc_kr5.md "localhost:5432:apimanga_preprod:app_conseiller:<mot de passe>" && git commit -q -m kr5'
+# Un DSN qui porte un mot de passe : la forme d'adresse ; sans mot de passe, ou avec une
+# référence, il passe.
+essai refuse "aspect : DSN qui porte un mot de passe" eval '
+    ecrire pc_kd1.py "DSN = \"postgresql://postgres:$HORS_MOTIF_S@127.0.0.1:5432/apimanga\"" && git commit -q -m kd1'
+essai passe  "DSN sans mot de passe, ou par référence" eval '
+    ecrire pc_kd2.md "postgresql://postgres@localhost:5432/apimanga_preprod
+postgresql://app_conseiller:\${MOT_DE_PASSE}@db:5432/x
+postgresql://app_conseiller:<mot de passe>@hote:5432/base" && git commit -q -m kd2'
 essai refuse "mention dans un texte non UTF-8" eval '
     export LC_ALL=C.UTF-8 && printf "caf\351 r\351dig\351 avec %s Code\n" "$NOM" >pc_nu.txt &&
     git add pc_nu.txt && git commit -q -m nu'

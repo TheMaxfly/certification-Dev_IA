@@ -1,0 +1,7 @@
+id = "E4Q-10"
+origine = "E4, lot 2b, spec 03 (2026-11-08) — le résumé non coupé : la fiche afficherait les critiques de lecteurs recopiées dans le résumé"
+fichier = "02_api_manga/app/resumes.py"
+avant = '''        texte = couper(manga_sanctuary, position)'''
+apres = '''        texte = manga_sanctuary'''
+dossier = "02_api_manga"
+commande = ["uv", "run", "--locked", "pytest", "-x", "-p", "no:cacheprovider", "tests/test_resumes.py", "-k", "coupe_tombe_avant"]

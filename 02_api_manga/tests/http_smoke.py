@@ -24,7 +24,7 @@ BASE_URL = "http://api:8000"
 API_KEY = os.environ["API_KEY"]
 API_KEY_HEADER = "X-API-Key"
 
-# Les onze routes de données, et les routes qui restent ouvertes. Ces deux
+# Les douze routes de données, et les routes qui restent ouvertes. Ces deux
 # listes sont le contrat d'accès du module, vérifié ici contre une API réelle
 # et non contre un client de test en mémoire.
 ROUTES_PROTEGEES = (
@@ -35,6 +35,7 @@ ROUTES_PROTEGEES = (
     f"/rag/doc/{quote_plus('kitsu:38')}",
     "/search?q=one",
     # 3b — catalogue, identité, couverture.
+    "/series?q=one",
     "/series/736",
     "/series/736/volumes",
     "/series/736/reviews",
@@ -277,7 +278,12 @@ def main() -> None:
     verifier_les_curseurs_illisibles()
 
     assert get_json("/live") == {"status": "ok", "db": "not_checked"}
-    assert get_json("/health") == {"status": "ok", "db": "ok"}
+    # Le harnais migre jusqu'au dernier fichier, donc avec la 028 : la fonction.
+    assert get_json("/health") == {
+        "status": "ok",
+        "db": "ok",
+        "normalisation": "fonction",
+    }
 
     # /kitsu/{id} lit manga.kitsu_series_core, peuplée d'une seule série.
     kitsu = get_json("/kitsu/38")
@@ -352,6 +358,7 @@ def main() -> None:
     verifier_la_composition()
     verifier_que_l_export_ignore_offset()
     verifier_le_catalogue()
+    verifier_la_recherche()
     verifier_l_identite()
     verifier_la_couverture()
 
@@ -371,6 +378,46 @@ def verifier_le_catalogue() -> None:
     assert serie["series_id"] == 736
     assert serie["title"] == "One Piece"
     assert serie["work_uid"] == 4242
+
+    # Les sept champs de `manga.v_metadonnees_serie` (contrat 0.5.0), dérivés de la
+    # fixture et des règles des migrations 025 et 026 :
+    attendus = {
+        # un volume, sans EAN ; `series_type` NULL (pas « Manga ») → inconnue ;
+        "disponibilite": "inconnue",
+        # `volume_tomes_published` NULL ; un volume sans numéro compte pour le 1 ;
+        "nb_volumes": 1,
+        "nb_volumes_source": "repli_volumes_distincts",
+        # `series_statuses` NULL → pas de badge ; 736 rattachée au moyeu
+        # (`work_identity` 4242, `kitsu_id` '38') ; `kitsu_series_core` 38 a
+        # `status = 'current'` → règle de la 025 « en_cours : le statut Kitsu
+        # current, sans badge » : le smoke éprouve le chemin Kitsu de la vue ;
+        "statut": "en_cours",
+        # ni `series_category_clean` ni `series_category` ;
+        "demographie": None,
+        # le scénariste seul (pas de dessinateur) ;
+        "auteurs": "Eiichiro ODA",
+        # aucun volume à EAN français ;
+        "annee_fr": None,
+    }
+    assert {champ: serie[champ] for champ in attendus} == attendus
+    assert serie["members_rating"] == 8.69 and serie["members_votes"] == 6936
+
+    # Le résumé (contrat 0.6.0), dérivé de la fixture (section 2 ter) : coupé avant la
+    # critique recopiée, au point qui la précède ; la source ; le résumé Kitsu.
+    assert serie["synopsis_enriched"] == (
+        "Gol D. Roger, roi des pirates, a cache son tresor a Raftel. "
+        "Luffy part a sa recherche avec son equipage, d'ile en ile, sur Grand Line."
+    )
+    assert "abordage" not in serie["synopsis_enriched"]
+    assert "abordage" in serie["synopsis"], "le brut reste au contrat"
+    assert serie["synopsis_source"] == "manga_sanctuary"
+    assert serie["synopsis_kitsu"] == (
+        "Gol D. Roger, roi des pirates, a cache son tresor a Raftel."
+    )
+    # 8514 : ni résumé Manga Sanctuary ni lien au moyeu — rien.
+    sans = get_json("/series/8514")
+    assert (sans["synopsis_enriched"], sans["synopsis_source"]) == (None, None)
+    assert sans["synopsis_kitsu"] is None
 
     # Aucune colonne de travail du rapprochement ne doit sortir par HTTP.
     for interdit in ("ms_title_norm_x", "_other_titles_list", "match_score"):
@@ -399,6 +446,8 @@ def verifier_le_catalogue() -> None:
     for critique in critiques["items"]:
         assert set(critique) == CHAMPS_CRITIQUE_ATTENDUS
         assert critique["review_url"] == urls_attendues[critique["title"]]
+        # La fixture pose un auteur d'essai sur chaque critique : il ne sort jamais.
+        assert critique["author"] is None
 
     urls_par_serie = {
         736: "https://www.manga-sanctuary.com/critique/1-tome-1.html",
@@ -412,6 +461,7 @@ def verifier_le_catalogue() -> None:
         )
         assert set(critique) == CHAMPS_CRITIQUE_ATTENDUS
         assert critique["review_url"] == review_url
+        assert all(item["author"] is None for item in reponse["items"])
 
     # La date non analysable de la fixture (« jeu. ») reste NULL sans faire
     # échouer la ligne : `date_raw` conserve ce que la source affichait.
@@ -427,6 +477,79 @@ def verifier_le_catalogue() -> None:
     # est tout l'intérêt des deux assertions.
     assert statut_http("/series/99999999") == 404
     assert statut_http("/series/99999999/reviews") == 404
+
+
+def verifier_la_recherche() -> None:
+    """`GET /series` (contrat 0.5.0) : chaque attendu se dérive de la fixture.
+
+    Séries posées : 736 « One Piece » (scénariste « Eiichiro ODA », autres titres
+    « ワンピース » et « Wan Pīsu »), 8514 « Serie B », 9999 « Serie C », 999 « Serie
+    sans critique ».
+    """
+    # « one » : « One Piece » commence par « one » (rang 2) ; aucun autre titre, aucun
+    # auteur ne contient « one ».
+    trouve = get_json("/series?q=one")
+    assert trouve["total"] == 1 and trouve["query"] == "one"
+    assert trouve["items"][0]["series_id"] == 736
+    assert trouve["items"][0]["correspondance"] == "titre"
+    assert trouve["items"][0]["titre_correspondant"] is None
+
+    # « Wan pisu » : ni le titre ni l'auteur ; l'autre titre « Wan Pīsu », une fois
+    # normalisé (casse, « ī »), est égal à la saisie normalisée.
+    autre = get_json("/series?q=Wan%20pisu")
+    assert autre["total"] == 1
+    assert autre["items"][0]["series_id"] == 736
+    assert autre["items"][0]["correspondance"] == "autre_titre"
+    assert autre["items"][0]["titre_correspondant"] == "Wan Pīsu"
+
+    # « oda » : seul le scénariste de 736 le contient (rang 4).
+    auteur = get_json("/series?q=oda")
+    assert auteur["total"] == 1
+    assert auteur["items"][0]["series_id"] == 736
+    assert auteur["items"][0]["correspondance"] == "auteur"
+    assert auteur["items"][0]["auteurs"] == "Eiichiro ODA"
+
+    # « zz » : rien ne le contient — 200 et une liste vide, jamais 404 ; et rien ne
+    # lui ressemble : aucune suggestion.
+    vide = get_json("/series?q=zz")
+    assert vide["total"] == 0 and vide["items"] == []
+    assert vide["suggestions"] == []
+
+    # Contrat 0.6.0 — cinq saisies sur la fixture, pour la mécanique (la mesure du
+    # seuil, elle, se joue sur le catalogue réel : README).
+    # « oda eiichiro » : l'auteur, ses mots dans l'autre ordre — correspondance directe.
+    inverse = get_json("/series?q=oda%20eiichiro")
+    assert [i["series_id"] for i in inverse["items"]] == [736]
+    assert inverse["items"][0]["correspondance"] == "auteur"
+    # « Wân Pisu » : une romanisation fautive, couverte par la normalisation.
+    roman = get_json("/series?q=W%C3%A2n%20Pisu")
+    assert [i["correspondance"] for i in roman["items"]] == ["autre_titre"]
+    assert roman["suggestions"] == []
+    # « one pice » (une lettre manquante) : rien ne la contient ; « One Piece » lui
+    # ressemble au-dessus du seuil — par son titre.
+    faute = get_json("/series?q=one%20pice")
+    assert faute["total"] == 0 and faute["items"] == []
+    assert faute["suggestions"][0]["series_id"] == 736
+    assert faute["suggestions"][0]["correspondance"] == "titre"
+    assert 0.4 <= faute["suggestions"][0]["score"] <= 1
+    # « eiichiro odda » (une lettre doublée dans l'auteur) : par l'auteur.
+    auteur_faute = get_json("/series?q=eiichiro%20odda")
+    assert auteur_faute["total"] == 0
+    assert [s["series_id"] for s in auteur_faute["suggestions"]] == [736]
+    assert auteur_faute["suggestions"][0]["correspondance"] == "auteur"
+    # « serie d » : « Serie B », « Serie C », « Serie sans critique » lui ressemblent ;
+    # cinq au plus, la plus ressemblante d'abord.
+    proches = get_json("/series?q=serie%20d")
+    assert proches["total"] == 0
+    scores = [s["score"] for s in proches["suggestions"]]
+    assert scores == sorted(scores, reverse=True) and 1 <= len(scores) <= 5
+    assert {s["series_id"] for s in proches["suggestions"]} <= {8514, 9999, 999}
+
+    # « 100% » : le « % » de la saisie n'est pas un joker — rien ne contient « 100% ».
+    assert get_json("/series?q=100%25")["total"] == 0
+
+    # Une saisie trop courte : 422, comme `/search`.
+    assert statut_http("/series?q=o") == 422
 
 
 def verifier_l_identite() -> None:

@@ -1,0 +1,7 @@
+id = "E4S-01"
+origine = "E4, lot 1, spec 01 (2026-11-08) — le journal des actions perd l'ajout seul : app_rw pourrait le réécrire ou l'effacer"
+fichier = "database/migrations/027_schema_application.sql"
+avant = '''GRANT SELECT, INSERT ON application.journal_actions TO app_rw;'''
+apres = '''GRANT SELECT, INSERT, UPDATE, DELETE ON application.journal_actions TO app_rw;'''
+dossier = "database"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_schema_application.py", "-k", "journal or par_table"]

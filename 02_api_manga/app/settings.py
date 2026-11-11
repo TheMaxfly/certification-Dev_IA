@@ -21,6 +21,19 @@ API_KEY_LABEL_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 # génération est dans le README (`openssl rand -base64 32`).
 API_KEY_MIN_LENGTH = 32
 
+# Le seuil de ressemblance des suggestions de la recherche (« Vouliez-vous dire… ? »,
+# E4, lot 2b) : SEARCH_SIMILARITY_THRESHOLD. Choisi sur la mesure du 2026-11-09 (seconde
+# mesure, E4, lot 4), sur le jeu de saisies fautives complété de 10 saisies sans espace
+# (`tests/fixtures/saisies_fautives.tsv`, 40 lignes) : 0,4 garde le rappel de 0,3
+# (16 / 20 fautes de frappe, 10 / 10 espaces retirées) avec une meilleure précision
+# (0,29 contre 0,22) ; la première mesure (2026-11-08) avait pris 0,3 faute de seuil à
+# 90 % (README).
+SEUIL_RESSEMBLANCE_DEFAUT = 0.4
+# Le plancher d'un résumé coupé avant ses extraits de critiques : SYNOPSIS_MIN_CHARS.
+# Choisi sur la mesure du 2026-11-08 : la distribution des longueurs après coupe a un
+# creux de 20 à 120 caractères ; 100 y tombe (README).
+RESUME_MIN_DEFAUT = 100
+
 
 @dataclass(frozen=True, slots=True)
 class ApiKey:
@@ -42,6 +55,19 @@ def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
 
     if value < minimum:
         raise ValueError(f"{name} doit être supérieur ou égal à {minimum}")
+    return value
+
+
+def _env_float(name: str, default: float, *, minimum: float, maximum: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} doit être un nombre") from exc
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{name} doit être entre {minimum} et {maximum}")
     return value
 
 
@@ -140,6 +166,9 @@ class Settings:
     # Trousseau d'autorisation. Vide par défaut pour que `Settings()` reste
     # utilisable en test unitaire ; `from_env` ne l'accepte JAMAIS vide.
     api_keys: tuple[ApiKey, ...] = ()
+    # La recherche tolérante et les résumés (E4, lot 2b, contrat 0.6.0).
+    search_similarity_threshold: float = SEUIL_RESSEMBLANCE_DEFAUT
+    synopsis_min_chars: int = RESUME_MIN_DEFAUT
 
     @classmethod
     def database_from_env(cls) -> Settings:
@@ -174,6 +203,15 @@ class Settings:
                 "DB_POOL_MIN_SIZE", defaults.db_pool_min_size, minimum=0
             ),
             db_pool_max_size=_env_int("DB_POOL_MAX_SIZE", defaults.db_pool_max_size),
+            search_similarity_threshold=_env_float(
+                "SEARCH_SIMILARITY_THRESHOLD",
+                defaults.search_similarity_threshold,
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            synopsis_min_chars=_env_int(
+                "SYNOPSIS_MIN_CHARS", defaults.synopsis_min_chars, minimum=0
+            ),
         )
         if settings.db_pool_min_size > settings.db_pool_max_size:
             raise ValueError(

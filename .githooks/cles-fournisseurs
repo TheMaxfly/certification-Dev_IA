@@ -59,9 +59,56 @@ CLES_VARIABLES+=(GRAFANA_SMTP_MOT_DE_PASSE)
 CLES_FOURNISSEUR[GRAFANA_SMTP_MOT_DE_PASSE]="du canal d'alerte"
 CLES_NATURE[GRAFANA_SMTP_MOT_DE_PASSE]="mot de passe"
 CLES_ASPECT[GRAFANA_SMTP_MOT_DE_PASSE]="GF_SMTP_PASSWORD[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{8,}"
+# Les secrets de l'application du libraire (E4, lot 1), posés AVANT que ces secrets
+# existent sur le poste :
+#   - APPLICATION_CLE_SESSION : la clé de signature des sessions, dans le .env du module
+#     12 ; sa valeur, et une affectation littérale de 32 caractères au moins (une
+#     référence « ${…} » n'en est pas une) ;
+#   - le mot de passe du rôle de connexion `app_conseiller` : sa valeur, lue dans le
+#     fichier de mots de passe de PostgreSQL du poste (PGPASSFILE, sinon ~/.pgpass), sur
+#     les seules lignes de ce rôle, 12 caractères au moins ; et une ligne de ce fichier
+#     recopiée (le rôle entre deux « : », suivi d'une valeur ; la forme documentée,
+#     « <mot de passe> », passe). La variable APP_CONSEILLER_MOT_DE_PASSE n'existe
+#     pas : c'est le nom interne de ce secret ici ;
+#   - un DSN qui porte un mot de passe, forme d'adresse (le rôle, « : », une valeur,
+#     « @ », après le schéma postgresql) : motif seul, aucune valeur à comparer ; une
+#     valeur entre chevrons ou une référence (« ${…} », « $… ») passe. La forme par mots-clés (« password=… ») n'est pas
+#     cherchée : elle se confondrait avec un argument nommé du code.
+CLES_VARIABLES+=(APPLICATION_CLE_SESSION APP_CONSEILLER_MOT_DE_PASSE DSN_MOT_DE_PASSE)
+CLES_FOURNISSEUR[APPLICATION_CLE_SESSION]="de session de l'application"
+CLES_FOURNISSEUR[APP_CONSEILLER_MOT_DE_PASSE]="du rôle de connexion de l'application"
+CLES_NATURE[APP_CONSEILLER_MOT_DE_PASSE]="mot de passe"
+CLES_FOURNISSEUR[DSN_MOT_DE_PASSE]="à mot de passe"
+CLES_NATURE[DSN_MOT_DE_PASSE]="DSN"
+CLES_ASPECT[APPLICATION_CLE_SESSION]="APPLICATION_CLE_SESSION[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$]{32,}"
+# « [r] » : la ligne du motif ne tombe pas sous son propre motif.
+CLES_ASPECT[APP_CONSEILLER_MOT_DE_PASSE]=":app_conseille[r]:[^[:space:]<>\"'\$]{8,}"
+CLES_ASPECT[DSN_MOT_DE_PASSE]="postgres(ql)?://[^[:space:]/:@\"']+:[^[:space:]@\"'<>\${}/]{3,}@"
+# Les clés du catalogue (E4, lot 2a), posées AVANT que ces secrets existent sur le poste :
+#   - APPLICATION_CLE_CATALOGUE : la clé de l'application auprès de l'API data du module
+#     02, dans le .env du 12 ; sa valeur, et une affectation littérale de 32 caractères
+#     au moins (une référence « ${…} » ou une forme entre chevrons n'en est pas une) ;
+#   - API_KEYS : le trousseau de l'API data, « nom:clé,nom:clé », dans le .env du 02 ;
+#     chaque clé, découpée comme celles du trousseau de l'API du modèle, et une
+#     affectation littérale dont une entrée porte une clé de 32 caractères au moins.
+CLES_VARIABLES+=(APPLICATION_CLE_CATALOGUE API_KEYS)
+CLES_FOURNISSEUR[APPLICATION_CLE_CATALOGUE]="du catalogue de l'application"
+CLES_FOURNISSEUR[API_KEYS]="du trousseau de l'API data"
+CLES_ASPECT[APPLICATION_CLE_CATALOGUE]="APPLICATION_CLE_CATALOGUE[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$<>]{32,}"
+CLES_ASPECT[API_KEYS]="API_KEYS[\"']?[[:space:]]*[:=][[:space:]]*[\"']?([a-z0-9_-]+:[^[:space:],\"']*,)*[a-z0-9_-]+:[^[:space:],\"'\$<>]{32,}"
+# La clé « comptes » de l'application auprès de l'API du modèle (E4, lot 2b), posée AVANT
+# que ce secret existe sur le poste (il sera posé au lot de livraison continue) :
+#   - APPLICATION_CLE_API_COMPTES : la clé des comptes connectés (client, libraire,
+#     administrateur), dans le .env du 12 ; sa valeur, et une affectation littérale de
+#     32 caractères au moins (une référence « ${…} » ou une forme entre chevrons n'en est
+#     pas une). Le motif de APPLICATION_CLE_API ne la voit pas : « _COMPTES » le rompt.
+CLES_VARIABLES+=(APPLICATION_CLE_API_COMPTES)
+CLES_FOURNISSEUR[APPLICATION_CLE_API_COMPTES]="des comptes de l'application"
+CLES_ASPECT[APPLICATION_CLE_API_COMPTES]="APPLICATION_CLE_API_COMPTES[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'\$<>]{32,}"
 # Le fichier où l'outil du fournisseur range la valeur du poste.
 declare -A CLES_FICHIER=([HF_TOKEN]="${HF_HOME:-$HOME/.cache/huggingface}/token")
 CLES_FICHIER[GRAFANA_SMTP_MOT_DE_PASSE]="$(git rev-parse --show-toplevel 2>/dev/null)/13_monitorage/.secrets/smtp_mot_de_passe"
+CLES_FICHIER[APP_CONSEILLER_MOT_DE_PASSE]="${PGPASSFILE:-$HOME/.pgpass}"
 
 cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
     local v
@@ -78,10 +125,22 @@ cles_valeur_env() { # <fichier .env> <variable> : sa dernière affectation, nue
 }
 
 cles_decouper() { # <variable> ; entrée : ses valeurs, une par ligne ; sortie : à comparer
-    if [ "$1" = API_MODELE_CLES ]; then
+    if [ "$1" = API_MODELE_CLES ] || [ "$1" = API_KEYS ]; then
         tr ',' '\n' | sed -E 's/^[[:space:]]*[^:]*://'
     elif [ "$1" = GRAFANA_SMTP_MOT_DE_PASSE ]; then
         sed -E 'p; s/[[:space:]]+//g'
+    elif [ "$1" = APP_CONSEILLER_MOT_DE_PASSE ]; then
+        # Les lignes « hôte:port:base:rôle:mot de passe » du rôle (\: et \\ échappés) ;
+        # le mot de passe seul, 12 caractères au moins.
+        awk -v role=app_conseiller '{
+            l = $0; gsub(/\\\\/, "\001", l); gsub(/\\:/, "\002", l)
+            n = split(l, f, ":")
+            if (n >= 5 && f[4] == role) {
+                p = f[5]; for (i = 6; i <= n; i++) p = p ":" f[i]
+                gsub(/\002/, ":", p); gsub(/\001/, "\\", p)
+                if (length(p) >= 12) print p
+            }
+        }'
     else
         cat
     fi
