@@ -31,7 +31,12 @@ répond pas ; `90` erreur inattendue, ou un journal qui porterait un secret.
 | 6 | La production | les migrations en attente, appliquées par le mainteneur après sa sauvegarde (`database/README.md`) ; `make livrer ACTION=deployer CIBLE=production` | `journal/<horodatage>_production_<étiquette>.md`, et Grafana |
 
 **Construire** exige un arbre propre, sur `main`, exactement à une étiquette annotée
-(`git describe --exact-match`). Les versions viennent des `pyproject.toml` de l'étiquette
+(`git describe --exact-match`). **L'arbre doit être propre, les journaux exceptés : ils
+sont ce que la commande écrit** — `git status --porcelain` est jugé hors de
+`15_livraison/journal/` (journaux non suivis et `index.md` modifié admis là, et là
+seulement) ; tout autre écart refuse, et le refus nomme le premier fichier en cause. Les
+journaux ne participent à aucune image ni à aucun Compose : ce que l'étiquette décrit
+reste ce qui tourne. Les versions viennent des `pyproject.toml` de l'étiquette
 (02, 11, 12), et le Compose de l'étiquette doit désigner les mêmes. **Une étiquette = une
 construction** : chaque image est construite sous une étiquette provisoire
 (`<version>-candidat`), puis son empreinte est comparée à celle de l'étiquette d'image
@@ -39,6 +44,14 @@ existante. Si elles sont égales, rien ne change ; si elle est absente, l'image 
 étiquetée ; si elles diffèrent, **refus avant toute réécriture**, sauf `RECONSTRUIRE=1`.
 La réécriture est alors notée avec l'ancienne empreinte, et le journal du déploiement
 suivant la reprend.
+
+**Dette — constructions reproductibles.** Deux constructions de la même étiquette
+donnent deux empreintes (horodatages des couches) : toute construction d'une étiquette
+d'image déjà présente refuse, et `RECONSTRUIRE=1` est de règle, journalisé avec
+l'ancienne et la nouvelle empreinte. La règle « une étiquette = une construction » est
+donc tenue **par le journal**, pas par l'empreinte. La rendre vraie par l'empreinte
+demande des images reproductibles (`SOURCE_DATE_EPOCH`, couches sans horodatage) :
+étape du serveur privé virtuel.
 
 **Déployer** vérifie d'abord, sans rien écrire :
 
@@ -165,6 +178,12 @@ cible. Chaque journal porte :
 - les appels facturés comptés par l'API (avant et après) ;
 - pour un retour : le motif, ce qui a été quitté, et la phrase sur les migrations.
 
+**Les étiquettes de livraison d'E4.** `e4-livraison` est la première étiquette de
+livraison, module 15 en 0.1.0 : le staging ne s'y est pas levé, et le premier journal
+rendait l'arbre « sale » pour le geste suivant (le journal dans l'arbre, la propreté
+exigée). `e4-livraison-1` porte le correctif 0.1.1 ; c'est l'étiquette de la production.
+Une étiquette ne se déplace pas : `e4-livraison` reste, l'histoire se lit.
+
 **Versionné**, parce que c'est la preuve d'un déploiement effectif : on le relit dans
 l'historique, on le commite après le déploiement. **Aucun secret, aucune adresse autre
 que `127.0.0.1`** : avant d'écrire, `livrer` relit le texte avec les motifs du hook
@@ -179,10 +198,13 @@ make verify MODULE=15    # Ruff, tests sur doubles, Pyright strict, Bandit, pip-
 
 Les tests remplacent `git`, `docker`, Compose, `psql`, `uv` et le bouclage par des doubles.
 Aucune commande réelle ne tourne, sauf la relecture par le hook, jouée dans un dépôt
-jetable. Mutations `E4V-01` à `E4V-05` (`verification/mutations/`) :
+jetable — et `git`, réel, dans `tests/test_arbre_reel.py` : un outil qui écrit dans
+l'arbre se teste sur un dépôt réel, deux gestes à la suite. Mutations `E4V-01` à
+`E4V-06` (`verification/mutations/`) :
 
 - la santé qui passerait avec un service manquant ;
 - `construire` sur un arbre sale ;
 - `deployer` qui ignorerait l'autre cible ;
 - un journal sans empreintes ;
 - un retour qui toucherait aux migrations.
+- le filtre des journaux qui admettrait tout fichier de l'arbre.

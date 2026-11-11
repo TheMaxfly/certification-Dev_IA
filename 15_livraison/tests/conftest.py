@@ -1,8 +1,9 @@
 """Le poste en double : git, docker, Compose, psql, uv, le bouclage.
 
 Aucune commande réelle n'est lancée (sauf l'essai de la relecture par le hook, dans un
-dépôt jetable) ; aucun journal n'est écrit hors de `tmp_path`. L'état de départ est une
-production saine à l'étiquette `e4-livraison`.
+dépôt jetable, et git dans le dépôt jetable de `test_arbre_reel.py`) ; aucun journal
+n'est écrit hors de `tmp_path`. L'état de départ est une production saine à l'étiquette
+`e4-livraison`.
 """
 
 from __future__ import annotations
