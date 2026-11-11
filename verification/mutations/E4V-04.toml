@@ -1,0 +1,7 @@
+id = "E4V-04"
+origine = "E4, lot 8, spec 01 (2026-11-11) — le journal de déploiement sans les empreintes des images"
+fichier = "15_livraison/src/livraison/journal.py"
+avant = '''    t += [f"| `{c.image.ref}` | `{c.empreinte}` | {c.statut} |" for c in e.images]'''
+apres = '''    t += [f"| `{c.image.ref}` | {c.statut} |" for c in e.images]'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_journal.py", "-k", "empreintes"]

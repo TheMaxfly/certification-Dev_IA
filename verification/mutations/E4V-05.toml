@@ -1,0 +1,8 @@
+id = "E4V-05"
+origine = "E4, lot 8, spec 01 (2026-11-11) — le retour arrière touche aux migrations de la base"
+fichier = "15_livraison/src/livraison/retour.py"
+avant = '''    entree.migrations_avant = texte_migrations(o, cible.base)'''
+apres = '''    entree.migrations_avant = texte_migrations(o, cible.base)
+    o.lanceur(Commande("migrate.up", ("uv", "run", "python", "migrate.py", "up"), dossier=o.racine / "database"))'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_retour.py", "-k", "chaine_livraison"]
