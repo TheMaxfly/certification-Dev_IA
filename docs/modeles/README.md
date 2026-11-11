@@ -4,16 +4,17 @@ Livrable documentaire du bloc C4. Les planches sont **derivees du schema reel**
 de la base `apimanga` : aucune table, aucune colonne, aucune cle etrangere n'y
 est saisie a la main.
 
-**Regenere le 2026-11-08** (E4, lot 2b) sur la **preproduction** (`apimanga_preprod`,
-30 migrations, `028` et `029` comprises), la dette des migrations `015` a `026` levee
-du meme coup (personnages multi-sources, vues `manga.v_pseudonymes` et
-`manga.v_metadonnees_serie`, decisions du moyeu) : 51 tables, 735 colonnes, 23 FK,
-123 index, dont les quatre index de trigrammes de la `028`. L'extraction couvre les
-schemas `manga` et `staging` : ni les fonctions (`manga.normaliser`, `028`), ni le
-schema `application` de l'application du libraire (`027`, `029` : decrit par
-`12_application/schema/README.md`) n'y figurent. La production (`apimanga`) recevra
-`027` a `029` au lot de livraison continue : jusque-la, le livrable decrit la
-preproduction, en avance de trois migrations.
+**Regenere le 2026-11-11** (E4, lot 8) sur la **production** (`apimanga`, 30 migrations,
+`027` a `029` appliquees le jour meme), sous `verif_lecture` en lecture seule. L'extraction
+couvre desormais trois schemas — `manga`, `staging` et **`application`**, l'application
+du libraire (`027`, `029`) — plus les **fonctions** des migrations (`manga.normaliser`,
+`028`), les **droits par role** et les **commentaires** de la base : 58 tables
+(36 `manga`, 15 `staging`, 7 `application`), 10 vues, 781 colonnes, 28 FK, 133 index
+dont les quatre index de trigrammes de la `028`, 1 fonction, 106 droits accordes. La
+structure de `manga` et de `staging` est identique a celle extraite le 2026-11-08 sur
+la preproduction, comptes compris. Les planches, qui ne dessinent que `manga` et
+`staging`, sont inchangees ; le schema `application` a sa page, avec son diagramme :
+**`application.md`**.
 
 ## Fichiers
 
@@ -22,25 +23,28 @@ preproduction, en avance de trois migrations.
 | `modele_donnees.drawio` | **La reference.** 3 onglets, editable dans draw.io / diagrams.net / l'extension VS Code. |
 | `mpd_coeur.png` · `mpd_staging.png` · `mcd.png` | Exports pour insertion directe au rapport (2800 x 1980, A3 paysage). |
 | `mpd_coeur.svg` · `mpd_staging.svg` · `mcd.svg` | Sources vectorielles des PNG. |
-| `schema_reel.md` | **La preuve de fidelite** : inventaire complet extrait de la base (51 tables, 735 colonnes, 23 FK, 2026-11-08), plus la confrontation avec les migrations. |
+| `schema_reel.md` | **La preuve de fidelite** : inventaire complet extrait de la base (58 tables, 781 colonnes, 28 FK, fonctions, droits par role, 2026-11-11), plus la confrontation avec les migrations. |
+| `application.md` | **Le modele de donnees de l'application** (schema `application`) : tables, colonnes, cles, contraintes, cascades, droits par role, et le diagramme Mermaid (`erDiagram`, rendu par GitHub). |
 | `modele_donnees.mmd` | Version Mermaid du MPD coeur (secondaire, rendu automatique sur GitHub). |
 | `schema.json` | Extraction brute, source des generateurs. |
-| `extraire_schema.py` · `generer_schema_reel.py` · `generer_diagrammes.py` · `layout.py` | La chaine de production, rejouable. |
+| `extraire_schema.py` · `generer_schema_reel.py` · `generer_application.py` · `generer_diagrammes.py` · `layout.py` | La chaine de production, rejouable. |
 
 ## Regenerer
 
 L'extraction est jouee sous le **role de consultation** `manga_api`, en session
 `default_transaction_read_only = on` : le livrable se produit avec les droits
-les plus faibles, pas avec ceux du proprietaire. Le 2026-11-08, sur la preproduction,
-sous `verif_lecture` (`verif_ro`, lecture seule lui aussi, sans droit sur `staging` :
-memes comptes indisponibles) ; la base et le role lus sont ecrits dans `schema.json`
-(`source`) et en tete de `schema_reel.md`.
+les plus faibles, pas avec ceux du proprietaire. Le 2026-11-11, sur la production,
+sous `verif_lecture` (`verif_ro`, lecture seule lui aussi, sans droit sur `staging` ni
+sur `application` : leurs comptes sont indisponibles, leur structure et leurs droits
+se lisent dans `pg_catalog`) ; la base et le role lus sont ecrits dans `schema.json`
+(`source`) et en tete de `schema_reel.md` et d'`application.md`.
 
 ```bash
 export DATABASE_URL='postgresql://manga_api@localhost:5432/apimanga?options=-c%20default_transaction_read_only%3Don'
 cd docs/modeles
 uv run --with 'psycopg[binary]' python extraire_schema.py > schema.json   # lecture seule
 uv run python generer_schema_reel.py                                      # schema_reel.md
+uv run python generer_application.py                                      # application.md
 uv run python generer_diagrammes.py                                       # .drawio + .svg + .mmd
 uv run --with cairosvg python -c "
 import cairosvg

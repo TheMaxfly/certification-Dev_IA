@@ -5,6 +5,9 @@ retrouver ici, et ce fichier ne contient que ce que la base a repondu. Il porte
 aussi la confrontation avec toutes les migrations de `database/migrations/`.
 
     uv run python docs/modeles/generer_schema_reel.py
+
+Trois schemas depuis la livraison d'E4 (lot 8) : `manga`, `staging`,
+`application` ; plus les fonctions des migrations et les droits par role.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parents[1]
 MIGRATIONS = RACINE / "database" / "migrations"
 
+SCHEMAS = ("manga", "staging", "application")
 MOTIF_CREATE = re.compile(
     r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_]+\.[a-z_0-9]+)", re.I
 )
@@ -67,10 +71,14 @@ def main() -> int:
         if t["table_type"] == "VIEW"
     )
     comptes = brut["comptes"]
+    commentaires = {
+        f"{t['table_schema']}.{t['table_name']}": t.get("commentaire")
+        for t in brut["tables"]
+    }
     comptes_indisponibles = brut.get("comptes_indisponibles", {})
 
     par_fichier, declarees = tables_des_migrations()
-    pertinentes = {t for t in declarees if t.split(".")[0] in ("manga", "staging")}
+    pertinentes = {t for t in declarees if t.split(".")[0] in SCHEMAS}
     en_trop = sorted(set(base_tables) - pertinentes)
     manquantes = sorted(pertinentes - set(base_tables))
 
@@ -104,20 +112,30 @@ def main() -> int:
         f"| Tables `staging` | "
         f"{sum(1 for t in base_tables if t.startswith('staging.'))} |"
     )
+    a(
+        f"| Tables `application` | "
+        f"{sum(1 for t in base_tables if t.startswith('application.'))} |"
+    )
     a(f"| Vues (`manga`) | {len(vues)} |")
     a(f"| Colonnes (total) | {len(brut['colonnes'])} |")
     a(f"| Cles etrangeres | {len(brut['fk'])} |")
     a(f"| Index (dont UNIQUE) | {len(brut['index'])} |")
     a(f"| Contraintes declarees | {len(brut['contraintes'])} |")
+    a(f"| Fonctions (hors extensions) | {len(brut.get('fonctions', []))} |")
+    a(f"| Droits accordes (objet x role) | {len(brut.get('droits', []))} |")
     a("")
 
     a("## Confrontation base <-> toutes les migrations versionnees")
     a("")
     a(
-        f"- tables `manga` + `staging` **declarees par les migrations** : "
+        f"- tables `manga` + `staging` + `application` **declarees par les "
+        "migrations** : "
         f"**{len(pertinentes)}**"
     )
-    a(f"- tables `manga` + `staging` **presentes en base** : **{len(base_tables)}**")
+    a(
+        f"- tables `manga` + `staging` + `application` **presentes en base** : "
+        f"**{len(base_tables)}**"
+    )
     a("")
     if not en_trop and not manquantes:
         a(
@@ -146,7 +164,7 @@ def main() -> int:
     a("| Migration | Tables creees |")
     a("| --- | --- |")
     for nom, cles in par_fichier.items():
-        retenues = sorted(c for c in cles if c.split(".")[0] in ("manga", "staging"))
+        retenues = sorted(c for c in cles if c.split(".")[0] in SCHEMAS)
         if retenues:
             a(f"| `{nom}` | {', '.join(f'`{c}`' for c in retenues)} |")
     a("")
@@ -160,6 +178,48 @@ def main() -> int:
             sorted(set(re.findall(r"\b(manga\.[a-z_0-9]+)", v["definition"], re.I)))
         )
         a(f"| `{v['schema']}.{v['nom']}` | {cible or '—'} |")
+    a("")
+
+    a("## Fonctions")
+    a("")
+    a(
+        "Les fonctions ecrites par les migrations (celles des extensions, "
+        "`pg_trgm` et `unaccent`, exclues)."
+    )
+    a("")
+    for f in brut.get("fonctions", []):
+        a(f"### `{f['schema']}.{f['nom']}({f['arguments']})`")
+        a("")
+        a(
+            f"Rend `{f['resultat']}` ; langage `{f['langage']}`, "
+            f"`{f['volatilite']}`, parallele `{f['parallele']}`"
+            + (", stricte" if f["stricte"] else "")
+            + "."
+        )
+        if f.get("commentaire"):
+            a("")
+            a(f"> {f['commentaire']}")
+        a("")
+        a("```sql")
+        a(f["definition"].strip())
+        a("```")
+        a("")
+
+    a("## Droits par role")
+    a("")
+    a(
+        "L'ACL de chaque objet, depliee : les droits accordes, role par role. Le "
+        "proprietaire, qui a tous les droits implicitement, est donne a part."
+    )
+    a("")
+    a("| Schema | Objet | Type | Proprietaire | Role | Droits |")
+    a("| --- | --- | --- | --- | --- | --- |")
+    for d in brut.get("droits", []):
+        a(
+            f"| `{d['schema']}` | `{d['objet']}` | {d['type']} "
+            f"| `{d['proprietaire']}` | `{d['role']}` "
+            f"| {', '.join(d['privileges'])} |"
+        )
     a("")
 
     a("## Cles etrangeres (toutes)")
@@ -180,6 +240,9 @@ def main() -> int:
     for cle in base_tables:
         a(f"### `{cle}`")
         a("")
+        if commentaires.get(cle):
+            a(f"> {commentaires[cle]}")
+            a("")
         if cle in comptes:
             a(f"{comptes[cle]} lignes.")
         else:
@@ -187,7 +250,7 @@ def main() -> int:
             # dire lequel, plutot que d'ecrire un `?` qu'on prendrait pour
             # une defaillance de l'extraction.
             motif = comptes_indisponibles.get(cle, "compte non releve")
-            a(f"Nombre de lignes **non lisible** sous `manga_api` ({motif}).")
+            a(f"Nombre de lignes **non lisible** sous `{source['role']}` ({motif}).")
         a("")
         a("| Colonne | Type | Null | Defaut |")
         a("| --- | --- | --- | --- |")
