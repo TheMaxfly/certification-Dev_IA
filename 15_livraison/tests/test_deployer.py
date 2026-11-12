@@ -3,8 +3,21 @@ journal."""
 
 from __future__ import annotations
 
+import re
+
 import pytest
-from conftest import E4, SERVIES, Bouclage, Poste, sante_application
+from conftest import (
+    CIBLES,
+    E4,
+    RELEVE_AVANT,
+    SERVIES,
+    Bouclage,
+    Poste,
+    cible_prometheus,
+    cibles,
+    cibles_sauf,
+    sante_application,
+)
 
 from livraison import deployer
 from livraison.codes import Arret, Code
@@ -236,3 +249,32 @@ def test_docker_qui_ne_repond_pas(o: Outils):
     o.lanceur = lambda c: Sortie(1, "", "absent")
     with pytest.raises(Arret, match="docker ne répond pas"):
         deployer.en_marche(o, "api-modele")
+
+
+def test_j_le_journal_porte_pile_prete_et_duree_et_l_attente(
+    o: Outils, bouclage: Bouclage
+):
+    """Écart 25 (0.1.2) : un déploiement attend un relevé postérieur au lever ; le
+    journal porte « Pile prête » (Compose → /sante 200) et « Durée » (le geste entier),
+    et l'attente de Prometheus."""
+    bouclage.reponses[CIBLES] = [
+        cibles_sauf(application=cible_prometheus("application", "down", RELEVE_AVANT)),
+        cibles(),
+    ]
+    assert deployer.deployer(o, "production") == Code.OK
+    texte = (o.journal / journaux(o)[0]).read_text(encoding="utf-8")
+    pret = re.search(r"\| Pile prête \| (\d+) s \|", texte)
+    duree = re.search(r"\| Durée \| (\d+) s \|", texte)
+    assert pret and duree and int(pret.group(1)) < int(duree.group(1))
+    assert "**santé verte**" in texte
+    assert re.search(
+        r"- Prometheus : \d+ s d'attente d'un relevé postérieur au lever", texte
+    )
+
+
+def test_j_une_pile_qui_ne_repond_pas_n_est_jamais_prete(o: Outils, bouclage: Bouclage):
+    bouclage.reponses.pop("http://127.0.0.1:8020/sante")
+    assert deployer.deployer(o, "production") == Code.DEPLOIEMENT
+    texte = (o.journal / journaux(o)[0]).read_text(encoding="utf-8")
+    assert "| Pile prête | — |" in texte
+    assert "Prometheus :" not in texte

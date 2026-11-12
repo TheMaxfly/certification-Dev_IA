@@ -2,7 +2,8 @@
 
 C'EST LA PREUVE que la grille demande (décision 6 du cadre) : qui (l'utilisateur du
 poste), quand, l'étiquette et son commit, les images et leurs empreintes, les migrations
-avant et après, le verdict de santé, la durée, les appels facturés relevés, et pour un
+avant et après, le verdict de santé, deux durées (pile prête, geste entier), les appels
+facturés relevés, et pour un
 retour arrière le motif et ce qui a été quitté. `index.md` reçoit une ligne par journal.
 
 AUCUN SECRET, AUCUNE ADRESSE autre que `127.0.0.1` : avant d'écrire, le texte est relu
@@ -55,6 +56,9 @@ class Entree:
     debut: datetime
     utilisateur: str
     duree_s: float = 0.0
+    #: Du lancement des commandes Compose à `/sante` 200 ; `None` si la pile n'a pas
+    #: répondu.
+    pile_prete_s: float | None = None
     images: list[Construite] = field(default_factory=list[Construite])
     migrations_avant: str = "—"
     migrations_apres: str = "—"
@@ -85,6 +89,9 @@ def rendre(e: Entree) -> str:
         f"| Geste | {e.geste} |",
         f"| Étiquette | `{e.etiquette}` (commit `{e.commit[:12]}`) |",
         f"| Début (UTC) | {e.debut.strftime('%Y-%m-%d %H:%M:%S')} |",
+        "| Pile prête | "
+        + ("—" if e.pile_prete_s is None else f"{e.pile_prete_s:.0f} s")
+        + " |",
         f"| Durée | {e.duree_s:.0f} s |",
         f"| Utilisateur du poste | `{e.utilisateur}` |",
         f"| Verdict | **{e.verdict}** |",

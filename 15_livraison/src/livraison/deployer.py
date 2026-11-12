@@ -221,7 +221,11 @@ def lever_et_verifier(
     leves: list[Commande],
     relire: Relecture | None,
 ) -> Code:
-    """Lance les commandes Compose, attend, vérifie, journalise — dans tous les cas."""
+    """Lance les commandes Compose, attend, vérifie, journalise — dans tous les cas.
+
+    Deux durées au journal : « Pile prête », du lancement des commandes Compose à
+    `/sante` 200 ; « Durée », le geste entier, santé et attente de Prometheus comprises.
+    L'instant de référence de la santé est celui où `/sante` a répondu."""
     t0 = o.horloge()
     code = Code.OK
     try:
@@ -234,7 +238,11 @@ def lever_et_verifier(
                     s.stderr,
                 )
         attendre(o, f"http://127.0.0.1:{cible.port_application}/sante")
-        entree.controles = sante.verifier(o, cible, at)
+        entree.pile_prete_s = o.horloge() - t0
+        depuis = o.maintenant()
+        entree.controles = sante.verifier(
+            o, cible, at, depuis=depuis, notes=entree.notes
+        )
         if sante.verte(entree.controles):
             entree.verdict = "santé verte"
         else:
