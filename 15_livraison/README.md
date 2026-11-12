@@ -26,7 +26,7 @@ répond pas ; `90` erreur inattendue, ou un journal qui porterait un secret.
 | 1 | Un commit sur une branche `feature/…` | `git commit` ; les hooks `.githooks/` refusent auteur, mention, fichier exclu, clé | l'historique de la branche |
 | 2 | Une demande vers `develop` | `gh pr create` ; la chaîne `verify` joue une tâche par module et la tâche `statique` | les contrôles de la demande sur GitHub |
 | 3 | La fusion vers `develop` | par le mainteneur, dans l'interface (branches protégées, aucune exemption) | le commit de fusion |
-| 4 | La livraison vers `main` | demande `develop → main` après `make verify-poste` et la sauvegarde de la base ; fusion par le mainteneur ; **étiquette annotée** poussée | l'étiquette, `main` et `develop` alignées |
+| 4 | La livraison vers `main` | demande `develop → main`, après les vérifications que demande ce qu'elle change (`CONTRIBUTING.md`) : du code servi, le harnais ou la base → pile arrêtée par `ACTION=arreter`, `make verify-poste`, `make verify-mutations`, sauvegarde ; sinon `make verify` et la chaîne verte ; fusion par le mainteneur ; **étiquette annotée** poussée dans les deux cas | l'étiquette, `main` et `develop` alignées ; le journal de l'arrêt, s'il y en a un |
 | 5 | Le staging | depuis `main` à l'étiquette : `make livrer ACTION=construire`, puis `ACTION=deployer CIBLE=staging` ; vérification par l'interface ; `ACTION=arreter CIBLE=staging` | `journal/<horodatage>_staging_<étiquette>.md` |
 | 6 | La production | les migrations en attente, appliquées par le mainteneur après sa sauvegarde (`database/README.md`) ; `make livrer ACTION=deployer CIBLE=production` | `journal/<horodatage>_production_<étiquette>.md`, et Grafana |
 
