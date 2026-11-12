@@ -205,6 +205,12 @@ def dernier(o: Outils, cible: str) -> Path | None:
     return trouves[-1] if trouves else None
 
 
+def etiquette_de(chemin: Path, cible: str) -> str:
+    """L'étiquette d'un journal, lue dans son nom :
+    `<horodatage>_<cible>_<étiquette>.md`."""
+    return chemin.stem.partition(f"_{cible}_")[2]
+
+
 def completer(
     o: Outils,
     chemin: Path,

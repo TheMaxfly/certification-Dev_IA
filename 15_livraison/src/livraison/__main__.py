@@ -2,7 +2,7 @@
 
     livrer construire [--reconstruire] [--a-blanc]
     livrer deployer --cible staging|production [--a-blanc]
-    livrer sante    --cible staging|production
+    livrer sante    --cible staging|production [--etiquette <étiquette>]
     livrer retour   --cible staging|production --vers <étiquette> --motif "…"
     livrer arreter  --cible staging|production
     livrer etat
@@ -38,6 +38,11 @@ def analyseur() -> argparse.ArgumentParser:
     d.add_argument("--a-blanc", action="store_true", help="affiche, ne lève rien")
     s = sous.add_parser("sante", help="les contrôles de santé de la cible")
     s.add_argument("--cible", required=True, choices=cibles.NOMS)
+    s.add_argument(
+        "--etiquette",
+        help="la référence jugée (par défaut : l'étiquette du dernier journal de la"
+        " cible ; sans journal, celle de HEAD)",
+    )
     r = sous.add_parser("retour", help="redéploie une étiquette antérieure")
     r.add_argument("--cible", required=True, choices=cibles.NOMS)
     r.add_argument("--vers", required=True)
@@ -84,7 +89,7 @@ def principal(arguments: list[str], outils: Outils | None = None) -> int:
         if args.commande == "deployer":
             return int(deployer.deployer(o, args.cible, a_blanc=args.a_blanc))
         if args.commande == "sante":
-            return int(deployer.verifier_sante(o, args.cible))
+            return int(deployer.verifier_sante(o, args.cible, args.etiquette))
         if args.commande == "retour":
             return int(retour.retour(o, args.cible, args.vers, args.motif))
         if args.commande == "arreter":

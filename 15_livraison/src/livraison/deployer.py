@@ -346,15 +346,47 @@ def a_blanc_deployer(o: Outils, cible: Cible) -> Code:
     return Code.OK
 
 
-def verifier_sante(o: Outils, nom: str) -> Code:
-    """`livrer sante` : les contrôles, aux versions de l'étiquette de HEAD."""
+def reference_de_sante(
+    o: Outils, cible: Cible, etiquette: str | None = None
+) -> tuple[Etiquette, str]:
+    """La référence de `livrer sante`, et d'où elle vient (0.1.2, écart 27) : ce qui
+    est déployé, pas l'arbre de travail. L'étiquette demandée ; sinon celle du dernier
+    journal de la cible, quel que soit son verdict (la dernière que `livrer` y a
+    posée) ; sinon celle de HEAD ; sinon refus. L'étiquette retenue doit être annotée
+    et connue."""
+    if etiquette:
+        nom, provenance = etiquette, "demandée"
+    else:
+        precedent = journal.dernier(o, cible.nom)
+        if precedent is not None:
+            nom = journal.etiquette_de(precedent, cible.nom)
+            provenance = "dernier journal de la cible"
+        else:
+            tete = depot.etiquette_de_head(o)
+            if tete is None:
+                raise Arret(
+                    Code.PREREQUIS,
+                    f"aucun journal pour la cible {cible.nom}, et HEAD n'est à aucune"
+                    " étiquette : nommer la référence (livrer sante --cible"
+                    f" {cible.nom} --etiquette <étiquette>)",
+                )
+            nom, provenance = tete, "étiquette de HEAD, aucun journal pour la cible"
+    return depot.etiquette_connue(o, nom), provenance
+
+
+def verifier_sante(o: Outils, nom: str, etiquette: str | None = None) -> Code:
+    """`livrer sante` : les contrôles, aux versions de ce qui a été déployé sur la cible
+    (`reference_de_sante`)."""
     cible = cibles.lire(nom)
-    reference = depot.etiquette_de_head(o) or "HEAD"
-    controles = sante.verifier(o, cible, sante.attendus(o, reference, cible))
+    reference, provenance = reference_de_sante(o, cible, etiquette)
+    controles = sante.verifier(o, cible, sante.attendus(o, reference.nom, cible))
     for ligne in sante.lignes_verdict(controles):
         o.afficher(ligne)
     verte = sante.verte(controles)
-    o.afficher(f"Santé {cible.nom} ({reference}) : {'verte' if verte else 'ROUGE'}.")
+    o.afficher(
+        f"Santé {cible.nom} ({reference.nom} — {provenance}) :"
+        f" {'verte' if verte else 'ROUGE'}."
+    )
     return Code.OK if verte else Code.SANTE_ROUGE
 
 

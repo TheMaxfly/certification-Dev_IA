@@ -1,0 +1,7 @@
+id = "E5V-03"
+origine = "E5, lot 1, spec 01 (2026-11-12) — livrer sante ignore le dernier journal de la cible et juge à l'étiquette de HEAD (écart 27)"
+fichier = "15_livraison/src/livraison/deployer.py"
+avant = '''        precedent = journal.dernier(o, cible.nom)'''
+apres = '''        precedent = None'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "test_27a"]

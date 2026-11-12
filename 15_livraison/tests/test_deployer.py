@@ -3,11 +3,14 @@ journal."""
 
 from __future__ import annotations
 
+import json
 import re
+import tempfile
 
 import pytest
 from conftest import (
     CIBLES,
+    E3,
     E4,
     RELEVE_AVANT,
     SERVIES,
@@ -19,7 +22,8 @@ from conftest import (
     sante_application,
 )
 
-from livraison import deployer
+from livraison import __main__ as principal
+from livraison import deployer, journal, retour
 from livraison.codes import Arret, Code
 from livraison.outils import Outils
 
@@ -228,7 +232,10 @@ def test_arreter_sans_journal_ou_en_echec(o: Outils, poste: Poste):
 
 def test_sante_seule(o: Outils, bouclage: Bouclage, ecran):
     assert deployer.verifier_sante(o, "production") == Code.OK
-    assert ecran[-1] == "Santé production (e4-livraison) : verte."
+    assert ecran[-1] == (
+        "Santé production (e4-livraison — étiquette de HEAD, aucun journal pour la"
+        " cible) : verte."
+    )
     bouclage.reponses.pop("http://127.0.0.1:8000/health")
     assert deployer.verifier_sante(o, "production") == Code.SANTE_ROUGE
 
@@ -278,3 +285,78 @@ def test_j_une_pile_qui_ne_repond_pas_n_est_jamais_prete(o: Outils, bouclage: Bo
     texte = (o.journal / journaux(o)[0]).read_text(encoding="utf-8")
     assert "| Pile prête | — |" in texte
     assert "Prometheus :" not in texte
+
+
+# --------------------------------------------------------------------------- #
+#  Écart 27 (0.1.2) : `livrer sante` juge ce qui a été déployé
+# --------------------------------------------------------------------------- #
+
+
+def test_27a_apres_un_retour_la_sante_juge_l_etiquette_visee(
+    o: Outils, poste: Poste, bouclage: Bouclage, ecran, tmp_path
+):
+    """HEAD reste à l'étiquette d'E4 ; la pile sert `chaine-livraison` : c'est elle
+    que juge `livrer sante`, par le dernier journal de la cible."""
+    poste.apres_up = dict(SERVIES[E3])
+    poste.api.update(version_api="1.4.0")
+    bouclage.reponses["http://127.0.0.1:8020/sante"] = (
+        200,
+        json.dumps({"application": "ok", "api": "ok", "version": "0.1.0"}),
+    )
+    temporaire = lambda: tempfile.TemporaryDirectory(dir=tmp_path)  # noqa: E731
+    assert retour.retour(o, "production", E3, "essai", temporaire=temporaire) == 0
+    assert poste.head == E4
+    ecran.clear()
+    assert deployer.verifier_sante(o, "production") == Code.OK
+    assert ecran[-1] == (
+        "Santé production (chaine-livraison — dernier journal de la cible) : verte."
+    )
+
+
+def test_27b_l_etiquette_demandee(o: Outils, ecran):
+    deployer.deployer(o, "production")
+    ecran.clear()
+    assert deployer.verifier_sante(o, "production", E3) == Code.SANTE_ROUGE
+    assert ecran[-1] == "Santé production (chaine-livraison — demandée) : ROUGE."
+    assert (
+        principal.principal(["sante", "--cible", "production", "--etiquette", E4], o)
+        == 0
+    )
+    assert ecran[-1] == "Santé production (e4-livraison — demandée) : verte."
+
+
+def test_27c_sans_journal_l_etiquette_de_head_dite(o: Outils, ecran):
+    assert journal.dernier(o, "production") is None
+    assert deployer.verifier_sante(o, "production") == Code.OK
+    assert ecran[-1].startswith(
+        "Santé production (e4-livraison — étiquette de HEAD, aucun journal pour la"
+        " cible)"
+    )
+
+
+def test_27d_sans_journal_ni_etiquette_de_head_refus(o: Outils, poste: Poste):
+    poste.head = None
+    with pytest.raises(Arret, match="--etiquette") as e:
+        deployer.verifier_sante(o, "production")
+    assert e.value.code == Code.PREREQUIS
+
+
+def test_27e_l_etiquette_du_dernier_journal_n_existe_plus(o: Outils, poste: Poste):
+    o.journal.mkdir(parents=True)
+    (o.journal / "20261111T100000Z_production_e4-disparue.md").write_text(
+        "# Déploiement\n", encoding="utf-8"
+    )
+    poste.legeres.add("e4-legere")
+    with pytest.raises(Arret, match="'e4-disparue'") as e:
+        deployer.verifier_sante(o, "production")
+    assert e.value.code == Code.PREREQUIS
+    (o.journal / "20261111T110000Z_production_e4-legere.md").write_text(
+        "# Déploiement\n", encoding="utf-8"
+    )
+    with pytest.raises(Arret, match="'e4-legere' inconnue, ou légère"):
+        deployer.verifier_sante(o, "production")
+
+
+def test_l_etiquette_lue_dans_le_nom_du_journal(tmp_path):
+    chemin = tmp_path / "20261112T223702Z_production_e4-livraison-journal.md"
+    assert journal.etiquette_de(chemin, "production") == "e4-livraison-journal"
