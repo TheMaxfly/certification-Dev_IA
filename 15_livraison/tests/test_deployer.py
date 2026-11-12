@@ -9,7 +9,9 @@ import tempfile
 
 import pytest
 from conftest import (
+    APPELS,
     CIBLES,
+    DEPUIS,
     E3,
     E4,
     RELEVE_AVANT,
@@ -19,6 +21,7 @@ from conftest import (
     cible_prometheus,
     cibles,
     cibles_sauf,
+    requete,
     sante_application,
 )
 
@@ -360,3 +363,66 @@ def test_27e_l_etiquette_du_dernier_journal_n_existe_plus(o: Outils, poste: Post
 def test_l_etiquette_lue_dans_le_nom_du_journal(tmp_path):
     chemin = tmp_path / "20261112T223702Z_production_e4-livraison-journal.md"
     assert journal.etiquette_de(chemin, "production") == "e4-livraison-journal"
+
+
+# --------------------------------------------------------------------------- #
+#  Écart 28 (0.1.2) : le compteur « après » ne vient que du conteneur levé
+# --------------------------------------------------------------------------- #
+
+PRODUCTION = deployer.cibles.lire("production")
+
+
+def test_28a_metrics_ferme_dans_le_conteneur_l_api_relevee_apres_le_lever(o: Outils):
+    assert deployer.compteur(o, PRODUCTION, DEPUIS) == "4 appels, 0.012300 $"
+
+
+def test_28b_sans_releve_posterieur_de_l_api_jamais_le_chiffre_d_avant(
+    o: Outils, bouclage: Bouclage
+):
+    bouclage.reponses[APPELS] = requete("2")
+    bouclage.reponses[CIBLES] = cibles_sauf(
+        api=cible_prometheus("api", "up", RELEVE_AVANT)
+    )
+    lu = deployer.compteur(o, PRODUCTION, DEPUIS)
+    assert lu == deployer.NON_RELEVE_APRES and "2 appels" not in lu
+    bouclage.reponses[CIBLES] = cibles_sauf(api=cible_prometheus("api", "down"))
+    assert deployer.compteur(o, PRODUCTION, DEPUIS) == deployer.NON_RELEVE_APRES
+    bouclage.reponses[CIBLES] = (0, "")
+    assert deployer.compteur(o, PRODUCTION, DEPUIS) == deployer.NON_RELEVE_APRES
+
+
+def test_28c_le_staging_et_le_compteur_avant_inchanges(
+    o: Outils, poste: Poste, bouclage: Bouclage
+):
+    bouclage.reponses[CIBLES] = cibles_sauf(
+        api=cible_prometheus("api", "up", RELEVE_AVANT)
+    )
+    # Avant toute commande, Prometheus parle du conteneur en marche : accepté.
+    assert deployer.compteur(o, PRODUCTION) == "4 appels, 0.012300 $"
+    poste.en_marche = {"senpai-staging": dict(SERVIES[E4])}
+    poste.metriques = {"statut": 200, "appels": 7, "cout": 0.5}
+    staging = deployer.cibles.lire("staging")
+    assert deployer.compteur(o, staging, DEPUIS) == "7 appels, 0.500000 $"
+
+
+def test_28_un_deploiement_dont_l_api_n_est_jamais_relevee_apres_le_lever(
+    o: Outils, bouclage: Bouclage
+):
+    bouclage.reponses[APPELS] = requete("2")
+    bouclage.reponses[CIBLES] = cibles_sauf(
+        api=cible_prometheus("api", "up", RELEVE_AVANT)
+    )
+    assert deployer.deployer(o, "production") == Code.SANTE_ROUGE
+    texte = (o.journal / journaux(o)[0]).read_text(encoding="utf-8")
+    assert "- avant : 2 appels, 0.012300 $" in texte
+    assert f"- après : {deployer.NON_RELEVE_APRES}" in texte
+    assert f"api:{deployer.sante.NON_RELEVEE}" in texte
+
+
+def test_28_le_compteur_d_une_pile_qui_ne_se_leve_pas(o: Outils, poste: Poste):
+    """La pile n'a jamais répondu : l'instant de référence du compteur est la fin des
+    commandes Compose."""
+    poste.compose_code = 1
+    assert deployer.deployer(o, "production") == Code.DEPLOIEMENT
+    texte = (o.journal / journaux(o)[0]).read_text(encoding="utf-8")
+    assert "- après : 4 appels, 0.012300 $" in texte

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "livraison"
-version = "0.1.1"
+version = "0.1.2"
 description = "La livraison continue : construire à l'étiquette, déployer par cible, vérifier la santé, journaliser, revenir en arrière."
 readme = "README.md"
 requires-python = ">=3.12"

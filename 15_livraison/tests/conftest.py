@@ -120,8 +120,14 @@ class Poste:
             "nb_fragments": 77006,
         }
     )
+    #: `/metrics` lu dans le conteneur de l'API, hors production (le bouclage admis).
     metriques: dict[str, object] = field(
         default_factory=lambda: {"statut": 200, "appels": 4, "cout": 0.0123}
+    )
+    #: En production, le 13 n'admet que le réseau de collecte : ce que le programme
+    #: rend réellement dans le conteneur (relevé sur le poste le 2026-11-12, E5-4).
+    metriques_production: dict[str, object] = field(
+        default_factory=lambda: {"statut": 404, "appels": 0, "cout": 0}
     )
     refus_cles: list[str] = field(default_factory=list[str])
     refus_mention: bool = False
@@ -174,7 +180,9 @@ class Poste:
             if a[-1] == sante.PROGRAMME_API:
                 return Sortie(0, json.dumps(self.api))
             if a[-1] == deployer.PROGRAMME_METRIQUES:
-                return Sortie(0, json.dumps(self.metriques))
+                production = a[2].startswith(f"{PROJETS['production']}-")
+                lues = self.metriques_production if production else self.metriques
+                return Sortie(0, json.dumps(lues))
             return Sortie(1)
         if a[0] == "uv" and "migrate.py" in a:
             if a[-1] != "status":
@@ -285,6 +293,21 @@ def cibles(*actives: dict[str, object]) -> Reponse:
     return 200, json.dumps(corps)
 
 
+REQUETE = "http://127.0.0.1:9090/api/v1/query?query="
+APPELS = REQUETE + "sum(api_modele_llm_appels_total)"
+COUT = REQUETE + "sum(api_modele_llm_cout_usd_total)"
+
+
+def requete(valeur: str | None) -> Reponse:
+    """Une réponse de `/api/v1/query`, dans la forme relevée sur le poste ; `None` :
+    aucune série."""
+    resultat = (
+        [] if valeur is None else [{"metric": {}, "value": [1762855200.0, valeur]}]
+    )
+    corps = {"status": "success", "data": {"resultType": "vector", "result": resultat}}
+    return 200, json.dumps(corps)
+
+
 def cibles_sauf(**autres: dict[str, object]) -> Reponse:
     """Les cinq cibles saines, sauf celles nommées (job → cible)."""
     return cibles(*[autres.get(j) or cible_prometheus(j) for j in JOBS])
@@ -312,6 +335,8 @@ def bouclage_sain(port_app: int = 8020, port_cat: int = 8000) -> Bouclage:
                 json.dumps({"status": "ok", "db": "ok", "normalisation": "fonction"}),
             ),
             CIBLES: cibles(),
+            APPELS: requete("4"),
+            COUT: requete("0.0123"),
         }
     )
 

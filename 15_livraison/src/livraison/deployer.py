@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from livraison import cibles, depot, images, journal, sante
 from livraison.cibles import Cible
@@ -44,6 +45,7 @@ PHRASE_UNE_CIBLE = (
     " {autre})"
 )
 PHRASE_RETOUR = "proposer un retour arrière à Max (livrer retour), jamais sans lui"
+NON_RELEVE_APRES = "non relevé (aucun relevé de l'API postérieur au lever)"
 PROGRAMME_METRIQUES = """
 import json, urllib.request as u
 try:
@@ -160,10 +162,24 @@ def valeur_prometheus(o: Outils, requete: str) -> float | None:
     return float(str(valeur[1])) if len(valeur) == 2 else None
 
 
-def compteur(o: Outils, cible: Cible) -> str:
+def releve_api_posterieur(o: Outils, depuis: datetime) -> bool:
+    """La cible `api` de Prometheus a-t-elle un relevé réussi, commencé après
+    l'instant de référence ? Sinon, la valeur que Prometheus rend est la dernière du
+    conteneur quitté (0.1.2, écart 28)."""
+    api = [c for c in sante.lire_cibles(o) if c.job == "api"]
+    return bool(api) and api[0].sante == "up" and sante.posterieur(api[0], depuis)
+
+
+def compteur(o: Outils, cible: Cible, depuis: datetime | None = None) -> str:
     """Les appels au modèle de langage et leur coût, comptés par l'API depuis son
-    démarrage : `/metrics` lu dans son conteneur ; en production (le 13 restreint
-    `/metrics` au réseau de collecte), par Prometheus."""
+    démarrage : `/metrics` lu dans son conteneur, la voie du conteneur en marche ; en
+    production (le 13 restreint `/metrics` au réseau de collecte : 404 dans le
+    conteneur), par Prometheus.
+
+    APRÈS UN LEVER (`depuis` : l'instant de référence), la valeur de Prometheus n'est
+    acceptée que si l'API y a un relevé réussi postérieur ; sinon « non relevé » —
+    jamais un chiffre de l'ancien conteneur. Le compteur « avant » (`depuis` absent) est
+    lu sur ce qui tourne."""
     if not en_marche(o, cible.projet):
         return "non relevé (pile arrêtée)"
     s = o.lanceur(
@@ -184,6 +200,8 @@ def compteur(o: Outils, cible: Cible) -> str:
     if lu.get("statut") == 200:
         appels, cout = float(str(lu.get("appels"))), float(str(lu.get("cout")))
     elif cible.avec_monitorage:
+        if depuis is not None and not releve_api_posterieur(o, depuis):
+            return NON_RELEVE_APRES
         a = valeur_prometheus(o, "sum(api_modele_llm_appels_total)")
         c = valeur_prometheus(o, "sum(api_modele_llm_cout_usd_total)")
         if a is None or c is None:
@@ -225,9 +243,12 @@ def lever_et_verifier(
 
     Deux durées au journal : « Pile prête », du lancement des commandes Compose à
     `/sante` 200 ; « Durée », le geste entier, santé et attente de Prometheus comprises.
-    L'instant de référence de la santé est celui où `/sante` a répondu."""
+    L'instant de référence de la santé et du compteur « après » est celui où `/sante`
+    a répondu ; si la pile n'a jamais répondu, celui du compteur est la fin des
+    commandes Compose."""
     t0 = o.horloge()
     code = Code.OK
+    reference: datetime | None = None
     try:
         for commande in leves:
             s = o.lanceur(commande)
@@ -237,9 +258,10 @@ def lever_et_verifier(
                     f"{commande.nom} : la pile ne se lève pas",
                     s.stderr,
                 )
+        reference = o.maintenant()
         attendre(o, f"http://127.0.0.1:{cible.port_application}/sante")
         entree.pile_prete_s = o.horloge() - t0
-        depuis = o.maintenant()
+        depuis = reference = o.maintenant()
         entree.controles = sante.verifier(
             o, cible, at, depuis=depuis, notes=entree.notes
         )
@@ -254,7 +276,7 @@ def lever_et_verifier(
         entree.notes.append(f"La pile est laissée telle quelle : {PHRASE_RETOUR}.")
         code = arret.code
     entree.migrations_apres = texte_migrations(o, cible.base)
-    entree.compteur_apres = compteur(o, cible)
+    entree.compteur_apres = compteur(o, cible, reference or o.maintenant())
     entree.duree_s = o.horloge() - t0
     chemin = journal.ecrire(o, entree, relire=relire)
     for ligne in sante.lignes_verdict(entree.controles):

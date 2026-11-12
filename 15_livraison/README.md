@@ -9,7 +9,7 @@ même commande sur un autre hôte.
 ```bash
 make livrer ACTION=construire                      # RECONSTRUIRE=1, A_BLANC=1
 make livrer ACTION=deployer CIBLE=staging          # A_BLANC=1 : ce qui serait fait
-make livrer ACTION=sante    CIBLE=production
+make livrer ACTION=sante    CIBLE=production       # ETIQUETTE=… : la référence jugée
 make livrer ACTION=retour   CIBLE=production VERS=chaine-livraison MOTIF="…"
 make livrer ACTION=arreter  CIBLE=staging
 make livrer-etat                                   # les deux cibles
@@ -76,7 +76,34 @@ est un retour arrière proposé au mainteneur.
   publiée) : la clé reste dans le conteneur, `livrer` ne reçoit que quatre champs ;
 - l'encodage servi, égal à l'encodage en service de la base ;
 - `migrate.py status` : 0 en attente ;
-- en production, toutes les cibles de Prometheus `up`.
+- en production, toutes les cibles de Prometheus `up`, **sur un relevé postérieur au
+  lever**.
+
+**Prometheus juge sur un relevé postérieur au lever.** Juste après un `up`,
+`/api/v1/targets` porte encore, un temps, le relevé d'avant — celui du conteneur quitté,
+`down` comme `up`. Après un déploiement ou un retour, une cible n'est donc jugée que sur un
+relevé commencé après l'instant où `/sante` a répondu (`lastScrape`, heure murale UTC) ;
+tant qu'il en manque un, la santé relit `/api/v1/targets`. La borne de cette attente se
+dérive de Prometheus, elle ne se recopie pas : le plus grand `scrapeInterval +
+scrapeTimeout` de ses cibles, plus une marge de 5 s (aujourd'hui 15 + 10 + 5 s) ; sans ces
+champs, l'intervalle écrit dans `13_monitorage/prometheus/prometheus.yml` à l'étiquette ;
+sinon, la santé juge sans attendre et le dit. Une cible `down` sur un relevé postérieur est
+un manque réel ; une cible sans relevé postérieur à la borne est « non relevée depuis le
+lever ». `livrer sante`, seul, n'a pas d'instant de référence : une lecture.
+
+**La référence de `livrer sante`** est ce qui a été déployé, pas l'arbre de travail :
+l'étiquette du **dernier journal de la cible**, quel que soit son verdict — après un retour
+arrière, l'étiquette visée. `ETIQUETTE=…` (`--etiquette`) l'impose ; sans journal pour la
+cible, l'étiquette de HEAD ; sans l'une ni l'autre, refus (code 20) qui demande
+`--etiquette`. L'étiquette retenue doit être annotée et connue. La dernière ligne dit la
+référence et d'où elle vient :
+
+```text
+Santé production (e4-livraison-journal — dernier journal de la cible) : verte.
+```
+
+Les deux autres provenances : `— demandée`, `— étiquette de HEAD, aucun journal pour la
+cible`.
 
 ## Revenir en arrière
 
@@ -179,8 +206,16 @@ cible. Chaque journal porte :
 - l'étiquette et son commit ;
 - les images et leurs **empreintes** (et une réécriture, avec l'ancienne) ;
 - l'état des migrations avant et après ;
-- le tableau de santé et la durée ;
-- les appels facturés comptés par l'API (avant et après) ;
+- le tableau de santé, et l'attente d'un relevé de Prometheus postérieur au lever ;
+- deux durées : **« Pile prête »**, du lancement des commandes Compose à `/sante` 200, et
+  **« Durée »**, le geste entier, santé et attente de Prometheus comprises (les durées des
+  journaux d'avant la 0.1.2 — 37 s, 42 s, 23 s — sont des « Durée ») ;
+- les appels facturés comptés par l'API, avant et après. **Après un lever, le compteur ne
+  vient que du conteneur levé** : `/metrics` lu dans son conteneur (hors production) ; en
+  production, où `/metrics` n'admet que le réseau de collecte (404 dans le conteneur), la
+  valeur de Prometheus n'est acceptée que si l'API y a un relevé réussi postérieur au lever
+  — sinon « non relevé », jamais un chiffre de l'ancien conteneur. Si la pile n'a jamais
+  répondu, l'instant de référence est la fin des commandes Compose ;
 - pour un retour : le motif, ce qui a été quitté, et la phrase sur les migrations.
 
 **Les étiquettes de livraison d'E4.** `e4-livraison` est la première étiquette de
@@ -197,19 +232,18 @@ le journal n'est pas écrit.
 
 ## Limites connues
 
-- **La santé juge Prometheus trop tôt.** Juste après un `up`, Prometheus n'a pas encore
-  refait sa collecte : il voit les conteneurs quittés, et le contrôle « cibles up »
-  manque. Les trois gestes de production du 2026-11-11 ont ainsi un journal « santé
-  rouge » pour une pile saine quelques secondes plus tard ; `livrer sante`, rejoué, est
-  vert. Un journal ne se réécrit pas : le constat de la relance est au rapport.
-- **`livrer sante` juge aux versions de l'étiquette de HEAD.** Après un retour arrière,
-  il jugerait la pile servie contre les versions de l'étiquette courante : la santé aux
-  versions de l'étiquette visée n'est jugée que par `livrer retour` lui-même.
-- **Le compteur « après » d'un redémarrage, en production, est lu par Prometheus** : il
-  rend encore la dernière valeur du conteneur quitté.
 - **`main` doit être à une étiquette pour déployer.** Les journaux commités après une
   livraison avancent `main` au-delà de l'étiquette : un nouveau déploiement demande une
   étiquette annotée sur ce commit.
+
+**Corrigé en 0.1.2.** Les cinq journaux de production « santé rouge » — quatre le
+2026-11-11 (trois déploiements, un retour arrière), un le 2026-11-12 — le sont sur le seul
+contrôle « cibles up » : la santé lisait Prometheus avant son relevé suivant, pour une pile
+saine au relevé d'après (le 12, `livrer sante` rejoué 30 s plus tard : vert). La 0.1.2 juge sur un relevé postérieur au lever (« La santé »),
+prend pour référence de `livrer sante` le dernier journal de la cible, et ne prend plus le
+compteur « après » du conteneur quitté. **La preuve réelle sera le premier déploiement de
+production en 0.1.2**, à la livraison `e5-monitorage`. Les journaux écrits ne se réécrivent
+pas.
 
 ## Vérifier
 
@@ -220,12 +254,19 @@ make verify MODULE=15    # Ruff, tests sur doubles, Pyright strict, Bandit, pip-
 Les tests remplacent `git`, `docker`, Compose, `psql`, `uv` et le bouclage par des doubles.
 Aucune commande réelle ne tourne, sauf la relecture par le hook, jouée dans un dépôt
 jetable — et `git`, réel, dans `tests/test_arbre_reel.py` : un outil qui écrit dans
-l'arbre se teste sur un dépôt réel, deux gestes à la suite. Mutations `E4V-01` à
-`E4V-06` (`verification/mutations/`) :
+l'arbre se teste sur un dépôt réel, deux gestes à la suite. Les doublures reprennent ce que
+le poste rend réellement : `/api/v1/targets` et `/api/v1/query` de Prometheus dans la forme
+relevée le 2026-11-12, `/metrics` à 404 dans le conteneur de l'API en production. Mutations
+`E4V-01` à `E4V-06` et `E5V-01` à `E5V-04` (`verification/mutations/`) :
 
 - la santé qui passerait avec un service manquant ;
 - `construire` sur un arbre sale ;
 - `deployer` qui ignorerait l'autre cible ;
 - un journal sans empreintes ;
-- un retour qui toucherait aux migrations.
-- le filtre des journaux qui admettrait tout fichier de l'arbre.
+- un retour qui toucherait aux migrations ;
+- le filtre des journaux qui admettrait tout fichier de l'arbre ;
+- la santé qui jugerait une cible de Prometheus sans relevé postérieur au lever ;
+- une cible `down` sur un relevé postérieur qui passerait pour tenue ;
+- `livrer sante` qui ignorerait le dernier journal et jugerait à l'étiquette de HEAD ;
+- le compteur « après » qui accepterait une valeur de Prometheus sans relevé postérieur
+  de l'API.

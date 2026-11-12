@@ -151,12 +151,13 @@ def test_deux_deploiements_a_la_suite_le_journal_du_premier_dans_l_arbre(
     assert "  préalable tenu : étiquette" in ecran
     assert deployer.deployer(o_reel, "production") == Code.OK
     journaux = sorted(p.name for p in o_reel.journal.glob("2*.md"))
-    # Deux heures murales lues par déploiement (0.1.2) : le début, puis l'instant où la
-    # pile a répondu — le second journal commence 10 min après le premier.
-    assert journaux == [
-        "20261111T100000Z_production_e4-livraison.md",
-        "20261111T101000Z_production_e4-livraison.md",
-    ]
+    # Le premier journal à 10:00 ; le second plus tard (l'horloge murale avance à chaque
+    # heure que `livrer` lit : début, fin des commandes Compose, instant du lever).
+    assert len(journaux) == 2
+    assert journaux[0] == "20261111T100000Z_production_e4-livraison.md"
+    assert journaux[1] > journaux[0] and journaux[1].endswith(
+        "_production_e4-livraison.md"
+    )
 
 
 @pytest.mark.parametrize(

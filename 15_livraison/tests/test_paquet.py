@@ -11,7 +11,7 @@ import livraison
 
 def test_la_version_est_celle_du_projet():
     projet = tomllib.loads((MODULE / "pyproject.toml").read_text(encoding="utf-8"))
-    assert livraison.__version__ == projet["project"]["version"] == "0.1.1"
+    assert livraison.__version__ == projet["project"]["version"] == "0.1.2"
 
 
 def test_httpx_seule_dependance():
