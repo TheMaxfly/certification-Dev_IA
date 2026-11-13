@@ -216,6 +216,11 @@ def test_le_courriel_passe_par_un_fichier_de_mot_de_passe_et_une_adresse_hors_de
     assert "smtp_mot_de_passe" in service["secrets"]
     for variable in ("GF_SMTP_USER", "GF_SMTP_FROM_ADDRESS", "MONITORAGE_COURRIEL"):
         assert environnement[variable].startswith("${MONITORAGE_COURRIEL:-")
+    # L'environnement en tête de l'objet : celui de la cible, défaut de l'application.
+    assert (
+        environnement["MONITORAGE_ENVIRONNEMENT"]
+        == "${APPLICATION_ENVIRONNEMENT:-developpement}"
+    )
 
 
 def test_la_sonde_lit_la_base_par_un_pgpass_et_un_dsn_sans_mot_de_passe():
