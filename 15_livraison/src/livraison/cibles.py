@@ -2,7 +2,9 @@
 
 LE FICHIER DE CIBLE ne contient que ce qui diffère d'une cible à l'autre : le nom du
 projet Compose, le nom de la base (dans les DSN des conteneurs et `DB_NAME`), les ports
-publiés, l'environnement de l'application, et la présence du monitorage. Il est
+publiés, l'environnement de l'application, et la présence du monitorage — levé dans les
+deux cibles depuis la 0.1.3 ; en staging, la sonde du 13 ne lit pas la base et n'écrit
+pas dans le journal de la production (variables facultatives, défauts inchangés). Il est
 passé **en dernier** à `docker compose --env-file` : il l'emporte sur les fichiers des
 modules.
 
@@ -47,6 +49,19 @@ ADMISES = frozenset(
         "APPLICATION_PORT_PUBLIE",
         "CATALOGUE_PORT_PUBLIE",
         "API_MODELE_VERIFIER_MODELES",
+        "MONITORAGE_LECTURE_BASE",
+        "MONITORAGE_DSN_LECTURE",
+        "MONITORAGE_JOURNAL_SONDE",
+    }
+)
+#: Les variables admises qu'une cible peut omettre : leur défaut est celui des modules
+#: (la production ne les pose pas).
+FACULTATIVES = frozenset(
+    {
+        "API_MODELE_VERIFIER_MODELES",
+        "MONITORAGE_LECTURE_BASE",
+        "MONITORAGE_DSN_LECTURE",
+        "MONITORAGE_JOURNAL_SONDE",
     }
 )
 
@@ -102,7 +117,7 @@ def lire(nom: str, dossier: Path | None = None) -> Cible:
             f"cibles/{nom}.env : variables non admises ({', '.join(hors)}) — le fichier"
             " ne porte que ce qui diffère d'une cible à l'autre, jamais un secret",
         )
-    manquent = sorted(ADMISES - {"API_MODELE_VERIFIER_MODELES"} - set(v))
+    manquent = sorted(ADMISES - FACULTATIVES - set(v))
     if manquent:
         raise Arret(
             Code.PREREQUIS, f"cibles/{nom}.env : manquent {', '.join(manquent)}"
@@ -114,8 +129,14 @@ def lire(nom: str, dossier: Path | None = None) -> Cible:
             f"cibles/{nom}.env : l'environnement {environnement} n'admet pas la base"
             f" {base}",
         )
-    for cle in ("API_MODELE_DSN_CONTENEUR", "APPLICATION_BASE_DSN_CONTENEUR"):
-        dsn = v[cle]
+    for cle in (
+        "API_MODELE_DSN_CONTENEUR",
+        "APPLICATION_BASE_DSN_CONTENEUR",
+        "MONITORAGE_DSN_LECTURE",
+    ):
+        dsn = v.get(cle, "")
+        if not dsn and cle == "MONITORAGE_DSN_LECTURE":
+            continue  # facultatif ; vide, la sonde ne lit pas la base
         if not dsn.endswith(f"/{base}") or ":" in dsn.split("//", 1)[-1].split("@")[0]:
             raise Arret(
                 Code.PREREQUIS,

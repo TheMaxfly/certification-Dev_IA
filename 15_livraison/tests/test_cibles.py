@@ -32,12 +32,13 @@ def test_les_deux_cibles_se_lisent():
         "apimanga_preprod",
         "preproduction",
     )
+    # 0.1.3 : le monitorage est levé dans les deux cibles.
     assert (s.port_application, s.port_catalogue, s.avec_monitorage) == (
         8021,
         8001,
-        False,
+        True,
     )
-    assert s.compose == (cibles.COMPOSE_11, cibles.COMPOSE_12)
+    assert s.compose == (cibles.COMPOSE_11, cibles.COMPOSE_12, cibles.COMPOSE_13)
     assert (p.projet, p.base, p.port_application, p.port_catalogue) == (
         "api-modele",
         "apimanga",
@@ -51,6 +52,33 @@ def test_les_deux_cibles_se_lisent():
 def test_le_staging_coupe_le_controle_des_modeles_au_demarrage():
     v = cibles.valeurs(VALIDE)
     assert v["API_MODELE_VERIFIER_MODELES"] == "false"
+
+
+def test_la_sonde_du_staging_ne_lit_pas_la_base_ni_n_ecrit_le_journal_de_production():
+    """La sonde du 13, en staging : aucune lecture de base, journal à /dev/null ; la
+    production ne pose aucune de ces variables (les défauts du 13 valent)."""
+    v = cibles.valeurs(VALIDE)
+    assert v["MONITORAGE_LECTURE_BASE"] == "0"
+    assert v["MONITORAGE_DSN_LECTURE"] == ""
+    assert v["MONITORAGE_JOURNAL_SONDE"] == "/dev/null"
+    production = (MODULE / "cibles" / "production.env").read_text(encoding="utf-8")
+    assert not set(cibles.valeurs(production)) & (
+        cibles.FACULTATIVES - {"API_MODELE_VERIFIER_MODELES"}
+    )
+    assert cibles.lire("production").avec_monitorage
+
+
+def test_un_dsn_de_lecture_de_la_sonde_vise_la_base_de_la_cible(tmp_path):
+    texte = VALIDE.replace(
+        "MONITORAGE_DSN_LECTURE=\n",
+        "MONITORAGE_DSN_LECTURE=postgresql://verif_lecture@host.docker.internal:5432/apimanga\n",
+    )
+    with pytest.raises(
+        Arret, match="MONITORAGE_DSN_LECTURE doit viser apimanga_preprod"
+    ):
+        cibles.lire("staging", ecrire(tmp_path, "staging", texte))
+    juste = texte.replace("/apimanga\n", "/apimanga_preprod\n")
+    assert cibles.lire("staging", ecrire(tmp_path, "staging", juste))
 
 
 @pytest.mark.parametrize(
@@ -122,6 +150,7 @@ def test_l_ordre_des_fichiers_d_environnement(o: Outils):
         "11_api_modele/.env",
         "12_application/.env",
         "02_api_manga/.env",
+        "13_monitorage/.env",
         "12_application/.env.staging",
     ]
     p = cibles.lire("production")
@@ -140,6 +169,7 @@ def test_la_commande_compose_passe_le_fichier_de_cible_en_dernier(o: Outils):
     assert [a[i + 1] for i, x in enumerate(a) if x == "-f"] == [
         str(o.racine / cibles.COMPOSE_11),
         str(o.racine / cibles.COMPOSE_12),
+        str(o.racine / cibles.COMPOSE_13),
     ]
     assert a[-2:] == ["up", "-d"]
     assert a.index("-p") > a.index("--env-file")

@@ -16,7 +16,16 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from conftest import E4, FICHIERS, Poste
+from conftest import (
+    CIBLES,
+    E4,
+    FICHIERS,
+    JOBS,
+    Bouclage,
+    Poste,
+    cible_prometheus,
+    cibles,
+)
 
 from livraison import deployer
 from livraison.codes import Arret, Code
@@ -84,7 +93,9 @@ def horloge_murale() -> Iterator[datetime]:
 
 
 @pytest.fixture
-def o_reel(o: Outils, poste: Poste, depot_reel: tuple[Path, Path]) -> Outils:
+def o_reel(
+    o: Outils, poste: Poste, bouclage: Bouclage, depot_reel: tuple[Path, Path]
+) -> Outils:
     r, maison = depot_reel
 
     def lanceur(c: Commande) -> Sortie:
@@ -95,12 +106,29 @@ def o_reel(o: Outils, poste: Poste, depot_reel: tuple[Path, Path]) -> Outils:
         return poste(c)
 
     murale = horloge_murale()
+    lue = [datetime(2026, 11, 11, 10, 0, 0, tzinfo=UTC)]
+
+    def maintenant() -> datetime:
+        lue[0] = next(murale)
+        return lue[0]
+
+    def http(url: str) -> tuple[int, str]:
+        """Prometheus suit l'horloge murale : son dernier relevé commence 7 s après la
+        dernière heure lue par `livrer` (l'instant où la pile a répondu)."""
+        if url == CIBLES:
+            releve = (lue[0] + timedelta(seconds=7)).strftime(
+                "%Y-%m-%dT%H:%M:%S.450771275Z"
+            )
+            return cibles(*[cible_prometheus(j, releve=releve) for j in JOBS])
+        return bouclage(url)
+
     return replace(
         o,
         lanceur=lanceur,
+        http=http,
         racine=r,
         journal=r / "15_livraison" / "journal",
-        maintenant=lambda: next(murale),
+        maintenant=maintenant,
     )
 
 
@@ -123,10 +151,13 @@ def test_deux_deploiements_a_la_suite_le_journal_du_premier_dans_l_arbre(
     assert "  préalable tenu : étiquette" in ecran
     assert deployer.deployer(o_reel, "production") == Code.OK
     journaux = sorted(p.name for p in o_reel.journal.glob("2*.md"))
-    assert journaux == [
-        "20261111T100000Z_production_e4-livraison.md",
-        "20261111T100500Z_production_e4-livraison.md",
-    ]
+    # Le premier journal à 10:00 ; le second plus tard (l'horloge murale avance à chaque
+    # heure que `livrer` lit : début, fin des commandes Compose, instant du lever).
+    assert len(journaux) == 2
+    assert journaux[0] == "20261111T100000Z_production_e4-livraison.md"
+    assert journaux[1] > journaux[0] and journaux[1].endswith(
+        "_production_e4-livraison.md"
+    )
 
 
 @pytest.mark.parametrize(

@@ -9,7 +9,7 @@ même commande sur un autre hôte.
 ```bash
 make livrer ACTION=construire                      # RECONSTRUIRE=1, A_BLANC=1
 make livrer ACTION=deployer CIBLE=staging          # A_BLANC=1 : ce qui serait fait
-make livrer ACTION=sante    CIBLE=production
+make livrer ACTION=sante    CIBLE=production       # ETIQUETTE=… : la référence jugée
 make livrer ACTION=retour   CIBLE=production VERS=chaine-livraison MOTIF="…"
 make livrer ACTION=arreter  CIBLE=staging
 make livrer-etat                                   # les deux cibles
@@ -26,7 +26,7 @@ répond pas ; `90` erreur inattendue, ou un journal qui porterait un secret.
 | 1 | Un commit sur une branche `feature/…` | `git commit` ; les hooks `.githooks/` refusent auteur, mention, fichier exclu, clé | l'historique de la branche |
 | 2 | Une demande vers `develop` | `gh pr create` ; la chaîne `verify` joue une tâche par module et la tâche `statique` | les contrôles de la demande sur GitHub |
 | 3 | La fusion vers `develop` | par le mainteneur, dans l'interface (branches protégées, aucune exemption) | le commit de fusion |
-| 4 | La livraison vers `main` | demande `develop → main` après `make verify-poste` et la sauvegarde de la base ; fusion par le mainteneur ; **étiquette annotée** poussée | l'étiquette, `main` et `develop` alignées |
+| 4 | La livraison vers `main` | demande `develop → main`, après les vérifications que demande ce qu'elle change (`CONTRIBUTING.md`) : du code servi, le harnais ou la base → pile arrêtée par `ACTION=arreter`, `make verify-poste`, `make verify-mutations`, sauvegarde ; sinon `make verify` et la chaîne verte ; fusion par le mainteneur ; **étiquette annotée** poussée dans les deux cas | l'étiquette, `main` et `develop` alignées ; le journal de l'arrêt, s'il y en a un |
 | 5 | Le staging | depuis `main` à l'étiquette : `make livrer ACTION=construire`, puis `ACTION=deployer CIBLE=staging` ; vérification par l'interface ; `ACTION=arreter CIBLE=staging` | `journal/<horodatage>_staging_<étiquette>.md` |
 | 6 | La production | les migrations en attente, appliquées par le mainteneur après sa sauvegarde (`database/README.md`) ; `make livrer ACTION=deployer CIBLE=production` | `journal/<horodatage>_production_<étiquette>.md`, et Grafana |
 
@@ -76,7 +76,34 @@ est un retour arrière proposé au mainteneur.
   publiée) : la clé reste dans le conteneur, `livrer` ne reçoit que quatre champs ;
 - l'encodage servi, égal à l'encodage en service de la base ;
 - `migrate.py status` : 0 en attente ;
-- en production, toutes les cibles de Prometheus `up`.
+- en production, toutes les cibles de Prometheus `up`, **sur un relevé postérieur au
+  lever**.
+
+**Prometheus juge sur un relevé postérieur au lever.** Juste après un `up`,
+`/api/v1/targets` porte encore, un temps, le relevé d'avant — celui du conteneur quitté,
+`down` comme `up`. Après un déploiement ou un retour, une cible n'est donc jugée que sur un
+relevé commencé après l'instant où `/sante` a répondu (`lastScrape`, heure murale UTC) ;
+tant qu'il en manque un, la santé relit `/api/v1/targets`. La borne de cette attente se
+dérive de Prometheus, elle ne se recopie pas : le plus grand `scrapeInterval +
+scrapeTimeout` de ses cibles, plus une marge de 5 s (aujourd'hui 15 + 10 + 5 s) ; sans ces
+champs, l'intervalle écrit dans `13_monitorage/prometheus/prometheus.yml` à l'étiquette ;
+sinon, la santé juge sans attendre et le dit. Une cible `down` sur un relevé postérieur est
+un manque réel ; une cible sans relevé postérieur à la borne est « non relevée depuis le
+lever ». `livrer sante`, seul, n'a pas d'instant de référence : une lecture.
+
+**La référence de `livrer sante`** est ce qui a été déployé, pas l'arbre de travail :
+l'étiquette du **dernier journal de la cible**, quel que soit son verdict — après un retour
+arrière, l'étiquette visée. `ETIQUETTE=…` (`--etiquette`) l'impose ; sans journal pour la
+cible, l'étiquette de HEAD ; sans l'une ni l'autre, refus (code 20) qui demande
+`--etiquette`. L'étiquette retenue doit être annotée et connue. La dernière ligne dit la
+référence et d'où elle vient :
+
+```text
+Santé production (e4-livraison-journal — dernier journal de la cible) : verte.
+```
+
+Les deux autres provenances : `— demandée`, `— étiquette de HEAD, aucun journal pour la
+cible`.
 
 ## Revenir en arrière
 
@@ -114,23 +141,37 @@ make livrer ACTION=deployer CIBLE=production     # puis le retour à l'étiquett
 |---|---|---|
 | Projet Compose | `senpai-staging` | `api-modele` (la pile du monitorage) |
 | Base | `apimanga_preprod` | `apimanga` |
-| Fichiers Compose | 11 + 12 | 11 + 12 + 13 |
+| Fichiers Compose | 11 + 12 + 13 (depuis la 0.1.3) | 11 + 12 + 13 |
 | Application, catalogue | `127.0.0.1:8021`, `127.0.0.1:8001` | `127.0.0.1:8020`, `127.0.0.1:8000` |
-| Prometheus, Grafana | absents | `127.0.0.1:9090`, `127.0.0.1:3000` |
+| Prometheus, Grafana | `127.0.0.1:9090`, `127.0.0.1:3000` — les mêmes ; données de Prometheus dans un volume du projet, propres au staging | `127.0.0.1:9090`, `127.0.0.1:3000` |
+| Objet des alertes | `[preproduction] …` | `[production] …` |
+| Sonde du 13 | ne lit pas la base ; journal à `/dev/null` | lit la mesure de la promotion si configurée ; journal `09_service_embedding/mesures/equivalence/journal_sonde.jsonl` |
 | Clé de session | `12_application/.env.staging` (exigé) | `12_application/.env` |
 | Fichier de mots de passe de l'API | `PREPROD_PGPASS_CONTENEUR` (celui de la chaîne) | celui du module 11 |
 
 **Une cible à la fois** : les deux partagent la carte graphique, le conteneur
-`tei-api-modele` (nom fixe) et les sous-réseaux fixes qu'admet `pg_hba.conf`. Déployer
-l'une est refusé tant que l'autre tourne. C'est une limite du poste ; sur un serveur, il
-y a deux hôtes.
+`tei-api-modele` (nom fixe), les sous-réseaux fixes qu'admet `pg_hba.conf` et, depuis que le
+monitorage est levé dans les deux, les ports de Prometheus et de Grafana. Déployer l'une est
+refusé tant que l'autre tourne — **et tant qu'elle a encore des conteneurs, même arrêtés, ou
+des réseaux** (0.1.3) : leurs sous-réseaux sont les mêmes. C'est une limite du poste ; sur un
+serveur, il y a deux hôtes.
+
+**Le geste du matin.** Le poste s'éteint la nuit : la production s'arrête avec lui et ne
+repart pas seule, et ses conteneurs restent, arrêtés, avec leurs réseaux. Avant de lever le
+staging, la retirer : `make livrer ACTION=arreter CIBLE=production` (un `down` : conteneurs
+et réseaux retirés, comptés au dernier journal de la production) ; `deployer` le demande
+sinon, et nomme ce geste. Pour relever la production, `ACTION=deployer` depuis `main` à
+l'étiquette.
 
 **Le fichier de cible** (`cibles/<nom>.env`) ne porte que ce qui diffère : nom de projet,
 base (dans `DB_NAME` et dans les DSN des conteneurs, sans mot de passe), ports,
 environnement de l'application, monitorage ; en staging, aucun contrôle des modèles au
-démarrage (`API_MODELE_VERIFIER_MODELES=false`, comme le 13 en production). Il est passé
-**en dernier** à `docker compose --env-file`, après ceux des modules (11, 12, 02 ; 13 en
-production s'il existe) et `12_application/.env.<cible>` s'il existe. **Aucun secret** :
+démarrage (`API_MODELE_VERIFIER_MODELES=false`, comme le 13 en production), et la sonde du
+13 tenue à l'écart de la production (`MONITORAGE_LECTURE_BASE=0`, `MONITORAGE_DSN_LECTURE`
+vide, `MONITORAGE_JOURNAL_SONDE=/dev/null` ; variables facultatives, la production ne les
+pose pas, les défauts du 13 valent). Il est passé **en dernier** à `docker compose
+--env-file`, après ceux des modules (11, 12, 02 ; 13 s'il existe) et
+`12_application/.env.<cible>` s'il existe. **Aucun secret** :
 un test y cherche les noms de secrets des fichiers d'exemple des modules, et les motifs du
 hook y sont rejoués.
 
@@ -179,8 +220,16 @@ cible. Chaque journal porte :
 - l'étiquette et son commit ;
 - les images et leurs **empreintes** (et une réécriture, avec l'ancienne) ;
 - l'état des migrations avant et après ;
-- le tableau de santé et la durée ;
-- les appels facturés comptés par l'API (avant et après) ;
+- le tableau de santé, et l'attente d'un relevé de Prometheus postérieur au lever ;
+- deux durées : **« Pile prête »**, du lancement des commandes Compose à `/sante` 200, et
+  **« Durée »**, le geste entier, santé et attente de Prometheus comprises (les durées des
+  journaux d'avant la 0.1.2 — 37 s, 42 s, 23 s — sont des « Durée ») ;
+- les appels facturés comptés par l'API, avant et après. **Après un lever, le compteur ne
+  vient que du conteneur levé** : `/metrics` lu dans son conteneur (hors production) ; en
+  production, où `/metrics` n'admet que le réseau de collecte (404 dans le conteneur), la
+  valeur de Prometheus n'est acceptée que si l'API y a un relevé réussi postérieur au lever
+  — sinon « non relevé », jamais un chiffre de l'ancien conteneur. Si la pile n'a jamais
+  répondu, l'instant de référence est la fin des commandes Compose ;
 - pour un retour : le motif, ce qui a été quitté, et la phrase sur les migrations.
 
 **Les étiquettes de livraison d'E4.** `e4-livraison` est la première étiquette de
@@ -197,19 +246,18 @@ le journal n'est pas écrit.
 
 ## Limites connues
 
-- **La santé juge Prometheus trop tôt.** Juste après un `up`, Prometheus n'a pas encore
-  refait sa collecte : il voit les conteneurs quittés, et le contrôle « cibles up »
-  manque. Les trois gestes de production du 2026-11-11 ont ainsi un journal « santé
-  rouge » pour une pile saine quelques secondes plus tard ; `livrer sante`, rejoué, est
-  vert. Un journal ne se réécrit pas : le constat de la relance est au rapport.
-- **`livrer sante` juge aux versions de l'étiquette de HEAD.** Après un retour arrière,
-  il jugerait la pile servie contre les versions de l'étiquette courante : la santé aux
-  versions de l'étiquette visée n'est jugée que par `livrer retour` lui-même.
-- **Le compteur « après » d'un redémarrage, en production, est lu par Prometheus** : il
-  rend encore la dernière valeur du conteneur quitté.
 - **`main` doit être à une étiquette pour déployer.** Les journaux commités après une
   livraison avancent `main` au-delà de l'étiquette : un nouveau déploiement demande une
   étiquette annotée sur ce commit.
+
+**Corrigé en 0.1.2.** Les cinq journaux de production « santé rouge » — quatre le
+2026-11-11 (trois déploiements, un retour arrière), un le 2026-11-12 — le sont sur le seul
+contrôle « cibles up » : la santé lisait Prometheus avant son relevé suivant, pour une pile
+saine au relevé d'après (le 12, `livrer sante` rejoué 30 s plus tard : vert). La 0.1.2 juge sur un relevé postérieur au lever (« La santé »),
+prend pour référence de `livrer sante` le dernier journal de la cible, et ne prend plus le
+compteur « après » du conteneur quitté. **La preuve réelle sera le premier déploiement de
+production en 0.1.2**, à la livraison `e5-monitorage`. Les journaux écrits ne se réécrivent
+pas.
 
 ## Vérifier
 
@@ -220,12 +268,21 @@ make verify MODULE=15    # Ruff, tests sur doubles, Pyright strict, Bandit, pip-
 Les tests remplacent `git`, `docker`, Compose, `psql`, `uv` et le bouclage par des doubles.
 Aucune commande réelle ne tourne, sauf la relecture par le hook, jouée dans un dépôt
 jetable — et `git`, réel, dans `tests/test_arbre_reel.py` : un outil qui écrit dans
-l'arbre se teste sur un dépôt réel, deux gestes à la suite. Mutations `E4V-01` à
-`E4V-06` (`verification/mutations/`) :
+l'arbre se teste sur un dépôt réel, deux gestes à la suite. Les doublures reprennent ce que
+le poste rend réellement : `/api/v1/targets` et `/api/v1/query` de Prometheus dans la forme
+relevée le 2026-11-12, `/metrics` à 404 dans le conteneur de l'API en production. Mutations
+`E4V-01` à `E4V-06`, `E5V-01` à `E5V-05` (`verification/mutations/`) :
 
 - la santé qui passerait avec un service manquant ;
 - `construire` sur un arbre sale ;
 - `deployer` qui ignorerait l'autre cible ;
 - un journal sans empreintes ;
-- un retour qui toucherait aux migrations.
-- le filtre des journaux qui admettrait tout fichier de l'arbre.
+- un retour qui toucherait aux migrations ;
+- le filtre des journaux qui admettrait tout fichier de l'arbre ;
+- la santé qui jugerait une cible de Prometheus sans relevé postérieur au lever ;
+- une cible `down` sur un relevé postérieur qui passerait pour tenue ;
+- `livrer sante` qui ignorerait le dernier journal et jugerait à l'étiquette de HEAD ;
+- le compteur « après » qui accepterait une valeur de Prometheus sans relevé postérieur
+  de l'API ;
+- `deployer` qui lèverait une cible alors que l'autre a encore des conteneurs arrêtés
+  ou des réseaux.

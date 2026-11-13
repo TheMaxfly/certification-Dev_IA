@@ -20,6 +20,9 @@
 #   12     ← le contrat du 11 (la doublure de l'API est validée contre lui) et son Compose
 #            (le fichier de fusion du 12 s'y ajoute) ; aucun code ; `database/` (bases
 #            jetables, schéma `application` de la 027 ; E4, lot 1)
+#   13     ← le 09 (la sonde) ; le contrat, le Compose et les métriques du 11 ; le Compose,
+#            les métriques et la configuration du 12 (le tableau « application » trace le
+#            plafond du jour lu dans `reglages.toml` ; E5, lot 1)
 #   14     ← les modules dont il lance les commandes (05, 09, 10, 11), et `indicatif.yml`
 #            (son test compare les déclencheurs du README aux workflows)
 #   15     ← les fichiers Compose qu'il compose (11, 12, 13), les fichiers d'exemple des
@@ -39,7 +42,7 @@
 10	10_mesures_recherche/ database/ 09_service_embedding/ 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 11	11_api_modele/ database/ 09_service_embedding/ 10_mesures_recherche/src/ 10_mesures_recherche/uv.lock 05_nettoyage_agregation_bdd/src/evaluation/atteignabilite.py
 12	12_application/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml database/ 02_api_manga/openapi.json
-13	13_monitorage/ 09_service_embedding/src/ 09_service_embedding/config/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml 11_api_modele/src/api_modele/metriques.py 12_application/compose.yaml 12_application/src/application/metriques.py
+13	13_monitorage/ 09_service_embedding/src/ 09_service_embedding/config/ 11_api_modele/contrat/ 11_api_modele/docker-compose.yml 11_api_modele/src/api_modele/metriques.py 12_application/compose.yaml 12_application/config/reglages.toml 12_application/src/application/metriques.py
 14	14_chaine/ 05_nettoyage_agregation_bdd/ 09_service_embedding/ 10_mesures_recherche/ 11_api_modele/ .github/workflows/indicatif.yml
 15	15_livraison/ 11_api_modele/docker-compose.yml 12_application/compose.yaml 13_monitorage/compose.yaml 02_api_manga/.env.example 11_api_modele/.env.example 12_application/.env.example 13_monitorage/.env.example .githooks/cles-fournisseurs .githooks/controler-texte .githooks/pre-push
 database	database/ sauvegarde/sauvegarder.sh

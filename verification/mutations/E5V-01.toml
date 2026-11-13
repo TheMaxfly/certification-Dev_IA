@@ -1,0 +1,7 @@
+id = "E5V-01"
+origine = "E5, lot 1, spec 01 (2026-11-12) — la santé juge une cible de Prometheus sans exiger de relevé postérieur au lever (écart 25)"
+fichier = "15_livraison/src/livraison/sante.py"
+avant = '''    return c.releve is not None and c.releve > depuis'''
+apres = '''    return True'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sante.py", "-k", "test_25d"]

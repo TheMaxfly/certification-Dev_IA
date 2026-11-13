@@ -13,6 +13,22 @@
 #     valeur identique, cause non établie. Le résumé a trois branches : en alerte, revenue,
 #     sans valeur (la jauge absente, au redémarrage de la sonde).
 #     Sans donnée : OK, la jauge n'existe qu'après la première mesure.
+#
+# Le groupe « application » (E5, lot 1), même dossier, même intervalle :
+# E : la règle de A, pour la cible que A ne regarde pas : `up{job="application"}`, sans
+#     `== 0`. Une minute, provisoire : celle de A, avec son motif ; la séance de pannes en
+#     staging (E5, spec 03) mesure le délai de détection réel. Sans donnée : Alerting.
+# F : la jauge `application_base_etat{etat="indisponible"}` au-dessus de 0 (elle vaut 1 quand
+#     l'état est constaté) : les comptes et l'administration rendent 503, le conseiller
+#     continue en visiteur. Une minute, provisoire, comme E. Sans donnée : OK, E couvre
+#     l'absence. Cette jauge ne se relit qu'au passage d'une requête qui touche la base :
+#     c'est connu, et c'est ce que la séance de pannes mesure.
+# G : la même règle pour `application_catalogue_etat{etat="indisponible"}` : la recherche et
+#     les fiches ne répondent plus. Une minute, provisoire. Sans donnée : OK. Même limite.
+# H : `application_cout_jour_usd` au-dessus de 80 % du plafond du jour (`cout_jour_max_usd`
+#     de reglages.toml du 12 : 0,40 $ pour 0,50 $ ; un test compare les deux) : prévenir
+#     avant le refus. Aucune durée : le coût ne redescend pas dans la journée. Sans donnée :
+#     OK, la jauge ne se pose qu'à la première question.
 apiVersion: 1
 groups:
   - orgId: 1
@@ -164,3 +180,152 @@ groups:
           severite: critique
         annotations:
           summary: "{{ $b := (index $values \"B\").Value }}{{ if and (gt $b 0.0) (lt $b 0.999) }}Cosinus minimal {{ index $values \"B\" }}, sous 0,999 sur deux sondes de suite. Lire le journal de la sonde : si ce sont les fragments 487295 et 491847, à 0,998797, c'est l'état connu, intermittent, cause non établie ; sinon, le service n'encode plus comme à la mesure. Ne pas promouvoir ; prévenir avant toute démonstration.{{ else if gt $b 0.0 }}Cosinus minimal {{ index $values \"B\" }} : l'équivalence est revenue (seuil 0,999). Lire le journal de la sonde pour la durée de l'écart et ses fragments.{{ else }}Plus de valeur de la sonde (jauge absente : sonde redémarrée ou arrêtée). Lire le journal de la sonde et vérifier qu'elle tourne.{{ end }}"
+  - orgId: 1
+    name: application
+    folder: Monitorage
+    interval: 30s
+    rules:
+      - uid: alerte-e-application
+        title: "E — application absente"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'up{job="application"}'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [1]}
+        for: 1m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "L'application n'est plus relevée par Prometheus depuis une minute. Vérifier livrer sante et le journal du conteneur de l'application, puis la relever par livrer."
+      - uid: alerte-f-base
+        title: "F — base des comptes indisponible"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'application_base_etat{etat="indisponible"}'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "La base des comptes est indisponible pour l'application depuis une minute : les comptes et l'administration rendent 503, le conseiller continue en visiteur. Vérifier PostgreSQL, puis livrer sante."
+      - uid: alerte-g-catalogue
+        title: "G — catalogue indisponible"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'application_catalogue_etat{etat="indisponible"}'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "Le catalogue est indisponible pour l'application depuis une minute : la recherche et les fiches ne répondent plus. Vérifier le conteneur du catalogue et livrer sante."
+      - uid: alerte-h-cout-jour
+        title: "H — coût du jour"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'application_cout_jour_usd'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0.4]}
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: attention
+        annotations:
+          summary: "Le coût du jour du conseiller dépasse 0,40 $, 80 % du plafond de 0,50 $ : il refusera les questions au plafond, jusqu'à minuit UTC. Vérifier le trafic sur le tableau Application."

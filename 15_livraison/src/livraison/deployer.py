@@ -7,8 +7,11 @@ est 1, le journal dit le verdict, et la suite est un retour arrière proposé à
 
 UNE CIBLE À LA FOIS SUR LE POSTE (décision 3 du cadre) : staging et production partagent
 la carte graphique, le conteneur `tei-api-modele` (nom fixe) et les sous-réseaux fixes
-admis par `pg_hba.conf`. `deployer` refuse si l'autre cible tourne. Sur un serveur, deux
-hôtes : la même commande, un autre `DOCKER_HOST`.
+admis par `pg_hba.conf`. `deployer` refuse si l'autre cible tourne — **et, depuis la
+0.1.3, si elle a encore des conteneurs arrêtés ou des réseaux** : après une extinction
+du poste, les conteneurs restent, arrêtés, avec leurs réseaux, aux mêmes sous-réseaux.
+Le refus nomme le geste, `livrer arreter --cible <autre>`. Sur un serveur, deux hôtes :
+la même commande, un autre `DOCKER_HOST`.
 
 LA COMMANDE NE MIGRE JAMAIS : des migrations en attente sur la base de la cible sont un
 refus (geste de Max, après sa sauvegarde).
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from livraison import cibles, depot, images, journal, sante
 from livraison.cibles import Cible
@@ -43,7 +47,14 @@ PHRASE_UNE_CIBLE = (
     " {autre} tourne ({n} conteneurs) ; arrêtez-la d'abord (livrer arreter --cible"
     " {autre})"
 )
+PHRASE_RESTES = (
+    "une cible à la fois sur le poste : la cible {autre} est arrêtée mais pas retirée"
+    " ({conteneurs} conteneurs arrêtés, {reseaux} réseaux — ils restent après une"
+    " extinction du poste, et ses sous-réseaux sont ceux de la cible {cible}) ;"
+    " retirez-la d'abord (livrer arreter --cible {autre})"
+)
 PHRASE_RETOUR = "proposer un retour arrière à Max (livrer retour), jamais sans lui"
+NON_RELEVE_APRES = "non relevé (aucun relevé de l'API postérieur au lever)"
 PROGRAMME_METRIQUES = """
 import json, urllib.request as u
 try:
@@ -92,12 +103,62 @@ def en_marche(o: Outils, projet: str) -> list[str]:
     return lignes(s)
 
 
+def restes(o: Outils, projet: str) -> tuple[list[str], list[str]]:
+    """Ce qu'un projet laisse sur le poste, en marche ou non : ses conteneurs (`docker
+    ps -a`) et ses réseaux, par l'étiquette de projet de Compose."""
+    s = o.lanceur(
+        Commande(
+            f"docker.ps.tous.{projet}",
+            (
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"label=com.docker.compose.project={projet}",
+                "--format",
+                "{{.Names}}",
+            ),
+            dossier=o.racine,
+        )
+    )
+    r = o.lanceur(
+        Commande(
+            f"docker.reseaux.{projet}",
+            (
+                "docker",
+                "network",
+                "ls",
+                "--filter",
+                f"label=com.docker.compose.project={projet}",
+                "--format",
+                "{{.Name}}",
+            ),
+            dossier=o.racine,
+        )
+    )
+    if s.code != 0 or r.code != 0:
+        raise Arret(Code.PREREQUIS, "docker ne répond pas", s.stderr + r.stderr)
+    return lignes(s), lignes(r)
+
+
 def exiger_autre_arretee(o: Outils, cible: Cible) -> None:
+    """L'autre cible ne tourne pas, et n'a laissé ni conteneur ni réseau."""
     autre = cibles.lire(cible.autre, cible.fichier_env.parent)
     tournent = en_marche(o, autre.projet)
     if tournent:
         raise Arret(
             Code.PREREQUIS, PHRASE_UNE_CIBLE.format(autre=autre.nom, n=len(tournent))
+        )
+    conteneurs, reseaux = restes(o, autre.projet)
+    if conteneurs or reseaux:
+        raise Arret(
+            Code.PREREQUIS,
+            PHRASE_RESTES.format(
+                autre=autre.nom,
+                cible=cible.nom,
+                conteneurs=len(conteneurs),
+                reseaux=len(reseaux),
+            ),
         )
 
 
@@ -160,10 +221,24 @@ def valeur_prometheus(o: Outils, requete: str) -> float | None:
     return float(str(valeur[1])) if len(valeur) == 2 else None
 
 
-def compteur(o: Outils, cible: Cible) -> str:
+def releve_api_posterieur(o: Outils, depuis: datetime) -> bool:
+    """La cible `api` de Prometheus a-t-elle un relevé réussi, commencé après
+    l'instant de référence ? Sinon, la valeur que Prometheus rend est la dernière du
+    conteneur quitté (0.1.2, écart 28)."""
+    api = [c for c in sante.lire_cibles(o) if c.job == "api"]
+    return bool(api) and api[0].sante == "up" and sante.posterieur(api[0], depuis)
+
+
+def compteur(o: Outils, cible: Cible, depuis: datetime | None = None) -> str:
     """Les appels au modèle de langage et leur coût, comptés par l'API depuis son
-    démarrage : `/metrics` lu dans son conteneur ; en production (le 13 restreint
-    `/metrics` au réseau de collecte), par Prometheus."""
+    démarrage : `/metrics` lu dans son conteneur, la voie du conteneur en marche ; en
+    production (le 13 restreint `/metrics` au réseau de collecte : 404 dans le
+    conteneur), par Prometheus.
+
+    APRÈS UN LEVER (`depuis` : l'instant de référence), la valeur de Prometheus n'est
+    acceptée que si l'API y a un relevé réussi postérieur ; sinon « non relevé » —
+    jamais un chiffre de l'ancien conteneur. Le compteur « avant » (`depuis` absent) est
+    lu sur ce qui tourne."""
     if not en_marche(o, cible.projet):
         return "non relevé (pile arrêtée)"
     s = o.lanceur(
@@ -184,6 +259,8 @@ def compteur(o: Outils, cible: Cible) -> str:
     if lu.get("statut") == 200:
         appels, cout = float(str(lu.get("appels"))), float(str(lu.get("cout")))
     elif cible.avec_monitorage:
+        if depuis is not None and not releve_api_posterieur(o, depuis):
+            return NON_RELEVE_APRES
         a = valeur_prometheus(o, "sum(api_modele_llm_appels_total)")
         c = valeur_prometheus(o, "sum(api_modele_llm_cout_usd_total)")
         if a is None or c is None:
@@ -221,9 +298,16 @@ def lever_et_verifier(
     leves: list[Commande],
     relire: Relecture | None,
 ) -> Code:
-    """Lance les commandes Compose, attend, vérifie, journalise — dans tous les cas."""
+    """Lance les commandes Compose, attend, vérifie, journalise — dans tous les cas.
+
+    Deux durées au journal : « Pile prête », du lancement des commandes Compose à
+    `/sante` 200 ; « Durée », le geste entier, santé et attente de Prometheus comprises.
+    L'instant de référence de la santé et du compteur « après » est celui où `/sante`
+    a répondu ; si la pile n'a jamais répondu, celui du compteur est la fin des
+    commandes Compose."""
     t0 = o.horloge()
     code = Code.OK
+    reference: datetime | None = None
     try:
         for commande in leves:
             s = o.lanceur(commande)
@@ -233,8 +317,13 @@ def lever_et_verifier(
                     f"{commande.nom} : la pile ne se lève pas",
                     s.stderr,
                 )
+        reference = o.maintenant()
         attendre(o, f"http://127.0.0.1:{cible.port_application}/sante")
-        entree.controles = sante.verifier(o, cible, at)
+        entree.pile_prete_s = o.horloge() - t0
+        depuis = reference = o.maintenant()
+        entree.controles = sante.verifier(
+            o, cible, at, depuis=depuis, notes=entree.notes
+        )
         if sante.verte(entree.controles):
             entree.verdict = "santé verte"
         else:
@@ -246,7 +335,7 @@ def lever_et_verifier(
         entree.notes.append(f"La pile est laissée telle quelle : {PHRASE_RETOUR}.")
         code = arret.code
     entree.migrations_apres = texte_migrations(o, cible.base)
-    entree.compteur_apres = compteur(o, cible)
+    entree.compteur_apres = compteur(o, cible, reference or o.maintenant())
     entree.duree_s = o.horloge() - t0
     chemin = journal.ecrire(o, entree, relire=relire)
     for ligne in sante.lignes_verdict(entree.controles):
@@ -338,31 +427,66 @@ def a_blanc_deployer(o: Outils, cible: Cible) -> Code:
     return Code.OK
 
 
-def verifier_sante(o: Outils, nom: str) -> Code:
-    """`livrer sante` : les contrôles, aux versions de l'étiquette de HEAD."""
+def reference_de_sante(
+    o: Outils, cible: Cible, etiquette: str | None = None
+) -> tuple[Etiquette, str]:
+    """La référence de `livrer sante`, et d'où elle vient (0.1.2, écart 27) : ce qui
+    est déployé, pas l'arbre de travail. L'étiquette demandée ; sinon celle du dernier
+    journal de la cible, quel que soit son verdict (la dernière que `livrer` y a
+    posée) ; sinon celle de HEAD ; sinon refus. L'étiquette retenue doit être annotée
+    et connue."""
+    if etiquette:
+        nom, provenance = etiquette, "demandée"
+    else:
+        precedent = journal.dernier(o, cible.nom)
+        if precedent is not None:
+            nom = journal.etiquette_de(precedent, cible.nom)
+            provenance = "dernier journal de la cible"
+        else:
+            tete = depot.etiquette_de_head(o)
+            if tete is None:
+                raise Arret(
+                    Code.PREREQUIS,
+                    f"aucun journal pour la cible {cible.nom}, et HEAD n'est à aucune"
+                    " étiquette : nommer la référence (livrer sante --cible"
+                    f" {cible.nom} --etiquette <étiquette>)",
+                )
+            nom, provenance = tete, "étiquette de HEAD, aucun journal pour la cible"
+    return depot.etiquette_connue(o, nom), provenance
+
+
+def verifier_sante(o: Outils, nom: str, etiquette: str | None = None) -> Code:
+    """`livrer sante` : les contrôles, aux versions de ce qui a été déployé sur la cible
+    (`reference_de_sante`)."""
     cible = cibles.lire(nom)
-    reference = depot.etiquette_de_head(o) or "HEAD"
-    controles = sante.verifier(o, cible, sante.attendus(o, reference, cible))
+    reference, provenance = reference_de_sante(o, cible, etiquette)
+    controles = sante.verifier(o, cible, sante.attendus(o, reference.nom, cible))
     for ligne in sante.lignes_verdict(controles):
         o.afficher(ligne)
     verte = sante.verte(controles)
-    o.afficher(f"Santé {cible.nom} ({reference}) : {'verte' if verte else 'ROUGE'}.")
+    o.afficher(
+        f"Santé {cible.nom} ({reference.nom} — {provenance}) :"
+        f" {'verte' if verte else 'ROUGE'}."
+    )
     return Code.OK if verte else Code.SANTE_ROUGE
 
 
 def arreter(o: Outils, nom: str, *, relire: Relecture | None = None) -> Code:
-    """`docker compose down` de la cible ; l'arrêt est ajouté à son dernier journal."""
+    """`docker compose down` de la cible : arrêtée **et retirée** — conteneurs, arrêtés
+    compris, et réseaux. L'arrêt est ajouté à son dernier journal."""
     cible = cibles.lire(nom)
-    avant = en_marche(o, cible.projet)
+    marche = en_marche(o, cible.projet)
+    conteneurs, reseaux = restes(o, cible.projet)
     t0 = o.horloge()
     s = o.lanceur(cibles.commande_compose(cible, o, "down", "--remove-orphans"))
     if s.code != 0:
         raise Arret(Code.DEPLOIEMENT, f"la cible {cible.nom} ne s'arrête pas", s.stderr)
-    restent = en_marche(o, cible.projet)
-    o.afficher(
-        f"Cible {cible.nom} arrêtée : {len(avant)} conteneurs avant, {len(restent)}"
-        " après."
+    apres_c, apres_r = restes(o, cible.projet)
+    bilan = (
+        f"{len(conteneurs)} conteneurs (dont {len(marche)} en marche) et {len(reseaux)}"
+        f" réseaux avant, {len(apres_c)} et {len(apres_r)} après"
     )
+    o.afficher(f"Cible {cible.nom} arrêtée et retirée : {bilan}.")
     dernier = journal.dernier(o, cible.nom)
     if dernier is not None:
         journal.completer(
@@ -371,12 +495,11 @@ def arreter(o: Outils, nom: str, *, relire: Relecture | None = None) -> Code:
             f"Arrêt — {o.maintenant().strftime('%Y-%m-%d %H:%M:%S')} UTC",
             [
                 f"`livrer arreter --cible {cible.nom}`, par `{o.utilisateur()}`",
-                f"{len(avant)} conteneurs avant, {len(restent)} après ;"
-                f" {o.horloge() - t0:.0f} s",
+                f"{bilan} ; {o.horloge() - t0:.0f} s",
             ],
             relire=relire,
         )
-    return Code.OK if not restent else Code.DEPLOIEMENT
+    return Code.OK if not (apres_c or apres_r) else Code.DEPLOIEMENT
 
 
 def etat(o: Outils) -> Code:

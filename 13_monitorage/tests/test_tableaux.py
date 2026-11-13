@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from typing import Any
 
 import jsonschema
@@ -61,6 +62,49 @@ SERVICE = {
         "node_cpu_seconds_total",
     },
     "Machine : disque": {"node_filesystem_avail_bytes"},
+}
+#: Le tableau « application » (E5, lot 1) : l'application vue d'elle-même.
+APPLICATION = {
+    "Cible de l'application": {"up"},
+    "Dépendances vues de l'application": {
+        "application_base_etat",
+        "application_catalogue_etat",
+        "application_api_sante_ok",
+    },
+    "Réponses 503 de l'application": {"application_requetes_total"},
+    "Questions au conseiller par mode et issue": {"application_questions_total"},
+    "Refus par borne": {"application_quota_refus_total"},
+    "Coût du jour et plafond": {
+        "application_cout_jour_usd",
+        "application_plafond_cout_etat",
+    },
+    "Latence du conseiller, p50 et p95": {"application_latence_secondes_bucket"},
+    "Appels au catalogue par route et statut": {"application_catalogue_appels_total"},
+    "Appels à l'API du modèle vus de l'application": {"application_api_appels_total"},
+    "Gestes des comptes": {
+        "application_critiques_total",
+        "application_listes_total",
+        "application_comptes_supprimes_total",
+    },
+    "Profil actif et tests des clés": {
+        "application_profil_actif_info",
+        "application_verifications_cles_total",
+    },
+}
+TOUS = {"modele": MODELE, "service": SERVICE, "application": APPLICATION}
+#: Les étiquettes que les légendes du tableau « application » peuvent citer : les
+#: listes fermées de `metriques.py` du 12 ; aucune ne porte une donnée personnelle.
+ETIQUETTES_APPLICATION = {
+    "route",
+    "etat",
+    "mode",
+    "issue",
+    "motif",
+    "route_catalogue",
+    "statut",
+    "route_api",
+    "action",
+    "profil",
 }
 #: Les seuils tracés et nommés : une série `vector(…)`, son nom dans la légende.
 SEUILS = {
@@ -147,13 +191,13 @@ def declarees(chemin: str) -> set[str]:
     )
 
 
-@pytest.mark.parametrize("nom", ["modele", "service"])
+@pytest.mark.parametrize("nom", list(TOUS))
 def test_la_forme_du_tableau(nom: str):
     jsonschema.validate(tableau(nom), SCHEMA)
     assert tableau(nom)["uid"] == nom
 
 
-@pytest.mark.parametrize(("nom", "attendu"), [("modele", MODELE), ("service", SERVICE)])
+@pytest.mark.parametrize(("nom", "attendu"), list(TOUS.items()))
 def test_les_panneaux_sont_ceux_de_la_liste(nom: str, attendu: dict[str, set[str]]):
     trouves: dict[str, set[str]] = {}
     for panneau in panneaux(nom):
@@ -165,12 +209,12 @@ def test_les_panneaux_sont_ceux_de_la_liste(nom: str, attendu: dict[str, set[str
 
 
 def test_les_identifiants_de_panneau_sont_uniques():
-    for nom in ("modele", "service"):
+    for nom in TOUS:
         ids = [p["id"] for p in panneaux(nom)]
         assert len(ids) == len(set(ids))
 
 
-@pytest.mark.parametrize("nom", ["modele", "service"])
+@pytest.mark.parametrize("nom", list(TOUS))
 def test_chaque_description_dit_les_trois_choses(nom: str):
     for panneau in panneaux(nom):
         description = panneau["description"]
@@ -213,7 +257,7 @@ def test_le_cout_dit_qu_il_repart_de_zero_et_qu_il_est_estime():
     assert "pas la facture" in cout["description"]
 
 
-@pytest.mark.parametrize("nom", ["modele", "service"])
+@pytest.mark.parametrize("nom", list(TOUS))
 def test_les_variables_et_la_periode(nom: str):
     donnees = tableau(nom)
     variables = {v["name"]: v for v in donnees["templating"]["list"]}
@@ -222,7 +266,7 @@ def test_les_variables_et_la_periode(nom: str):
     assert variables["profil"]["includeAll"] is True
 
 
-@pytest.mark.parametrize("nom", ["modele", "service"])
+@pytest.mark.parametrize("nom", list(TOUS))
 def test_aucun_identifiant_de_source_ni_adresse_en_dur(nom: str):
     texte = (TABLEAUX / f"{nom}.json").read_text(encoding="utf-8")
     assert "http://" not in texte
@@ -239,9 +283,7 @@ def test_les_metriques_lues_existent_aux_modules_11_et_12():
     """Un tableau ne peut pas citer une métrique disparue."""
     api = declarees("11_api_modele/src/api_modele/metriques.py")
     application = declarees("12_application/src/application/metriques.py")
-    lues = {
-        m for attendu in (MODELE, SERVICE) for noms in attendu.values() for m in noms
-    }
+    lues = {m for attendu in TOUS.values() for noms in attendu.values() for m in noms}
     for metrique in lues:
         if metrique.startswith("api_modele_") and metrique not in PROVISOIRES:
             assert metrique in api, metrique
@@ -263,3 +305,84 @@ def test_les_trois_defauts_d_affichage_sont_corriges():
     assert (taux["min"], taux["max"]) == (0, 1)
     duree = config_du_panneau("service", "Service d'embedding : durée moyenne")
     assert duree["custom"]["spanNulls"] is False
+
+
+# --------------------------------------------------------------------------- #
+#  Le tableau « application » (E5, lot 1)
+# --------------------------------------------------------------------------- #
+
+REGLAGES_12 = RACINE / "12_application" / "config" / "reglages.toml"
+
+
+def plafond_du_jour() -> float:
+    """Le plafond de coût du jour de l'application, lu dans sa configuration."""
+    reglages = tomllib.loads(REGLAGES_12.read_text(encoding="utf-8"))
+    return float(reglages["conseiller"]["limites"]["cout_jour_max_usd"])
+
+
+def test_le_plafond_et_le_seuil_de_h_sont_traces_et_nommes_depuis_la_configuration():
+    """La règle avant le chiffre : le plafond et le seuil de l'alerte H (80 %) se
+    dérivent de `cout_jour_max_usd` ; changer le plafond sans le tableau échoue."""
+    (cout,) = [
+        p for p in panneaux("application") if p["title"] == "Coût du jour et plafond"
+    ]
+    vecteurs = {
+        float(m.group(1)): c["legendFormat"]
+        for c in cout["targets"]
+        if (m := re.fullmatch(r"vector\(([0-9.]+)\)", c["expr"]))
+    }
+    plafond = plafond_du_jour()
+    assert set(vecteurs) == {plafond, round(0.8 * plafond, 6)}
+    assert vecteurs[plafond].startswith("Plafond du jour : ")
+    assert vecteurs[round(0.8 * plafond, 6)].startswith("Seuil de l'alerte H : ")
+    assert "0,50 $" in vecteurs[plafond] and "0,40 $" in vecteurs[0.4]
+
+
+def test_les_dependances_disent_qu_elles_ne_se_relisent_pas_seules():
+    (deps,) = [
+        p
+        for p in panneaux("application")
+        if p["title"] == "Dépendances vues de l'application"
+    ]
+    assert "à la dernière requête qui a touché la dépendance" in deps["description"]
+    assert "ne se relit pas seule" in deps["description"]
+
+
+def test_les_etats_de_l_application_sont_en_toutes_lettres():
+    tous = {p["title"]: p for p in panneaux("application")}
+
+    def textes(config: dict[str, Any]) -> set[str]:
+        return {v["text"] for c in config for v in c["options"].values()}
+
+    cible = tous["Cible de l'application"]["fieldConfig"]["defaults"]["mappings"]
+    assert textes(cible) == {"en marche", "arrêtée"}
+    deps = tous["Dépendances vues de l'application"]["fieldConfig"]
+    assert textes(deps["defaults"]["mappings"]) == {"état à la dernière requête"}
+    (api,) = deps["overrides"]
+    assert api["matcher"]["options"] == "C"
+    assert textes(api["properties"][0]["value"]) == {
+        "répondait à la dernière lecture",
+        "ne répondait pas à la dernière lecture",
+    }
+    for panneau in tous.values():
+        if panneau["type"] == "stat":
+            assert panneau["options"]["colorMode"] == "none", panneau["title"]
+
+
+def test_aucune_legende_ne_porte_une_donnee_personnelle():
+    """Les légendes ne citent que des étiquettes des listes fermées du 12 ;
+    l'apparence n'est pas affichée."""
+    for panneau in panneaux("application"):
+        for cible in panneau["targets"]:
+            citees = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", cible["legendFormat"]))
+            assert citees <= ETIQUETTES_APPLICATION, panneau["title"]
+            assert "apparence" not in cible["expr"]
+
+
+def test_la_latence_est_celle_de_la_question_au_conseiller():
+    (latence,) = [
+        p
+        for p in panneaux("application")
+        if p["title"] == "Latence du conseiller, p50 et p95"
+    ]
+    assert all('route="/question"' in c["expr"] for c in latence["targets"])
