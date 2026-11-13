@@ -40,6 +40,7 @@ def test_la_forme_du_journal(o: Outils):
     for attendu in (
         "# Déploiement — cible production, étiquette `e4-livraison`",
         "| Étiquette | `e4-livraison` (commit `aaaaaaaaaaaa`) |",
+        "| Pile prête | — |",
         "| Durée | 42 s |",
         "| Utilisateur du poste | `poste` |",
         "| `api-modele:1.5.0` | `sha256:" + "1" * 64 + "` | présente |",

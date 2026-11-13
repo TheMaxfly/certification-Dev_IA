@@ -120,8 +120,14 @@ class Poste:
             "nb_fragments": 77006,
         }
     )
+    #: `/metrics` lu dans le conteneur de l'API, hors production (le bouclage admis).
     metriques: dict[str, object] = field(
         default_factory=lambda: {"statut": 200, "appels": 4, "cout": 0.0123}
+    )
+    #: En production, le 13 n'admet que le réseau de collecte : ce que le programme
+    #: rend réellement dans le conteneur (relevé sur le poste le 2026-11-12, E5-4).
+    metriques_production: dict[str, object] = field(
+        default_factory=lambda: {"statut": 404, "appels": 0, "cout": 0}
     )
     refus_cles: list[str] = field(default_factory=list[str])
     refus_mention: bool = False
@@ -174,7 +180,9 @@ class Poste:
             if a[-1] == sante.PROGRAMME_API:
                 return Sortie(0, json.dumps(self.api))
             if a[-1] == deployer.PROGRAMME_METRIQUES:
-                return Sortie(0, json.dumps(self.metriques))
+                production = a[2].startswith(f"{PROJETS['production']}-")
+                lues = self.metriques_production if production else self.metriques
+                return Sortie(0, json.dumps(lues))
             return Sortie(1)
         if a[0] == "uv" and "migrate.py" in a:
             if a[-1] != "status":
@@ -214,21 +222,95 @@ class Poste:
         raise AssertionError(f"git inattendu : {a}")
 
 
+Reponse = tuple[int, str]
+
+
 @dataclass
 class Bouclage:
-    """Le bouclage : URL → (statut, corps) ; ce qui n'est pas réglé ne répond pas."""
+    """Le bouclage : URL → (statut, corps) ; ce qui n'est pas réglé ne répond pas. Une
+    liste de réponses est rendue dans l'ordre, la dernière ensuite à chaque demande
+    (les lectures successives de Prometheus pendant une attente)."""
 
-    reponses: dict[str, tuple[int, str]] = field(
-        default_factory=dict[str, tuple[int, str]]
+    reponses: dict[str, Reponse | list[Reponse]] = field(
+        default_factory=dict[str, Reponse | list[Reponse]]
     )
     demandes: list[str] = field(default_factory=list[str])
 
-    def __call__(self, url: str) -> tuple[int, str]:
+    def __call__(self, url: str) -> Reponse:
         self.demandes.append(url)
         for debut, reponse in self.reponses.items():
             if url.startswith(debut):
+                if isinstance(reponse, list):
+                    return reponse.pop(0) if len(reponse) > 1 else reponse[0]
                 return reponse
         return 0, "ConnectError"
+
+
+#: `/api/v1/targets`, dans la forme relevée sur le poste le 2026-11-12 (Prometheus
+#: v3.15.1, rapport du lot, § 2.2) : les champs que `livrer` lit, sans adresse.
+CIBLES = "http://127.0.0.1:9090/api/v1/targets"
+JOBS = ("api", "application", "embedding", "machine", "qualite")
+#: L'instant de référence des doubles : `maintenant` du poste simulé.
+DEPUIS = datetime(2026, 11, 11, 10, 0, 0, tzinfo=UTC)
+RELEVE_AVANT = "2026-11-11T09:59:52.149113766Z"
+RELEVE_APRES = "2026-11-11T10:00:07.450771275Z"
+#: L'heure d'une cible jamais relevée : l'heure nulle de Prometheus.
+JAMAIS = "0001-01-01T00:00:00Z"
+
+
+def cible_prometheus(
+    job: str,
+    health: str = "up",
+    releve: str = RELEVE_APRES,
+    intervalle: str | None = "15s",
+    delai: str | None = "10s",
+) -> dict[str, object]:
+    c: dict[str, object] = {
+        "labels": {"job": job},
+        "health": health,
+        "lastScrape": releve,
+        "lastError": "" if health == "up" else "connexion refusée",
+        "lastScrapeDuration": 0.006050338,
+    }
+    if intervalle is not None:
+        c["scrapeInterval"] = intervalle
+    if delai is not None:
+        c["scrapeTimeout"] = delai
+    return c
+
+
+def cibles(*actives: dict[str, object]) -> Reponse:
+    """Une réponse de `/api/v1/targets` ; sans argument, les cinq cibles relevées
+    après l'instant de référence, `up`."""
+    corps = {
+        "status": "success",
+        "data": {
+            "activeTargets": list(actives) or [cible_prometheus(j) for j in JOBS],
+            "droppedTargets": [],
+            "droppedTargetCounts": {},
+        },
+    }
+    return 200, json.dumps(corps)
+
+
+REQUETE = "http://127.0.0.1:9090/api/v1/query?query="
+APPELS = REQUETE + "sum(api_modele_llm_appels_total)"
+COUT = REQUETE + "sum(api_modele_llm_cout_usd_total)"
+
+
+def requete(valeur: str | None) -> Reponse:
+    """Une réponse de `/api/v1/query`, dans la forme relevée sur le poste ; `None` :
+    aucune série."""
+    resultat = (
+        [] if valeur is None else [{"metric": {}, "value": [1762855200.0, valeur]}]
+    )
+    corps = {"status": "success", "data": {"resultType": "vector", "result": resultat}}
+    return 200, json.dumps(corps)
+
+
+def cibles_sauf(**autres: dict[str, object]) -> Reponse:
+    """Les cinq cibles saines, sauf celles nommées (job → cible)."""
+    return cibles(*[autres.get(j) or cible_prometheus(j) for j in JOBS])
 
 
 def sante_application(**surcharges: object) -> str:
@@ -252,19 +334,9 @@ def bouclage_sain(port_app: int = 8020, port_cat: int = 8000) -> Bouclage:
                 200,
                 json.dumps({"status": "ok", "db": "ok", "normalisation": "fonction"}),
             ),
-            "http://127.0.0.1:9090/api/v1/targets": (
-                200,
-                json.dumps(
-                    {
-                        "data": {
-                            "activeTargets": [
-                                {"labels": {"job": "api"}, "health": "up"},
-                                {"labels": {"job": "application"}, "health": "up"},
-                            ]
-                        }
-                    }
-                ),
-            ),
+            CIBLES: cibles(),
+            APPELS: requete("4"),
+            COUT: requete("0.0123"),
         }
     )
 
@@ -305,7 +377,7 @@ def o(
         afficher=ecran.append,
         horloge=lambda: next(temps),
         dormir=lambda _s: None,
-        maintenant=lambda: datetime(2026, 11, 11, 10, 0, 0, tzinfo=UTC),
+        maintenant=lambda: DEPUIS,
         racine=racine,
         environ={},
         utilisateur=lambda: "poste",

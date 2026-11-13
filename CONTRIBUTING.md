@@ -69,9 +69,23 @@ commande sur le poste et sur GitHub.
 - Les volumes Docker créés par la vérification, et eux seuls, sont supprimés.
 
 Avant une demande de fusion vers `develop` : `make verify` (les modules touchés). Vers
-`main` : `make verify-poste`, `make verify-mutations`, et une sauvegarde de ce qui vit
-hors du dépôt ; si le harnais a changé (`verification/`, `Makefile`, workflows),
-`make verify TOUT=1` d'abord.
+`main`, ce qu'il faut dépend de ce que la fusion change :
+
+- **du code servi** — ce qui entre dans une image ou dans la pile, tel que les fichiers
+  Compose de la cible le désignent (leurs constructions et leurs volumes ;
+  `15_livraison/README.md`, « Les deux cibles ») —, **le harnais** (`verification/`,
+  `Makefile`, workflows, hooks, harnais de tests de la base) ou **la base**
+  (migrations) : `make verify TOUT=1` si le harnais a changé, puis `make verify-poste`,
+  `make verify-mutations`, et une sauvegarde de ce qui vit hors du dépôt ;
+- **aucun des trois** (journaux de déploiement, documentation, modèles générés, tests) :
+  `make verify` et la chaîne verte suffisent ;
+- **dans les deux cas, une étiquette annotée** sur `main` : `livrer` ne déploie que
+  depuis elle.
+
+`make verify-poste` et une sauvegarde exigent la pile arrêtée : la production livrée
+s'arrête par `make livrer ACTION=arreter CIBLE=production` et se relance, depuis `main`
+à l'étiquette, par `make livrer ACTION=deployer CIBLE=production` ; les deux gestes
+laissent leur journal.
 
 **La pile du monitorage s'arrête avant `make verify-poste` et avant une sauvegarde** :
 `make monitorage-arret`. Elle fait tourner une instance du service d'embedding, et toutes
@@ -364,9 +378,12 @@ ou de co-auteur refuse le push. Le message se relit quand même avant le push.
    commit.
 4. Fin d'étape : `make verify`, rapport, demande de fusion vers `develop`, chaîne
    verte, puis **le mainteneur fusionne** dans l'interface.
-5. `develop` vers `main` : **seulement sur demande explicite du mainteneur** :
-   `make verify-poste` et une sauvegarde, demande de fusion, chaîne verte, fusion par
-   le mainteneur, puis une étiquette annotée sur `main`, poussée.
+5. `develop` vers `main` : **seulement sur demande explicite du mainteneur** : les
+   vérifications que demande ce que la fusion change (« Avant une demande de fusion »,
+   plus haut) — pile arrêtée, `make verify-poste`, `make verify-mutations` et une
+   sauvegarde si elle change du code servi, le harnais ou la base ; sinon `make verify`
+   —, demande de fusion, chaîne verte, fusion par le mainteneur, puis, dans les deux
+   cas, une étiquette annotée sur `main`, poussée.
 6. La branche de travail fusionnée est supprimée sur le distant par GitHub, en local
    à la main ; ses commits restent atteignables.
 
@@ -452,7 +469,10 @@ git switch develop && git pull --ff-only
 git branch -d feature/e3-etape1-corpus-v2 && git fetch --prune
 
 # sur demande : livrer develop dans main, étiqueter
-make verify-poste      # et une sauvegarde
+# code servi, harnais ou base changés : la pile arrêtée, puis les vérifications du poste
+make livrer ACTION=arreter CIBLE=production
+make verify-poste && make verify-mutations      # et une sauvegarde
+# rien de tout cela : make verify, et la chaîne verte
 gh pr create --base main --head develop \
   --title "chore(git): fusionner develop dans main — e3-etape1" --body-file ../livraison.md
 # chaîne verte → le mainteneur fusionne
@@ -460,4 +480,7 @@ git fetch origin
 git tag -a e3-etape1 -F ../etiquette.txt origin/main
 git push origin e3-etape1
 git diff --quiet origin/main origin/develop && echo "main et develop alignées"
+# la pile arrêtée se relance depuis main, à l'étiquette
+git switch main && git pull --ff-only
+make livrer ACTION=deployer CIBLE=production
 ```

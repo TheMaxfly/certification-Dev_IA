@@ -36,10 +36,11 @@
 #                            chaine-revenir MOTIF="…" sont les gestes de Max ; chaine-etat
 #                            lit le journal de la préproduction
 #   make livrer ACTION=… CIBLE=…  la livraison continue (module 15) : ACTION=construire
-#                            (RECONSTRUIRE=1), deployer, sante, arreter, retour (VERS=…
-#                            MOTIF="…") ; CIBLE=staging ou production ; A_BLANC=1 :
-#                            ce qui serait fait, sans rien lever ; livrer-etat : les
-#                            deux cibles
+#                            (RECONSTRUIRE=1), deployer, sante (ETIQUETTE=… : la
+#                            référence jugée, sinon l'étiquette du dernier journal de
+#                            la cible), arreter, retour (VERS=… MOTIF="…") ;
+#                            CIBLE=staging ou production ; A_BLANC=1 : ce qui serait
+#                            fait, sans rien lever ; livrer-etat : les deux cibles
 #   make verify-mutations    les mutations versionnées (verification/mutations/),
 #                            rejouées dans un arbre jetable : chacune doit faire
 #                            rougir son test (poste, avant une demande vers main ;
@@ -62,6 +63,7 @@ ACTION ?=
 CIBLE ?=
 VERS ?=
 RECONSTRUIRE ?=
+ETIQUETTE ?=
 # Les fichiers suivent la base : la préproduction écrit ses échantillons dans le sien.
 EQUIVALENCE_DOSSIER ?= $(CURDIR)/09_service_embedding/mesures/equivalence_preprod
 
@@ -158,7 +160,7 @@ LIVRER = cd 15_livraison && uv run --quiet --locked --no-env-file livrer
 livrer:
 	@$(LIVRER) $(ACTION) $(if $(CIBLE),--cible $(CIBLE)) $(if $(VERS),--vers "$(VERS)") \
 		$(if $(MOTIF),--motif "$(MOTIF)") $(if $(RECONSTRUIRE),--reconstruire) \
-		$(if $(A_BLANC),--a-blanc)
+		$(if $(ETIQUETTE),--etiquette "$(ETIQUETTE)") $(if $(A_BLANC),--a-blanc)
 
 livrer-etat:
 	@$(LIVRER) etat
