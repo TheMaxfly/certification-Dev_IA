@@ -135,9 +135,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      # Hors dépôt : l'échantillon exporté, en lecture seule, et le journal de la sonde.
+      # Hors dépôt : l'échantillon exporté, en lecture seule, et le journal de la sonde. Le
+      # journal se règle par MONITORAGE_JOURNAL_SONDE (le staging : /dev/null, il n'écrit pas
+      # dans celui de la production) ; par défaut, celui de la production.
       - ../09_service_embedding/mesures/equivalence/encodage_3.json:/app/09_service_embedding/mesures/equivalence/encodage_3.json:ro
-      - ../09_service_embedding/mesures/equivalence/journal_sonde.jsonl:/app/09_service_embedding/mesures/equivalence/journal_sonde.jsonl
+      - ${MONITORAGE_JOURNAL_SONDE:-../09_service_embedding/mesures/equivalence/journal_sonde.jsonl}:/app/09_service_embedding/mesures/equivalence/journal_sonde.jsonl
     networks: [collecte_embedding, collecte, publication_monitorage]
     restart: "no"
 

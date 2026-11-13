@@ -235,6 +235,30 @@ def test_la_sonde_lit_la_base_par_un_pgpass_et_un_dsn_sans_mot_de_passe():
     assert reseau["ipam"]["config"][0]["subnet"] == "172.30.14.0/24"
 
 
+def test_le_journal_de_la_sonde_se_regle_par_variable_et_garde_celui_de_la_production():
+    """E5 : en staging, la sonde n'écrit pas dans le journal de la production ; par
+    défaut, le montage reste celui d'avant."""
+    (journal,) = [
+        v
+        for v in fichier_compose()["services"]["sonde"]["volumes"]
+        if v.endswith(
+            ":/app/09_service_embedding/mesures/equivalence/journal_sonde.jsonl"
+        )
+    ]
+    assert journal.startswith(
+        "${MONITORAGE_JOURNAL_SONDE:-"
+        "../09_service_embedding/mesures/equivalence/journal_sonde.jsonl}:"
+    )
+    (monte,) = [
+        v
+        for v in fusion()["services"]["sonde"]["volumes"]
+        if v["target"].endswith("journal_sonde.jsonl")
+    ]
+    assert monte["source"].endswith(
+        "/09_service_embedding/mesures/equivalence/journal_sonde.jsonl"
+    )
+
+
 def test_discord_est_ecarte():
     for relatif in (*SUIVIS, "grafana/provisioning/alerting/canaux.yml"):
         texte = (MODULE / relatif).read_text(encoding="utf-8").lower()
