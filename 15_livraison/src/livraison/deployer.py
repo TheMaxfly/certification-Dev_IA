@@ -7,8 +7,11 @@ est 1, le journal dit le verdict, et la suite est un retour arrière proposé à
 
 UNE CIBLE À LA FOIS SUR LE POSTE (décision 3 du cadre) : staging et production partagent
 la carte graphique, le conteneur `tei-api-modele` (nom fixe) et les sous-réseaux fixes
-admis par `pg_hba.conf`. `deployer` refuse si l'autre cible tourne. Sur un serveur, deux
-hôtes : la même commande, un autre `DOCKER_HOST`.
+admis par `pg_hba.conf`. `deployer` refuse si l'autre cible tourne — **et, depuis la
+0.1.3, si elle a encore des conteneurs arrêtés ou des réseaux** : après une extinction
+du poste, les conteneurs restent, arrêtés, avec leurs réseaux, aux mêmes sous-réseaux.
+Le refus nomme le geste, `livrer arreter --cible <autre>`. Sur un serveur, deux hôtes :
+la même commande, un autre `DOCKER_HOST`.
 
 LA COMMANDE NE MIGRE JAMAIS : des migrations en attente sur la base de la cible sont un
 refus (geste de Max, après sa sauvegarde).
@@ -43,6 +46,12 @@ PHRASE_UNE_CIBLE = (
     " graphique, le conteneur tei-api-modele et les sous-réseaux de la base — la cible"
     " {autre} tourne ({n} conteneurs) ; arrêtez-la d'abord (livrer arreter --cible"
     " {autre})"
+)
+PHRASE_RESTES = (
+    "une cible à la fois sur le poste : la cible {autre} est arrêtée mais pas retirée"
+    " ({conteneurs} conteneurs arrêtés, {reseaux} réseaux — ils restent après une"
+    " extinction du poste, et ses sous-réseaux sont ceux de la cible {cible}) ;"
+    " retirez-la d'abord (livrer arreter --cible {autre})"
 )
 PHRASE_RETOUR = "proposer un retour arrière à Max (livrer retour), jamais sans lui"
 NON_RELEVE_APRES = "non relevé (aucun relevé de l'API postérieur au lever)"
@@ -94,12 +103,62 @@ def en_marche(o: Outils, projet: str) -> list[str]:
     return lignes(s)
 
 
+def restes(o: Outils, projet: str) -> tuple[list[str], list[str]]:
+    """Ce qu'un projet laisse sur le poste, en marche ou non : ses conteneurs (`docker
+    ps -a`) et ses réseaux, par l'étiquette de projet de Compose."""
+    s = o.lanceur(
+        Commande(
+            f"docker.ps.tous.{projet}",
+            (
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"label=com.docker.compose.project={projet}",
+                "--format",
+                "{{.Names}}",
+            ),
+            dossier=o.racine,
+        )
+    )
+    r = o.lanceur(
+        Commande(
+            f"docker.reseaux.{projet}",
+            (
+                "docker",
+                "network",
+                "ls",
+                "--filter",
+                f"label=com.docker.compose.project={projet}",
+                "--format",
+                "{{.Name}}",
+            ),
+            dossier=o.racine,
+        )
+    )
+    if s.code != 0 or r.code != 0:
+        raise Arret(Code.PREREQUIS, "docker ne répond pas", s.stderr + r.stderr)
+    return lignes(s), lignes(r)
+
+
 def exiger_autre_arretee(o: Outils, cible: Cible) -> None:
+    """L'autre cible ne tourne pas, et n'a laissé ni conteneur ni réseau."""
     autre = cibles.lire(cible.autre, cible.fichier_env.parent)
     tournent = en_marche(o, autre.projet)
     if tournent:
         raise Arret(
             Code.PREREQUIS, PHRASE_UNE_CIBLE.format(autre=autre.nom, n=len(tournent))
+        )
+    conteneurs, reseaux = restes(o, autre.projet)
+    if conteneurs or reseaux:
+        raise Arret(
+            Code.PREREQUIS,
+            PHRASE_RESTES.format(
+                autre=autre.nom,
+                cible=cible.nom,
+                conteneurs=len(conteneurs),
+                reseaux=len(reseaux),
+            ),
         )
 
 
@@ -413,18 +472,21 @@ def verifier_sante(o: Outils, nom: str, etiquette: str | None = None) -> Code:
 
 
 def arreter(o: Outils, nom: str, *, relire: Relecture | None = None) -> Code:
-    """`docker compose down` de la cible ; l'arrêt est ajouté à son dernier journal."""
+    """`docker compose down` de la cible : arrêtée **et retirée** — conteneurs, arrêtés
+    compris, et réseaux. L'arrêt est ajouté à son dernier journal."""
     cible = cibles.lire(nom)
-    avant = en_marche(o, cible.projet)
+    marche = en_marche(o, cible.projet)
+    conteneurs, reseaux = restes(o, cible.projet)
     t0 = o.horloge()
     s = o.lanceur(cibles.commande_compose(cible, o, "down", "--remove-orphans"))
     if s.code != 0:
         raise Arret(Code.DEPLOIEMENT, f"la cible {cible.nom} ne s'arrête pas", s.stderr)
-    restent = en_marche(o, cible.projet)
-    o.afficher(
-        f"Cible {cible.nom} arrêtée : {len(avant)} conteneurs avant, {len(restent)}"
-        " après."
+    apres_c, apres_r = restes(o, cible.projet)
+    bilan = (
+        f"{len(conteneurs)} conteneurs (dont {len(marche)} en marche) et {len(reseaux)}"
+        f" réseaux avant, {len(apres_c)} et {len(apres_r)} après"
     )
+    o.afficher(f"Cible {cible.nom} arrêtée et retirée : {bilan}.")
     dernier = journal.dernier(o, cible.nom)
     if dernier is not None:
         journal.completer(
@@ -433,12 +495,11 @@ def arreter(o: Outils, nom: str, *, relire: Relecture | None = None) -> Code:
             f"Arrêt — {o.maintenant().strftime('%Y-%m-%d %H:%M:%S')} UTC",
             [
                 f"`livrer arreter --cible {cible.nom}`, par `{o.utilisateur()}`",
-                f"{len(avant)} conteneurs avant, {len(restent)} après ;"
-                f" {o.horloge() - t0:.0f} s",
+                f"{bilan} ; {o.horloge() - t0:.0f} s",
             ],
             relire=relire,
         )
-    return Code.OK if not restent else Code.DEPLOIEMENT
+    return Code.OK if not (apres_c or apres_r) else Code.DEPLOIEMENT
 
 
 def etat(o: Outils) -> Code:

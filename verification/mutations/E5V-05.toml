@@ -1,0 +1,7 @@
+id = "E5V-05"
+origine = "E5, lot 1, spec 02 (2026-11-13) — livrer lève une cible alors que l'autre a encore des conteneurs arrêtés ou des réseaux"
+fichier = "15_livraison/src/livraison/deployer.py"
+avant = '''    conteneurs, reseaux = restes(o, autre.projet)'''
+apres = '''    conteneurs, reseaux = [], []'''
+dossier = "15_livraison"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_deployer.py", "-k", "eteinte_avec_le_poste or reseaux_seuls"]

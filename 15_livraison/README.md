@@ -141,23 +141,37 @@ make livrer ACTION=deployer CIBLE=production     # puis le retour à l'étiquett
 |---|---|---|
 | Projet Compose | `senpai-staging` | `api-modele` (la pile du monitorage) |
 | Base | `apimanga_preprod` | `apimanga` |
-| Fichiers Compose | 11 + 12 | 11 + 12 + 13 |
+| Fichiers Compose | 11 + 12 + 13 (depuis la 0.1.3) | 11 + 12 + 13 |
 | Application, catalogue | `127.0.0.1:8021`, `127.0.0.1:8001` | `127.0.0.1:8020`, `127.0.0.1:8000` |
-| Prometheus, Grafana | absents | `127.0.0.1:9090`, `127.0.0.1:3000` |
+| Prometheus, Grafana | `127.0.0.1:9090`, `127.0.0.1:3000` — les mêmes ; données de Prometheus dans un volume du projet, propres au staging | `127.0.0.1:9090`, `127.0.0.1:3000` |
+| Objet des alertes | `[preproduction] …` | `[production] …` |
+| Sonde du 13 | ne lit pas la base ; journal à `/dev/null` | lit la mesure de la promotion si configurée ; journal `09_service_embedding/mesures/equivalence/journal_sonde.jsonl` |
 | Clé de session | `12_application/.env.staging` (exigé) | `12_application/.env` |
 | Fichier de mots de passe de l'API | `PREPROD_PGPASS_CONTENEUR` (celui de la chaîne) | celui du module 11 |
 
 **Une cible à la fois** : les deux partagent la carte graphique, le conteneur
-`tei-api-modele` (nom fixe) et les sous-réseaux fixes qu'admet `pg_hba.conf`. Déployer
-l'une est refusé tant que l'autre tourne. C'est une limite du poste ; sur un serveur, il
-y a deux hôtes.
+`tei-api-modele` (nom fixe), les sous-réseaux fixes qu'admet `pg_hba.conf` et, depuis que le
+monitorage est levé dans les deux, les ports de Prometheus et de Grafana. Déployer l'une est
+refusé tant que l'autre tourne — **et tant qu'elle a encore des conteneurs, même arrêtés, ou
+des réseaux** (0.1.3) : leurs sous-réseaux sont les mêmes. C'est une limite du poste ; sur un
+serveur, il y a deux hôtes.
+
+**Le geste du matin.** Le poste s'éteint la nuit : la production s'arrête avec lui et ne
+repart pas seule, et ses conteneurs restent, arrêtés, avec leurs réseaux. Avant de lever le
+staging, la retirer : `make livrer ACTION=arreter CIBLE=production` (un `down` : conteneurs
+et réseaux retirés, comptés au dernier journal de la production) ; `deployer` le demande
+sinon, et nomme ce geste. Pour relever la production, `ACTION=deployer` depuis `main` à
+l'étiquette.
 
 **Le fichier de cible** (`cibles/<nom>.env`) ne porte que ce qui diffère : nom de projet,
 base (dans `DB_NAME` et dans les DSN des conteneurs, sans mot de passe), ports,
 environnement de l'application, monitorage ; en staging, aucun contrôle des modèles au
-démarrage (`API_MODELE_VERIFIER_MODELES=false`, comme le 13 en production). Il est passé
-**en dernier** à `docker compose --env-file`, après ceux des modules (11, 12, 02 ; 13 en
-production s'il existe) et `12_application/.env.<cible>` s'il existe. **Aucun secret** :
+démarrage (`API_MODELE_VERIFIER_MODELES=false`, comme le 13 en production), et la sonde du
+13 tenue à l'écart de la production (`MONITORAGE_LECTURE_BASE=0`, `MONITORAGE_DSN_LECTURE`
+vide, `MONITORAGE_JOURNAL_SONDE=/dev/null` ; variables facultatives, la production ne les
+pose pas, les défauts du 13 valent). Il est passé **en dernier** à `docker compose
+--env-file`, après ceux des modules (11, 12, 02 ; 13 s'il existe) et
+`12_application/.env.<cible>` s'il existe. **Aucun secret** :
 un test y cherche les noms de secrets des fichiers d'exemple des modules, et les motifs du
 hook y sont rejoués.
 
@@ -257,7 +271,7 @@ jetable — et `git`, réel, dans `tests/test_arbre_reel.py` : un outil qui écr
 l'arbre se teste sur un dépôt réel, deux gestes à la suite. Les doublures reprennent ce que
 le poste rend réellement : `/api/v1/targets` et `/api/v1/query` de Prometheus dans la forme
 relevée le 2026-11-12, `/metrics` à 404 dans le conteneur de l'API en production. Mutations
-`E4V-01` à `E4V-06` et `E5V-01` à `E5V-04` (`verification/mutations/`) :
+`E4V-01` à `E4V-06`, `E5V-01` à `E5V-05` (`verification/mutations/`) :
 
 - la santé qui passerait avec un service manquant ;
 - `construire` sur un arbre sale ;
@@ -269,4 +283,6 @@ relevée le 2026-11-12, `/metrics` à 404 dans le conteneur de l'API en producti
 - une cible `down` sur un relevé postérieur qui passerait pour tenue ;
 - `livrer sante` qui ignorerait le dernier journal et jugerait à l'étiquette de HEAD ;
 - le compteur « après » qui accepterait une valeur de Prometheus sans relevé postérieur
-  de l'API.
+  de l'API ;
+- `deployer` qui lèverait une cible alors que l'autre a encore des conteneurs arrêtés
+  ou des réseaux.

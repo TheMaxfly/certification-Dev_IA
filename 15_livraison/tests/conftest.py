@@ -74,6 +74,24 @@ SERVIES = {
     E3: {"api": "api-modele:1.4.0", "application": "application-conseiller:0.1.0"},
 }
 PROJETS = {"production": "api-modele", "staging": "senpai-staging"}
+#: Les réseaux d'une pile levée (relevé du poste, 2026-11-13, rapport du lot, spec 02,
+#: § 2.1) : `<projet>_<réseau>`, cinq à sous-réseau fixe ; ils restent après une
+#: extinction du poste, avec les conteneurs arrêtés, jusqu'au `down`.
+RESEAUX = (
+    "applicatif",
+    "application_sortie",
+    "catalogue_sortie",
+    "collecte",
+    "collecte_embedding",
+    "interne",
+    "publication",
+    "publication_monitorage",
+    "sortie",
+)
+
+
+def reseaux_de(projet: str) -> list[str]:
+    return [f"{projet}_{r}" for r in RESEAUX]
 
 
 @dataclass
@@ -105,6 +123,12 @@ class Poste:
     en_marche: dict[str, dict[str, str]] = field(
         default_factory=lambda: {"api-modele": dict(SERVIES[E4])}
     )
+    #: Les services arrêtés mais présents (`docker ps -a`), par projet : l'état d'une
+    #: pile après l'extinction du poste.
+    arretes: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    reseaux: dict[str, list[str]] = field(
+        default_factory=lambda: {"api-modele": reseaux_de("api-modele")}
+    )
     apres_up: dict[str, str] | None = None
     compose_code: int = 0
     migrations: tuple[int, int] = (30, 0)
@@ -124,11 +148,13 @@ class Poste:
     metriques: dict[str, object] = field(
         default_factory=lambda: {"statut": 200, "appels": 4, "cout": 0.0123}
     )
-    #: En production, le 13 n'admet que le réseau de collecte : ce que le programme
+    #: Sous le monitorage, le 13 n'admet que le réseau de collecte : ce que le programme
     #: rend réellement dans le conteneur (relevé sur le poste le 2026-11-12, E5-4).
-    metriques_production: dict[str, object] = field(
+    metriques_collecte: dict[str, object] = field(
         default_factory=lambda: {"statut": 404, "appels": 0, "cout": 0}
     )
+    #: Les projets levés avec le 13 : les deux cibles depuis la 0.1.3.
+    collecte: set[str] = field(default_factory=lambda: set(PROJETS.values()))
     refus_cles: list[str] = field(default_factory=list[str])
     refus_mention: bool = False
 
@@ -162,26 +188,34 @@ class Poste:
             self.images.pop(a[3], None)
             return Sortie(0)
         if a[:2] == ("docker", "ps"):
-            projet = a[3].rsplit("=", 1)[1]
+            projet = a[a.index("--filter") + 1].rsplit("=", 1)[1]
             servies = self.en_marche.get(projet, {})
             if "{{.Names}}" in a:
-                return Sortie(0, "".join(f"{projet}-{s}-1\n" for s in servies))
+                noms = [*servies, *(self.arretes.get(projet, []) if "-a" in a else [])]
+                return Sortie(0, "".join(f"{projet}-{s}-1\n" for s in noms))
             return Sortie(0, "".join(f"{s}\t{i}\n" for s, i in servies.items()))
+        if a[:3] == ("docker", "network", "ls"):
+            projet = a[a.index("--filter") + 1].rsplit("=", 1)[1]
+            return Sortie(0, "".join(f"{r}\n" for r in self.reseaux.get(projet, [])))
         if a[:2] == ("docker", "compose"):
             projet = a[a.index("-p") + 1]
             if self.compose_code:
                 return Sortie(self.compose_code, stderr="refus")
             if "up" in a:
                 self.en_marche[projet] = dict(self.apres_up or SERVIES[E4])
+                self.arretes.pop(projet, None)
+                self.reseaux[projet] = reseaux_de(projet)
             if "down" in a:
                 self.en_marche.pop(projet, None)
+                self.arretes.pop(projet, None)
+                self.reseaux.pop(projet, None)
             return Sortie(0)
         if a[:2] == ("docker", "exec"):
             if a[-1] == sante.PROGRAMME_API:
                 return Sortie(0, json.dumps(self.api))
             if a[-1] == deployer.PROGRAMME_METRIQUES:
-                production = a[2].startswith(f"{PROJETS['production']}-")
-                lues = self.metriques_production if production else self.metriques
+                monitore = any(a[2].startswith(f"{p}-") for p in self.collecte)
+                lues = self.metriques_collecte if monitore else self.metriques
                 return Sortie(0, json.dumps(lues))
             return Sortie(1)
         if a[0] == "uv" and "migrate.py" in a:

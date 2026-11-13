@@ -216,6 +216,11 @@ def test_le_courriel_passe_par_un_fichier_de_mot_de_passe_et_une_adresse_hors_de
     assert "smtp_mot_de_passe" in service["secrets"]
     for variable in ("GF_SMTP_USER", "GF_SMTP_FROM_ADDRESS", "MONITORAGE_COURRIEL"):
         assert environnement[variable].startswith("${MONITORAGE_COURRIEL:-")
+    # L'environnement en tête de l'objet : celui de la cible, défaut de l'application.
+    assert (
+        environnement["MONITORAGE_ENVIRONNEMENT"]
+        == "${APPLICATION_ENVIRONNEMENT:-developpement}"
+    )
 
 
 def test_la_sonde_lit_la_base_par_un_pgpass_et_un_dsn_sans_mot_de_passe():
@@ -228,6 +233,30 @@ def test_la_sonde_lit_la_base_par_un_pgpass_et_un_dsn_sans_mot_de_passe():
     assert "host.docker.internal:host-gateway" in service["extra_hosts"]
     reseau = fusion()["networks"]["publication_monitorage"]
     assert reseau["ipam"]["config"][0]["subnet"] == "172.30.14.0/24"
+
+
+def test_le_journal_de_la_sonde_se_regle_par_variable_et_garde_celui_de_la_production():
+    """E5 : en staging, la sonde n'écrit pas dans le journal de la production ; par
+    défaut, le montage reste celui d'avant."""
+    (journal,) = [
+        v
+        for v in fichier_compose()["services"]["sonde"]["volumes"]
+        if v.endswith(
+            ":/app/09_service_embedding/mesures/equivalence/journal_sonde.jsonl"
+        )
+    ]
+    assert journal.startswith(
+        "${MONITORAGE_JOURNAL_SONDE:-"
+        "../09_service_embedding/mesures/equivalence/journal_sonde.jsonl}:"
+    )
+    (monte,) = [
+        v
+        for v in fusion()["services"]["sonde"]["volumes"]
+        if v["target"].endswith("journal_sonde.jsonl")
+    ]
+    assert monte["source"].endswith(
+        "/09_service_embedding/mesures/equivalence/journal_sonde.jsonl"
+    )
 
 
 def test_discord_est_ecarte():

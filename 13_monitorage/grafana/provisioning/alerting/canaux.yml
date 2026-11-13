@@ -1,6 +1,12 @@
 # Deux points de contact : le courriel d'exploitation, et le webhook d'essai servi par la
 # sonde, pour les essais sans sortie. L'adresse n'est jamais ici : MONITORAGE_COURRIEL, hors
 # dépôt. La politique (politiques.yml) choisit.
+#
+# L'objet du courriel et le titre du webhook commencent par l'environnement
+# (MONITORAGE_ENVIRONNEMENT : production, preproduction ; le Compose du module la prend dans
+# APPLICATION_ENVIRONNEMENT, celle du fichier de cible) : une alerte du staging ne se prend
+# pas pour une alerte de production. Grafana interpole les variables dans ce fichier, y
+# compris dans un gabarit : le gabarit qui suit ne porte donc aucun dollar.
 apiVersion: 1
 contactPoints:
   - orgId: 1
@@ -11,6 +17,7 @@ contactPoints:
         settings:
           addresses: $MONITORAGE_COURRIEL
           singleEmail: true
+          subject: '[$MONITORAGE_ENVIRONNEMENT] {{ template "default.title" . }}'
   - orgId: 1
     name: webhook-essai
     receivers:
@@ -19,3 +26,4 @@ contactPoints:
         settings:
           url: http://sonde:9108/webhook-essai
           httpMethod: POST
+          title: '[$MONITORAGE_ENVIRONNEMENT] {{ template "default.title" . }}'

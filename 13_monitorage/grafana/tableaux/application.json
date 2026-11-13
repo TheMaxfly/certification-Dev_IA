@@ -1,0 +1,950 @@
+{
+  "uid": "application",
+  "title": "Application",
+  "description": "L'application du libraire vue d'elle-même : sa cible, ses dépendances telles qu'elle les a vues, ses refus, ce que coûte le conseiller, ce que font les comptes. E5.",
+  "tags": [
+    "monitorage",
+    "application"
+  ],
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source de données",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 2
+      },
+      {
+        "name": "profil",
+        "label": "Profil",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${source}"
+        },
+        "query": {
+          "query": "label_values(api_modele_llm_appels_total, profil)",
+          "refId": "profil"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "intervalle",
+        "label": "Intervalle",
+        "type": "interval",
+        "query": "1m,5m,15m,1h",
+        "auto": false,
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Cible de l'application",
+      "description": "Ce qu'il montre : Prometheus relève-t-il l'application, toutes les 15 s ? Normal : en marche. Si elle est arrêtée ou sans donnée : l'alerte E part après une minute ; lire livrer sante et le journal du conteneur de l'application, puis la relever par livrer.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "up{job=\"application\"}",
+          "legendFormat": "application",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "en marche",
+                  "index": 0
+                },
+                "0": {
+                  "text": "arrêtée",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Dépendances vues de l'application",
+      "description": "Ce qu'il montre : la base des comptes, le catalogue et l'API du modèle, tels que l'application les a vus. Chaque jauge est l'état à la dernière requête qui a touché la dépendance : elle ne se relit pas seule ; sans requête, elle garde l'état d'avant, même si la dépendance est tombée depuis. Normal : base ok, catalogue ok, API du modèle qui répondait. Si la base ou le catalogue est indisponible : les alertes F et G partent après une minute ; vérifier la dépendance par livrer sante, puis la page des services de l'administration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "application_base_etat == 1",
+          "legendFormat": "base des comptes : {{etat}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "application_catalogue_etat == 1",
+          "legendFormat": "catalogue : {{etat}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "application_api_sante_ok",
+          "legendFormat": "API du modèle (/v1/sante)",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "état à la dernière requête",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "répondait à la dernière lecture",
+                        "index": 0
+                      },
+                      "0": {
+                        "text": "ne répondait pas à la dernière lecture",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Réponses 503 de l'application",
+      "description": "Ce qu'il montre : les réponses 503 servies par l'application, par route, sur l'intervalle choisi. Normal : aucune. Si elles montent sur les comptes et l'administration : la base des comptes est indisponible — le conseiller, lui, continue en visiteur ; sur une autre route : lire le journal de l'application.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (route) (increase(application_requetes_total{statut=\"503\"}[$intervalle]))",
+          "legendFormat": "{{route}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucune réponse 503",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Questions au conseiller par mode et issue",
+      "description": "Ce qu'il montre : les questions posées au conseiller, par mode (strict, enrichi) et par issue (réponse, refus, quota, débit, plafond de coût, erreur ou indisponibilité de l'API), sur l'intervalle. Normal : des réponses. Si les erreurs ou l'indisponibilité de l'API montent : lire le tableau Service ; si ce sont les quotas ou le plafond : lire le panneau des refus et celui du coût.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (mode, issue) (increase(application_questions_total[$intervalle]))",
+          "legendFormat": "{{mode}} — {{issue}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucune question",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Refus par borne",
+      "description": "Ce qu'il montre : les refus des bornes du conseiller, par motif : quota d'un visiteur (session), quota d'un compte client, débit de la clé publique, budget du jour, inscriptions d'une session. Normal : rares. S'ils montent : vérifier le trafic ; les bornes se règlent dans reglages.toml de l'application, pas ici.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (motif) (increase(application_quota_refus_total[$intervalle]))",
+          "legendFormat": "{{motif}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucun refus",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Coût du jour et plafond",
+      "description": "Ce qu'il montre : le coût estimé du jour (UTC) à sa dernière lecture — relu avant chaque question, il ne bouge qu'au passage d'une question —, le plafond du jour et le seuil de l'alerte H, tracés et nommés ; l'état du plafond (ok, atteint, inconnu) en points, axe de droite. Normal : quelques centimes, plafond ok. Au-dessus du seuil : l'alerte H part, vérifier le trafic du conseiller. Plafond atteint : le conseiller refuse jusqu'à minuit UTC ; inconnu : la base est indisponible, le plafond n'est pas vérifiable.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "application_cout_jour_usd",
+          "legendFormat": "coût du jour (UTC)",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(0.5)",
+          "legendFormat": "Plafond du jour : 0,50 $",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "vector(0.4)",
+          "legendFormat": "Seuil de l'alerte H : 0,40 $ (80 % du plafond)",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "max by (etat) (application_plafond_cout_etat) == 1",
+          "legendFormat": "plafond : {{etat}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "aucune donnée",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "état du plafond"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence du conseiller, p50 et p95",
+      "description": "Ce qu'il montre : la durée d'une question au conseiller (POST /question), du formulaire à la réponse, modèle de langage compris ; plafonne à 75 s, dernier seau. Normal : quelques secondes. S'il monte : lire la latence du modèle sur le tableau Modèle ; si c'est le fournisseur, changer de profil.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(application_latence_secondes_bucket{route=\"/question\"}[$intervalle])))",
+          "legendFormat": "p95",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(application_latence_secondes_bucket{route=\"/question\"}[$intervalle])))",
+          "legendFormat": "p50",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "aucune question",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Appels au catalogue par route et statut",
+      "description": "Ce qu'il montre : les appels de l'application au catalogue (l'API data), par route et issue : ok, introuvable, indisponible, cle (clé refusée), corps (hors contrat), sur l'intervalle. Normal : ok, quelques introuvables. Si indisponible monte : le catalogue ne répond plus, l'alerte G part ; si cle : la clé du catalogue a changé.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (route_catalogue, statut) (increase(application_catalogue_appels_total[$intervalle]))",
+          "legendFormat": "{{route_catalogue}} — {{statut}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucun appel",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Appels à l'API du modèle vus de l'application",
+      "description": "Ce qu'il montre : les appels de l'application à l'API du modèle, par route de l'API et statut, sur l'intervalle. Normal : 200. Si d'autres statuts montent : lire les erreurs vues de l'application sur le tableau Service, puis /v1/sante.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (route_api, statut) (increase(application_api_appels_total[$intervalle]))",
+          "legendFormat": "{{route_api}} — {{statut}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucun appel",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Gestes des comptes",
+      "description": "Ce qu'il montre : ce que les comptes écrivent — critiques publiées, modifiées, retirées ; gestes sur les listes ; comptes supprimés par leur titulaire —, sur l'intervalle. Un nombre, jamais qui : aucune étiquette ne porte un compte. Normal : quelques gestes. Si plus rien ne s'écrit alors que des comptes sont actifs : lire l'état de la base des comptes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (action) (increase(application_critiques_total[$intervalle]))",
+          "legendFormat": "critiques — {{action}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (action) (increase(application_listes_total[$intervalle]))",
+          "legendFormat": "listes — {{action}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum(increase(application_comptes_supprimes_total[$intervalle]))",
+          "legendFormat": "comptes supprimés",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "aucun geste",
+          "custom": {
+            "showPoints": "auto",
+            "fillOpacity": 5,
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Profil actif et tests des clés",
+      "description": "Ce qu'il montre : le profil qui part avec une question sans choix, et les tests des clés demandés par l'administration sur la période affichée, par issue. Normal : le profil réglé ; des tests « teste ». Si trop_tot ou indisponible : attendre une minute entre deux tests, ou lire /v1/sante.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "application_profil_actif_info{profil=~\"$profil\"} == 1",
+          "legendFormat": "profil actif : {{profil}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "sum by (issue) (increase(application_verifications_cles_total[$__range]))",
+          "legendFormat": "tests des clés sur la période : {{issue}}",
+          "editorMode": "code",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "none",
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "en service",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 8,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      }
+    }
+  ]
+}

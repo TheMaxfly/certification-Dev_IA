@@ -1,18 +1,20 @@
 """Les alertes : `promtool` ne lit pas les règles de Grafana ; ce test les lit.
 
-Quatre règles, `uid` uniques, chaque requête nomme une métrique inventoriée, seuils
-égaux aux valeurs documentées, `noDataState` fixé partout ; aucune adresse, aucun
-secret.
+Deux groupes (le modèle, l'application), huit règles, `uid` uniques, chaque requête
+nomme une métrique inventoriée, seuils égaux aux valeurs documentées, `noDataState` fixé
+partout ; le seuil de H dérivé du plafond du jour de l'application ; l'environnement en
+tête de l'objet ; aucune adresse, aucun secret.
 """
 
 from __future__ import annotations
 
 import re
+import tomllib
 from typing import Any
 
 import pytest
 import yaml
-from conftest import MODULE
+from conftest import MODULE, RACINE
 
 ALERTING = MODULE / "grafana" / "provisioning" / "alerting"
 ATTENDU = {
@@ -40,28 +42,62 @@ ATTENDU = {
         "for": "20m",
         "noData": "OK",
     },
+    "E — application absente": {
+        "expr": 'up{job="application"}',
+        "evaluateur": ("lt", 1),
+        "for": "1m",
+        "noData": "Alerting",
+    },
+    "F — base des comptes indisponible": {
+        "expr": 'application_base_etat{etat="indisponible"}',
+        "evaluateur": ("gt", 0),
+        "for": "1m",
+        "noData": "OK",
+    },
+    "G — catalogue indisponible": {
+        "expr": 'application_catalogue_etat{etat="indisponible"}',
+        "evaluateur": ("gt", 0),
+        "for": "1m",
+        "noData": "OK",
+    },
+    "H — coût du jour": {
+        "expr": "application_cout_jour_usd",
+        "evaluateur": ("gt", 0.4),
+        "for": "0s",
+        "noData": "OK",
+    },
 }
+#: Les règles de chaque groupe, par la lettre de leur titre.
+GROUPES = {"modele": "ABCD", "application": "EFGH"}
+REGLAGES_12 = RACINE / "12_application" / "config" / "reglages.toml"
 
 
 def lire(nom: str) -> dict[str, Any]:
     return yaml.safe_load((ALERTING / nom).read_text(encoding="utf-8"))
 
 
+def groupes() -> list[dict[str, Any]]:
+    return lire("regles.yml")["groups"]
+
+
 def regles() -> list[dict[str, Any]]:
-    (groupe,) = lire("regles.yml")["groups"]
-    return groupe["rules"]
+    return [r for g in groupes() for r in g["rules"]]
 
 
-def test_un_groupe_evalue_toutes_les_30_secondes():
-    (groupe,) = lire("regles.yml")["groups"]
-    assert groupe["interval"] == "30s"
+def test_deux_groupes_evalues_toutes_les_30_secondes_dans_le_meme_dossier():
+    assert {
+        g["name"]: "".join(r["title"][0] for r in g["rules"]) for g in groupes()
+    } == (GROUPES)
+    for groupe in groupes():
+        assert groupe["interval"] == "30s"
+        assert groupe["folder"] == "Monitorage"
 
 
-def test_quatre_regles_aux_uid_uniques():
+def test_huit_regles_aux_uid_uniques():
     assert {r["title"] for r in regles()} == set(ATTENDU)
     uids = [r["uid"] for r in regles()]
-    assert len(uids) == 4
-    assert len(set(uids)) == 4
+    assert len(uids) == 8
+    assert len(set(uids)) == 8
 
 
 @pytest.mark.parametrize("titre", ATTENDU)
@@ -79,10 +115,46 @@ def test_la_requete_le_seuil_la_duree_sont_ceux_documentes(titre: str):
     assert regle["execErrState"] == "Alerting"
 
 
-def test_l_alerte_du_direct_ne_filtre_pas_sur_zero():
+@pytest.mark.parametrize("lettre", ["A", "E"])
+def test_l_alerte_du_direct_ne_filtre_pas_sur_zero(lettre: str):
     """`== 0` rendrait un vecteur vide en marche normale : No Data, donc Alerting."""
-    (regle,) = [r for r in regles() if r["title"].startswith("A ")]
+    (regle,) = [r for r in regles() if r["title"].startswith(f"{lettre} ")]
     assert "==" not in regle["data"][0]["model"]["expr"]
+
+
+def test_le_seuil_de_h_suit_le_plafond_du_jour_de_l_application():
+    """La règle avant le chiffre : 80 % de `cout_jour_max_usd` (reglages.toml du 12).
+    Changer le plafond sans la règle fait échouer ce test."""
+    reglages = tomllib.loads(REGLAGES_12.read_text(encoding="utf-8"))
+    plafond = float(reglages["conseiller"]["limites"]["cout_jour_max_usd"])
+    (regle,) = [r for r in regles() if r["title"].startswith("H ")]
+    donnees = {d["refId"]: d for d in regle["data"]}
+    seuil = donnees["C"]["model"]["conditions"][0]["evaluator"]["params"][0]
+    assert seuil == pytest.approx(0.8 * plafond)
+    assert f"{seuil:.2f}".replace(".", ",") in regle["annotations"]["summary"]
+    assert f"{plafond:.2f}".replace(".", ",") in regle["annotations"]["summary"]
+
+
+@pytest.mark.parametrize(
+    "lettre", ["E", "F", "G"], ids=["absente", "base", "catalogue"]
+)
+def test_les_regles_de_l_application_disent_leur_effet(lettre: str):
+    (regle,) = [r for r in regles() if r["title"].startswith(f"{lettre} ")]
+    resume = regle["annotations"]["summary"]
+    assert "depuis une minute" in resume
+    assert "livrer sante" in resume
+
+
+def test_l_objet_et_le_titre_portent_l_environnement():
+    """Un courriel du staging ne peut pas passer pour une alerte de production. Le
+    gabarit est interpolé par Grafana : il ne porte aucun dollar."""
+    points = {p["name"]: p for p in lire("canaux.yml")["contactPoints"]}
+    (courriel,) = points["courriel-exploitation"]["receivers"]
+    (essai,) = points["webhook-essai"]["receivers"]
+    for gabarit in (courriel["settings"]["subject"], essai["settings"]["title"]):
+        prefixe, _, reste = gabarit.partition("] ")
+        assert prefixe == "[$MONITORAGE_ENVIRONNEMENT"
+        assert "$" not in reste and "default.title" in reste
 
 
 @pytest.mark.parametrize("titre", ATTENDU)

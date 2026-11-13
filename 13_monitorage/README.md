@@ -1,7 +1,7 @@
 # 13_monitorage
 
-Le monitorage du modèle : **Prometheus collecte, Grafana restitue et alerte, MLflow garde la
-qualité**. Une sonde d'équivalence et un exporteur de qualité publient un indicateur du
+Le monitorage du modèle et de l'application (0.2.0) : **Prometheus collecte, Grafana restitue
+et alerte, MLflow garde la qualité**. Une sonde d'équivalence et un exporteur de qualité publient un indicateur du
 modèle comme métrique, pour qu'une alerte puisse porter sur le modèle et pas seulement sur
 la machine. Tout tourne sur le poste, par Compose ; aucun serveur distant.
 
@@ -23,6 +23,16 @@ make monitorage-arret  # tout s'arrête ; les données de Prometheus restent sur
   `MONITORAGE_PGPASS_FICHIER`. Les données de Grafana ne durent pas (`tmpfs`) : tout ce qu'il
   montre est provisionné, et un nouveau mot de passe vaut au redémarrage suivant.
 - Besoin : environ 5,3 Go de mémoire vive avec l'application, 1,5 Go de mémoire vidéo.
+- **Par `livrer`, dans les deux cibles** (`15_livraison/README.md`) : la production
+  (`api-modele`) et, depuis le module 15 en 0.1.3, le staging (`senpai-staging`), aux mêmes ports
+  — elles ne tournent jamais ensemble. En staging, la sonde ne lit pas la base et n'écrit pas dans
+  le journal de la production (`MONITORAGE_LECTURE_BASE=0`, `MONITORAGE_JOURNAL_SONDE=/dev/null`,
+  posés par le fichier de cible ; défauts inchangés ici).
+- **L'image de la sonde reste `monitorage-sonde:0.1.0`** : son code n'a pas changé en 0.2.0 — les
+  tableaux et les règles sont des fichiers montés, pas dans l'image ; `livrer construire` ne la
+  construit pas et `livrer deployer` lève l'image du poste, sans construction. Limite :
+  `make monitorage` (`--build`) la reconstruirait sous la même étiquette depuis l'arbre courant,
+  chaîne de version 0.2.0 comprise.
 
 ## Les cibles
 
@@ -91,7 +101,8 @@ La session est en lecture seule et membre de `verif_ro`, ou la lecture est refus
 
 ## Les tableaux de bord
 
-`grafana/tableaux/modele.json` et `service.json`, chargés par provisionnement : **ce qu'on montre
+`grafana/tableaux/modele.json`, `service.json` et `application.json`, chargés par
+provisionnement : **ce qu'on montre
 est ce qui est versionné**. L'écran ne les modifie pas (`allowUiUpdates: false`). Pour changer un
 tableau : modifier le JSON et attendre 30 s ; ou, pour le faire à l'écran, ouvrir « Modèle JSON »
 dans les réglages du tableau, travailler sur une copie, et recopier le JSON dans le dépôt.
@@ -99,10 +110,22 @@ dans les réglages du tableau, travailler sur une copie, et recopier le JSON dan
 Chaque panneau dit dans sa description ce qu'il montre, sa valeur normale, ce qu'on fait si elle
 bouge. Les seuils sont des séries tracées et nommées ; les états sont en toutes lettres.
 
+**Le tableau « Application »** (E5) : l'application vue d'elle-même, onze panneaux — sa cible ; ses
+dépendances telles qu'elle les a vues (la base des comptes, le catalogue, l'API du modèle) ; les
+réponses 503 par route ; les questions au conseiller par mode et issue ; les refus par borne ; le
+coût du jour, **son plafond et le seuil de l'alerte H tracés et nommés, dérivés de
+`cout_jour_max_usd`** (`12_application/config/reglages.toml`, un test les compare) ; la latence de
+`POST /question`, p50 et p95 ; les appels au catalogue et à l'API du modèle ; les gestes des
+comptes ; le profil actif et les tests des clés. **Les jauges des dépendances sont l'état à la
+dernière requête qui a touché la dépendance : elles ne se relisent pas seules** — sans requête,
+elles gardent l'état d'avant. Aucune étiquette ne porte une donnée personnelle : les listes sont
+fermées (`metriques.py` du 12), et l'apparence n'est pas affichée.
+
 ## Les alertes
 
-Grafana évalue quatre règles toutes les 30 s (`grafana/provisioning/alerting/regles.yml`) ; aucun
-Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce fichier.
+Grafana évalue huit règles toutes les 30 s, en deux groupes, le modèle (A à D) et
+l'application (E à H), dans le dossier « Monitorage » (`grafana/provisioning/alerting/regles.yml`) ;
+aucun Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce fichier.
 
 | Règle | Requête | Condition | Durée | Sans donnée | Pourquoi ce seuil |
 |---|---|---|---|---|---|
@@ -110,6 +133,22 @@ Alertmanager externe. Les seuils et les durées sont écrits une fois, dans ce f
 | **B — sorties invalides** | `sum(increase(api_modele_sortie_invalide_total[15m]))` | `> 3` | 0 | OK | quelques refus isolés sont le contrôle qui travaille ; au-delà, le modèle dérive |
 | **C — coût** | `sum(increase(api_modele_llm_cout_usd_total[1h]))` | `> 0,50 $` | 0 | OK | le plafond d'un run de mesure ; **elle prévient, rien ne bloque côté API** |
 | **D — équivalence** | `modele_sonde_equivalence_cosinus_min` | `< 0,999` | 20 min | OK | deux sondes de suite : un écart isolé vers 0,9988 revient sans panne |
+| **E — application absente** | `up{job="application"}` | `< 1` | 1 min | Alerting | la règle de A, pour la cible que A ne regarde pas |
+| **F — base des comptes indisponible** | `application_base_etat{etat="indisponible"}` | `> 0` | 1 min | OK | les comptes et l'administration rendent 503 ; le conseiller continue en visiteur ; E couvre l'absence |
+| **G — catalogue indisponible** | `application_catalogue_etat{etat="indisponible"}` | `> 0` | 1 min | OK | la recherche et les fiches ne répondent plus |
+| **H — coût du jour** | `application_cout_jour_usd` | `> 0,40 $` | 0 | OK | 80 % du plafond du jour (0,50 $) : prévenir avant le refus ; un test le dérive du plafond |
+
+- **Les durées de E, F et G sont provisoires** : celle de A, avec son motif. La séance de pannes en
+  staging mesure le délai de détection réel ; si elle les contredit, elles changent avec la mesure.
+- **F et G lisent des jauges qui ne se relisent qu'au passage d'une requête** qui touche la
+  dépendance : une base ou un catalogue tombés sans trafic ne se voient pas tant qu'aucune requête
+  ne passe. C'est connu, et c'est ce que la séance de pannes mesure.
+- **L'objet du courriel et le titre du webhook d'essai commencent par l'environnement** —
+  `[production] …`, `[preproduction] …` : `MONITORAGE_ENVIRONNEMENT`, prise par le Compose dans
+  `APPLICATION_ENVIRONNEMENT`, celle du fichier de cible (défaut `developpement`). Grafana
+  interpole les variables dans les points de contact, gabarits compris : le gabarit de l'objet ne
+  porte aucun dollar. Les annotations des règles, elles, ne sont pas interpolées (Grafana 13.3) :
+  leurs `{{ $labels.job }}` restent des gabarits.
 
 - **A ne filtre pas sur `== 0`** : en marche normale, le résultat serait vide, et la règle
   passerait en « No Data ». Le seuil est porté par Grafana.

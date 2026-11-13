@@ -241,12 +241,15 @@ def test_migrate_illisible_est_un_manque(o: Outils, poste: Poste, monkeypatch):
     assert "base · migrations en attente" in manques(verifier(o))
 
 
-def test_le_staging_admet_une_seule_cle(o: Outils, poste: Poste, bouclage: Bouclage):
+def test_le_staging_admet_une_seule_cle_et_juge_prometheus(
+    o: Outils, poste: Poste, bouclage: Bouclage
+):
+    """0.1.3 : le monitorage est levé en staging ; ses cibles se jugent comme en
+    production (le même port : les deux cibles ne tournent jamais ensemble)."""
     poste.en_marche = {"senpai-staging": dict(SERVIES[E4])}
     bouclage.reponses = {
         k.replace(":8020/", ":8021/").replace(":8000/", ":8001/"): v
         for k, v in bouclage.reponses.items()
-        if "9090" not in k
     }
     bouclage.reponses["http://127.0.0.1:8021/sante"] = (
         200,
@@ -254,7 +257,10 @@ def test_le_staging_admet_une_seule_cle(o: Outils, poste: Poste, bouclage: Boucl
     )
     c = verifier(o, "staging")
     assert manques(c) == []
-    assert not [x for x in c if x.service == "prometheus"]
+    (prom,) = [x for x in c if x.service == "prometheus"]
+    assert prom.tenu and prom.constate == "5/5 up"
+    bouclage.reponses[CIBLES] = cibles_sauf(api=cible_prometheus("api", "down"))
+    assert "prometheus · cibles up" in manques(verifier(o, "staging"))
 
 
 def test_aux_versions_d_une_etiquette_anterieure(
