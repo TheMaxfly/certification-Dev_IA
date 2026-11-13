@@ -55,3 +55,8 @@
 ## Notes
 
 - La pile n'est pas arrêtée : proposer un retour arrière à Max (livrer retour), jamais sans lui.
+
+## Arrêt — 2026-11-13 12:21:11 UTC
+
+- `livrer arreter --cible production`, par `maxime`
+- 8 conteneurs (dont 0 en marche) et 9 réseaux avant, 0 et 0 après ; 2 s
