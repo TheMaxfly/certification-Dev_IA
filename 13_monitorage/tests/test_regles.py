@@ -1,9 +1,10 @@
 """Les alertes : `promtool` ne lit pas les règles de Grafana ; ce test les lit.
 
-Deux groupes (le modèle, l'application), huit règles, `uid` uniques, chaque requête
+Deux groupes (le modèle, l'application), dix règles, `uid` uniques, chaque requête
 nomme une métrique inventoriée, seuils égaux aux valeurs documentées, `noDataState` fixé
-partout ; le seuil de H dérivé du plafond du jour de l'application ; l'environnement en
-tête de l'objet ; aucune adresse, aucun secret.
+partout ; le seuil de H dérivé du plafond du jour de l'application, celui de J de la
+période de sa sonde ; l'environnement en tête de l'objet ; aucune adresse, aucun
+secret.
 """
 
 from __future__ import annotations
@@ -66,9 +67,21 @@ ATTENDU = {
         "for": "0s",
         "noData": "OK",
     },
+    "I — API du modèle dégradée vue de l'application": {
+        "expr": "application_api_sante_ok",
+        "evaluateur": ("lt", 1),
+        "for": "1m",
+        "noData": "OK",
+    },
+    "J — la sonde de l'application ne tourne plus": {
+        "expr": "time() - application_sonde_derniere_passe_timestamp",
+        "evaluateur": ("gt", 60),
+        "for": "0s",
+        "noData": "OK",
+    },
 }
 #: Les règles de chaque groupe, par la lettre de leur titre.
-GROUPES = {"modele": "ABCD", "application": "EFGH"}
+GROUPES = {"modele": "ABCD", "application": "EFGHIJ"}
 REGLAGES_12 = RACINE / "12_application" / "config" / "reglages.toml"
 
 
@@ -93,11 +106,11 @@ def test_deux_groupes_evalues_toutes_les_30_secondes_dans_le_meme_dossier():
         assert groupe["folder"] == "Monitorage"
 
 
-def test_huit_regles_aux_uid_uniques():
+def test_dix_regles_aux_uid_uniques():
     assert {r["title"] for r in regles()} == set(ATTENDU)
     uids = [r["uid"] for r in regles()]
-    assert len(uids) == 8
-    assert len(set(uids)) == 8
+    assert len(uids) == 10
+    assert len(set(uids)) == 10
 
 
 @pytest.mark.parametrize("titre", ATTENDU)
@@ -136,13 +149,34 @@ def test_le_seuil_de_h_suit_le_plafond_du_jour_de_l_application():
 
 
 @pytest.mark.parametrize(
-    "lettre", ["E", "F", "G"], ids=["absente", "base", "catalogue"]
+    "lettre", ["E", "F", "G", "I"], ids=["absente", "base", "catalogue", "api"]
 )
 def test_les_regles_de_l_application_disent_leur_effet(lettre: str):
     (regle,) = [r for r in regles() if r["title"].startswith(f"{lettre} ")]
     resume = regle["annotations"]["summary"]
     assert "depuis une minute" in resume
     assert "livrer sante" in resume
+
+
+def test_le_seuil_de_j_suit_la_periode_de_la_sonde():
+    """La règle avant le chiffre : quatre périodes de `[sonde] periode_s` (reglages.toml
+    du 12). Changer la période sans la règle fait échouer ce test."""
+    reglages = tomllib.loads(REGLAGES_12.read_text(encoding="utf-8"))
+    periode = float(reglages["sonde"]["periode_s"])
+    (regle,) = [r for r in regles() if r["title"].startswith("J ")]
+    donnees = {d["refId"]: d for d in regle["data"]}
+    seuil = donnees["C"]["model"]["conditions"][0]["evaluator"]["params"][0]
+    assert seuil == pytest.approx(4 * periode)
+    resume = regle["annotations"]["summary"]
+    assert f"plus de {seuil:.0f} s, quatre périodes de {periode:.0f} s" in resume
+
+
+def test_f_ne_dit_plus_que_le_conseiller_continue_serveur_arrete():
+    """Décision 2 amendée (spec 04) : serveur arrêté, seul l'accueil reste servi."""
+    (regle,) = [r for r in regles() if r["title"].startswith("F ")]
+    resume = regle["annotations"]["summary"]
+    assert "le conseiller continue en visiteur" not in resume
+    assert "seul l'accueil reste servi" in resume
 
 
 def test_l_objet_et_le_titre_portent_l_environnement():

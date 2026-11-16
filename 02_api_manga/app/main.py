@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 
 from . import API_VERSION, recherche, resumes
 from .database import create_pool, get_pool
+from .journal import FormatJson
 from .security import api_key_header, require_api_key
 from .settings import RESUME_MIN_DEFAUT, SEUIL_RESSEMBLANCE_DEFAUT, Settings
 
@@ -1895,13 +1896,18 @@ def configure_logging() -> None:
     d'autorisation qui ne consigne que les échecs ne permet pas de répondre à
     « qui a lu quoi » — c'est la question à laquelle il doit servir.
 
+    Le journal est en JSON, une ligne par événement (`app.journal`, E5-12).
     `basicConfig` sans `force` ne fait rien si l'hôte a déjà configuré le
-    journal : on n'écrase pas la configuration d'un déploiement.
+    journal — le déploiement le fait, `app/journalisation.json` passé à
+    uvicorn : on n'écrase pas la configuration d'un déploiement. `LOG_LEVEL`
+    règle le niveau de la racine dans les deux cas.
     """
-    logging.basicConfig(
-        level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    sortie = logging.StreamHandler()
+    sortie.setFormatter(FormatJson())
+    niveau = os.getenv("LOG_LEVEL", "").strip().upper()
+    logging.basicConfig(level=niveau or "INFO", handlers=[sortie])
+    if niveau:
+        logging.getLogger().setLevel(niveau)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

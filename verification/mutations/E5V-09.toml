@@ -1,0 +1,7 @@
+id = "E5V-09"
+origine = "E5, lot 1, spec 04 (2026-11-16) — les réponses 503 d'une route ne sont plus créées à zéro au démarrage : la première naît à 1 et le tableau ne la dessine pas (E5-24)"
+fichier = "12_application/src/application/app.py"
+avant = '''    metriques.routes_servies(r.path for r in app.routes if isinstance(r, APIRoute))'''
+apres = '''    metriques.routes_servies([])'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_compteurs.py", "-k", "reponses_503_a_zero"]

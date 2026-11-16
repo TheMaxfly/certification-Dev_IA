@@ -493,6 +493,15 @@ class Monitorage:
 
 
 @dataclass(frozen=True, slots=True)
+class Sonde:
+    """`[sonde]` (E5, lot 1, spec 04) : la période de la sonde des dépendances — la
+    base, le catalogue, l'API du modèle et le coût du jour relus par l'application
+    elle-même, qu'il y ait ou non un visiteur."""
+
+    periode_s: float
+
+
+@dataclass(frozen=True, slots=True)
 class Administration:
     """Les pages de l'administration (`[administration]`, E4, lot 5) : le lien vers la
     procédure de pose et de rotation des clés (un document du dépôt)."""
@@ -539,6 +548,7 @@ class Reglages:
     administration: Administration
     couts: Couts
     monitorage: Monitorage
+    sonde: Sonde
 
 
 class _Lecteur:
@@ -901,6 +911,13 @@ def lire_monitorage(lecteur: _Lecteur, donnees: Table, ecarts: list[str]) -> Mon
     return Monitorage(adresse_grafana=adresse or None)
 
 
+def lire_sonde(lecteur: _Lecteur, donnees: Table) -> Sonde:
+    """La période de la sonde, en secondes, strictement positive : son motif dit
+    pourquoi elle dépasse la durée d'une passe (un test le garde)."""
+    table = lecteur.table(donnees, "sonde")
+    return Sonde(periode_s=lecteur.positif(table, "periode_s", "sonde"))
+
+
 def lire_cle_comptes(environ: Mapping[str, str], ecarts: list[str]) -> str | None:
     cle = environ.get(VARIABLE_CLE_COMPTES, "").strip() or None
     if cle is not None and not cle.isascii():
@@ -1066,6 +1083,7 @@ def charger(environ: Mapping[str, str], fichier: Path = FICHIER_REGLAGES) -> Reg
         administration=lire_administration(lecteur, donnees, ecarts),
         couts=lire_couts(lecteur, donnees, ecarts),
         monitorage=lire_monitorage(lecteur, donnees, ecarts),
+        sonde=lire_sonde(lecteur, donnees),
     )
     if ecarts:
         raise ConfigurationInvalide(ecarts)

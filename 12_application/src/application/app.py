@@ -3,8 +3,13 @@
 Au démarrage, `/v1/info` est lu une fois : un échec n'empêche pas de démarrer, l'écran
 le dit. L'application ne parle jamais à un fournisseur ni au catalogue en base : à l'API
 du modèle seule, par son contrat. Elle a sa base à elle (schéma `application`, rôle
-`app_rw`, E4) pour les comptes : absente ou injoignable, le conseiller fonctionne, les
-pages de compte le disent (503).
+`app_rw`, E4) pour les comptes : absente ou injoignable seule, le conseiller fonctionne,
+les pages de compte le disent (503). Le serveur PostgreSQL arrêté, l'API du modèle et le
+catalogue, qui le lisent aussi, tombent avec : seul l'accueil reste servi (E5, lot 1).
+
+La sonde des dépendances (`sonde`, E5, lot 1, spec 04), lancée par le cycle de vie,
+relit à chaque période la base, le catalogue, l'API et le coût du jour, sans attendre un
+visiteur : les jauges du monitorage disent l'état courant.
 
 Les sessions (`sessions`) : un cookie signé, le compte relu en base à chaque requête, un
 jeton CSRF sur chaque formulaire `POST` — celui du conseiller compris.
@@ -25,6 +30,7 @@ from pathlib import Path
 import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -77,6 +83,7 @@ from application.sessions import (
     NonConnecte,
     Redirection,
 )
+from application.sonde import Lecture, SondeDependances
 
 ICI = Path(__file__).resolve().parent
 #: Un identifiant de série dans `/?serie=` : des chiffres, assez peu pour un `bigint`.
@@ -191,6 +198,44 @@ def creer_application(
     bornes = reglages.bornes
     #: Le plafond global de débit de la clé publique (un processus : README).
     limiteur = quotas.Limiteur(bornes.debit_public_par_minute, maintenant)
+    plafond_du_jour = Decimal(str(bornes.cout_jour_max_usd))
+
+    async def lire_cout_du_jour(instant: float) -> tuple[Decimal | None, str]:
+        """Le cumul du jour lu en base, posé sur ses jauges (le coût, l'état du
+        plafond) : la lecture du plafond avant une question, et celle de la sonde.
+        (None, `inconnu`) : la base ne répond pas, le plafond n'est pas vérifiable."""
+        jour = quotas.jour_utc(instant)
+        try:
+            cumul = await couts.cumul_du_jour(base, jour)
+        except BaseIndisponible:
+            metriques.etat_plafond("inconnu")
+            return None, "inconnu"
+        metriques.cout_jour.set(float(cumul))
+        etat = "atteint" if cumul >= plafond_du_jour else "ok"
+        metriques.etat_plafond(etat)
+        return cumul, etat
+
+    async def lire_api() -> str:
+        """La lecture de l'API par la sonde : `/v1/sante`, la jauge qu'en pose déjà
+        `/sante`."""
+        api_ok = await client.sante()
+        metriques.api_sante_ok.set(1 if api_ok else 0)
+        return "ok" if api_ok else "indisponible"
+
+    async def lire_plafond() -> str:
+        _, etat = await lire_cout_du_jour(maintenant())
+        return etat
+
+    # Les lectures de la sonde : ce qui n'est pas configuré n'est pas lu (son état
+    # reste `non_configuree`, `non_configure`).
+    lectures: dict[str, Lecture] = {}
+    if base.configuree:
+        lectures["base"] = base.sonder
+        lectures["cout_du_jour"] = lire_plafond
+    if catalogue is not None:
+        lectures["catalogue"] = catalogue.sonder
+    lectures["api"] = lire_api
+    sonde = SondeDependances(lectures, reglages.sonde.periode_s, metriques)
     environnement = environnement_gabarits()
     gabarits = Jinja2Templates(env=environnement)
     t = reglages.textes
@@ -219,9 +264,11 @@ def creer_application(
             # Développement seul (la configuration l'impose ailleurs) : la clé est tirée
             # au démarrage, les sessions se perdent quand l'application redémarre.
             journal.evenement("cle_session_ephemere", niveau=logging.WARNING)
+        sonde.lancer()
         try:
             yield
         finally:
+            await sonde.arreter()
             await client.fermer()
             if catalogue is not None:
                 await catalogue.fermer()
@@ -702,16 +749,12 @@ def creer_application(
                     t["debit_public"], 429, attente, titre=t["debit_titre"]
                 )
                 return borne("debit", encart), "debit"
-        try:
-            cumul = await couts.cumul_du_jour(base, jour)
-        except BaseIndisponible:
+        cumul, etat = await lire_cout_du_jour(instant)
+        if cumul is None:
             # Non vérifiable : le conseiller répond quand même (décision 11 du lot 1).
-            metriques.etat_plafond("inconnu")
             journal.evenement_requete(request, "plafond_non_verifiable")
             return None
-        metriques.cout_jour.set(float(cumul))
-        if cumul >= Decimal(str(bornes.cout_jour_max_usd)):
-            metriques.etat_plafond("atteint")
+        if etat == "atteint":
             minuit = quotas.minuit_suivant(instant)
             encart = presentation.Encart(
                 t["budget_atteint"],
@@ -720,7 +763,6 @@ def creer_application(
                 titre=t["budget_titre"],
             )
             return borne("cout", encart), "plafond_cout"
-        metriques.etat_plafond("ok")
         return None
 
     async def compter(
@@ -966,10 +1008,13 @@ def creer_application(
     pages_listes.installer(app, reglages, rendre, catalogue, metriques)
     pages_admin.installer(app, reglages, rendre, vue, metriques, catalogue)
     pages_apparence.installer(app, reglages, rendre)
+    # E5-24 : les réponses 503 de chaque route, à zéro dès le démarrage.
+    metriques.routes_servies(r.path for r in app.routes if isinstance(r, APIRoute))
 
     app.state.vue = vue
     app.state.metriques = metriques
     app.state.base = base
+    app.state.sonde = sonde
     app.state.hacheur = hacheur if hacheur is not None else Hacheur()
     app.state.reglages = reglages
     app.state.horloge = maintenant

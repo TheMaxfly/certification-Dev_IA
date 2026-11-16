@@ -1,9 +1,11 @@
 """Les métriques : un registre propre au module, `/metrics` sur le bouclage seulement.
 
 Matière de l'étape de surveillance : requêtes par route et statut, appels à l'API et
-leurs erreurs par code, latence, et l'état de l'API vu d'ici : deux lectures, deux
-jauges, écrites à une page ou à un `/sante`. Aucune ne se relit seule : la panne de
-l'API se lit sur la cible de Prometheus, pas ici.
+leurs erreurs par code, latence, et l'état des dépendances vu d'ici. Les jauges de la
+base, du catalogue, de l'API (`/v1/sante`) et du coût du jour sont posées par les
+requêtes qui les touchent **et par la sonde des dépendances** (`sonde`, E5, lot 1,
+spec 04), à chaque période, qu'il y ait ou non un visiteur ; l'heure de sa dernière
+passe dit qu'elle tourne.
 """
 
 from __future__ import annotations
@@ -49,6 +51,12 @@ ETATS_PLAFOND = ("ok", "atteint", "inconnu")
 ACTIONS_LISTES = ("ajout", "changement", "retrait")
 #: L'issue d'un test des clés demandé par l'administration (E4, lot 5).
 ISSUES_VERIFICATION = ("teste", "route_absente", "trop_tot", "indisponible")
+#: Les routes du catalogue que l'application appelle (`client_catalogue`) et l'issue
+#: d'un appel : deux listes fermées, toutes leurs combinaisons à zéro dès le démarrage.
+ROUTES_CATALOGUE = ("series", "serie", "volumes")
+STATUTS_CATALOGUE = ("ok", "introuvable", "indisponible", "cle", "corps")
+#: Le statut des requêtes que le tableau trace par route (« Réponses 503 »).
+STATUT_TRACE = "503"
 
 
 class Metriques:
@@ -103,8 +111,9 @@ class Metriques:
         )
         self.catalogue_etat = Gauge(
             "application_catalogue_etat",
-            "L'état du catalogue au dernier appel (1 sur l'état constaté) : ok,"
-            " indisponible, non_configure (aucune clé), cle (clé refusée).",
+            "L'état du catalogue à sa dernière lecture, un appel ou la sonde (1 sur"
+            " l'état constaté) : ok, indisponible, non_configure (aucune clé), cle"
+            " (clé refusée, vue par un appel).",
             ["etat"],
             registry=self.registre,
         )
@@ -133,7 +142,7 @@ class Metriques:
         self.cout_jour = Gauge(
             "application_cout_jour_usd",
             "Coût estimé du jour (UTC), en dollars, à sa dernière lecture dans"
-            " application.couts_jour (avant chaque question).",
+            " application.couts_jour (avant chaque question, et par la sonde).",
             registry=self.registre,
         )
         self.plafond_cout = Gauge(
@@ -156,8 +165,14 @@ class Metriques:
             " l'effacement).",
             registry=self.registre,
         )
+        # E5-24 : une série créée à son premier événement naît à 1, et `increase()` ne
+        # dessine pas ce premier pas ; les compteurs que le tableau trace existent à
+        # zéro dès le démarrage, pour chaque combinaison de leurs listes fermées.
         for action in ACTIONS_LISTES:
             self.listes.labels(action=action)
+        for route in ROUTES_CATALOGUE:
+            for statut in STATUTS_CATALOGUE:
+                self.catalogue_appels.labels(route_catalogue=route, statut=statut)
         for motif in MOTIFS_REFUS:
             self.quota_refus.labels(motif=motif)
         for mode in MODES_QUESTION:
@@ -191,9 +206,23 @@ class Metriques:
         )
         self.api_sante_ok = Gauge(
             "application_api_sante_ok",
-            "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante).",
+            "1 si /v1/sante a répondu 200 à sa dernière lecture (démarrage, /sante,"
+            " sonde).",
             registry=self.registre,
         )
+        self.sonde_derniere_passe = Gauge(
+            "application_sonde_derniere_passe_timestamp",
+            "L'heure de la dernière passe terminée de la sonde des dépendances, en"
+            " secondes depuis l'époque ; posée au lancement de la sonde, avant sa"
+            " première passe. Elle dit que la sonde tourne.",
+            registry=self.registre,
+        )
+
+    def routes_servies(self, routes: Iterable[str]) -> None:
+        """Les réponses 503 de chaque route de l'application (ses gabarits, liste
+        fermée par le code), à zéro dès le démarrage : la première se voit."""
+        for route in routes:
+            self.requetes.labels(route=route, statut=STATUT_TRACE)
 
     def etat_catalogue(self, etat: str) -> None:
         """Pose l'état du catalogue : 1 sur l'état constaté, 0 sur les autres."""

@@ -183,15 +183,25 @@ Une clé compromise se révoque en la retirant d'`API_KEYS` et en redémarrant.
 
 ### Ce que le journal consigne
 
+**Une ligne JSON par événement** (0.7.1), dans la forme de l'API du modèle et de
+l'application : `horodatage` (UTC), `niveau`, `evenement` (le message), et `trace`
+quand une exception l'accompagne, sur la même ligne — aucun autre champ. Le
+Dockerfile passe `app/journalisation.json` à uvicorn (`--log-config`) : son
+démarrage, ses erreurs et son journal d'accès sortent au même format ; lancé sans
+configuration, le module pose le même formateur sur sa racine.
+
 Le journal **ne contient jamais de clé** — ni valide, ni rejetée. Une clé
 rejetée reste une clé : la journaliser la publierait à quiconque lit les
 journaux. Il porte le libellé du consommateur, ou rien :
 
 ```
-INFO  app.security: appel autorisé sur /rag/export/composition, consommateur « app_backend »
-WARN  app.security: appel refusé sur /rag/export/composition : clé d'API inconnue
-WARN  app.security: appel refusé sur /rag/export : en-tête X-API-Key absent
+{"horodatage": "…", "niveau": "INFO", "evenement": "appel autorisé sur /rag/export/composition, consommateur « app_backend »"}
+{"horodatage": "…", "niveau": "WARNING", "evenement": "appel refusé sur /rag/export/composition : clé d'API inconnue"}
+{"horodatage": "…", "niveau": "WARNING", "evenement": "appel refusé sur /rag/export : en-tête X-API-Key absent"}
 ```
+
+Le journal d'accès d'uvicorn porte, comme avant, l'adresse de l'appelant et la
+ligne de requête, chaîne de recherche comprise.
 
 Le journal distingue les deux causes de refus ; **la réponse HTTP, non**. Les
 deux cas renvoient un `401` au message identique, pour ne pas indiquer à un

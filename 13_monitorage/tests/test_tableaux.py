@@ -90,6 +90,7 @@ APPLICATION = {
         "application_profil_actif_info",
         "application_verifications_cles_total",
     },
+    "Sonde des dépendances": {"application_sonde_derniere_passe_timestamp"},
 }
 TOUS = {"modele": MODELE, "service": SERVICE, "application": APPLICATION}
 #: Les étiquettes que les légendes du tableau « application » peuvent citer : les
@@ -338,14 +339,51 @@ def test_le_plafond_et_le_seuil_de_h_sont_traces_et_nommes_depuis_la_configurati
     assert "0,50 $" in vecteurs[plafond] and "0,40 $" in vecteurs[0.4]
 
 
-def test_les_dependances_disent_qu_elles_ne_se_relisent_pas_seules():
-    (deps,) = [
-        p
-        for p in panneaux("application")
-        if p["title"] == "Dépendances vues de l'application"
-    ]
-    assert "à la dernière requête qui a touché la dépendance" in deps["description"]
-    assert "ne se relit pas seule" in deps["description"]
+def periode_de_la_sonde() -> float:
+    """La période de la sonde des dépendances de l'application (`[sonde]` du 12)."""
+    reglages = tomllib.loads(REGLAGES_12.read_text(encoding="utf-8"))
+    return float(reglages["sonde"]["periode_s"])
+
+
+def panneau_application(titre: str) -> dict[str, Any]:
+    (panneau,) = [p for p in panneaux("application") if p["title"] == titre]
+    return panneau
+
+
+def test_le_tableau_application_a_douze_panneaux():
+    assert len(panneaux("application")) == 12
+    assert len(APPLICATION) == 12
+
+
+def test_les_dependances_disent_l_etat_courant():
+    """E5-23 : une requête sur la période gardait une série par état vu ;
+    instantanée, elle ne rend que l'état courant — plus jamais « ok » et
+    « indisponible » ensemble."""
+    deps = panneau_application("Dépendances vues de l'application")
+    assert "l'état courant" in deps["description"]
+    assert "une seule valeur par dépendance" in deps["description"]
+    assert "relues par la sonde" in deps["description"]
+    assert "ne se relit pas seule" not in deps["description"]
+    for cible in deps["targets"]:
+        assert (cible["instant"], cible["range"]) == (True, False), cible["refId"]
+
+
+def test_le_profil_actif_est_l_etat_courant():
+    profil = panneau_application("Profil actif et tests des clés")
+    (actif,) = [c for c in profil["targets"] if "profil_actif" in c["expr"]]
+    assert (actif["instant"], actif["range"]) == (True, False)
+
+
+def test_la_sonde_dit_son_age_et_le_seuil_de_j_derive_de_la_periode():
+    """La règle avant le chiffre : le seuil de J, quatre périodes de la sonde."""
+    sonde = panneau_application("Sonde des dépendances")
+    (cible,) = sonde["targets"]
+    assert cible["expr"] == "time() - application_sonde_derniere_passe_timestamp"
+    assert (cible["instant"], cible["range"]) == (True, False)
+    assert sonde["fieldConfig"]["defaults"]["unit"] == "s"
+    seuil = 4 * periode_de_la_sonde()
+    assert f"{seuil:.0f} s (quatre périodes)" in sonde["description"]
+    assert f"toutes les {periode_de_la_sonde():.0f} s" in sonde["description"]
 
 
 def test_les_etats_de_l_application_sont_en_toutes_lettres():
@@ -357,13 +395,10 @@ def test_les_etats_de_l_application_sont_en_toutes_lettres():
     cible = tous["Cible de l'application"]["fieldConfig"]["defaults"]["mappings"]
     assert textes(cible) == {"en marche", "arrêtée"}
     deps = tous["Dépendances vues de l'application"]["fieldConfig"]
-    assert textes(deps["defaults"]["mappings"]) == {"état à la dernière requête"}
+    assert textes(deps["defaults"]["mappings"]) == {"état courant"}
     (api,) = deps["overrides"]
     assert api["matcher"]["options"] == "C"
-    assert textes(api["properties"][0]["value"]) == {
-        "répondait à la dernière lecture",
-        "ne répondait pas à la dernière lecture",
-    }
+    assert textes(api["properties"][0]["value"]) == {"répond", "ne répond pas"}
     for panneau in tous.values():
         if panneau["type"] == "stat":
             assert panneau["options"]["colorMode"] == "none", panneau["title"]
