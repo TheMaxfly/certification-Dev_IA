@@ -144,7 +144,7 @@ def test_l_application_lit_la_base_par_un_pgpass_monte_et_un_sous_reseau_fixe():
     assert "file: ${APPLICATION_PGPASS:-../12_application/.pgpass.conteneur}" in FUSION
     # Aucune valeur : ni DSN écrit, ni mot de passe.
     assert "postgresql://" not in application
-    assert "image: application-conseiller:0.9.1" in application
+    assert "image: application-conseiller:0.9.2" in application
 
 
 def test_le_pgpass_et_les_fichiers_d_environnement_du_module_sont_ignores():

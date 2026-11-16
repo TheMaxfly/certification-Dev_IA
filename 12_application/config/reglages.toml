@@ -130,6 +130,10 @@ motif = "Le budget du projet : 20 $, fixé à l'ouverture d'E3. La dépense ant�
 adresse_grafana = ""
 motif = "L'adresse du tableau de bord Grafana du module 13 (publié sur le poste, 127.0.0.1:3000 dans la pile) : facultative, vide par défaut — la page des services n'en fait alors pas de lien. Grafana reste l'outil de fond (E5) ; la page des services ne lit que l'instant."
 
+[sonde]
+periode_s = 15.0
+motif = "La sonde des dépendances (E5, lot 1, spec 04) : toutes les 15 s, l'application relit elle-même la base, le catalogue (/health), l'API du modèle (/v1/sante) et le coût du jour, en même temps, qu'il y ait ou non un visiteur. 15 s : au-dessus de la durée d'une passe — 5,0 s mesurées serveur PostgreSQL arrêté le 2026-11-13 (l'API attend sa base 5 s), 10 s au pire par les délais ci-dessus (API : connexion 5 s + santé 5 s ; catalogue 3 s ; base 3 + 3 s) — et égale à l'intervalle de relevé de Prometheus (module 13). L'alerte J du module 13 part quand la dernière passe date de plus de quatre périodes : un test du 13 compare les deux."
+
 [fournisseurs.mistral]
 nom = "Mistral"
 hebergement = "Union européenne"
