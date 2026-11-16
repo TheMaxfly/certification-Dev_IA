@@ -30,6 +30,7 @@ from pathlib import Path
 import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -1007,6 +1008,8 @@ def creer_application(
     pages_listes.installer(app, reglages, rendre, catalogue, metriques)
     pages_admin.installer(app, reglages, rendre, vue, metriques, catalogue)
     pages_apparence.installer(app, reglages, rendre)
+    # E5-24 : les réponses 503 de chaque route, à zéro dès le démarrage.
+    metriques.routes_servies(r.path for r in app.routes if isinstance(r, APIRoute))
 
     app.state.vue = vue
     app.state.metriques = metriques

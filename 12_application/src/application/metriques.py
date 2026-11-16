@@ -51,6 +51,12 @@ ETATS_PLAFOND = ("ok", "atteint", "inconnu")
 ACTIONS_LISTES = ("ajout", "changement", "retrait")
 #: L'issue d'un test des clés demandé par l'administration (E4, lot 5).
 ISSUES_VERIFICATION = ("teste", "route_absente", "trop_tot", "indisponible")
+#: Les routes du catalogue que l'application appelle (`client_catalogue`) et l'issue
+#: d'un appel : deux listes fermées, toutes leurs combinaisons à zéro dès le démarrage.
+ROUTES_CATALOGUE = ("series", "serie", "volumes")
+STATUTS_CATALOGUE = ("ok", "introuvable", "indisponible", "cle", "corps")
+#: Le statut des requêtes que le tableau trace par route (« Réponses 503 »).
+STATUT_TRACE = "503"
 
 
 class Metriques:
@@ -159,8 +165,14 @@ class Metriques:
             " l'effacement).",
             registry=self.registre,
         )
+        # E5-24 : une série créée à son premier événement naît à 1, et `increase()` ne
+        # dessine pas ce premier pas ; les compteurs que le tableau trace existent à
+        # zéro dès le démarrage, pour chaque combinaison de leurs listes fermées.
         for action in ACTIONS_LISTES:
             self.listes.labels(action=action)
+        for route in ROUTES_CATALOGUE:
+            for statut in STATUTS_CATALOGUE:
+                self.catalogue_appels.labels(route_catalogue=route, statut=statut)
         for motif in MOTIFS_REFUS:
             self.quota_refus.labels(motif=motif)
         for mode in MODES_QUESTION:
@@ -205,6 +217,12 @@ class Metriques:
             " première passe. Elle dit que la sonde tourne.",
             registry=self.registre,
         )
+
+    def routes_servies(self, routes: Iterable[str]) -> None:
+        """Les réponses 503 de chaque route de l'application (ses gabarits, liste
+        fermée par le code), à zéro dès le démarrage : la première se voit."""
+        for route in routes:
+            self.requetes.labels(route=route, statut=STATUT_TRACE)
 
     def etat_catalogue(self, etat: str) -> None:
         """Pose l'état du catalogue : 1 sur l'état constaté, 0 sur les autres."""
