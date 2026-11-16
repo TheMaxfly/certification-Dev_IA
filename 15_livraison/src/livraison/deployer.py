@@ -54,6 +54,12 @@ PHRASE_RESTES = (
     " retirez-la d'abord (livrer arreter --cible {autre})"
 )
 PHRASE_RETOUR = "proposer un retour arrière à Max (livrer retour), jamais sans lui"
+#: `livrer etat`, une cible qui ne tourne pas mais a laissé des conteneurs ou des
+#: réseaux (après une extinction du poste) : l'état, et le geste qui la retire.
+PHRASE_NON_RETIREE = (
+    "arrêtée, non retirée ({conteneurs} conteneurs arrêtés, {reseaux} réseaux) ;"
+    " retirez-la : livrer arreter --cible {nom}"
+)
 NON_RELEVE_APRES = "non relevé (aucun relevé de l'API postérieur au lever)"
 PROGRAMME_METRIQUES = """
 import json, urllib.request as u
@@ -502,16 +508,30 @@ def arreter(o: Outils, nom: str, *, relire: Relecture | None = None) -> Code:
     return Code.OK if not (apres_c or apres_r) else Code.DEPLOIEMENT
 
 
+def etat_de(o: Outils, cible: Cible) -> tuple[str, list[str]]:
+    """Trois états : en marche ; arrêtée et retirée ; arrêtée, non retirée — des
+    conteneurs arrêtés ou des réseaux restent (l'extinction du poste les laisse), avec
+    le geste qui la retire. Rend aussi les conteneurs en marche."""
+    tournent = en_marche(o, cible.projet)
+    if tournent:
+        return f"en marche, {len(tournent)} conteneurs", tournent
+    conteneurs, reseaux = restes(o, cible.projet)
+    if conteneurs or reseaux:
+        texte = PHRASE_NON_RETIREE.format(
+            conteneurs=len(conteneurs), reseaux=len(reseaux), nom=cible.nom
+        )
+        return texte, tournent
+    return "arrêtée et retirée", tournent
+
+
 def etat(o: Outils) -> Code:
-    """Les deux cibles : en marche ou non, les images servies, le dernier journal."""
+    """Les deux cibles : leur état (en marche ; arrêtée et retirée ; arrêtée, non
+    retirée, avec le geste), les images servies, le dernier journal."""
     for nom in cibles.NOMS:
         cible = cibles.lire(nom)
-        tournent = en_marche(o, cible.projet)
+        texte, tournent = etat_de(o, cible)
         dernier = journal.dernier(o, nom)
-        o.afficher(
-            f"{nom} ({cible.projet}) : "
-            + (f"en marche, {len(tournent)} conteneurs" if tournent else "arrêtée")
-        )
+        o.afficher(f"{nom} ({cible.projet}) : {texte}")
         if tournent:
             o.afficher(f"  servies : {servies_texte(o, cible)}")
         o.afficher(f"  dernier journal : {dernier.name if dernier else '—'}")
