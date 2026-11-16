@@ -15,7 +15,9 @@
   },
   "loggers": {
     "uvicorn": {
-      "handlers": ["sortie"],
+      "handlers": [
+        "sortie"
+      ],
       "level": "INFO",
       "propagate": false
     },
@@ -23,13 +25,15 @@
       "level": "INFO"
     },
     "uvicorn.access": {
-      "handlers": ["sortie"],
-      "level": "INFO",
+      "handlers": [],
+      "level": "WARNING",
       "propagate": false
     }
   },
   "root": {
-    "handlers": ["sortie"],
+    "handlers": [
+      "sortie"
+    ],
     "level": "INFO"
   }
 }
