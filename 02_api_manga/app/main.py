@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 
 from . import API_VERSION, recherche, resumes
 from .database import create_pool, get_pool
-from .journal import FormatJson
+from .journal import FormatJson, JournalDesRequetes, SuiviDeLaBase
 from .security import api_key_header, require_api_key
 from .settings import RESUME_MIN_DEFAUT, SEUIL_RESSEMBLANCE_DEFAUT, Settings
 
@@ -736,6 +736,12 @@ def normalisation_courante(
     return normalisation_de(request.app, pool)
 
 
+def suivi_de_la_base(request: Request) -> SuiviDeLaBase:
+    """L'état de la base vu par `/health`, propre à l'application (E5, spec 04 bis)."""
+    suivi: SuiviDeLaBase = request.app.state.suivi_base
+    return suivi
+
+
 def reglage_recherche(request: Request, pool: PoolDependency) -> ReglageRecherche:
     settings: Settings = request.app.state.settings
     return ReglageRecherche(
@@ -775,19 +781,27 @@ def health(
     normalisation: Annotated[
         recherche.Normalisation | None, Depends(normalisation_courante)
     ] = None,
+    suivi: Annotated[SuiviDeLaBase | None, Depends(suivi_de_la_base)] = None,
 ) -> ReadinessResponse | JSONResponse:
-    """Vérifie que l'API répond et que PostgreSQL accepte une requête."""
+    """Vérifie que l'API répond et que PostgreSQL accepte une requête.
+
+    Le journal ne se remplit pas des lectures de santé (E5, spec 04 bis) : la base
+    perdue s'écrit quand elle tombe, avec sa trace, et quand elle revient — pas à
+    chaque lecture. Sans suivi (un appel direct), chaque échec s'écrit."""
     try:
         with pool.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
                 cur.fetchone()
     except DATABASE_ERRORS:
-        LOGGER.warning("PostgreSQL health check failed", exc_info=True)
+        if suivi is None or suivi.echec():
+            LOGGER.warning("PostgreSQL health check failed", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"status": "degraded", "db": "error"},
         )
+    if suivi is not None and suivi.retour():
+        LOGGER.info("PostgreSQL health check: database reachable again")
     return ReadinessResponse(status="ok", db="ok", normalisation=normalisation)
 
 
@@ -1928,6 +1942,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     api.state.settings = resolved_settings
+    api.state.suivi_base = SuiviDeLaBase()
+    # La ligne de requête du 02, à la place du journal d'accès d'uvicorn (E5, 04 bis).
+    api.add_middleware(JournalDesRequetes)
     api.include_router(router)
     return api
 
