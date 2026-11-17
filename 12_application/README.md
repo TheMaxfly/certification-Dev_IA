@@ -36,6 +36,9 @@ navigateur → application (127.0.0.1:8020) → API du modèle (X-API-Key de l'a
                                              └→ fournisseur du profil
 ```
 
+Les schémas de conception de l'épreuve E4 (architecture technique, flux de données, cas
+d'utilisation, parcours utilisateurs), en SVG et en PDF : [`conception/`](conception/README.md).
+
 Ce que l'application ne voit jamais : la base, les clés des fournisseurs, la liste des
 pseudonymes (l'API contrôle ses sorties ; l'application n'affiche que ce qu'elle rend, et
 aucun chemin ne la contourne). Un passage reste, lui, tel qu'il est au corpus : voir « Le mode
