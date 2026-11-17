@@ -4,3 +4,6 @@
 # couvert par l'exclusion locale.
 docs/RAPPORT_COUVERTURE_CASCADE.md
 docs/REGISTRE_TRAITEMENTS_C4.md
+docs/incidents/README.md
+docs/incidents/2026-11-13_panne_de_base_non_detectee.md
+docs/incidents/2026-11-11_sante_rouge_a_tort.md
