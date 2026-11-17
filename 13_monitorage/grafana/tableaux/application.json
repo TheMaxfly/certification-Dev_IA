@@ -1,13 +1,13 @@
 {
   "uid": "application",
   "title": "Application",
-  "description": "L'application du libraire vue d'elle-même : sa cible, ses dépendances telles qu'elle les a vues, ses refus, ce que coûte le conseiller, ce que font les comptes. E5.",
+  "description": "L'application du libraire vue d'elle-même : sa cible, l'état courant de ses dépendances (relues par sa sonde toutes les 15 s), ses refus, ce que coûte le conseiller, ce que font les comptes. E5.",
   "tags": [
     "monitorage",
     "application"
   ],
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "graphTooltip": 1,
   "refresh": "15s",
@@ -158,7 +158,7 @@
     {
       "type": "stat",
       "title": "Dépendances vues de l'application",
-      "description": "Ce qu'il montre : la base des comptes, le catalogue et l'API du modèle, tels que l'application les a vus. Chaque jauge est l'état à la dernière requête qui a touché la dépendance : elle ne se relit pas seule ; sans requête, elle garde l'état d'avant, même si la dépendance est tombée depuis. Normal : base ok, catalogue ok, API du modèle qui répondait. Si la base ou le catalogue est indisponible : les alertes F et G partent après une minute ; vérifier la dépendance par livrer sante, puis la page des services de l'administration.",
+      "description": "Ce qu'il montre : l'état courant de la base des comptes, du catalogue et de l'API du modèle, vus de l'application — une seule valeur par dépendance. Les jauges sont relues par la sonde de l'application à chaque période (15 s), qu'il y ait ou non un visiteur, et par chaque requête qui touche la dépendance. Normal : base ok, catalogue ok, API du modèle qui répond. Si la base ou le catalogue est indisponible : les alertes F et G partent après une minute ; si l'API ne répond plus à /v1/sante : l'alerte I ; vérifier la dépendance par livrer sante, puis la page des services de l'administration. Si le panneau « Sonde des dépendances » vieillit, ces états ne sont plus relus : l'alerte J.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -173,8 +173,8 @@
           "expr": "application_base_etat == 1",
           "legendFormat": "base des comptes : {{etat}}",
           "editorMode": "code",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         },
         {
           "refId": "B",
@@ -185,8 +185,8 @@
           "expr": "application_catalogue_etat == 1",
           "legendFormat": "catalogue : {{etat}}",
           "editorMode": "code",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         },
         {
           "refId": "C",
@@ -197,8 +197,8 @@
           "expr": "application_api_sante_ok",
           "legendFormat": "API du modèle (/v1/sante)",
           "editorMode": "code",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -208,7 +208,7 @@
               "type": "value",
               "options": {
                 "1": {
-                  "text": "état à la dernière requête",
+                  "text": "état courant",
                   "index": 0
                 }
               }
@@ -235,11 +235,11 @@
                     "type": "value",
                     "options": {
                       "1": {
-                        "text": "répondait à la dernière lecture",
+                        "text": "répond",
                         "index": 0
                       },
                       "0": {
-                        "text": "ne répondait pas à la dernière lecture",
+                        "text": "ne répond pas",
                         "index": 1
                       }
                     }
@@ -261,6 +261,10 @@
           ],
           "fields": "",
           "values": false
+        },
+        "text": {
+          "titleSize": 16,
+          "valueSize": 22
         }
       },
       "id": 2,
@@ -274,7 +278,7 @@
     {
       "type": "timeseries",
       "title": "Réponses 503 de l'application",
-      "description": "Ce qu'il montre : les réponses 503 servies par l'application, par route, sur l'intervalle choisi. Normal : aucune. Si elles montent sur les comptes et l'administration : la base des comptes est indisponible — le conseiller, lui, continue en visiteur ; sur une autre route : lire le journal de l'application.",
+      "description": "Ce qu'il montre : les réponses 503 servies par l'application, par route, sur l'intervalle choisi ; chaque route part de zéro au démarrage, la première 503 se voit. Normal : aucune. Si elles montent sur les comptes et l'administration : la base des comptes est indisponible — seule, le conseiller continue en visiteur ; si c'est le serveur PostgreSQL, l'API du modèle et le catalogue tombent avec, et seul l'accueil reste servi ; sur une autre route : lire le journal de l'application.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -433,7 +437,7 @@
     {
       "type": "timeseries",
       "title": "Coût du jour et plafond",
-      "description": "Ce qu'il montre : le coût estimé du jour (UTC) à sa dernière lecture — relu avant chaque question, il ne bouge qu'au passage d'une question —, le plafond du jour et le seuil de l'alerte H, tracés et nommés ; l'état du plafond (ok, atteint, inconnu) en points, axe de droite. Normal : quelques centimes, plafond ok. Au-dessus du seuil : l'alerte H part, vérifier le trafic du conseiller. Plafond atteint : le conseiller refuse jusqu'à minuit UTC ; inconnu : la base est indisponible, le plafond n'est pas vérifiable.",
+      "description": "Ce qu'il montre : le coût estimé du jour (UTC) à sa dernière lecture — relu avant chaque question et par la sonde de l'application toutes les 15 s —, le plafond du jour et le seuil de l'alerte H, tracés et nommés ; l'état du plafond (ok, atteint, inconnu) en points, axe de droite. Normal : quelques centimes, plafond ok. Au-dessus du seuil : l'alerte H part, vérifier le trafic du conseiller. Plafond atteint : le conseiller refuse jusqu'à minuit UTC ; inconnu : la base est indisponible, le plafond n'est pas vérifiable.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -676,7 +680,7 @@
     {
       "type": "timeseries",
       "title": "Appels au catalogue par route et statut",
-      "description": "Ce qu'il montre : les appels de l'application au catalogue (l'API data), par route et issue : ok, introuvable, indisponible, cle (clé refusée), corps (hors contrat), sur l'intervalle. Normal : ok, quelques introuvables. Si indisponible monte : le catalogue ne répond plus, l'alerte G part ; si cle : la clé du catalogue a changé.",
+      "description": "Ce qu'il montre : les appels de l'application au catalogue (l'API data), par route et issue : ok, introuvable, indisponible, cle (clé refusée), corps (hors contrat), sur l'intervalle ; chaque route et chaque issue partent de zéro au démarrage. La sonde lit /health sans compter d'appel. Normal : ok, quelques introuvables. Si indisponible monte : le catalogue ne répond plus, l'alerte G part ; si cle : la clé du catalogue a changé.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -729,7 +733,7 @@
     {
       "type": "timeseries",
       "title": "Appels à l'API du modèle vus de l'application",
-      "description": "Ce qu'il montre : les appels de l'application à l'API du modèle, par route de l'API et statut, sur l'intervalle. Normal : 200. Si d'autres statuts montent : lire les erreurs vues de l'application sur le tableau Service, puis /v1/sante.",
+      "description": "Ce qu'il montre : les appels de l'application à l'API du modèle, par route de l'API et statut, sur l'intervalle ; les lectures de /v1/sante par la sonde de l'application y comptent, quatre par minute. Normal : 200. Si d'autres statuts montent : lire les erreurs vues de l'application sur le tableau Service, puis /v1/sante.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -859,7 +863,7 @@
     {
       "type": "stat",
       "title": "Profil actif et tests des clés",
-      "description": "Ce qu'il montre : le profil qui part avec une question sans choix, et les tests des clés demandés par l'administration sur la période affichée, par issue. Normal : le profil réglé ; des tests « teste ». Si trop_tot ou indisponible : attendre une minute entre deux tests, ou lire /v1/sante.",
+      "description": "Ce qu'il montre : le profil qui part avec une question sans choix, à la dernière lecture du réglage (chaque page) — un seul profil, l'état courant —, et les tests des clés demandés par l'administration sur la période affichée, par issue. Normal : le profil réglé ; des tests « teste ». Si trop_tot ou indisponible : attendre une minute entre deux tests, ou lire /v1/sante.",
       "datasource": {
         "type": "prometheus",
         "uid": "${source}"
@@ -874,8 +878,8 @@
           "expr": "application_profil_actif_info{profil=~\"$profil\"} == 1",
           "legendFormat": "profil actif : {{profil}}",
           "editorMode": "code",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         },
         {
           "refId": "B",
@@ -944,6 +948,62 @@
         "y": 24,
         "w": 8,
         "h": 8
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Sonde des dépendances",
+      "description": "Ce qu'il montre : l'âge de la dernière passe de la sonde de l'application, qui relit la base, le catalogue, l'API du modèle et le coût du jour toutes les 15 s, qu'il y ait ou non un visiteur. Normal : moins de 30 s. Au-delà de 60 s (quatre périodes) : l'alerte J part, les états du panneau « Dépendances » ne sont plus relus ; lire le journal de l'application (sonde_passe_en_echec, dependance_etat), puis la relever par livrer.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${source}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${source}"
+          },
+          "expr": "time() - application_sonde_derniere_passe_timestamp",
+          "legendFormat": "âge de la dernière passe",
+          "editorMode": "code",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "s",
+          "decimals": 0,
+          "noValue": "aucune donnée",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
       }
     }
   ]

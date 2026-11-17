@@ -18,8 +18,10 @@ et les passages cités.
 - **E4, lot 1 (le socle)** : une base à elle (schéma `application`, migration `027`, rôle
   `app_rw` seul) ; mots de passe hachés par Argon2id ; sessions signées, le compte relu en
   base à chaque requête ; jeton CSRF sur chaque formulaire `POST` ; verrou après des
-  échecs ; garde par rôle ; garde d'environnement. Sans base configurée, ou base
-  injoignable, le conseiller fonctionne comme avant.
+  échecs ; garde par rôle ; garde d'environnement. Sans base configurée, ou la base des
+  comptes seule injoignable, le conseiller fonctionne comme avant. **Le serveur PostgreSQL
+  arrêté, seul l'accueil reste servi** : l'API du modèle et le catalogue, qui le lisent
+  aussi, tombent avec (mesuré en staging le 2026-11-13).
 
 C'est le tronc de l'application de l'épreuve E4 : même module, même pile. Le dossier
 `schema/` décrit son modèle de données, le schéma `application` de la base (migration
@@ -94,12 +96,41 @@ le gabarit de la route, `statique` pour les feuilles de style, `inconnue` pour l
 `application_api_erreurs_total{code}` : une liste fermée, `corps_inattendu` hors d'elle.
 **Deux jauges pour l'état de l'API** : `application_api_info_etat{etat}` (`ok`, `ko`, `cle` : la
 clé est refusée), lue au démarrage et à chaque page ; `application_api_sante_ok`, lue au
-démarrage et à chaque `/sante`. Aucune ne se relit seule : une panne de l'API se lit sur la
-cible de Prometheus. **Le catalogue** (E4, lot 2a) :
-`application_catalogue_appels_total{route_catalogue, statut}` (routes `series`, `serie` ;
-issues `ok`, `introuvable`, `indisponible`, `cle`, `corps`) et la jauge
-`application_catalogue_etat{etat}` (`ok`, `indisponible`, `non_configure`, `cle`), posée à
-chaque appel.
+démarrage, à chaque `/sante` **et par la sonde des dépendances** (ci-dessous). **Le
+catalogue** (E4, lot 2a) : `application_catalogue_appels_total{route_catalogue, statut}`
+(routes `series`, `serie`, `volumes` ; issues `ok`, `introuvable`, `indisponible`, `cle`,
+`corps`) et la jauge `application_catalogue_etat{etat}` (`ok`, `indisponible`,
+`non_configure`, `cle`), posée à chaque appel et par la sonde. **Les compteurs que le
+tableau trace existent à zéro dès le démarrage** (E5, lot 1) : les réponses 503 de chaque
+gabarit de route, les quinze combinaisons route × issue du catalogue — comme les questions
+et les refus ; une série créée à son premier événement naîtrait à 1, et Prometheus ne
+dessinerait pas ce premier pas.
+
+### La sonde des dépendances (E5, lot 1, 0.9.2)
+
+L'application relit elle-même, à intervalle régulier, l'état de ce dont elle dépend — qu'il y
+ait ou non un visiteur. Le défaut corrigé, mesuré en staging le 2026-11-13 : l'état d'une
+dépendance n'était relu qu'au passage d'une requête ; serveur PostgreSQL arrêté, aucune jauge
+n'a bougé pendant 4 min 08 s, aucune alerte n'est partie ; revenu, les jauges sont restées à
+`indisponible` 4 min 15 s.
+
+- **La période** : `[sonde] periode_s = 15.0` (`config/reglages.toml`, avec son motif) — au-dessus
+  de la durée d'une passe (5,0 s mesurées serveur arrêté, 10 s au pire par les délais), égale à
+  l'intervalle de relevé de Prometheus. L'alerte J du module 13 en dérive son seuil (quatre
+  périodes) : un test du 13 compare les deux.
+- **Une passe** lit **en même temps**, chacune sous son délai existant : la base (`SELECT 1`), le
+  coût du jour (la lecture du plafond), le catalogue (`GET /health`, sans clé, aucun appel compté ;
+  l'état `cle`, que `/health` ne lit pas, reste celui du dernier appel), l'API du modèle (`GET
+  /v1/sante`, compté comme tout appel). Chaque lecture pose la jauge qu'elle posait déjà ; ce qui
+  n'est pas configuré n'est pas lu (`non_configuree`, `non_configure`).
+- **Deux passes ne se chevauchent jamais** ; une lecture qui échoue n'empêche pas les autres ; une
+  exception n'arrête pas la tâche (`sonde_passe_en_echec`, par son type). La première passe vient
+  une période après le lancement ; la tâche s'arrête avec l'application.
+- **`application_sonde_derniere_passe_timestamp`** : l'heure de la dernière passe terminée, posée au
+  lancement — elle dit que la sonde tourne (alerte J).
+- **Le journal ne s'emballe pas** : un événement `dependance_etat` (la dépendance, l'état d'avant,
+  l'état constaté) par changement d'état, jamais par passe.
+- `/sante` lit toujours en direct ; le plafond non vérifiable laisse toujours partir la question.
 
 ### L'en-tête (E4, lot 7)
 
@@ -789,8 +820,9 @@ l'empreinte exacte.
   10 connexions au plus pour le rôle) ; délai borné (`[comptes] delai_base_s`) pour se
   connecter, pour une instruction et pour attendre un verrou. DSN **sans mot de passe**
   (`~/.pgpass` sur le poste, un fichier monté dans un conteneur) : un DSN qui en porte un
-  empêche de démarrer. Base absente ou injoignable : les pages de compte disent 503,
-  le conseiller fonctionne ; `/sante` et la métrique `application_base_etat` disent son
+  empêche de démarrer. Base des comptes absente ou injoignable : les pages de compte
+  disent 503, le conseiller fonctionne ; le serveur PostgreSQL arrêté, seul l'accueil reste
+  servi. `/sante` et la métrique `application_base_etat`, relue par la sonde, disent son
   état, sans détail.
 - **Les mots de passe** : **Argon2id**, par `argon2-cffi` directement, aux paramètres par
   défaut de la bibliothèque, relevés le 2026-11-08 (argon2-cffi 25.1.0) : **temps 3, mémoire
@@ -1110,3 +1142,10 @@ fixe vers la base (« Par Compose », ci-dessus) ; **déployée en production le
 staging sur la préproduction, par `make livrer` (`15_livraison/`). À venir : l'entrée des
 critiques de libraires dans le corpus ; le masquage à l'affichage des mentions de membres
 connues du corpus ; le serveur (procédure écrite au module 15, non jouée).
+
+## Ce que l'épreuve E5 ajoute
+
+**Lot 1 (le monitorage, 0.9.2)** : la sonde des dépendances (ci-dessus), le correctif de
+l'incident mesuré en staging le 2026-11-13 — un test le rejoue sans requête et échouait sur la
+0.9.1 ; les compteurs tracés à zéro dès le démarrage. Le tableau « Application » et ses alertes
+sont au module 13.

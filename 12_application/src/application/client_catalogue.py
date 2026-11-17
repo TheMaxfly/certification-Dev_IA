@@ -3,8 +3,10 @@
 
 Trois appels de données, `rechercher(q, page)` (`GET /series`), `serie(series_id)`
 (`GET /series/{series_id}`, 404 → None) et `volumes(series_id)` (`GET
-/series/{series_id}/volumes`, toutes les pages, 404 → None ; E4, lot 3), et une sonde,
-`sante()` (`GET /live`, sans clé).
+/series/{series_id}/volumes`, toutes les pages, 404 → None ; E4, lot 3), et trois
+lectures sans clé : `sante()` (`GET /live`, le processus), `etat()` (`GET /health`, le
+catalogue et sa base) et `sonder()`, la lecture de la sonde des dépendances (E5, lot 1,
+spec 04) : `/health`, qui pose la jauge d'état sans compter d'appel.
 Les formes ci-dessous ne retiennent que ce que l'application emploie : un champ de plus
 de l'API est ignoré. L'application n'appelle **jamais** `/series/{id}/reviews` : les
 critiques collectées portent des pseudonymes de lecteurs.
@@ -220,6 +222,8 @@ class ClientCatalogue:
         self._http = httpx.AsyncClient(
             base_url=adresse, transport=transport, follow_redirects=False
         )
+        #: Le dernier état posé sur la jauge, par un appel ou par la sonde.
+        self.dernier_etat = "inconnu"
 
     def __repr__(self) -> str:
         return f"ClientCatalogue(adresse={self.adresse!r})"
@@ -231,6 +235,10 @@ class ClientCatalogue:
         self._metriques.catalogue_appels.labels(
             route_catalogue=route, statut=statut
         ).inc()
+        self._etat(etat)
+
+    def _etat(self, etat: str) -> None:
+        self.dernier_etat = etat
         self._metriques.etat_catalogue(etat)
 
     async def _appeler(
@@ -350,6 +358,20 @@ class ClientCatalogue:
         except ValidationError:
             return None
         return EtatCatalogue(reponse.status_code == 200, lu.normalisation)
+
+    async def sonder(self) -> str:
+        """La lecture de la sonde : `/health` (le catalogue et sa base), sans clé,
+        borné par le délai de connexion, aucun appel compté. 200 : `ok` — sauf si le
+        dernier appel a vu la clé refusée (`cle`), que `/health` ne lit pas : l'état
+        reste `cle` jusqu'au prochain appel. 503, injoignable, hors contrat :
+        `indisponible`."""
+        lu = await self.etat()
+        if lu is None or not lu.ok:
+            constate = "indisponible"
+        else:
+            constate = "cle" if self.dernier_etat == "cle" else "ok"
+        self._etat(constate)
+        return constate
 
     async def sante(self) -> bool:
         """`GET /live`, sans clé, délai court : le catalogue vit-il ?"""

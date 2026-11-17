@@ -1,0 +1,8 @@
+id = "E5V-08"
+origine = "E5, lot 1, spec 04 (2026-11-16) — la sonde ne relit pas la base (ni le coût du jour, qui la lit aussi) : serveur arrêté, la jauge de la base garde l'état d'avant"
+fichier = "12_application/src/application/app.py"
+avant = '''        lectures["base"] = base.sonder
+        lectures["cout_du_jour"] = lire_plafond'''
+apres = '''        pass'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sonde.py", "tests/test_sonde_incident.py", "-k", "base_arretee or n_est_pas_configure"]

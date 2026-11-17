@@ -259,10 +259,38 @@ def test_etat(o: Outils, ecran):
     deployer.deployer(o, "production")
     ecran.clear()
     assert deployer.etat(o) == Code.OK
-    assert ecran[0] == "staging (senpai-staging) : arrêtée"
+    assert ecran[0] == "staging (senpai-staging) : arrêtée et retirée"
     assert ecran[2].startswith("production (api-modele) : en marche, 4 conteneurs")
     assert "application application-conseiller:0.9.1" in ecran[3]
     assert ecran[4].endswith("_production_e4-livraison.md")
+
+
+def test_etat_d_une_cible_eteinte_avec_le_poste_dit_le_geste(
+    o: Outils, poste: Poste, ecran
+):
+    """Après une extinction du poste : la production ne tourne plus, ses conteneurs et
+    ses réseaux restent. `livrer etat` le dit, et nomme le geste qui la retire."""
+    poste.arretes = {"api-modele": list(poste.en_marche.pop("api-modele"))}
+    assert deployer.etat(o) == Code.OK
+    (ligne,) = [e for e in ecran if e.startswith("production (api-modele) : ")]
+    assert ligne == (
+        "production (api-modele) : arrêtée, non retirée (4 conteneurs arrêtés, 9"
+        " réseaux) ; retirez-la : livrer arreter --cible production"
+    )
+
+
+def test_etat_des_reseaux_seuls_restent(o: Outils, poste: Poste, ecran):
+    poste.en_marche = {}
+    assert deployer.etat(o) == Code.OK
+    assert any(
+        e.startswith("production (api-modele) : arrêtée, non retirée (0 conteneurs")
+        and "9 réseaux" in e
+        for e in ecran
+    )
+    poste.reseaux = {}
+    ecran.clear()
+    deployer.etat(o)
+    assert "production (api-modele) : arrêtée et retirée" in ecran
 
 
 def test_docker_qui_ne_repond_pas(o: Outils):

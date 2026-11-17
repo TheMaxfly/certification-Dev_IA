@@ -183,14 +183,34 @@ Une clé compromise se révoque en la retirant d'`API_KEYS` et en redémarrant.
 
 ### Ce que le journal consigne
 
+**Ce que le journal garde, et ce qu'il ne garde pas** (0.7.2) : une ligne par
+requête servie — la méthode, le chemin sans sa chaîne de requête, le statut, la
+durée — ; les autorisations, par le libellé du consommateur ; une base perdue,
+quand elle tombe et quand elle revient. **Il ne garde ni le texte d'une recherche,
+ni l'adresse de l'appelant, ni une clé** ; les lectures de santé (`/health`,
+`/live`) qui répondent normalement ne s'y écrivent pas.
+
+**Une ligne JSON par événement**, dans la forme de l'API du modèle et de
+l'application : `horodatage` (UTC), `niveau`, `evenement` (le message), les champs
+de l'événement (`methode`, `chemin`, `statut`, `duree_ms` pour une requête), et
+`trace` quand une exception l'accompagne, sur la même ligne. Le Dockerfile passe
+`app/journalisation.json` à uvicorn (`--log-config`) et coupe son journal d'accès
+(`--no-access-log`), que la ligne de requête remplace ; son démarrage et ses erreurs
+sortent au même format ; lancé sans configuration, le module pose le même formateur
+sur sa racine.
+
+```
+{"horodatage": "…", "niveau": "INFO", "evenement": "requete", "methode": "GET", "chemin": "/series", "statut": 200, "duree_ms": 116}
+```
+
 Le journal **ne contient jamais de clé** — ni valide, ni rejetée. Une clé
 rejetée reste une clé : la journaliser la publierait à quiconque lit les
 journaux. Il porte le libellé du consommateur, ou rien :
 
 ```
-INFO  app.security: appel autorisé sur /rag/export/composition, consommateur « app_backend »
-WARN  app.security: appel refusé sur /rag/export/composition : clé d'API inconnue
-WARN  app.security: appel refusé sur /rag/export : en-tête X-API-Key absent
+{"horodatage": "…", "niveau": "INFO", "evenement": "appel autorisé sur /rag/export/composition, consommateur « app_backend »"}
+{"horodatage": "…", "niveau": "WARNING", "evenement": "appel refusé sur /rag/export/composition : clé d'API inconnue"}
+{"horodatage": "…", "niveau": "WARNING", "evenement": "appel refusé sur /rag/export : en-tête X-API-Key absent"}
 ```
 
 Le journal distingue les deux causes de refus ; **la réponse HTTP, non**. Les

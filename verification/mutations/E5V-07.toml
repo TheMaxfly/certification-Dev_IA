@@ -1,0 +1,7 @@
+id = "E5V-07"
+origine = "E5, lot 1, spec 04 (2026-11-16) — la tâche de fond de la sonde n'est pas lancée : sans visiteur, aucune jauge ne suit plus une dépendance (l'incident du 13 novembre)"
+fichier = "12_application/src/application/app.py"
+avant = '''        sonde.lancer()'''
+apres = '''        pass'''
+dossier = "12_application"
+commande = ["uv", "run", "--locked", "--extra", "dev", "pytest", "-q", "-x", "-p", "no:cacheprovider", "tests/test_sonde.py", "tests/test_sonde_incident.py", "-k", "tourne_avec_l_application or api_degradee"]

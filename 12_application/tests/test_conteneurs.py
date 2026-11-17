@@ -68,7 +68,7 @@ def test_le_catalogue_lit_la_base_par_un_pgpass_monte_jamais_par_un_mot_de_passe
     assert 'user: "${HOTE_UID:-1000}:${HOTE_GID:-1000}"' in catalogue
     # Le secret désigne un fichier hors dépôt, nommé par une variable surchargeable.
     assert "file: ${CATALOGUE_PGPASS:-../02_api_manga/.pgpass.conteneur}" in FUSION
-    assert "image: api-catalogue:0.7.0" in catalogue
+    assert "image: api-catalogue:0.7.2" in catalogue
 
 
 def test_le_catalogue_sort_vers_la_base_par_un_sous_reseau_fixe():
@@ -144,7 +144,7 @@ def test_l_application_lit_la_base_par_un_pgpass_monte_et_un_sous_reseau_fixe():
     assert "file: ${APPLICATION_PGPASS:-../12_application/.pgpass.conteneur}" in FUSION
     # Aucune valeur : ni DSN écrit, ni mot de passe.
     assert "postgresql://" not in application
-    assert "image: application-conseiller:0.9.1" in application
+    assert "image: application-conseiller:0.9.2" in application
 
 
 def test_le_pgpass_et_les_fichiers_d_environnement_du_module_sont_ignores():

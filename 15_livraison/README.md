@@ -12,7 +12,8 @@ make livrer ACTION=deployer CIBLE=staging          # A_BLANC=1 : ce qui serait f
 make livrer ACTION=sante    CIBLE=production       # ETIQUETTE=… : la référence jugée
 make livrer ACTION=retour   CIBLE=production VERS=chaine-livraison MOTIF="…"
 make livrer ACTION=arreter  CIBLE=staging
-make livrer-etat                                   # les deux cibles
+make livrer-etat                                   # les deux cibles : en marche ; arrêtée et retirée ;
+                                                   # arrêtée, non retirée (le geste qui la retire)
 ```
 
 Codes de sortie : `0` fait et vert ; `1` déployé mais un contrôle de santé manque ; `20`

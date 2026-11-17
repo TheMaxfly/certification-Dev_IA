@@ -1,4 +1,4 @@
-# Les quatre alertes, évaluées par Grafana toutes les 30 s. Les seuils et les durées sont
+# Les dix alertes, évaluées par Grafana toutes les 30 s. Les seuils et les durées sont
 # écrits une fois, ici, avec leur motif. Un essai qui les change les remet, et le dit.
 #
 # A : `up` sans `== 0`, le seuil porté par Grafana : `== 0` rendrait un vecteur vide en
@@ -19,16 +19,26 @@
 #     `== 0`. Une minute, provisoire : celle de A, avec son motif ; la séance de pannes en
 #     staging (E5, spec 03) mesure le délai de détection réel. Sans donnée : Alerting.
 # F : la jauge `application_base_etat{etat="indisponible"}` au-dessus de 0 (elle vaut 1 quand
-#     l'état est constaté) : les comptes et l'administration rendent 503, le conseiller
-#     continue en visiteur. Une minute, provisoire, comme E. Sans donnée : OK, E couvre
-#     l'absence. Cette jauge ne se relit qu'au passage d'une requête qui touche la base :
-#     c'est connu, et c'est ce que la séance de pannes mesure.
+#     l'état est constaté) : les comptes et l'administration rendent 503 ; serveur
+#     PostgreSQL arrêté, l'API du modèle et le catalogue tombent avec. Une minute : la
+#     séance de pannes du 13 novembre l'a confirmée (notification 105 à 136 s après la
+#     jauge). Sans donnée : OK, E couvre l'absence. Depuis la 0.9.2 de l'application
+#     (spec 04), la jauge est relue par sa sonde toutes les 15 s, sans attendre un
+#     visiteur : le 13 novembre, elle ne l'était qu'au passage d'une requête.
 # G : la même règle pour `application_catalogue_etat{etat="indisponible"}` : la recherche et
-#     les fiches ne répondent plus. Une minute, provisoire. Sans donnée : OK. Même limite.
+#     les fiches ne répondent plus. Une minute. Sans donnée : OK. Relue par la sonde.
 # H : `application_cout_jour_usd` au-dessus de 80 % du plafond du jour (`cout_jour_max_usd`
 #     de reglages.toml du 12 : 0,40 $ pour 0,50 $ ; un test compare les deux) : prévenir
 #     avant le refus. Aucune durée : le coût ne redescend pas dans la journée. Sans donnée :
-#     OK, la jauge ne se pose qu'à la première question.
+#     OK. Relu par la sonde toutes les 15 s, plus seulement avant une question.
+# I : `application_api_sante_ok` sous 1 pendant une minute : l'API du modèle ne répond plus
+#     à /v1/sante pour l'application. Le 13 novembre, serveur arrêté, l'API restait une
+#     cible `up` (A muette) et ne cherchait plus. Relue par la sonde. Sans donnée : OK.
+# J : la dernière passe de la sonde (`application_sonde_derniere_passe_timestamp`) date de
+#     plus de quatre périodes : 60 s pour `[sonde] periode_s = 15` de reglages.toml du 12
+#     (un test compare les deux, comme pour H). En marche, l'âge lu reste sous 30 s (une
+#     période et un relevé de Prometheus). Aucune durée : le seuil la porte. Sans donnée :
+#     OK, E couvre l'absence ; la jauge est posée au lancement de la sonde.
 apiVersion: 1
 groups:
   - orgId: 1
@@ -256,7 +266,7 @@ groups:
         labels:
           severite: critique
         annotations:
-          summary: "La base des comptes est indisponible pour l'application depuis une minute : les comptes et l'administration rendent 503, le conseiller continue en visiteur. Vérifier PostgreSQL, puis livrer sante."
+          summary: "La base des comptes est indisponible pour l'application depuis une minute : les comptes et l'administration rendent 503. Si c'est le serveur PostgreSQL, l'API du modèle et le catalogue tombent avec : seul l'accueil reste servi. Vérifier PostgreSQL, puis livrer sante."
       - uid: alerte-g-catalogue
         title: "G — catalogue indisponible"
         condition: C
@@ -329,3 +339,75 @@ groups:
           severite: attention
         annotations:
           summary: "Le coût du jour du conseiller dépasse 0,40 $, 80 % du plafond de 0,50 $ : il refusera les questions au plafond, jusqu'à minuit UTC. Vérifier le trafic sur le tableau Application."
+      - uid: alerte-i-api-application
+        title: "I — API du modèle dégradée vue de l'application"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'application_api_sante_ok'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [1]}
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "L'API du modèle ne répond plus à /v1/sante pour l'application depuis une minute : elle peut rester relevée par Prometheus (A muette) sans pouvoir chercher, et le conseiller ne répond plus. Vérifier /v1/sante de l'API et PostgreSQL, puis livrer sante."
+      - uid: alerte-j-sonde
+        title: "J — la sonde de l'application ne tourne plus"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'time() - application_sonde_derniere_passe_timestamp'
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange: {from: 0, to: 0}
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [60]}
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severite: critique
+        annotations:
+          summary: "La sonde des dépendances de l'application n'a plus terminé de passe depuis plus de 60 s, quatre périodes de 15 s : la base, le catalogue, l'API et le coût du jour ne sont plus relus, F, G, H et I peuvent se taire à tort. Lire le journal de l'application (sonde_passe_en_echec), puis la relever par livrer."
