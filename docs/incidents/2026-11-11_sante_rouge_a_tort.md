@@ -1,7 +1,7 @@
 # Incident — la santé jugée rouge à tort après une livraison
 
 > Fiche d'incident, courte. Incident **réel, non provoqué**, des 11 et 12 novembre 2026, corrigé le
-> 12 novembre (outil de livraison 0.1.2). Heures en UTC. Sources : le rapport du lot
+> 12 novembre (outil de livraison 0.1.2). Heures en UTC. Ticket : **#59**. Sources : le rapport du lot
 > (`e5_lot1_monitorage_20261112T195153Z`, hors dépôt, section 01) et les journaux de livraison
 > versionnés dans `15_livraison/journal/`.
 
@@ -12,6 +12,8 @@ rouge » alors que la pile était saine : l'outil de livraison lisait l'état de
 avant que Prometheus ait relevé les conteneurs qui venaient de démarrer. Correctif : ne juger une cible
 que sur un relevé postérieur au lever (commit `cb64759`). Depuis, quatre livraisons sur quatre sont
 vertes au premier jugement.
+
+Sévérité : **faible** (aucune indisponibilité).
 
 ## 2. Contexte et nature
 
@@ -35,6 +37,9 @@ seulement sur les conteneurs qui venaient d'être relancés. Le 11 à 18:24:18, 
 rejoué rend **vert**.
 
 ## 4. Impact
+
+**Sévérité : faible ; impact réel : aucune indisponibilité.** Le risque était un retour arrière
+proposé sur une production saine.
 
 **Aucune indisponibilité** : la pile servie était saine. Le risque était le message lui-même : il
 proposait de revenir en arrière sur une production en bon état.
