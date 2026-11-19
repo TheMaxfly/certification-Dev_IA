@@ -1,7 +1,7 @@
 # Incident — la panne de la base n'était pas détectée sans visiteur
 
 > Fiche d'incident. Défaut révélé le 13 novembre 2026, corrigé et livré en production le
-> 17 novembre 2026 (étiquette `e5-incident`). Heures en UTC.
+> 17 novembre 2026 (étiquette `e5-incident`). Heures en UTC. Ticket : **#58**.
 >
 > Les chiffres viennent du rapport du lot (`e5_lot1_monitorage_20261112T195153Z`, hors dépôt),
 > de ses dossiers de preuves (hors dépôt, cités par leur nom) et des journaux de livraison
@@ -18,6 +18,7 @@
 - Preuve : un test automatique qui échoue avant et passe après ; l'incident rejoué sans aucun
   visiteur le 17 novembre, en préproduction puis une fois en production — jauges en 18 à 37 s,
   notifications en 113 à 157 s.
+- Sévérité : **élevée** ; impact réel nul (aucune donnée perdue, aucun utilisateur touché).
 
 ## 2. Contexte et nature
 
@@ -61,6 +62,9 @@ zéro, **jauge figée environ 50 min** à l'ancienne valeur (15:32:38 → 16:22:
 **restée à 1** (elle n'était lue qu'au démarrage et par `/sante`).
 
 ## 4. Impact
+
+**Sévérité : élevée ; impact réel : nul.** Sans visiteur, le service pouvait rester coupé sans que
+personne soit prévenu ; aucune donnée perdue, aucun utilisateur touché.
 
 - **Ce que le serveur arrêté coupait** : les trois services. L'application rendait 503 sur les
   comptes et l'administration ; l'API du modèle, sans base, ne cherchait plus de passages, donc **le
