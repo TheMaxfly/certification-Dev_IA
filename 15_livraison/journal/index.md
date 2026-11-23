@@ -14,3 +14,5 @@ Une ligne par déploiement, retour arrière ou arrêt, écrite par `livrer`
 | 2026-11-12 22:37:02 | production | déploiement | `e4-livraison-journal` | santé rouge | [20261112T223702Z_production_e4-livraison-journal.md](20261112T223702Z_production_e4-livraison-journal.md) |
 | 2026-11-13 14:24:02 | staging | déploiement | `e5-monitorage` | santé verte | [20261113T142402Z_staging_e5-monitorage.md](20261113T142402Z_staging_e5-monitorage.md) |
 | 2026-11-13 16:44:54 | production | déploiement | `e5-monitorage` | santé verte | [20261113T164454Z_production_e5-monitorage.md](20261113T164454Z_production_e5-monitorage.md) |
+| 2026-11-17 01:53:18 | staging | déploiement | `e5-incident` | santé verte | [20261117T015318Z_staging_e5-incident.md](20261117T015318Z_staging_e5-incident.md) |
+| 2026-11-17 02:50:03 | production | déploiement | `e5-incident` | santé verte | [20261117T025003Z_production_e5-incident.md](20261117T025003Z_production_e5-incident.md) |

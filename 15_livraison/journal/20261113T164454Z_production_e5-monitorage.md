@@ -56,3 +56,8 @@
 ## Notes
 
 - Prometheus : 12 s d'attente d'un relevé postérieur au lever (borne 30 s, cibles de Prometheus)
+
+## Arrêt — 2026-11-16 23:49:58 UTC
+
+- `livrer arreter --cible production`, par `maxime`
+- 8 conteneurs (dont 0 en marche) et 9 réseaux avant, 0 et 0 après ; 1 s
